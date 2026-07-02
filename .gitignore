@@ -1,3 +1,7 @@
+# artefactos regenerables (export_xlsx / export_json)
+/demo_results.xlsx
+/results.json
+
 # Julia
 *.jl.cov
 *.jl.*.cov

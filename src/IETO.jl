@@ -11,8 +11,11 @@ using CSV
 using DataFrames
 using YAML
 using JSON3
+import Dates
+import HTTP
 import JuMP
 import HiGHS
+import XLSX
 
 # core: tipos, contrato de datos, validación, unidades
 include("core/units.jl")
@@ -43,12 +46,16 @@ include("results/financials.jl")
 include("results/emissions_summary.jl")
 include("results/results.jl")
 
-# solve: configuración de HiGHS y escenarios predefinidos (SPEC §11-12)
+# solve: configuración de HiGHS, escenarios predefinidos y lote (SPEC §11-12)
 include("solve/solver_config.jl")
 include("solve/run_scenario.jl")
+include("solve/run_batch.jl")
+include("results/pareto.jl")
+include("results/export_results.jl")
 
-# api thin (SPEC §12) — prompt posterior
-include("api/api.jl")
+# api HTTP thin (SPEC §12)
+include("api/routes.jl")
+include("api/server.jl")
 
 # tipos
 export Carrier, Source, Converter, Generator, Storage, Demand, PriceSeries,
@@ -67,10 +74,13 @@ export add_constraints!, add_converter_relations!, add_carrier_balance!,
        add_emissions_constraints!, net_cap_shadow_prices
 # solve + results
 export SolverConfig, configure_solver!, solve!, run_scenario, apply_scenario,
-       with_config, PREDEFINED_SCENARIOS,
+       with_config, PREDEFINED_SCENARIOS, run_batch, pareto_sweep, export_table,
        Results, extract_results, infeasible_results, print_summary,
        extract_dispatch, extract_financials, extract_capacity,
-       extract_emissions_summary, res_share_by_year
+       extract_emissions_summary, res_share_by_year,
+       export_xlsx, export_json, results_payload, scenario_version
+# api
+export start_server, build_router, ApiError
 # unidades
 export HOURS_PER_YEAR, STEPS_PER_YEAR, KW_PER_MW,
        kw_to_mw, mw_to_kw, capex_total, energy_mwh, discount_factor, escalate

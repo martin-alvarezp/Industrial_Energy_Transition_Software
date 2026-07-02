@@ -9,6 +9,7 @@ van vacíos y los agregados en NaN; `status` conserva el estado del solver
 struct Results
     site_name::String
     scenario::Symbol
+    config::ScenarioConfig              # config efectivo (post-override), trazabilidad
     status::Symbol
     feasible::Bool
     horizon_years::Int
@@ -35,6 +36,7 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
     return Results(
         im.site.name,
         scenario,
+        im.config,
         Symbol(JuMP.termination_status(im.model)),
         true,
         im.config.horizon_years,
@@ -53,7 +55,7 @@ end
 "Results vacío para un escenario no resuelto (infactible, time limit, ...)."
 function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
                             status::Symbol)
-    return Results(site.name, scenario, status, false, cfg.horizon_years,
+    return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
                    DataFrame(), DataFrame(), DataFrame(), Float64[])
 end

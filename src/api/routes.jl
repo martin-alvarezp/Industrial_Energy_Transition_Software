@@ -1,0 +1,178 @@
+# Handlers de la API HTTP (SPEC §12): validación de input, ejecución del motor
+# y errores JSON claros. El transporte (router, CORS, serve) vive en server.jl.
+#
+# Endpoints:
+#   GET  /scenarios  → lista de escenarios predefinidos (§11)
+#   POST /scenario   → corre un escenario y devuelve el contrato de
+#                      docs/api_contract.md (results_payload)
+#   POST /pareto     → barre la curva Pareto (§11)
+
+"Error de API con status HTTP; su mensaje llega al cliente como JSON."
+struct ApiError <: Exception
+    status::Int
+    message::String
+    details::Vector{String}
+end
+ApiError(status::Int, message::String) = ApiError(status, message, String[])
+
+const SCENARIO_DESCRIPTIONS = Dict(
+    :bau           => "sin caps de emisiones y sin inversiones nuevas (solo parque existente)",
+    :least_cost    => "mínimo costo sin caps de emisiones",
+    :emissions_cap => "trayectoria de cap neto start → end (caso base, SPEC §8)",
+    :no_offsets    => "caso base sin compra de offsets",
+    :high_gas      => "caso base con precio del gas × 1.5",
+    :high_carbon   => "caso base con precio de carbono × 3 (150 USD/t si el base es 0)",
+    :no_new_fossil => "caso base sin nuevas tecnologías fósiles",
+)
+
+_json_response(status::Int, payload) =
+    HTTP.Response(status, ["Content-Type" => "application/json"],
+                  JSON3.write(payload))
+
+_error_payload(message, details = String[]) =
+    (error = (message = message, details = details),)
+
+"Body JSON obligatorio y de tipo objeto; 400 con mensaje claro si no."
+function _parse_body(req::HTTP.Request)
+    # en HTTP.jl 2.x req.body es un HTTP.BytesBody, no un Vector{UInt8}
+    raw = try
+        String(copy(req.body))
+    catch
+        ""
+    end
+    isempty(strip(raw)) &&
+        throw(ApiError(400, "se requiere un body JSON (objeto)"))
+    body = try
+        JSON3.read(raw)
+    catch
+        throw(ApiError(400, "el body no es JSON válido"))
+    end
+    body isa JSON3.Object ||
+        throw(ApiError(400, "el body debe ser un objeto JSON"))
+    return body
+end
+
+"Nombre de sitio saneado (sin path traversal) y existente en data_dir."
+function _load_site(body, data_dir::AbstractString)
+    haskey(body, :site) ||
+        throw(ApiError(400, "falta el campo 'site' (nombre en $(basename(data_dir))/)"))
+    name = String(body.site)
+    occursin(r"^[A-Za-z0-9_\-]+$", name) ||
+        throw(ApiError(400, "nombre de sitio inválido '$name' (solo letras, números, - y _)"))
+    dir = joinpath(data_dir, name)
+    isdir(dir) || throw(ApiError(404, "sitio '$name' no encontrado en $data_dir"))
+    return load_and_validate(dir)   # SchemaError/ValidationError → 400 (middleware)
+end
+
+_coerce(::Type{Int}, v) = Int(v)
+_coerce(::Type{Float64}, v) = Float64(v)
+_coerce(::Type{Bool}, v) = Bool(v)
+_coerce(::Type{Vector{Symbol}}, v) = Symbol[Symbol(x) for x in v]
+_coerce(::Type{Union{Float64,Nothing}}, v) = v === nothing ? nothing : Float64(v)
+_coerce(::Type{Dict{Symbol,Float64}}, v) =
+    Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
+
+"""
+Aplica `config_overrides` del request sobre el ScenarioConfig del sitio,
+coercionando tipos JSON → Julia campo a campo. Campos desconocidos o valores
+del tipo equivocado → 400.
+"""
+function _apply_overrides(cfg::ScenarioConfig, overrides)
+    overrides === nothing && return cfg
+    overrides isa JSON3.Object ||
+        throw(ApiError(400, "config_overrides debe ser un objeto JSON"))
+    kwargs = Pair{Symbol,Any}[]
+    for (k, v) in pairs(overrides)
+        f = Symbol(k)
+        f in fieldnames(ScenarioConfig) ||
+            throw(ApiError(400, "config_overrides: campo desconocido '$f'",
+                           ["campos válidos: " *
+                            join(fieldnames(ScenarioConfig), ", ")]))
+        coerced = try
+            _coerce(fieldtype(ScenarioConfig, f), v)
+        catch
+            throw(ApiError(400, "config_overrides: valor inválido para '$f' " *
+                                "(se esperaba $(fieldtype(ScenarioConfig, f)))"))
+        end
+        push!(kwargs, f => coerced)
+    end
+    return with_config(cfg; kwargs...)
+end
+
+# ────────────────────────── handlers ──────────────────────────
+
+handle_scenarios(::HTTP.Request) = _json_response(200,
+    (scenarios = [(name = String(s), description = SCENARIO_DESCRIPTIONS[s])
+                  for s in PREDEFINED_SCENARIOS],))
+
+"""
+POST /scenario — body:
+```json
+{"site": "demo", "scenario": "emissions_cap",
+ "config_overrides": {"horizon_years": 10, "...": "..."},
+ "include_dispatch": false}
+```
+Devuelve el contrato de docs/api_contract.md. Un escenario infactible es una
+respuesta 200 válida con `meta.feasible = false` y su diagnóstico.
+"""
+function handle_scenario(req::HTTP.Request, data_dir::AbstractString)
+    body = _parse_body(req)
+    scenario = Symbol(get(body, :scenario, "emissions_cap"))
+    scenario in PREDEFINED_SCENARIOS ||
+        throw(ApiError(400, "escenario desconocido '$scenario'",
+                       ["disponibles: " * join(PREDEFINED_SCENARIOS, ", ")]))
+    include_dispatch = try
+        Bool(get(body, :include_dispatch, false))
+    catch
+        throw(ApiError(400, "include_dispatch debe ser booleano"))
+    end
+
+    site, cfg = _load_site(body, data_dir)
+    cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
+    validate_scenario(cfg, site)   # ValidationError → 400 (middleware)
+
+    r = run_scenario(site, cfg; scenario, verbose = false)
+    return _json_response(200, results_payload(r; site, include_dispatch))
+end
+
+"""
+POST /pareto — body:
+```json
+{"site": "demo", "points": 6, "cap_end_min": 0.0,
+ "config_overrides": {"horizon_years": 5}}
+```
+Devuelve `meta` + `pareto` (una fila por punto del barrido, ver contrato §2).
+"""
+function handle_pareto(req::HTTP.Request, data_dir::AbstractString)
+    body = _parse_body(req)
+    points = try
+        Int(get(body, :points, 6))
+    catch
+        throw(ApiError(400, "points debe ser entero"))
+    end
+    2 <= points <= 50 ||
+        throw(ApiError(400, "points debe estar entre 2 y 50 (recibido: $points)"))
+    cap_end_min = try
+        Float64(get(body, :cap_end_min, 0.0))
+    catch
+        throw(ApiError(400, "cap_end_min debe ser numérico"))
+    end
+
+    site, cfg = _load_site(body, data_dir)
+    cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
+    validate_scenario(cfg, site)
+    cap_end_min <= cfg.emissions_cap_net_start ||
+        throw(ApiError(400, "cap_end_min ($cap_end_min) debe ser ≤ " *
+                            "emissions_cap_net_start ($(cfg.emissions_cap_net_start))"))
+
+    df = pareto_sweep(site, cfg; points, cap_end_min)
+    return _json_response(200, (
+        meta = (site = site.name, scenario = "emissions_cap",
+                horizon_years = cfg.horizon_years,
+                scenario_version = scenario_version(cfg),
+                ieto_version = string(pkgversion(IETO)),
+                generated_at = Dates.format(Dates.now(), "yyyy-mm-ddTHH:MM:SS"),
+                points = points, cap_end_min = cap_end_min),
+        pareto = _json_rows(df),
+    ))
+end
