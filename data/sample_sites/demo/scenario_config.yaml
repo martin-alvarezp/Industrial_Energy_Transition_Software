@@ -1,0 +1,24 @@
+horizon_years: 10
+wacc: 0.08
+
+price_escalation:
+  electricity: 0.02
+  natural_gas: 0.03
+demand_growth: 0.01
+
+# net_end debe superar el piso físico del año 10 (~17.8 kt: PV al máximo,
+# todo el calor en HP, offsets al tope) — 20000 exige descarbonización profunda
+emissions_cap_net_start: 42000
+emissions_cap_net_end: 20000
+emissions_cap_gross: 48000
+
+allow_offsets: true
+max_offset_share: 0.15
+offset_price: 80
+offset_availability: 5000
+carbon_price: 50
+
+# holgado: solo PV al máximo ya cuesta 22.5M (30 MW × 750 USD/kW)
+capex_budget: 40000000
+allow_new_fossil: false
+allowed_techs: [grid_import, gas_boiler, electric_boiler, heat_pump, pv, battery, offsets]

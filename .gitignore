@@ -1,0 +1,10 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/docs/build/
+
+# editores / SO
+.vscode/
+.DS_Store
+Thumbs.db

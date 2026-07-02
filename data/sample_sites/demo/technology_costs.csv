@@ -1,0 +1,8 @@
+tech_id,capex_per_kw,fixed_opex,variable_opex,lifetime_years
+grid_import,0.0,0.0,0.0,40
+gas_boiler,120.0,2000.0,1.1,25
+electric_boiler,150.0,1500.0,0.8,20
+heat_pump,600.0,8000.0,1.5,20
+pv,750.0,12000.0,0.0,30
+battery,350.0,5000.0,0.5,15
+offsets,0.0,0.0,0.0,1

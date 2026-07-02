@@ -1,0 +1,8 @@
+tech_id,name,type,input_carrier,output_carrier,existing_capacity,max_new_capacity,efficiency,investable
+grid_import,Grid connection,source,,electricity,25.0,0.0,1.0,false
+gas_boiler,Gas boiler,converter,natural_gas,hot_water,20.0,0.0,0.9,false
+electric_boiler,Electric boiler,converter,electricity,hot_water,0.0,20.0,0.99,true
+heat_pump,Heat pump,converter,electricity,hot_water,0.0,15.0,3.5,true
+pv,Solar PV,generator,,electricity,0.0,30.0,1.0,true
+battery,Battery storage,storage,electricity,electricity,0.0,10.0,0.95,true
+offsets,Carbon offsets,source,,offsets,0.0,0.0,1.0,false

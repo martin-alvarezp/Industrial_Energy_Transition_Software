@@ -1,0 +1,6 @@
+carrier_id,name,unit,category
+electricity,Electricity,MWh,energy
+natural_gas,Natural gas,MWh,fuel
+hot_water,Hot water,MWh,heat
+co2e,CO2 equivalent,tCO2e,emissions
+offsets,Carbon offsets,tCO2e,offset
