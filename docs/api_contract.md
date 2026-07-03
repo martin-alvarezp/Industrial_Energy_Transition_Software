@@ -163,9 +163,18 @@ con status 400 (input/validación), 404 (sitio o ruta), 405 o 500.
 | Endpoint            | Body (JSON)                                                        | Respuesta 200                                   |
 |---------------------|--------------------------------------------------------------------|-------------------------------------------------|
 | `GET /scenarios`    | —                                                                  | `{"scenarios": [{"name", "description"}, ...]}` |
-| `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true}` | el esquema del §2 (results_payload)             |
-| `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
+| `GET /sites/{name}` | —                                                                  | el sitio completo como JSON (esquema del digital twin, docs/digital_twin_spec.md §7) + `site_version` + `layout` (GeoJSON o null) |
+| `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true, "site_payload": {...}}` | el esquema del §2 (results_payload)             |
+| `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}, "site_payload": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
 | `POST /export/xlsx` | mismo body que `/scenario` (sin flags)                             | binario XLSX (§4) como `attachment`             |
+
+**`site_payload` (digital twin, opcional en los tres POST):** el sitio físico
+completo con el esquema de `GET /sites/{name}` — si viene, reemplaza los CSVs
+del sitio (corrida *stateless* de un twin editado); del sitio en disco solo se
+toma su `scenario_config.yaml` como base para los overrides. El payload pasa
+por `validate_site` (errores → 400 con la lista de problemas). Las respuestas
+con sitio llevan `meta.site_version` (huella de 12 hex del contenido físico:
+mismos datos ⇒ misma huella), complementaria a `scenario_version`.
 
 Notas: `site` es obligatorio (nombre de carpeta en `data/sample_sites/`, sin
 rutas); `scenario` default `emissions_cap`; `config_overrides` acepta

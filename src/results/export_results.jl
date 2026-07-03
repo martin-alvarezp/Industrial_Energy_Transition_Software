@@ -219,8 +219,12 @@ function results_payload(r::Results;
           mw = sum(r.new_capacity.mw[r.new_capacity.tech .== t]))
          for (t, y) in sort(collect(r.investment_year); by = last)] : []
 
+    # trazabilidad del twin: la huella del sitio físico junto a la del config
+    meta = site === nothing ? _meta(r) :
+           merge(_meta(r), (site_version = site_version(site),))
+
     return (
-        meta = _meta(r),
+        meta = meta,
         assumptions = (
             scenario_config = _config_json(r.config),
             log = _json_rows(_assumptions_table(r, site)),

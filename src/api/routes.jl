@@ -53,15 +53,35 @@ function _parse_body(req::HTTP.Request)
 end
 
 "Nombre de sitio saneado (sin path traversal) y existente en data_dir."
-function _load_site(body, data_dir::AbstractString)
-    haskey(body, :site) ||
-        throw(ApiError(400, "falta el campo 'site' (nombre en $(basename(data_dir))/)"))
-    name = String(body.site)
+function _site_dir(name::AbstractString, data_dir::AbstractString)
     occursin(r"^[A-Za-z0-9_\-]+$", name) ||
         throw(ApiError(400, "nombre de sitio inválido '$name' (solo letras, números, - y _)"))
     dir = joinpath(data_dir, name)
     isdir(dir) || throw(ApiError(404, "sitio '$name' no encontrado en $data_dir"))
-    return load_and_validate(dir)   # SchemaError/ValidationError → 400 (middleware)
+    return dir
+end
+
+"""
+Resuelve el sitio y el config base de un request. Si el body trae
+`site_payload` (esquema de docs/digital_twin_spec.md §7), el sitio físico es
+el del payload (digital twin, stateless) y del sitio en disco solo se toma su
+scenario_config.yaml como base; si no, todo viene del disco.
+"""
+function _load_site(body, data_dir::AbstractString)
+    haskey(body, :site) ||
+        throw(ApiError(400, "falta el campo 'site' (nombre en $(basename(data_dir))/)"))
+    dir = _site_dir(String(body.site), data_dir)
+
+    payload = get(body, :site_payload, nothing)
+    payload === nothing && return load_and_validate(dir)
+
+    payload isa JSON3.Object ||
+        throw(ApiError(400, "site_payload debe ser un objeto JSON " *
+                            "(esquema en docs/digital_twin_spec.md §7)"))
+    site = site_from_json(payload; default_name = String(body.site))
+    cfg = load_scenario_config(dir)
+    validate_site(site)   # ValidationError → 400 con la lista de problemas
+    return site, cfg
 end
 
 _coerce(::Type{Int}, v) = Int(v)
@@ -106,6 +126,22 @@ handle_scenarios(::HTTP.Request) = _json_response(200,
                   for s in PREDEFINED_SCENARIOS],))
 
 """
+GET /sites/{name} — el sitio completo como JSON (esquema §7 del digital twin):
+el estado inicial de la tab Sitio. Incluye `layout` (GeoJSON de
+layout.geojson) si existe; null si no.
+"""
+function handle_get_site(req::HTTP.Request, data_dir::AbstractString)
+    name = get(HTTP.getparams(req), "name", "")
+    dir = _site_dir(name, data_dir)
+    site, _ = load_and_validate(dir)
+    layout_path = joinpath(dir, "layout.geojson")
+    layout = isfile(layout_path) ? JSON3.read(read(layout_path, String)) : nothing
+    return _json_response(200,
+        merge(site_json(site), (site_version = site_version(site),
+                                layout = layout)))
+end
+
+"""
 POST /scenario — body:
 ```json
 {"site": "demo", "scenario": "emissions_cap",
@@ -131,6 +167,9 @@ function handle_scenario(req::HTTP.Request, data_dir::AbstractString)
     r = run_scenario(site, cfg; scenario, verbose = false, shadow_prices)
     return _json_response(200, results_payload(r; site, include_dispatch))
 end
+
+# nota: results_payload agrega meta.site_version cuando recibe el site, así
+# las corridas del twin quedan trazables aunque no exista en disco.
 
 _bool_field(body, key::Symbol, default::Bool) = try
     Bool(get(body, key, default))
@@ -201,6 +240,7 @@ function handle_pareto(req::HTTP.Request, data_dir::AbstractString)
         meta = (site = site.name, scenario = "emissions_cap",
                 horizon_years = cfg.horizon_years,
                 scenario_version = scenario_version(cfg),
+                site_version = site_version(site),
                 ieto_version = string(pkgversion(IETO)),
                 generated_at = Dates.format(Dates.now(), "yyyy-mm-ddTHH:MM:SS"),
                 points = points, cap_end_min = cap_end_min),
