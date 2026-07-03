@@ -366,6 +366,30 @@ input:disabled { background: var(--page); color: var(--muted); }
   font-weight: 570;
 }
 
+/* ── editor de series (fase 3) ── */
+.series-row { border-top: 1px solid var(--grid); padding: 6px 0; }
+.series-row:first-of-type { border-top: none; }
+.series-head { display: flex; align-items: center; gap: 8px; }
+.series-name {
+  flex: 1; text-align: left; border: none; background: none; font: inherit;
+  font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; padding: 4px 0;
+}
+.series-caret { color: var(--muted); font-size: 11px; margin-right: 2px; }
+.series-stats { font-size: 11.5px; font-weight: 450; color: var(--muted); }
+.series-body { padding: 4px 0 10px 16px; }
+.series-seasons {
+  display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px;
+  color: var(--ink-2); margin: 4px 0 10px;
+}
+.series-actions { display: grid; grid-template-columns: 1fr 1.3fr; gap: 14px; }
+@media (max-width: 700px) { .series-actions { grid-template-columns: 1fr; } }
+.series-mode label {
+  display: block; font-size: 11px; font-weight: 620; color: var(--muted);
+  margin-bottom: 5px;
+}
+.series-mode input[type="file"] { font-size: 11.5px; }
+.series-csv-ok { margin-top: 8px; }
+
 /* leaflet: que el chrome del mapa combine con el producto */
 .leaflet-container { font-family: var(--font); }
 .leaflet-control-layers { border-radius: 10px !important; border: 1px solid var(--border) !important; }

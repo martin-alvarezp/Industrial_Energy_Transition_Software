@@ -5,7 +5,9 @@
 //   node scripts/twin_e2e.mjs <url> <screenshot_dir>
 
 import puppeteer from "puppeteer-core";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const [url = "http://localhost:4173/?tab=site", shots = "."] = process.argv.slice(2);
 const EDGE = [
@@ -71,6 +73,40 @@ try {
   await page.screenshot({ path: `${shots}/twin_created.png` });
   ok("screenshots guardados");
 
+  // 4b · FASE 3: CSV horario de 8760 valores → agregado a 96 pasos
+  // patrón conocido: valor = hora del día (0..23) ⇒ los 96 pasos quedan 0..23
+  const csvPath = join(tmpdir(), "ieto_e2e_8760.csv");
+  writeFileSync(csvPath,
+    "valor\n" + Array.from({ length: 8760 }, (_, i) => i % 24).join("\n"));
+  const rowSel = '.series-row[data-series="prices:grid_export"]';
+  await page.click(`${rowSel} .series-name`);
+  const fileInput = await page.$(`${rowSel} .series-csv-input`);
+  await fileInput.uploadFile(csvPath);
+  await page.waitForSelector(`${rowSel} .series-csv-ok`);
+  const aggMsg = await page.$eval(`${rowSel} .series-csv-ok`,
+                                  (el) => el.textContent);
+  ok("CSV 8760 agregado: " + aggMsg.trim().slice(0, 90));
+
+  // 4c · FASE 3: valor plano para todo el año (gas a 40 USD/MWh)
+  const gasSel = '.series-row[data-series="prices:natural_gas"]';
+  await page.click(`${gasSel} .series-name`);
+  await page.type(`${gasSel} .series-flat-input`, "40");
+  await page.click(`${gasSel} .series-flat-apply`);
+  await new Promise((r) => setTimeout(r, 300));
+  const gasStats = await page.$eval(`${gasSel} .series-stats`,
+                                    (el) => el.textContent);
+  gasStats.includes("prom 40") ? ok("valor plano aplicado: " + gasStats.trim()) :
+    fail("el plano no se aplicó: " + gasStats);
+
+  // ambos cambios visibles en el payload serializado
+  const state2 = await page.$eval(".twin-json", (el) => el.textContent);
+  state2.includes("[96 valores: 0.0 … 23.0]") ?
+    ok("payload: grid_export agregado del CSV (0.0 … 23.0)") :
+    fail("grid_export no refleja el CSV");
+  state2.includes("[96 valores: 40.0 … 40.0]") ?
+    ok("payload: natural_gas plano (40.0 … 40.0)") :
+    fail("natural_gas no refleja el plano");
+
   // 5 · FASE 4: validar el twin editado (dry-run, sin solve)
   await page.evaluate(() => {
     [...document.querySelectorAll("button")]
@@ -98,4 +134,4 @@ try {
 } finally {
   await browser.close();
 }
-console.log("DEF-DE-HECHO FASES 2+4: OK");
+console.log("DEF-DE-HECHO FASES 2+3+4: OK");

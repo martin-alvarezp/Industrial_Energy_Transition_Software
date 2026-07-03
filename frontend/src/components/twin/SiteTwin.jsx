@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import TwinMap from "./TwinMap.jsx";
 import AddressSearch from "./AddressSearch.jsx";
 import EquipmentDrawer from "./EquipmentDrawer.jsx";
+import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
   removeTech, polygonAreaM2, serializedPreview,
@@ -35,6 +36,8 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
   const { siteJson, layout, source } = twin;
   const patch = (p) => setTwin((t) => ({ ...t, dirty: true, ...p }));
   const patchLayout = (p) => patch({ layout: { ...layout, ...p } });
+  const patchSite = (fn) =>
+    setTwin((t) => ({ ...t, dirty: true, siteJson: fn(t.siteJson) }));
 
   const onMapClick = (pos, m) => {
     if (m === "draw") {
@@ -82,6 +85,7 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
     .filter((id) => siteJson.technologies.some((t) => t.tech_id === id)).length;
 
   return (
+    <>
     <div className="twin-layout">
       <div className="twin-map-col">
         {mode === "draw" && (
@@ -269,5 +273,8 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
         />
       )}
     </div>
+
+    <SeriesEditor siteJson={siteJson} patchSite={patchSite} />
+    </>
   );
 }
