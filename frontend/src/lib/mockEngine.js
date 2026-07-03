@@ -382,3 +382,89 @@ export const TECH_LABELS = {
 };
 
 export { SEASONS };
+
+// ── site_json mock (fallback del twin sin API): réplica del demo del backend ──
+
+const EN_SEASONS = ["winter", "spring", "summer", "autumn"];
+const SF = { elec: [1.15, 1.0, 0.95, 1.05], heat: [1.6, 1.0, 0.45, 1.1],
+             pv: [0.35, 0.55, 0.65, 0.45] };
+
+function series96(fn) {
+  const out = [];
+  for (let s = 0; s < 4; s++) for (let h = 0; h < 24; h++) out.push(+fn(s, h).toFixed(3));
+  return out;
+}
+
+/** El demo como site_json (mismo esquema de GET /sites/demo). */
+export function mockSiteJson() {
+  const ehf = (h) => (h >= 8 && h <= 19 ? 1.3 : h >= 20 && h <= 22 ? 1.1 : 0.8);
+  const hhf = (h) => (h >= 6 && h <= 9 ? 1.3 : h >= 10 && h <= 18 ? 1.0 : 0.85);
+  const tech = (o) => ({ input_carrier: null, storage_hours: null, ...o });
+  return {
+    name: "demo",
+    timesteps: EN_SEASONS.flatMap((se, s) =>
+      Array.from({ length: 24 }, (_, h) =>
+        ({ step_id: s * 24 + h + 1, season: se, hour: h, weight_hours: 91.25 }))),
+    carriers: [
+      { carrier_id: "co2e", name: "CO2 equivalent", unit: "tCO2e", category: "emissions" },
+      { carrier_id: "electricity", name: "Electricity", unit: "MWh", category: "energy" },
+      { carrier_id: "hot_water", name: "Hot water", unit: "MWh", category: "heat" },
+      { carrier_id: "natural_gas", name: "Natural gas", unit: "MWh", category: "fuel" },
+      { carrier_id: "offsets", name: "Carbon offsets", unit: "tCO2e", category: "offset" },
+    ],
+    technologies: [
+      tech({ tech_id: "battery", name: "Battery storage", type: "storage",
+             input_carrier: "electricity", output_carrier: "electricity",
+             existing_capacity: 0, max_new_capacity: 10, efficiency: 0.95,
+             investable: true, capex_per_kw: 350, fixed_opex: 5000,
+             variable_opex: 0.5, lifetime_years: 15, storage_hours: 4 }),
+      tech({ tech_id: "electric_boiler", name: "Electric boiler", type: "converter",
+             input_carrier: "electricity", output_carrier: "hot_water",
+             existing_capacity: 0, max_new_capacity: 20, efficiency: 0.99,
+             investable: true, capex_per_kw: 150, fixed_opex: 1500,
+             variable_opex: 0.8, lifetime_years: 20 }),
+      tech({ tech_id: "gas_boiler", name: "Gas boiler", type: "converter",
+             input_carrier: "natural_gas", output_carrier: "hot_water",
+             existing_capacity: 20, max_new_capacity: 0, efficiency: 0.9,
+             investable: false, capex_per_kw: 120, fixed_opex: 2000,
+             variable_opex: 1.1, lifetime_years: 25 }),
+      tech({ tech_id: "grid_import", name: "Grid connection", type: "source",
+             output_carrier: "electricity", existing_capacity: 25,
+             max_new_capacity: 0, efficiency: 1, investable: false,
+             capex_per_kw: 0, fixed_opex: 0, variable_opex: 0, lifetime_years: 40 }),
+      tech({ tech_id: "heat_pump", name: "Heat pump", type: "converter",
+             input_carrier: "electricity", output_carrier: "hot_water",
+             existing_capacity: 0, max_new_capacity: 15, efficiency: 3.5,
+             investable: true, capex_per_kw: 600, fixed_opex: 8000,
+             variable_opex: 1.5, lifetime_years: 20 }),
+      tech({ tech_id: "offsets", name: "Carbon offsets", type: "source",
+             output_carrier: "offsets", existing_capacity: 0, max_new_capacity: 0,
+             efficiency: 1, investable: false, capex_per_kw: 0, fixed_opex: 0,
+             variable_opex: 0, lifetime_years: 1 }),
+      tech({ tech_id: "pv", name: "Solar PV", type: "generator",
+             output_carrier: "electricity", existing_capacity: 0,
+             max_new_capacity: 30, efficiency: 1, investable: true,
+             capex_per_kw: 750, fixed_opex: 12000, variable_opex: 0,
+             lifetime_years: 30 }),
+    ],
+    demands: {
+      electricity: series96((s, h) => 8 * ehf(h) * SF.elec[s]),
+      hot_water: series96((s, h) => 9 * hhf(h) * SF.heat[s]),
+    },
+    prices: {
+      electricity: series96((s, h) => (h >= 8 && h <= 20 ? 95 : 55) + (s === 0 ? 10 : 0)),
+      grid_export: series96(() => 45),
+      natural_gas: series96(() => 38),
+    },
+    generation_profiles: {
+      pv: series96((s, h) =>
+        h >= 6 && h <= 18 ? SF.pv[s] * Math.sin((Math.PI * (h - 6)) / 12) : 0),
+    },
+    emission_factors: [
+      { carrier_id: "electricity", scope: "scope2", factor: 0.3 },
+      { carrier_id: "natural_gas", scope: "scope1", factor: 0.202 },
+    ],
+    site_version: "mock",
+    layout: null,
+  };
+}

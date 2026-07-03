@@ -3,7 +3,7 @@
 
 import {
   runScenario as mockScenario, runBau as mockBau,
-  runPareto as mockPareto, runBatch as mockBatch,
+  runPareto as mockPareto, runBatch as mockBatch, mockSiteJson,
 } from "./mockEngine.js";
 
 const API_BASE = import.meta.env.VITE_IETO_API ?? "http://127.0.0.1:8080";
@@ -119,6 +119,22 @@ export async function compute(cfg) {
     }
   }
   return computeViaMock(cfg);
+}
+
+/**
+ * GET /sites/{name}: el sitio completo como site_json (estado inicial del
+ * digital twin). Sin API → réplica mock del demo.
+ */
+export async function fetchSite(name = "demo") {
+  if (await apiAvailable()) {
+    try {
+      const resp = await fetch(`${API_BASE}/sites/${encodeURIComponent(name)}`);
+      if (resp.ok) return { source: "api", site: await resp.json() };
+    } catch (err) {
+      console.warn("GET /sites falló, usando mock:", err);
+    }
+  }
+  return { source: "mock", site: mockSiteJson() };
 }
 
 /** Descarga del Excel (POST /export/xlsx → blob). Solo en modo API. */

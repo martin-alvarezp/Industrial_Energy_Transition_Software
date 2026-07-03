@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
 import Cockpit from "./components/Cockpit.jsx";
 import Explorer from "./components/Explorer.jsx";
+import SiteTwin from "./components/twin/SiteTwin.jsx";
 import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
-import { compute, computeViaMock } from "./lib/api.js";
+import { compute, computeViaMock, fetchSite } from "./lib/api.js";
 
 const TABS = [
+  { id: "site", label: "Sitio" },
   { id: "builder", label: "Escenario" },
   { id: "cockpit", label: "Cockpit" },
   { id: "explorer", label: "Explorador" },
@@ -23,6 +25,8 @@ export default function App() {
   const [running, setRunning] = useState(false);
   // primer render instantáneo con mock; la API (si está viva) lo reemplaza
   const [data, setData] = useState(() => computeViaMock(DEFAULT_CONFIG));
+  // digital twin (tab Sitio): site_json + capa geográfica local
+  const [twin, setTwin] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -32,6 +36,16 @@ export default function App() {
       setData(d);
       setApplied(DEFAULT_CONFIG);
       setRunning(false);
+    });
+    fetchSite("demo").then(({ source, site }) => {
+      if (!alive) return;
+      const { layout, ...siteJson } = site;
+      setTwin({
+        siteJson, source, dirty: false,
+        // el layout persistido (GeoJSON, fase 5) aún no existe: estado local
+        layout: layout?.equipment ? layout :
+                { address: null, center: null, boundary: null, equipment: {} },
+      });
     });
     return () => { alive = false; };
   }, []);
@@ -99,6 +113,16 @@ export default function App() {
       </header>
 
       <main className="app-main">
+        {tab === "site" && (
+          <>
+            <p className="section-label">
+              Digital twin — mapea tu sitio y sus equipos (los cambios corren
+              como site_payload)
+            </p>
+            <SiteTwin twin={twin} setTwin={setTwin} />
+          </>
+        )}
+
         {tab === "builder" && (
           <>
             <p className="section-label">Construcción del escenario</p>
