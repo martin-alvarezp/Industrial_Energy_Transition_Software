@@ -27,6 +27,8 @@ export default function App() {
   const [data, setData] = useState(() => computeViaMock(DEFAULT_CONFIG));
   // digital twin (tab Sitio): site_json + capa geográfica local
   const [twin, setTwin] = useState(null);
+  // el site_payload que se usó en la corrida vigente (null = sitio de disco)
+  const [appliedPayload, setAppliedPayload] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -57,14 +59,17 @@ export default function App() {
 
   const onRun = useCallback(() => {
     const cfg = draft;
+    // twin con ediciones → viaja como site_payload en todas las corridas
+    const payload = twin?.dirty ? twin.siteJson : null;
     setRunning(true);
-    compute(cfg).then((d) => {
+    compute(cfg, payload).then((d) => {
       setData(d);
       setApplied(cfg);
+      setAppliedPayload(payload);
       setRunning(false);
       setTab("cockpit");
     });
-  }, [draft]);
+  }, [draft, twin]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -96,7 +101,10 @@ export default function App() {
               {result.meta.status}
             </span>
             <span className="chip mono">v.{result.meta.scenario_version}</span>
-            <span className="chip">sitio {result.meta.site} · {result.meta.horizon_years} años</span>
+            <span className="chip">
+              sitio {result.meta.site}
+              {appliedPayload ? " (twin editado)" : ""} · {result.meta.horizon_years} años
+            </span>
           </div>
         </div>
         <nav className="tabs">
@@ -119,7 +127,11 @@ export default function App() {
               Digital twin — mapea tu sitio y sus equipos (los cambios corren
               como site_payload)
             </p>
-            <SiteTwin twin={twin} setTwin={setTwin} />
+            <SiteTwin
+              twin={twin} setTwin={setTwin}
+              config={applied} onRun={onRun} running={running}
+              twinIgnored={data.twinIgnored}
+            />
           </>
         )}
 
@@ -133,7 +145,7 @@ export default function App() {
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
               <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
-              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} />
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} />
             </div>
           </>
         )}
@@ -141,7 +153,7 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
-            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} />
+            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} />
           </div>
         )}
 

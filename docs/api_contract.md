@@ -167,6 +167,7 @@ con status 400 (input/validación), 404 (sitio o ruta), 405 o 500.
 | `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true, "site_payload": {...}}` | el esquema del §2 (results_payload)             |
 | `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}, "site_payload": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
 | `POST /export/xlsx` | mismo body que `/scenario` (sin flags)                             | binario XLSX (§4) como `attachment`             |
+| `POST /validate`    | `{"site": "demo", "site_payload": {...}, "config_overrides": {...}}` | dry-run sin solve: `{"valid": true, "site_version", "n_techs", "n_steps"}`; 400 con problemas si es inconsistente |
 
 **`site_payload` (digital twin, opcional en los tres POST):** el sitio físico
 completo con el esquema de `GET /sites/{name}` — si viene, reemplaza los CSVs

@@ -142,6 +142,21 @@ end
         @test bad2.status == 400
         @test !isempty(JSON3.read(bad2.body).error.details)
 
+        # ── POST /validate: dry-run del twin sin resolver (fase 4) ──
+        v = post("/validate", (site = "demo", site_payload = p,
+                               config_overrides = overrides))
+        @test v.status == 200
+        vb = JSON3.read(v.body)
+        @test vb.valid === true
+        @test vb.site_version == p.site_version
+        @test vb.n_techs == 7
+        vbad = post("/validate", (site = "demo", site_payload = p_bad))
+        @test vbad.status == 400
+        @test !isempty(JSON3.read(vbad.body).error.details)
+        vbad2 = post("/validate", (site = "demo",
+                                   config_overrides = (horizon_years = 0,)))
+        @test vbad2.status == 400
+
         # ── pareto y export también aceptan el twin ──
         pr = post("/pareto", (site = "demo", points = 2, cap_end_min = 30_000.0,
                               config_overrides = overrides, site_payload = p))

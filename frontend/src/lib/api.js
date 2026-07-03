@@ -20,8 +20,9 @@ async function post(path, body, { timeoutMs = 120_000 } = {}) {
     });
     const payload = await resp.json();
     if (!resp.ok) {
-      const msg = payload?.error?.message ?? `HTTP ${resp.status}`;
-      throw new Error(`${path}: ${msg}`);
+      const err = new Error(payload?.error?.message ?? `${path}: HTTP ${resp.status}`);
+      err.details = payload?.error?.details ?? [];
+      throw err;
     }
     return payload;
   } finally {
@@ -57,18 +58,25 @@ export async function apiAvailable() {
   }
 }
 
-/** Corre todo lo que la UI necesita contra la API real (en paralelo). */
-export async function computeViaApi(cfg) {
+/**
+ * Corre todo lo que la UI necesita contra la API real (en paralelo).
+ * `sitePayload` (digital twin editado) viaja como site_payload en TODAS las
+ * corridas — escenario, referencia, comparación y pareto — para que los Δ
+ * comparen el mismo sitio físico.
+ */
+export async function computeViaApi(cfg, sitePayload = null) {
   const overrides = toOverrides(cfg);
   const site = "demo";
+  const payload = sitePayload ? { site_payload: sitePayload } : {};
   const run = (scenario, extra = {}) =>
-    post("/scenario", { site, scenario, config_overrides: overrides, ...extra });
+    post("/scenario", { site, scenario, config_overrides: overrides,
+                        ...payload, ...extra });
 
   const compareNames = ["bau", "least_cost", "emissions_cap", "no_offsets",
                         "high_gas", "high_carbon"];
   const [result, paretoResp, ...compare] = await Promise.all([
     run(scenarioName(cfg), { include_dispatch: true, shadow_prices: true }),
-    post("/pareto", { site, points: 9, config_overrides: overrides }),
+    post("/pareto", { site, points: 9, config_overrides: overrides, ...payload }),
     ...compareNames.map((s) => run(s, { shadow_prices: false })),
   ]);
 
@@ -110,15 +118,35 @@ export function computeViaMock(cfg) {
 }
 
 /** API si responde; si no, mock (la UI muestra la fuente). */
-export async function compute(cfg) {
+export async function compute(cfg, sitePayload = null) {
   if (await apiAvailable()) {
     try {
-      return await computeViaApi(cfg);
+      return await computeViaApi(cfg, sitePayload);
     } catch (err) {
       console.warn("IETO API falló, usando mock:", err);
     }
   }
-  return computeViaMock(cfg);
+  // el mock no consume ediciones del twin: se marca para que la UI lo diga
+  return { ...computeViaMock(cfg), twinIgnored: !!sitePayload };
+}
+
+/**
+ * POST /validate: dry-run del twin (sin resolver). Devuelve
+ * `{ok, site_version?, problems[]}`; ok=null si no hay API.
+ */
+export async function validateTwin(sitePayload, cfg) {
+  if (!(await apiAvailable()))
+    return { ok: null, problems: ["la validación del twin requiere la API real"] };
+  try {
+    const out = await post("/validate", {
+      site: "demo",
+      site_payload: sitePayload,
+      config_overrides: toOverrides(cfg),
+    });
+    return { ok: true, site_version: out.site_version, problems: [] };
+  } catch (err) {
+    return { ok: false, problems: err.details ?? [err.message] };
+  }
 }
 
 /**
@@ -138,7 +166,7 @@ export async function fetchSite(name = "demo") {
 }
 
 /** Descarga del Excel (POST /export/xlsx → blob). Solo en modo API. */
-export async function downloadXlsx(cfg) {
+export async function downloadXlsx(cfg, sitePayload = null) {
   const resp = await fetch(API_BASE + "/export/xlsx", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -146,6 +174,7 @@ export async function downloadXlsx(cfg) {
       site: "demo",
       scenario: scenarioName(cfg),
       config_overrides: toOverrides(cfg),
+      ...(sitePayload ? { site_payload: sitePayload } : {}),
     }),
   });
   if (!resp.ok) {

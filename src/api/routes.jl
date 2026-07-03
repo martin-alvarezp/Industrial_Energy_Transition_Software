@@ -178,6 +178,25 @@ catch
 end
 
 """
+POST /validate — dry-run del twin sin resolver: valida el sitio (payload o
+disco) y el config con overrides. 200 = todo consistente; 400 con la lista de
+problemas si no. Es lo que respalda el botón [Validar] de la tab Sitio.
+"""
+function handle_validate(req::HTTP.Request, data_dir::AbstractString)
+    body = _parse_body(req)
+    site, cfg = _load_site(body, data_dir)   # payload: SchemaError/ValidationError → 400
+    cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
+    validate_scenario(cfg, site)
+    return _json_response(200, (
+        valid = true,
+        site = site.name,
+        site_version = site_version(site),
+        n_techs = length(all_tech_ids(site)),
+        n_steps = n_steps(site),
+    ))
+end
+
+"""
 POST /export/xlsx — mismo body que /scenario (sin include_dispatch). Corre el
 escenario y responde el workbook XLSX de 8 hojas (docs/api_contract.md §4)
 como descarga binaria. Un escenario infactible también exporta (meta +

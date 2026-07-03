@@ -70,7 +70,32 @@ try {
 
   await page.screenshot({ path: `${shots}/twin_created.png` });
   ok("screenshots guardados");
+
+  // 5 · FASE 4: validar el twin editado (dry-run, sin solve)
+  await page.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((b) => b.textContent.trim() === "Validar")?.click();
+  });
+  await page.waitForSelector(".twin-valid", { timeout: 20_000 });
+  const valid = await page.$eval(".twin-valid", (el) => el.textContent);
+  valid.includes("sitio consistente") ?
+    ok("POST /validate: " + valid.trim()) : fail("validación falló: " + valid);
+
+  // 6 · FASE 4: ejecutar con el twin editado → cockpit del twin
+  await page.click(".twin-run");
+  await page.waitForSelector(".kpi-grid", { timeout: 120_000 });
+  await page.waitForFunction(
+    () => !document.querySelector(".busy"), { timeout: 120_000 });
+  const chips = await page.$eval(".meta-chips", (el) => el.textContent);
+  chips.includes("twin editado") ?
+    ok("cockpit corriendo el twin editado (chip 'twin editado')") :
+    fail("el cockpit no indica twin editado: " + chips);
+  chips.includes("OPTIMAL") ? ok("estado OPTIMAL con el sitio editado") :
+    fail("estado no OPTIMAL: " + chips);
+  const van = await page.$eval(".kpi .value", (el) => el.textContent);
+  ok(`VAN del twin: ${van}`);
+  await page.screenshot({ path: `${shots}/twin_cockpit.png` });
 } finally {
   await browser.close();
 }
-console.log("DEF-DE-HECHO FASE 2: OK");
+console.log("DEF-DE-HECHO FASES 2+4: OK");

@@ -6,6 +6,7 @@ import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
   removeTech, polygonAreaM2, serializedPreview,
 } from "../../lib/twin.js";
+import { validateTwin } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
 
 const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar dirección
@@ -15,11 +16,13 @@ const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar di
  * satelital con límites del sitio y equipos georreferenciados, editor
  * completo de equipos, y el site_json serializado listo para site_payload.
  */
-export default function SiteTwin({ twin, setTwin }) {
+export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIgnored }) {
   const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>"
   const [draftBoundary, setDraftBoundary] = useState([]);
   const [drawer, setDrawer] = useState(null);        // {tech, isNew}
   const [selectedId, setSelectedId] = useState(null);
+  const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
+  const [validating, setValidating] = useState(false);
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -65,6 +68,13 @@ export default function SiteTwin({ twin, setTwin }) {
             layout: { ...layout, equipment } });
     setDrawer(null);
     setSelectedId(null);
+  };
+
+  const doValidate = () => {
+    setValidating(true);
+    validateTwin(siteJson, config)
+      .then(setValidation)
+      .finally(() => setValidating(false));
   };
 
   const area = polygonAreaM2(layout.boundary);
@@ -190,6 +200,39 @@ export default function SiteTwin({ twin, setTwin }) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="card">
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="chart-toggle" onClick={doValidate}
+                    disabled={validating}>
+              {validating ? "Validando…" : "Validar"}
+            </button>
+            <button className="btn-run twin-run" style={{ flex: 1 }}
+                    onClick={onRun} disabled={running}>
+              {running ? "Optimizando…" : "Ejecutar con este sitio → Cockpit"}
+            </button>
+          </div>
+          {validation && (
+            <div className={validation.ok ? "twin-valid" : "drawer-problems"}
+                 style={{ marginTop: 10 }}>
+              {validation.ok
+                ? `✓ sitio consistente · huella ${validation.site_version}`
+                : validation.problems.map((p) => <div key={p}>• {p}</div>)}
+            </div>
+          )}
+          {twinIgnored && (
+            <p className="hint warn" style={{ marginTop: 8 }}>
+              La última corrida fue con datos mock: las ediciones del twin
+              requieren la API real levantada.
+            </p>
+          )}
+          {source !== "api" && (
+            <p className="hint" style={{ marginTop: 8 }}>
+              Sin API: puedes mapear y editar, pero ejecutar el twin editado
+              requiere el backend en 127.0.0.1:8080.
+            </p>
+          )}
         </div>
 
         <div className="card">
