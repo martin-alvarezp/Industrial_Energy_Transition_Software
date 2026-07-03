@@ -38,7 +38,9 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
 
     grid = get(site.sources, :grid_import, nothing)
     grid_carrier = grid === nothing ? :electricity : grid.output_carrier
-    import_limit = grid === nothing ? 0.0 : grid.existing_capacity
+    grid_allowed = grid !== nothing &&
+                   (isempty(cfg.allowed_techs) || :grid_import in cfg.allowed_techs)
+    import_limit = grid_allowed ? grid.existing_capacity : 0.0
     ef2 = _factor(site, grid_carrier, :scope2)
 
     # ── 1 · capacidad pico por carrier ──

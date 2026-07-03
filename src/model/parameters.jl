@@ -105,8 +105,12 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
 
     cap_net = [emissions_cap_net(cfg, y) for y in years]
 
+    # la red respeta allowed_techs igual que el resto: excluir :grid_import
+    # del escenario deja los límites de import/export en 0 (isla eléctrica)
     grid = get(site.sources, :grid_import, nothing)
-    grid_limit = grid === nothing ? 0.0 : grid.existing_capacity
+    grid_allowed = grid !== nothing &&
+                   (isempty(cfg.allowed_techs) || :grid_import in cfg.allowed_techs)
+    grid_limit = grid_allowed ? grid.existing_capacity : 0.0
     # MVP: el límite de export es la misma capacidad de conexión que el import.
     export_limit = grid_limit
 
