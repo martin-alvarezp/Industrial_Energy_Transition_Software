@@ -105,3 +105,43 @@ _body(resp) = JSON3.read(resp.body)
         close(server)
     end
 end
+
+@testset "api: frontend estático desde el mismo proceso (lanzador)" begin
+    static = mktempdir()
+    write(joinpath(static, "index.html"), "<html><body>IETO UI</body></html>")
+    mkpath(joinpath(static, "assets"))
+    write(joinpath(static, "assets", "app.js"), "console.log('ieto')")
+
+    server = start_server(; port = 8165,
+                          data_dir = joinpath(@__DIR__, "..", "data", "sample_sites"),
+                          static_dir = static, verbose = false)
+    api = "http://127.0.0.1:8165"
+    try
+        # raíz → index.html
+        r = HTTP.get(api * "/"; status_exception = false)
+        @test r.status == 200
+        @test startswith(HTTP.header(r, "Content-Type"), "text/html")
+        @test occursin("IETO UI", String(r.body))
+
+        # asset con su content-type
+        r2 = HTTP.get(api * "/assets/app.js"; status_exception = false)
+        @test r2.status == 200
+        @test HTTP.header(r2, "Content-Type") == "text/javascript"
+
+        # ruta SPA (sin extensión) → index; asset inexistente → 404
+        @test occursin("IETO UI",
+            String(HTTP.get(api * "/cualquier/ruta"; status_exception = false).body))
+        @test HTTP.get(api * "/assets/no.js"; status_exception = false).status == 404
+
+        # path traversal bloqueado
+        @test HTTP.get(api * "/../Project.toml";
+                       status_exception = false).status in (400, 404)
+
+        # la API sigue ganando sobre el estático
+        sc = HTTP.get(api * "/scenarios"; status_exception = false)
+        @test sc.status == 200
+        @test startswith(HTTP.header(sc, "Content-Type"), "application/json")
+    finally
+        close(server)
+    end
+end

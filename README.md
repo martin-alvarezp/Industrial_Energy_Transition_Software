@@ -63,6 +63,30 @@ export_xlsx(r, "demo_results.xlsx"; site, pareto = curve)
 export_json(r, "results.json"; site)
 ```
 
+## App de escritorio (Windows) — para usuarios no técnicos
+
+Un solo instalador deja IETO como un programa con icono en el Escritorio:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File launcher\install.ps1
+```
+
+Eso prepara el backend (deps + precompilación), compila el frontend, genera
+el icono y crea **dos accesos directos**:
+
+- **IETO** — doble click: levanta el motor en segundo plano (si no está) y
+  abre la app en una ventana propia (Edge en modo app, sin navegador visible).
+  La primera apertura tarda ~30-60 s (muestra una pantalla de arranque); las
+  siguientes son inmediatas porque el motor queda corriendo.
+- **IETO (actualizar)** — correr después de cada actualización del código:
+  reconstruye todo y los accesos directos quedan apuntando al código nuevo.
+
+Detalles: el programa es **un solo proceso** (el servidor Julia sirve la API
+y la UI compilada en `http://127.0.0.1:8080`); `launcher\Detener-IETO.ps1`
+apaga solo ese proceso; el diagnóstico del lanzador queda en
+`launcher\ieto-launcher.log`. Requisito: el repo no debe vivir en una ruta
+con espacios.
+
 ## Correr el frontend
 
 ```bash

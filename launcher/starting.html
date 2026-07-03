@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>IETO · iniciando</title>
+<style>
+  body {
+    margin: 0; height: 100vh; display: flex; align-items: center;
+    justify-content: center; font-family: system-ui, "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #082e2a, #0b3d38 55%, #0e564d);
+    color: #f2f7f5;
+  }
+  .box { text-align: center; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: 0.3px; }
+  h1 span { opacity: 0.5; font-weight: 300; margin: 0 10px; }
+  p { color: rgba(242,247,245,0.75); font-size: 13.5px; margin: 6px 0; }
+  .spin {
+    width: 44px; height: 44px; margin: 26px auto 18px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.18); border-top-color: #6fd0b4;
+    animation: r 0.9s linear infinite;
+  }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .hint { font-size: 11.5px; color: rgba(242,247,245,0.5); margin-top: 22px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spin"></div>
+    <h1>IETO<span>·</span>Executive Cockpit</h1>
+    <p id="msg">Iniciando el optimizador…</p>
+    <p class="hint">La primera vez puede tardar cerca de un minuto
+      (compilación del motor). Las siguientes, unos segundos.</p>
+  </div>
+  <script>
+    const APP = "http://127.0.0.1:8080/";
+    let tries = 0;
+    async function poll() {
+      tries++;
+      try {
+        const r = await fetch(APP + "scenarios", { cache: "no-store" });
+        if (r.ok) { location.href = APP; return; }
+      } catch (e) { /* aún no */ }
+      if (tries > 8)
+        document.getElementById("msg").textContent =
+          "Iniciando el optimizador… (" + tries * 2 + " s)";
+      setTimeout(poll, 2000);
+    }
+    poll();
+  </script>
+</body>
+</html>

@@ -46,8 +46,36 @@ _json_404(req::HTTP.Request) = _json_response(404,
 _json_405(req::HTTP.Request) = _json_response(405,
     _error_payload("método $(req.method) no permitido en $(req.target)"))
 
-"Router con los tres endpoints; `data_dir` es la raíz de los sitios."
-function build_router(data_dir::AbstractString)
+const MIME_TYPES = Dict(
+    ".html" => "text/html; charset=utf-8", ".js" => "text/javascript",
+    ".css" => "text/css", ".svg" => "image/svg+xml", ".png" => "image/png",
+    ".ico" => "image/x-icon", ".json" => "application/json",
+    ".map" => "application/json", ".woff2" => "font/woff2",
+)
+
+"""
+Sirve el frontend compilado (frontend/dist) desde el mismo proceso/puerto que
+la API — es lo que usa el lanzador de escritorio: un solo programa. Rutas sin
+extensión caen a index.html (SPA); `..` queda bloqueado.
+"""
+function _static_handler(req::HTTP.Request, static_dir::AbstractString)
+    req.method == "GET" || return _json_404(req)
+    path = HTTP.URI(req.target).path
+    path == "/" && (path = "/index.html")
+    occursin("..", path) && return _json_404(req)
+    file = joinpath(static_dir, lstrip(path, '/'))
+    if !isfile(file)
+        isempty(splitext(path)[2]) || return _json_404(req)   # asset perdido
+        file = joinpath(static_dir, "index.html")             # ruta SPA
+        isfile(file) || return _json_404(req)
+    end
+    ct = get(MIME_TYPES, lowercase(splitext(file)[2]), "application/octet-stream")
+    return HTTP.Response(200, ["Content-Type" => ct], read(file))
+end
+
+"Router con los endpoints (+ frontend estático si se pasa `static_dir`)."
+function build_router(data_dir::AbstractString;
+                      static_dir::Union{Nothing,AbstractString} = nothing)
     router = HTTP.Router(_json_404, _json_405)
     HTTP.register!(router, "GET", "/scenarios", handle_scenarios)
     HTTP.register!(router, "GET", "/sites",
@@ -64,6 +92,14 @@ function build_router(data_dir::AbstractString)
                    req -> handle_export_xlsx(req, data_dir))
     HTTP.register!(router, "POST", "/validate",
                    req -> handle_validate(req, data_dir))
+    if static_dir !== nothing
+        isdir(static_dir) ||
+            error("build_router: static_dir no existe: $static_dir (corre `npm run build` en frontend/)")
+        HTTP.register!(router, "GET", "/**",
+                       req -> _static_handler(req, static_dir))
+        HTTP.register!(router, "GET", "/",
+                       req -> _static_handler(req, static_dir))
+    end
     return router
 end
 
@@ -82,11 +118,13 @@ close(server)
 """
 function start_server(; host::AbstractString = "127.0.0.1", port::Integer = 8080,
                       data_dir::AbstractString = joinpath(pwd(), "data", "sample_sites"),
+                      static_dir::Union{Nothing,AbstractString} = nothing,
                       verbose::Bool = true)
     isdir(data_dir) ||
         error("start_server: data_dir no existe: $data_dir")
-    handler = cors_middleware(error_middleware(build_router(data_dir)))
+    handler = cors_middleware(error_middleware(build_router(data_dir; static_dir)))
     server = HTTP.serve!(handler, host, port)
-    verbose && @info "IETO API escuchando en http://$host:$port · sitios en $data_dir · endpoints: GET /scenarios, POST /scenario, POST /pareto"
+    ui = static_dir === nothing ? "" : " · UI en http://$host:$port/"
+    verbose && @info "IETO API escuchando en http://$host:$port · sitios en $data_dir$ui"
     return server
 end

@@ -5,6 +5,10 @@
 # sitio temporal del e2e de navegador (npm run verify:twin)
 /data/sample_sites/zz_e2e_tmp/
 
+# lanzador de escritorio: log local e icono generado por install.ps1
+/launcher/ieto-launcher.log
+/launcher/ieto.ico
+
 # Julia
 *.jl.cov
 *.jl.*.cov
