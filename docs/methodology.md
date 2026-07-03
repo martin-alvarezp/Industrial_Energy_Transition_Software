@@ -85,11 +85,16 @@ el espacio alcanzable.
 
 Cuando HiGHS reporta INFEASIBLE, `diagnose_infeasibility` calcula cotas
 analíticas y nombra el recurso faltante con cantidades: (a) demanda pico por
-carrier vs máximo instalable; (b) **piso de emisiones** año a año — mejor
-electrificación posible del calor, renovables al máximo y offsets al tope —
-contra la trayectoria del cap; (c) punta eléctrica sin sol vs límite de red +
-storage. El resultado viaja en `Results.diagnostics`, en el warning del log y
-en el campo `infeasibility.hints` de la API.
+carrier vs máximo instalable; (b) **piso de emisiones** año a año — cota por
+paso con electrificación del calor por niveles de COP (el residuo va a la
+ruta de menores emisiones), renovables al máximo con el excedente
+aprovechable solo vía storage pagando η², y offsets al tope — contra la
+trayectoria del cap; (c) punta eléctrica sin sol vs límite de red + storage.
+Las cotas son deliberadamente optimistas (cotas inferiores válidas): nunca
+producen falsos positivos, y cuando no pueden probar la causa caen a un
+mensaje honesto de "límites combinados". El resultado viaja en
+`Results.diagnostics`, en el warning del log y en el campo
+`infeasibility.hints` de la API.
 
 ## 8. Verificación
 

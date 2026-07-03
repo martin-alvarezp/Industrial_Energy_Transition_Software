@@ -12,9 +12,15 @@ function Switch({ on, onChange, disabled }) {
 }
 
 /** Controles ejecutivos del escenario. `draft` es el config aún no ejecutado. */
-export default function ScenarioBuilder({ draft, setDraft, onRun, running, dirty }) {
+export default function ScenarioBuilder({ draft, setDraft, applied, onRun, running, dirty }) {
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
   const reduction = 1 - draft.emissions_cap_net_end / draft.emissions_cap_net_start;
+  // H1 (docs/edge_cases.md): alargar el horizonte con la misma meta final
+  // puede volverla físicamente inalcanzable — la demanda sigue creciendo
+  const staleTarget =
+    applied &&
+    draft.horizon_years > applied.horizon_years &&
+    draft.emissions_cap_net_end === applied.emissions_cap_net_end;
 
   return (
     <div className="builder-grid">
@@ -55,6 +61,14 @@ export default function ScenarioBuilder({ draft, setDraft, onRun, running, dirty
             Trayectoria lineal del año 1 al año {draft.horizon_years}:{" "}
             <strong>{pct(reduction, 0)} de reducción</strong> exigida al final.
           </p>
+          {staleTarget && (
+            <p className="hint warn">
+              Alargaste el horizonte sin recalibrar la meta final: la demanda sigue
+              creciendo y una meta calibrada a {applied.horizon_years} años puede ser
+              inalcanzable a {draft.horizon_years}. Si sale infactible, el diagnóstico
+              te dirá a cuánto relajarla.
+            </p>
+          )}
         </div>
       </div>
 

@@ -19,8 +19,9 @@
 |---|---|---|
 | Cap plano (start == end) | resuelve; cap constante respetado todos los años | ✅ |
 | Cap **creciente** (end > start) | válido (más laxo con los años); no rompe la interpolación | ✅ |
-| Meta bajo el piso analítico (17,5 kt < 17,84 kt) | infactible; diagnóstico "piso de emisiones" con toneladas faltantes y opciones | ✅ |
-| Meta entre el piso analítico y el real (18 kt) | infactible; el diagnóstico es **honesto sobre el límite de sus cotas** ("límites combinados", no inventa una causa) | ✅ |
+| Meta bajo el piso analítico (17,5 y 18 kt < 18,24 kt) | infactible; diagnóstico "piso de emisiones" con toneladas faltantes y opciones | ✅ |
+| Config sin violación detectable por las cotas | fallback honesto ("límites combinados", no inventa una causa) — ejercitado determinísticamente | ✅ |
+| Meta entre el piso analítico y el real (18,5 kt) | **sin falso positivo**: la cota no reporta hallazgo de emisiones que no puede probar | ✅ |
 | Net-zero desde el año 1 | infactible ya en el año 1, y el diagnóstico lo dice | ✅ |
 
 ## 3. Clima degenerado
@@ -88,27 +89,33 @@
 | Nombre de sitio con espacios | 400 saneado | ✅ |
 | **3 corridas concurrentes** | todas 200 (HTTP.jl + HiGHS en tasks separados) | ✅ |
 
-## Hallazgos
+## Hallazgos y su resolución
 
-- **H1 · Horizonte × meta fija.** Estirar `horizon_years` manteniendo
-  `emissions_cap_net_end` puede volver infactible un caso factible: la demanda
-  sigue creciendo pero la meta no se recalibra (demo: piso del año 20 ≈
-  20,8 kt > cap de 20 kt calibrado a 10 años). Implicancia de producto: cuando
-  el slider del builder cambia el horizonte, conviene sugerir recalibrar la
-  meta final (el diagnóstico ya dice a cuánto).
+- **H1 · Horizonte × meta fija — mitigado en el builder.** Estirar
+  `horizon_years` manteniendo `emissions_cap_net_end` puede volver infactible
+  un caso factible: la demanda sigue creciendo pero la meta no se recalibra
+  (demo: piso del año 20 ≈ 20,8 kt > cap de 20 kt calibrado a 10 años). El
+  builder ahora avisa al alargar el horizonte sin tocar la meta, y el
+  diagnóstico dice a cuánto relajarla.
 - **H2 · El diagnóstico distingue causas.** Con crecimiento extremo la
   primera restricción que muerde no es la capacidad agregada sino el piso de
   emisiones y la punta de red — las cotas analíticas reportan la causa
   correcta en vez de la intuitiva.
-- **H3 · Precios negativos.** Son aceptados por el contrato de datos y el
-  modelo queda acotado solo por los límites de red, produciendo arbitraje
-  contable import→export. Candidato a warning de validación en un lote
-  futuro; mientras tanto, documentado.
+- **H3 · Precios negativos — warning implementado.** Son aceptados por el
+  contrato de datos y el modelo queda acotado solo por los límites de red,
+  produciendo arbitraje contable import→export. `validate_site` ahora emite
+  un aviso **no fatal** nombrando los carriers con precios negativos.
 - **H4 · Bug corregido:** `allowed_techs` ignoraba `grid_import` —
   `build_parameters` tomaba el límite de red del sitio sin mirar el
   escenario, así que "isla eléctrica" era imposible de modelar. Corregido en
   `parameters.jl` y en el diagnóstico (`infeasibility_diagnostics.jl`).
-- **H5 · Frontera analítica vs real.** Entre el piso analítico (17,84 kt,
-  sin pérdidas) y el piso real (~18-20 kt, con pérdidas de batería y efectos
-  por paso) el diagnóstico cae al mensaje de "límites combinados": honesto,
-  pero una cota con pérdidas estimadas lo afinaría (mejora futura).
+- **H5 · Cota de piso refinada: 17,84 → 18,24 kt.** La cota energética simple
+  electrificaba todo el calor al mejor COP sin límite de capacidad y sin
+  pérdidas. La nueva cota trabaja **por paso**: electrificación por niveles de
+  COP con sus capacidades (más allá de la bomba de calor, el residuo va a la
+  ruta de menores emisiones — con red a 0,3 t/MWh el gas gana a la caldera
+  eléctrica importando), traslado del excedente renovable solo vía storage
+  pagando η², y crédito del excedente sobrante alimentando gratis los niveles
+  eléctricos. Sigue siendo cota inferior válida (storage optimista en
+  potencia/energía): 18,5 kt no produce falsos positivos y 20 kt sigue
+  factible. El gap residual (18,24 kt → piso real) cae al fallback honesto.

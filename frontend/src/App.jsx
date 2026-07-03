@@ -103,7 +103,7 @@ export default function App() {
           <>
             <p className="section-label">Construcción del escenario</p>
             <ScenarioBuilder
-              draft={draft} setDraft={setDraft}
+              draft={draft} setDraft={setDraft} applied={applied}
               onRun={onRun} running={running} dirty={dirty}
             />
             <div style={{ height: 20 }} />

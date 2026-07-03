@@ -96,19 +96,27 @@ end
     @test rup.feasible
     @test issorted(rup.emissions.cap_net)
 
-    # frontera de factibilidad del demo (piso analítico ≈ 17.844 t; el piso
-    # real, con pérdidas de batería y efectos por paso, está entre 18k y 20k):
-    # (a) bajo el piso analítico → infactible CON causa nombrada y cuantificada
-    ra = _solve(site, with_config(cfg; emissions_cap_net_end = 17_500.0))
-    @test !ra.feasible
-    @test any(h -> occursin("piso de emisiones", h), ra.diagnostics)
-    @test any(h -> occursin("t de abatimiento", h), ra.diagnostics)
-    # (b) entre el piso analítico y el real → infactible, y el diagnóstico es
-    # honesto sobre el límite de sus cotas (causa combinada, no inventada)
-    rb = _solve(site, with_config(cfg; emissions_cap_net_end = 18_000.0))
-    @test !rb.feasible
-    @test any(h -> occursin("combinados", h), rb.diagnostics)
-    # (c) net-zero desde el año 1: infactible ya en el año 1
+    # frontera de factibilidad del demo — cota refinada (H5): por paso, con
+    # electrificación por niveles de COP, pérdidas η² del traslado y crédito
+    # del excedente sobrante → piso analítico ≈ 18.242 t
+    # (a) bajo el piso → infactible CON causa nombrada y cuantificada
+    for cap_end in (17_500.0, 18_000.0)
+        ra = _solve(site, with_config(cfg; emissions_cap_net_end = cap_end))
+        @test !ra.feasible
+        @test any(h -> occursin("piso de emisiones", h), ra.diagnostics)
+        @test any(h -> occursin("t de abatimiento", h), ra.diagnostics)
+    end
+    # (b) sin violación detectable por las cotas: fallback honesto ("límites
+    # combinados") — ejercitado determinísticamente sobre el config FACTIBLE
+    f = diagnose_infeasibility(site, cfg)
+    @test length(f) == 1
+    @test f[1].category == :unknown
+    @test occursin("combinados", f[1].message)
+    # (c) la cota no produce falsos positivos: 18.5k está entre el piso
+    # analítico y el real → el diagnóstico no inventa un hallazgo de emisiones
+    f185 = diagnose_infeasibility(site, with_config(cfg; emissions_cap_net_end = 18_500.0))
+    @test !any(x -> x.category == :emissions, f185)
+    # (d) net-zero desde el año 1: infactible ya en el año 1
     rz = _solve(site, with_config(cfg; emissions_cap_net_start = 0.0,
                                   emissions_cap_net_end = 0.0))
     @test !rz.feasible
@@ -199,6 +207,17 @@ end
                          row.step == 1 && row.year == 1, rneg.dispatch).value[1]
     @test imp1 ≈ 20.0 atol = 1e-6            # import al límite de conexión
     @test rneg.npv < 0                       # "gana" dinero: el artefacto es visible
+
+    # ...y la validación lo AVISA sin bloquear (warning H3, no fatal)
+    dir = corrupted_demo() do d
+        replace_in_file(joinpath(d, "prices.csv"),
+                        "1,electricity,65.0" => "1,electricity,-65.0")
+    end
+    sneg_demo = load_site(dir)
+    ok = @test_logs (:warn, r"precios negativos") match_mode = :any begin
+        validate_site(sneg_demo)
+    end
+    @test ok === true
 end
 
 @testset "edge: storage en los bordes" begin

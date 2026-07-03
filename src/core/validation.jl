@@ -102,6 +102,15 @@ function validate_site(site::Site)
             _check_carrier!(problems, site.carriers, p.carrier, "prices.csv")
         _check_series!(problems, p.values, nsteps, "prices.csv[$(p.carrier)]")
     end
+    # precios negativos: válidos (existen en mercados reales) pero el arbitraje
+    # import↔export queda acotado solo por los límites de red (§7.6) — aviso
+    # no fatal (hallazgo H3, docs/edge_cases.md)
+    negative = sort!([p.carrier for p in values(site.prices)
+                      if any(v -> !isnan(v) && v < 0, p.values)])
+    isempty(negative) ||
+        @warn "prices.csv: hay precios negativos en $(join(negative, ", ")) — " *
+              "es válido, pero revisa que los límites de red (§7.6) acoten el " *
+              "arbitraje import↔export que el optimizador va a explotar"
 
     # --- factores de emisión ---
     for ef in site.emission_factors

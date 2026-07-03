@@ -11,10 +11,6 @@ end
 _r1(x) = round(x; digits = 1)
 _r0(x) = round(Int, x)
 
-"Suma de factor de capacidad ponderado (MWh/año por MW) de un generador."
-_annual_yield(gen::Generator, w::Vector{Float64}) =
-    sum(gen.cf_profile[i] * w[i] for i in eachindex(w))
-
 """
     diagnose_infeasibility(site, cfg) -> Vector{InfeasibilityFinding}
 
@@ -75,15 +71,17 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     elec_carriers = [c for c in sets.demand_carriers
                      if site.carriers[c].category == :energy && c == grid_carrier]
 
-    # mejor ruta eléctrica al calor (máx eficiencia/COP) y su capacidad total
-    best_cop, elec_heat_cap = 0.0, 0.0
+    # rutas eléctricas al calor por niveles: (COP, capacidad máx), de mejor a
+    # peor COP — electrificar más allá de la bomba de calor cae a la caldera
+    # eléctrica (~COP 1), que consume mucha más electricidad
+    elec_heat_tiers = Tuple{Float64,Float64}[]
     fuel_eff, fuel_ef1 = nothing, 0.0
     for id in sets.converters
         cv = site.converters[id]
         cv.output_carrier in heat_carriers || continue
         if cv.input_carrier == grid_carrier
-            best_cop = max(best_cop, cv.efficiency)
-            elec_heat_cap += cv.existing_capacity + cv.max_new_capacity
+            push!(elec_heat_tiers,
+                  (cv.efficiency, cv.existing_capacity + cv.max_new_capacity))
         elseif haskey(site.carriers, cv.input_carrier) &&
                site.carriers[cv.input_carrier].category == :fuel
             f = _factor(site, cv.input_carrier, :scope1)
@@ -92,22 +90,70 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
             end
         end
     end
-    ren_max = sum(_annual_yield(site.generators[id], w) *
-                  (site.generators[id].existing_capacity +
-                   site.generators[id].max_new_capacity)
-                  for id in sets.generators; init = 0.0)
+    sort!(elec_heat_tiers; by = first, rev = true)
+    best_cop = isempty(elec_heat_tiers) ? 0.0 : elec_heat_tiers[1][1]
+    elec_heat_cap = sum(last.(elec_heat_tiers); init = 0.0)
+
+    # asignación de MÍNIMAS emisiones: un nivel eléctrico solo entra a la
+    # carga si su tasa importada (ef2/COP) no supera la del combustible —
+    # con red sucia, la caldera eléctrica importando emite MÁS que el gas.
+    # Si no hay ruta de combustible, todo nivel eléctrico es obligatorio.
+    fuel_rate = fuel_eff === nothing ? Inf : fuel_ef1 / fuel_eff
+    load_tiers = fuel_eff === nothing ? elec_heat_tiers :
+                 [(cop, cap) for (cop, cap) in elec_heat_tiers
+                  if ef2 / cop <= fuel_rate + 1e-12]
+    spare_cop = maximum((cop for (cop, cap) in elec_heat_tiers
+                         if !((cop, cap) in load_tiers)); init = 0.0)
+
+    "Electrifica `heat_mw` con los niveles de carga → (MW eléctricos, MW de calor cubiertos)."
+    function electrify(heat_mw)
+        elec_mw, covered = 0.0, 0.0
+        for (cop, cap) in load_tiers
+            take = min(heat_mw - covered, cap)
+            take <= 0 && break
+            elec_mw += take / cop
+            covered += take
+        end
+        return elec_mw, covered
+    end
+    # perfil renovable máximo por paso (MW): Σ (existente + max_new) · cf[s]
+    nsteps = length(w)
+    ren = zeros(nsteps)
+    for id in sets.generators
+        g = site.generators[id]
+        ren .+= (g.existing_capacity + g.max_new_capacity) .* g.cf_profile
+    end
+    ren_max = sum(ren .* w)
+    # mejor η de traslado intra-estación: el storage permitido más eficiente
+    # (potencia/energía ilimitadas = optimista → la cota sigue siendo válida)
+    η_shift = maximum((site.storages[id].efficiency for id in sets.storages);
+                      init = 0.0)
 
     for y in 1:N
-        elecE = sum(sum(site.demands[c].values .* w) for c in elec_carriers; init = 0.0) * grow(y)
-        heatE = sum(sum(site.demands[c].values .* w) for c in heat_carriers; init = 0.0) * grow(y)
-        heat_peak = isempty(heat_carriers) ? 0.0 :
-            sum(maximum(site.demands[c].values) for c in heat_carriers) * grow(y)
-        cov = best_cop > 0 && heat_peak > 0 ? min(1.0, elec_heat_cap / heat_peak) :
-              best_cop > 0 ? 1.0 : 0.0
-
-        import_min = max(elecE + (heatE * cov) / max(best_cop, 1.0) - ren_max, 0.0)
-        scope1_min = fuel_eff === nothing ? 0.0 :
-            (heatE * (1 - cov) / fuel_eff) * fuel_ef1
+        # cota POR PASO: el excedente renovable solo sirve trasladado por
+        # storage (paga η²) y nunca más que el déficit — captura curtailment
+        # y pérdidas round-trip que una cota energética pura ignora
+        deficitE, surplusE, residualE = 0.0, 0.0, 0.0
+        for s in 1:nsteps
+            elec_s = sum(site.demands[c].values[s] for c in elec_carriers;
+                         init = 0.0) * grow(y)
+            heat_s = sum(site.demands[c].values[s] for c in heat_carriers;
+                         init = 0.0) * grow(y)
+            hp_elec_s, covered_s = electrify(heat_s)
+            residualE += (heat_s - covered_s) * w[s]
+            load_s = elec_s + hp_elec_s
+            gap = load_s - ren[s]
+            gap >= 0 ? (deficitE += gap * w[s]) : (surplusE -= gap * w[s])
+        end
+        shifted = min(surplusE * η_shift^2, deficitE)
+        import_min = deficitE - shifted
+        # el excedente renovable que sobra tras el traslado puede alimentar
+        # gratis los niveles eléctricos "sucios" (caldera eléctrica) y comerse
+        # parte del residuo a combustible — crédito optimista, cota válida
+        surplus_used = η_shift > 0 ? shifted / η_shift^2 : 0.0
+        leftover = max(surplusE - surplus_used, 0.0)
+        residual_adj = max(residualE - leftover * spare_cop, 0.0)
+        scope1_min = fuel_eff === nothing ? 0.0 : (residual_adj / fuel_eff) * fuel_ef1
         gross_min = import_min * ef2 + scope1_min
         off_max = cfg.allow_offsets ?
             min(cfg.max_offset_share * gross_min, cfg.offset_availability) : 0.0
