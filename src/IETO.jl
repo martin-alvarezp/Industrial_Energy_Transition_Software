@@ -23,6 +23,7 @@ include("core/types.jl")
 include("core/schema.jl")
 include("core/validation.jl")
 include("core/site_json.jl")
+include("core/site_writer.jl")
 
 # model: sets, parámetros, variables, objetivo, construcción
 include("model/sets.jl")
@@ -66,7 +67,7 @@ export Carrier, Source, Converter, Generator, Storage, Demand, PriceSeries,
 export load_site, load_scenario_config, load_and_validate,
        validate_site, validate_scenario, SchemaError, ValidationError,
        emissions_cap_net, n_steps, all_tech_ids, find_tech,
-       site_json, site_from_json, site_version, default_timesteps
+       site_json, site_from_json, site_version, default_timesteps, save_site
 # model API
 export build_model, build_sets, build_parameters, add_variables!, set_objective!,
        expected_variable_count, IETOModel, ModelSets, ModelParameters

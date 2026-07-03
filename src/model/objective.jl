@@ -56,11 +56,23 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@expression(m, export_revenue_y[y in years],
         sum(params.export_price[s, y] * grid_export_p[s, y] * w[s] for s in steps))
 
+    # Valor residual (opcional, cfg.salvage_value): crédito lineal al fin del
+    # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,
+    # descontado al año N. Sin él, invertir tarde en activos longevos queda
+    # castigado por el truncamiento del VAN (la vida útil sería solo traza).
+    N = last(years)
+    JuMP.@expression(m, salvage_credit,
+        sum(params.costs[t].capex_per_kw * KW_PER_MW * new_capacity[t, y] *
+            (cfg.salvage_value ?
+             max(0.0, (params.costs[t].lifetime_years - (N - y + 1)) /
+                      params.costs[t].lifetime_years) : 0.0)
+            for t in sets.candidates, y in years; init = 0.0))
+
     JuMP.@objective(m, Min,
         sum(params.discount[y] *
             (capex_y[y] + fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
              carbon_cost_y[y] + offset_cost_y[y] - export_revenue_y[y])
-            for y in years))
+            for y in years) - params.discount[end] * salvage_credit)
 
     return m
 end

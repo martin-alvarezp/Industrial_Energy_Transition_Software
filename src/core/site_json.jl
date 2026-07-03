@@ -261,11 +261,13 @@ end
 """
     site_version(site::Site) -> String
 
-Huella de 12 hex del contenido físico del sitio (forma canónica de
-`site_json`): mismos datos ⇒ misma versión. Complementa a `scenario_version`
-(que cubre el ScenarioConfig) en la trazabilidad de corridas del twin.
+Huella de 12 hex del contenido FÍSICO del sitio (forma canónica de
+`site_json`, excluido el nombre — que es identidad, no física): mismos datos
+⇒ misma versión, aunque el sitio se guarde con otro nombre. Complementa a
+`scenario_version` (que cubre el ScenarioConfig) en la trazabilidad del twin.
 """
 function site_version(site::Site)
-    s = JSON3.write(site_json(site))
-    return lpad(string(hash(s); base = 16), 16, '0')[1:12]
+    sj = site_json(site)
+    phys = (; (k => v for (k, v) in pairs(sj) if k != :name)...)
+    return lpad(string(hash(JSON3.write(phys)); base = 16), 16, '0')[1:12]
 end

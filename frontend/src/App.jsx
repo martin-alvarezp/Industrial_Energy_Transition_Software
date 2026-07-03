@@ -5,6 +5,7 @@ import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
 import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
 import { compute, computeViaMock, fetchSite } from "./lib/api.js";
+import { geoJSONToLayout } from "./lib/twin.js";
 
 const TABS = [
   { id: "site", label: "Sitio" },
@@ -27,8 +28,23 @@ export default function App() {
   const [data, setData] = useState(() => computeViaMock(DEFAULT_CONFIG));
   // digital twin (tab Sitio): site_json + capa geográfica local
   const [twin, setTwin] = useState(null);
-  // el site_payload que se usó en la corrida vigente (null = sitio de disco)
+  // sitio activo (guardables vía PUT /sites, fase 5) y el payload aplicado
+  const [siteName, setSiteName] = useState("demo");
   const [appliedPayload, setAppliedPayload] = useState(null);
+  const [appliedSite, setAppliedSite] = useState("demo");
+
+  const loadTwin = useCallback((name) => {
+    setTwin(null);
+    fetchSite(name).then(({ source, site }) => {
+      const { layout, site_version, ...siteJson } = site;
+      setSiteName(name);
+      setTwin({
+        siteJson: { ...siteJson, site_version }, source, dirty: false,
+        layout: layout ? geoJSONToLayout(layout) :
+                { address: null, center: null, boundary: null, equipment: {} },
+      });
+    });
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -39,18 +55,9 @@ export default function App() {
       setApplied(DEFAULT_CONFIG);
       setRunning(false);
     });
-    fetchSite("demo").then(({ source, site }) => {
-      if (!alive) return;
-      const { layout, ...siteJson } = site;
-      setTwin({
-        siteJson, source, dirty: false,
-        // el layout persistido (GeoJSON, fase 5) aún no existe: estado local
-        layout: layout?.equipment ? layout :
-                { address: null, center: null, boundary: null, equipment: {} },
-      });
-    });
+    loadTwin("demo");
     return () => { alive = false; };
-  }, []);
+  }, [loadTwin]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(applied),
@@ -62,14 +69,15 @@ export default function App() {
     // twin con ediciones → viaja como site_payload en todas las corridas
     const payload = twin?.dirty ? twin.siteJson : null;
     setRunning(true);
-    compute(cfg, payload).then((d) => {
+    compute(cfg, payload, siteName).then((d) => {
       setData(d);
       setApplied(cfg);
       setAppliedPayload(payload);
+      setAppliedSite(siteName);
       setRunning(false);
       setTab("cockpit");
     });
-  }, [draft, twin]);
+  }, [draft, twin, siteName]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -129,6 +137,7 @@ export default function App() {
             </p>
             <SiteTwin
               twin={twin} setTwin={setTwin}
+              siteName={siteName} onLoadSite={loadTwin}
               config={applied} onRun={onRun} running={running}
               twinIgnored={data.twinIgnored}
             />
@@ -145,7 +154,7 @@ export default function App() {
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
               <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
-              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} />
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
             </div>
           </>
         )}
@@ -153,7 +162,7 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
-            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} />
+            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
           </div>
         )}
 

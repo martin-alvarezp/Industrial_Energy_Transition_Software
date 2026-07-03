@@ -26,6 +26,12 @@ try {
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: "networkidle2", timeout: 60_000 });
 
+  // 0 · exigir modo API: sin backend este e2e no prueba nada
+  await page.waitForFunction(
+    () => document.querySelector(".meta-chips")?.textContent.includes("API real"),
+    { timeout: 60_000 }).catch(() => fail("la app quedó en modo mock — levanta la API en 8080"));
+  ok("modo API real confirmado");
+
   // 1 · el twin carga desde GET /sites/demo: 7 equipos en la lista
   await page.waitForSelector(".equip-row", { timeout: 30_000 });
   const nEquip = (await page.$$(".equip-row")).length;
@@ -112,8 +118,8 @@ try {
     [...document.querySelectorAll("button")]
       .find((b) => b.textContent.trim() === "Validar")?.click();
   });
-  await page.waitForSelector(".twin-valid", { timeout: 20_000 });
-  const valid = await page.$eval(".twin-valid", (el) => el.textContent);
+  await page.waitForSelector(".twin-validate-result", { timeout: 20_000 });
+  const valid = await page.$eval(".twin-validate-result", (el) => el.textContent);
   valid.includes("sitio consistente") ?
     ok("POST /validate: " + valid.trim()) : fail("validación falló: " + valid);
 
@@ -131,7 +137,35 @@ try {
   const van = await page.$eval(".kpi .value", (el) => el.textContent);
   ok(`VAN del twin: ${van}`);
   await page.screenshot({ path: `${shots}/twin_cockpit.png` });
+
+  // 7 · FASE 5: guardar el twin como sitio nuevo y recargarlo desde disco
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".tab")]
+      .find((b) => b.textContent.trim() === "Sitio")?.click();
+  });
+  await page.waitForSelector(".twin-save-name");
+  await page.type(".twin-save-name", "zz_e2e_tmp");
+  await page.click(".twin-save");
+  await page.waitForFunction(
+    () => [...document.querySelectorAll(".twin-valid")]
+      .some((el) => el.textContent.includes("guardado")),
+    { timeout: 30_000 });
+  ok("PUT /sites: twin guardado como 'zz_e2e_tmp'");
+
+  // recargado desde disco: selector activo, 8 equipos, marker restaurado
+  // desde layout.geojson y sin ediciones pendientes
+  await page.waitForFunction(
+    () => document.querySelector(".site-select")?.value === "zz_e2e_tmp" &&
+          document.querySelectorAll(".equip-row").length === 8,
+    { timeout: 30_000 });
+  ok("recargado desde disco: selector 'zz_e2e_tmp' + 8 equipos");
+  await page.waitForSelector(".tw-marker", { timeout: 15_000 });
+  ok("marker restaurado desde layout.geojson");
+  const clean = await page.evaluate(() =>
+    document.body.textContent.includes("Sin ediciones"));
+  clean ? ok("estado limpio tras recargar (idéntico al disco)") :
+    fail("el twin recargado quedó marcado como editado");
 } finally {
   await browser.close();
 }
-console.log("DEF-DE-HECHO FASES 2+3+4: OK");
+console.log("DEF-DE-HECHO FASES 2+3+4+5: OK");

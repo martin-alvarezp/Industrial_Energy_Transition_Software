@@ -125,6 +125,45 @@ handle_scenarios(::HTTP.Request) = _json_response(200,
     (scenarios = [(name = String(s), description = SCENARIO_DESCRIPTIONS[s])
                   for s in PREDEFINED_SCENARIOS],))
 
+"GET /sites — lista de sitios disponibles en data_dir."
+handle_list_sites(::HTTP.Request, data_dir::AbstractString) = _json_response(200,
+    (sites = sort!([n for n in readdir(data_dir)
+                    if isdir(joinpath(data_dir, n)) &&
+                       isfile(joinpath(data_dir, n, "technologies.csv"))]),))
+
+"""
+PUT /sites/{name} — persiste un twin: body `{site_payload, layout?}`. Escribe
+los 8 CSV del contrato + layout.geojson; si el sitio no tenía
+scenario_config.yaml, copia el del demo como base. `demo` es el dataset de
+referencia y no se puede sobrescribir.
+"""
+function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
+    name = get(HTTP.getparams(req), "name", "")
+    occursin(r"^[A-Za-z0-9_\-]+$", name) ||
+        throw(ApiError(400, "nombre de sitio inválido '$name' (solo letras, números, - y _)"))
+    name == "demo" &&
+        throw(ApiError(403, "el sitio 'demo' es el dataset de referencia y no se puede sobrescribir — guarda con otro nombre"))
+
+    body = _parse_body(req)
+    payload = get(body, :site_payload, nothing)
+    payload isa JSON3.Object ||
+        throw(ApiError(400, "falta site_payload (esquema en docs/digital_twin_spec.md §7)"))
+    site = site_from_json(payload; default_name = name)
+    validate_site(site)   # ValidationError → 400: no se persiste un sitio roto
+
+    dir = joinpath(data_dir, name)
+    save_site(dir, site; layout = get(body, :layout, nothing))
+    yaml = joinpath(dir, "scenario_config.yaml")
+    if !isfile(yaml)
+        base = joinpath(data_dir, "demo", "scenario_config.yaml")
+        isfile(base) || throw(ApiError(500,
+            "no hay scenario_config base para el sitio nuevo (falta el del demo)"))
+        cp(base, yaml)
+    end
+    return _json_response(200, (saved = name, site_version = site_version(site),
+                                n_techs = length(all_tech_ids(site))))
+end
+
 """
 GET /sites/{name} — el sitio completo como JSON (esquema §7 del digital twin):
 el estado inicial de la tab Sitio. Incluye `layout` (GeoJSON de

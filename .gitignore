@@ -2,6 +2,9 @@
 /demo_results.xlsx
 /results.json
 
+# sitio temporal del e2e de navegador (npm run verify:twin)
+/data/sample_sites/zz_e2e_tmp/
+
 # Julia
 *.jl.cov
 *.jl.*.cov

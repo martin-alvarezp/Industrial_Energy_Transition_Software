@@ -7,7 +7,7 @@ import { musd, pct, usdPerTon } from "../lib/format.js";
 import { downloadXlsx } from "../lib/api.js";
 
 /** Cockpit ejecutivo: 6 KPIs + narrativa + trayectoria y costos. */
-export default function Cockpit({ result, reference, referenceLabel, bauFeasible, config, source, sitePayload }) {
+export default function Cockpit({ result, reference, referenceLabel, bauFeasible, config, source, sitePayload, siteName }) {
   if (!result.meta.feasible) {
     return (
       <div className="banner-infeasible">
@@ -28,16 +28,16 @@ export default function Cockpit({ result, reference, referenceLabel, bauFeasible
     <FeasibleCockpit
       result={result} reference={reference} referenceLabel={referenceLabel}
       bauFeasible={bauFeasible} config={config} source={source}
-      sitePayload={sitePayload}
+      sitePayload={sitePayload} siteName={siteName}
     />
   );
 }
 
-function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, config, source, sitePayload }) {
+function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, config, source, sitePayload, siteName }) {
   const [downloading, setDownloading] = useState(false);
   const onXlsx = () => {
     setDownloading(true);
-    downloadXlsx(config, sitePayload)
+    downloadXlsx(config, sitePayload, siteName ?? "demo")
       .catch((e) => alert("No se pudo generar el Excel: " + e.message))
       .finally(() => setDownloading(false));
   };

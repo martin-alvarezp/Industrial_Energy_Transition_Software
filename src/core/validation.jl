@@ -88,6 +88,8 @@ function validate_site(site::Site)
         _check_nonneg!(problems, st.max_new_capacity, "technologies.csv[$(st.id)].max_new_capacity")
         0 < st.efficiency <= 1 || push!(problems,
             "technologies.csv[$(st.id)].efficiency: debe estar en (0,1] (valor: $(st.efficiency))")
+        st.hours_ratio > 0 || push!(problems,
+            "technologies.csv[$(st.id)].storage_hours: debe ser > 0 (valor: $(st.hours_ratio))")
     end
 
     # --- demandas y precios: carriers válidos y series completas ---

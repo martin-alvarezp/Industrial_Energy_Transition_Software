@@ -92,6 +92,19 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
           />
         </div>
 
+        <div className="switch-row">
+          <div>
+            <div className="sw-label">Valor residual al año final</div>
+            <div className="sw-note">
+              acredita la vida útil no consumida: capex·(vida−años usados)/vida
+            </div>
+          </div>
+          <Switch
+            on={draft.salvage_value ?? false}
+            onChange={(v) => set({ salvage_value: v })}
+          />
+        </div>
+
         <div className="control" style={{ marginTop: 10 }}>
           <div className="switch-row" style={{ paddingBottom: 2 }}>
             <div className="sw-label">Presupuesto CAPEX</div>

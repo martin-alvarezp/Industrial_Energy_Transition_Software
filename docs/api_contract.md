@@ -54,7 +54,11 @@ presente. `NaN`/`Inf` y `missing` se serializan como `null`.
       "carbon_price": 50.0,
       "capex_budget": 40000000.0,     // null = sin límite
       "allow_new_fossil": false,
-      "allowed_techs": ["grid_import", "gas_boiler", "..."]
+      "allowed_techs": ["grid_import", "gas_boiler", "..."],
+      "salvage_value": false          // crédito por vida útil no consumida al
+                                      // año N: capex·(vida−años usados)/vida,
+                                      // descontado (columna salvage_credit en
+                                      // cost_breakdown, ≠0 solo en el año N)
     },
     "log": [                          // misma información en formato tabla,
                                       // apta para mostrar tal cual (incluye
@@ -163,7 +167,9 @@ con status 400 (input/validación), 404 (sitio o ruta), 405 o 500.
 | Endpoint            | Body (JSON)                                                        | Respuesta 200                                   |
 |---------------------|--------------------------------------------------------------------|-------------------------------------------------|
 | `GET /scenarios`    | —                                                                  | `{"scenarios": [{"name", "description"}, ...]}` |
+| `GET /sites`        | —                                                                  | `{"sites": ["demo", "mi_planta", ...]}`         |
 | `GET /sites/{name}` | —                                                                  | el sitio completo como JSON (esquema del digital twin, docs/digital_twin_spec.md §7) + `site_version` + `layout` (GeoJSON o null) |
+| `PUT /sites/{name}` | `{"site_payload": {...}, "layout": {GeoJSON}?}`                    | persiste el twin (8 CSVs + layout.geojson; copia el scenario_config del demo si el sitio es nuevo): `{"saved", "site_version", "n_techs"}`. `demo` es intocable (403) |
 | `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true, "site_payload": {...}}` | el esquema del §2 (results_payload)             |
 | `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}, "site_payload": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
 | `POST /export/xlsx` | mismo body que `/scenario` (sin flags)                             | binario XLSX (§4) como `attachment`             |

@@ -118,7 +118,12 @@ struct ScenarioConfig
     capex_budget::Union{Float64,Nothing}     # USD acumulado sobre el horizonte
     allow_new_fossil::Bool
     allowed_techs::Vector{Symbol}
+    salvage_value::Bool                      # crédito por vida útil no consumida al año N
 end
+
+# retro-compatibilidad: los 15 campos originales, salvage_value = false
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, false)
 
 """
 Trayectoria lineal del cap neto (SPEC §8):

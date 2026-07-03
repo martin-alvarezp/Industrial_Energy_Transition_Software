@@ -129,8 +129,11 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
                 "generation_profiles.csv: falta el perfil del generador '$id'"))
             generators[id] = Generator(id, name, outc, ex, mx, inv, c, prof)
         elseif kind == :storage
+            # columna opcional storage_hours (MWh por MW); default 4 h
+            hours = hasproperty(r, :storage_hours) && !ismissing(r.storage_hours) ?
+                    Float64(r.storage_hours) : DEFAULT_STORAGE_HOURS
             storages[id] = Storage(id, name, outc == Symbol("") ? inc : outc, eff,
-                                   ex, mx, DEFAULT_STORAGE_HOURS, inv, c)
+                                   ex, mx, hours, inv, c)
         else
             throw(SchemaError("technologies.csv: type desconocido '$kind' para '$id' " *
                               "(esperado: source|converter|generator|storage)"))
@@ -218,5 +221,6 @@ function load_scenario_config(path::AbstractString)
         budget,
         Bool(get(d, "allow_new_fossil", false)),
         allowed,
+        Bool(get(d, "salvage_value", false)),
     )
 end

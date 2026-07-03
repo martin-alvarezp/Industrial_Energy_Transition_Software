@@ -26,7 +26,7 @@ _body(resp) = JSON3.read(resp.body)
         # ── preflight CORS ──
         pre = HTTP.request("OPTIONS", API * "/scenario"; status_exception = false)
         @test pre.status == 204
-        @test HTTP.header(pre, "Access-Control-Allow-Methods") == "GET, POST, OPTIONS"
+        @test HTTP.header(pre, "Access-Control-Allow-Methods") == "GET, POST, PUT, OPTIONS"
 
         # ── POST /scenario: results válidos (horizonte 5 vía override) ──
         resp = _post("/scenario",

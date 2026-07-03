@@ -126,6 +126,46 @@ export function polygonAreaM2(pts) {
   return Math.abs(a) / 2;
 }
 
+/** Capa geográfica ↔ GeoJSON (layout.geojson, twin spec §6). Ojo: GeoJSON
+ * usa [lng, lat]; el estado del twin usa [lat, lng] (convención Leaflet). */
+export function layoutToGeoJSON(l) {
+  const features = [];
+  if (l.boundary?.length >= 3) {
+    const ring = l.boundary.map(([la, ln]) => [ln, la]);
+    ring.push(ring[0]);
+    features.push({ type: "Feature", properties: { role: "boundary" },
+                    geometry: { type: "Polygon", coordinates: [ring] } });
+  }
+  for (const [tech_id, [la, ln]] of Object.entries(l.equipment ?? {})) {
+    features.push({ type: "Feature", properties: { role: "equipment", tech_id },
+                    geometry: { type: "Point", coordinates: [ln, la] } });
+  }
+  return {
+    type: "FeatureCollection",
+    properties: { address: l.address ?? null,
+                  center: l.center ? [l.center[1], l.center[0]] : null },
+    features,
+  };
+}
+
+export function geoJSONToLayout(g) {
+  const out = { address: g?.properties?.address ?? null,
+                center: g?.properties?.center
+                  ? [g.properties.center[1], g.properties.center[0]] : null,
+                boundary: null, equipment: {} };
+  for (const f of g?.features ?? []) {
+    if (f.properties?.role === "boundary" && f.geometry?.type === "Polygon") {
+      const ring = f.geometry.coordinates[0] ?? [];
+      out.boundary = ring.slice(0, Math.max(ring.length - 1, 0))
+        .map(([ln, la]) => [la, ln]);
+    } else if (f.properties?.role === "equipment" && f.geometry?.type === "Point") {
+      const [ln, la] = f.geometry.coordinates;
+      out.equipment[f.properties.tech_id] = [la, ln];
+    }
+  }
+  return out;
+}
+
 /** Resumen legible del site_json para el panel "estado serializado". */
 export function serializedPreview(siteJson) {
   const short = (v) =>

@@ -22,8 +22,11 @@
   custom por año.
 - **SOC horario**: dentro de cada estación los pasos son horas consecutivas de
   un día representativo (Δt = 1 h); ciclo cerrado por estación, independiente
-  por año. Energía del storage = potencia × **4 h** (`DEFAULT_STORAGE_HOURS`,
-  parámetro de diseño, no está en el contrato de datos).
+  por año. Energía del storage = potencia × `storage_hours` (columna opcional
+  de technologies.csv; default **4 h**).
+- **Valor residual** (`salvage_value`, default off): crédito lineal
+  capex·(vida−años usados)/vida descontado al año N — con el flag apagado, la
+  vida útil sigue siendo solo trazabilidad.
 - **A lo más una inversión por tecnología** en el horizonte; **sin retiro** de
   activos (capacidad monotónica).
 - **CAPEX/OPEX constantes en términos reales** (sin curvas de aprendizaje).

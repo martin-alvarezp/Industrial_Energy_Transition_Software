@@ -8,12 +8,12 @@ import {
 
 const API_BASE = import.meta.env.VITE_IETO_API ?? "http://127.0.0.1:8080";
 
-async function post(path, body, { timeoutMs = 120_000 } = {}) {
+async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(API_BASE + path, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: ctrl.signal,
@@ -38,6 +38,7 @@ export function toOverrides(cfg) {
     emissions_cap_net_end: cfg.emissions_cap_net_end,
     allow_offsets: cfg.allow_offsets,
     allow_new_fossil: cfg.allow_new_fossil,
+    salvage_value: cfg.salvage_value ?? false,
     capex_budget: cfg.capex_budget_musd == null ? null : cfg.capex_budget_musd * 1e6,
   };
 }
@@ -64,9 +65,9 @@ export async function apiAvailable() {
  * corridas — escenario, referencia, comparación y pareto — para que los Δ
  * comparen el mismo sitio físico.
  */
-export async function computeViaApi(cfg, sitePayload = null) {
+export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") {
   const overrides = toOverrides(cfg);
-  const site = "demo";
+  const site = siteName;
   const payload = sitePayload ? { site_payload: sitePayload } : {};
   const run = (scenario, extra = {}) =>
     post("/scenario", { site, scenario, config_overrides: overrides,
@@ -118,28 +119,46 @@ export function computeViaMock(cfg) {
 }
 
 /** API si responde; si no, mock (la UI muestra la fuente). */
-export async function compute(cfg, sitePayload = null) {
+export async function compute(cfg, sitePayload = null, siteName = "demo") {
   if (await apiAvailable()) {
     try {
-      return await computeViaApi(cfg, sitePayload);
+      return await computeViaApi(cfg, sitePayload, siteName);
     } catch (err) {
       console.warn("IETO API falló, usando mock:", err);
     }
   }
   // el mock no consume ediciones del twin: se marca para que la UI lo diga
-  return { ...computeViaMock(cfg), twinIgnored: !!sitePayload };
+  return { ...computeViaMock(cfg), twinIgnored: !!sitePayload || siteName !== "demo" };
+}
+
+/** GET /sites: sitios guardados disponibles. Sin API → solo demo. */
+export async function listSites() {
+  if (!(await apiAvailable())) return ["demo"];
+  try {
+    const resp = await fetch(API_BASE + "/sites");
+    if (resp.ok) return (await resp.json()).sites;
+  } catch { /* fallthrough */ }
+  return ["demo"];
+}
+
+/** PUT /sites/{name}: persiste el twin (CSVs + layout.geojson). */
+export async function saveSite(name, siteJson, layoutGeoJSON) {
+  return post(`/sites/${encodeURIComponent(name)}`, {
+    site_payload: siteJson,
+    layout: layoutGeoJSON,
+  }, { method: "PUT" });
 }
 
 /**
  * POST /validate: dry-run del twin (sin resolver). Devuelve
  * `{ok, site_version?, problems[]}`; ok=null si no hay API.
  */
-export async function validateTwin(sitePayload, cfg) {
+export async function validateTwin(sitePayload, cfg, siteName = "demo") {
   if (!(await apiAvailable()))
     return { ok: null, problems: ["la validación del twin requiere la API real"] };
   try {
     const out = await post("/validate", {
-      site: "demo",
+      site: siteName,
       site_payload: sitePayload,
       config_overrides: toOverrides(cfg),
     });
@@ -166,12 +185,12 @@ export async function fetchSite(name = "demo") {
 }
 
 /** Descarga del Excel (POST /export/xlsx → blob). Solo en modo API. */
-export async function downloadXlsx(cfg, sitePayload = null) {
+export async function downloadXlsx(cfg, sitePayload = null, siteName = "demo") {
   const resp = await fetch(API_BASE + "/export/xlsx", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      site: "demo",
+      site: siteName,
       scenario: scenarioName(cfg),
       config_overrides: toOverrides(cfg),
       ...(sitePayload ? { site_payload: sitePayload } : {}),
@@ -185,7 +204,7 @@ export async function downloadXlsx(cfg, sitePayload = null) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `ieto_demo_${scenarioName(cfg)}.xlsx`;
+  a.download = `ieto_${siteName}_${scenarioName(cfg)}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

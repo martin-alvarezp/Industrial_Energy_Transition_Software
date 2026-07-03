@@ -25,6 +25,15 @@ function extract_financials(im::IETOModel)
     )
     df.total = df.capex .+ df.fixed_opex .+ df.var_opex .+ df.energy_purchases .+
                df.carbon_cost .+ df.offset_cost .- df.export_revenue
+    # valor residual: crédito único al fin del horizonte (0 si está apagado),
+    # incluido en total/npv del año N para que Σ npv == VAN del objetivo
+    salvage = haskey(JuMP.object_dictionary(m), :salvage_credit) ?
+              JuMP.value(m[:salvage_credit]) : 0.0
+    df.salvage_credit = zeros(length(df.year))
+    if salvage > 1e-9
+        df.salvage_credit[end] = -salvage
+        df.total[end] -= salvage
+    end
     df.discount_factor = im.params.discount
     df.npv = df.total .* df.discount_factor
 

@@ -108,6 +108,12 @@ ExportRevenue_y= Σ_step price_export[step,y]·grid_export_p[step,y]·weight_hou
 
 Los CSV del año-plantilla **no cambian de formato** respecto a v0.1 (siguen siendo un solo año de 96 pasos):
 
+> **Extensiones v0.2+ (retro-compatibles):** technologies.csv acepta la columna
+> opcional `storage_hours` (MWh por MW de storage; default 4);
+> scenario_config.yaml acepta `salvage_value: bool` (default false, crédito por
+> vida útil no consumida al año N); un `layout.geojson` opcional (digital twin)
+> convive en el directorio y el motor lo ignora.
+
 **`timesteps.csv`** → `step_id, season, hour, weight_hours`
 **`carriers.csv`** → `carrier_id, name, unit, category`
 **`technologies.csv`** → `tech_id, name, type, input_carrier, output_carrier, existing_capacity, max_new_capacity, efficiency, investable (bool)`

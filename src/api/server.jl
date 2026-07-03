@@ -3,7 +3,7 @@
 
 const CORS_HEADERS = [
     "Access-Control-Allow-Origin" => "*",
-    "Access-Control-Allow-Methods" => "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods" => "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers" => "Content-Type",
 ]
 
@@ -42,7 +42,7 @@ end
 
 _json_404(req::HTTP.Request) = _json_response(404,
     _error_payload("ruta no encontrada: $(req.method) $(req.target)",
-                   ["endpoints: GET /scenarios, GET /sites/{name}, POST /scenario, POST /pareto, POST /export/xlsx, POST /validate"]))
+                   ["endpoints: GET /scenarios, GET /sites, GET/PUT /sites/{name}, POST /scenario, POST /pareto, POST /export/xlsx, POST /validate"]))
 _json_405(req::HTTP.Request) = _json_response(405,
     _error_payload("método $(req.method) no permitido en $(req.target)"))
 
@@ -50,8 +50,12 @@ _json_405(req::HTTP.Request) = _json_response(405,
 function build_router(data_dir::AbstractString)
     router = HTTP.Router(_json_404, _json_405)
     HTTP.register!(router, "GET", "/scenarios", handle_scenarios)
+    HTTP.register!(router, "GET", "/sites",
+                   req -> handle_list_sites(req, data_dir))
     HTTP.register!(router, "GET", "/sites/{name}",
                    req -> handle_get_site(req, data_dir))
+    HTTP.register!(router, "PUT", "/sites/{name}",
+                   req -> handle_put_site(req, data_dir))
     HTTP.register!(router, "POST", "/scenario",
                    req -> handle_scenario(req, data_dir))
     HTTP.register!(router, "POST", "/pareto",

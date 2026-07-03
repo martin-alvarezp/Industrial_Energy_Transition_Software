@@ -5,9 +5,9 @@ import EquipmentDrawer from "./EquipmentDrawer.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
-  removeTech, polygonAreaM2, serializedPreview,
+  removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON,
 } from "../../lib/twin.js";
-import { validateTwin } from "../../lib/api.js";
+import { validateTwin, listSites, saveSite } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
 
 const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar dirección
@@ -17,14 +17,20 @@ const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar di
  * satelital con límites del sitio y equipos georreferenciados, editor
  * completo de equipos, y el site_json serializado listo para site_payload.
  */
-export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIgnored }) {
+export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
+                                   onRun, running, twinIgnored }) {
   const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>"
   const [draftBoundary, setDraftBoundary] = useState([]);
   const [drawer, setDrawer] = useState(null);        // {tech, isNew}
   const [selectedId, setSelectedId] = useState(null);
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
+  const [siteList, setSiteList] = useState([siteName ?? "demo"]);
+  const [saveName, setSaveName] = useState("");
+  const [saveMsg, setSaveMsg] = useState(null);       // {ok, text}
   const mapRef = useRef(null);
+
+  useEffect(() => { listSites().then(setSiteList); }, []);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && (setMode(null), setDraftBoundary([]));
@@ -75,9 +81,22 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
 
   const doValidate = () => {
     setValidating(true);
-    validateTwin(siteJson, config)
+    validateTwin(siteJson, config, siteName)
       .then(setValidation)
       .finally(() => setValidating(false));
+  };
+
+  const doSave = () => {
+    const name = saveName.trim();
+    saveSite(name, siteJson, layoutToGeoJSON(layout))
+      .then((r) => {
+        setSaveMsg({ ok: true, text: `guardado como '${r.saved}' · huella ${r.site_version}` });
+        setSaveName("");
+        listSites().then(setSiteList);
+        onLoadSite(r.saved);   // recarga desde disco: dirty=false, layout incluido
+      })
+      .catch((e) => setSaveMsg({ ok: false,
+        text: [e.message, ...(e.details ?? [])].join(" · ") }));
   };
 
   const area = polygonAreaM2(layout.boundary);
@@ -137,10 +156,17 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
 
       <div className="twin-panel">
         <div className="card">
-          <h3 className="card-title">
-            Sitio '{siteJson.name}'
-            {source !== "api" && <span className="chip" style={{ marginLeft: 8 }}>mock</span>}
-          </h3>
+          <div className="card-head">
+            <h3 className="card-title">Sitio</h3>
+            <select
+              className="site-select" value={siteName}
+              onChange={(e) => onLoadSite(e.target.value)}
+              aria-label="sitio activo"
+            >
+              {siteList.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            {source !== "api" && <span className="chip">mock</span>}
+          </div>
           <AddressSearch
             onResult={({ address, center }) => {
               patchLayout({ address, center });
@@ -161,6 +187,33 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="control">
+            <label>Guardar sitio (CSVs + layout.geojson)</label>
+            <div className="range-row">
+              <input
+                type="text" placeholder="mi_planta" value={saveName}
+                className="twin-save-name"
+                onChange={(e) =>
+                  setSaveName(e.target.value.toLowerCase()
+                    .replace(/[^a-z0-9_\-]/g, "_"))}
+              />
+              <button className="chart-toggle twin-save"
+                      disabled={!saveName.trim() || source !== "api"}
+                      onClick={doSave}>
+                Guardar
+              </button>
+            </div>
+            {saveMsg && (
+              <div className={saveMsg.ok ? "twin-valid" : "drawer-problems"}
+                   style={{ marginTop: 8 }}>
+                {saveMsg.ok ? "✓ " : "• "}{saveMsg.text}
+              </div>
+            )}
+            {source !== "api" && (
+              <p className="hint">guardar requiere la API real</p>
+            )}
           </div>
         </div>
 
@@ -218,7 +271,8 @@ export default function SiteTwin({ twin, setTwin, config, onRun, running, twinIg
             </button>
           </div>
           {validation && (
-            <div className={validation.ok ? "twin-valid" : "drawer-problems"}
+            <div className={"twin-validate-result " +
+                            (validation.ok ? "twin-valid" : "drawer-problems")}
                  style={{ marginTop: 10 }}>
               {validation.ok
                 ? `✓ sitio consistente · huella ${validation.site_version}`
