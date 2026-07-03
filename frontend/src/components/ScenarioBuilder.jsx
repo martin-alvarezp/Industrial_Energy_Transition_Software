@@ -1,0 +1,137 @@
+import { PRICE_SCENARIOS } from "../lib/mockEngine.js";
+import { pct, num } from "../lib/format.js";
+
+function Switch({ on, onChange, disabled }) {
+  return (
+    <button
+      type="button" role="switch" aria-checked={on} disabled={disabled}
+      className={"switch" + (on ? " on" : "")}
+      onClick={() => onChange(!on)}
+    />
+  );
+}
+
+/** Controles ejecutivos del escenario. `draft` es el config aún no ejecutado. */
+export default function ScenarioBuilder({ draft, setDraft, onRun, running, dirty }) {
+  const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const reduction = 1 - draft.emissions_cap_net_end / draft.emissions_cap_net_start;
+
+  return (
+    <div className="builder-grid">
+      <div className="card">
+        <div className="control">
+          <label htmlFor="horizon">Horizonte de planificación</label>
+          <div className="range-row">
+            <input
+              id="horizon" type="range" min={1} max={20} step={1}
+              value={draft.horizon_years}
+              onChange={(e) => set({ horizon_years: +e.target.value })}
+            />
+            <span className="range-value">{draft.horizon_years} años</span>
+          </div>
+          <p className={"hint" + (draft.horizon_years > 15 ? " warn" : "")}>
+            {draft.horizon_years > 15
+              ? "Sobre 15 años la guía de complejidad (§14) pide validar tiempos de resolución del optimizador."
+              : "El modelo decide cuándo invertir en cada tecnología dentro de este horizonte (§14: slider 1–20)."}
+          </p>
+        </div>
+
+        <div className="control">
+          <label>Meta de emisiones netas (tCO₂e/año)</label>
+          <div className="range-row">
+            <input
+              type="number" min={0} step={500} value={draft.emissions_cap_net_start}
+              onChange={(e) => set({ emissions_cap_net_start: +e.target.value })}
+              aria-label="Cap neto año 1"
+            />
+            <span style={{ color: "var(--muted)" }}>→</span>
+            <input
+              type="number" min={0} step={500} value={draft.emissions_cap_net_end}
+              onChange={(e) => set({ emissions_cap_net_end: +e.target.value })}
+              aria-label="Cap neto año final"
+            />
+          </div>
+          <p className="hint">
+            Trayectoria lineal del año 1 al año {draft.horizon_years}:{" "}
+            <strong>{pct(reduction, 0)} de reducción</strong> exigida al final.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="switch-row">
+          <div>
+            <div className="sw-label">Permitir offsets</div>
+            <div className="sw-note">tope 15% del bruto · 5.000 t/año · 80 USD/t</div>
+          </div>
+          <Switch on={draft.allow_offsets} onChange={(v) => set({ allow_offsets: v })} />
+        </div>
+
+        <div className="switch-row">
+          <div>
+            <div className="sw-label">Permitir fósil nuevo</div>
+            <div className="sw-note">sin candidatas fósiles en el MVP — sin efecto</div>
+          </div>
+          <Switch
+            on={draft.allow_new_fossil}
+            onChange={(v) => set({ allow_new_fossil: v })}
+          />
+        </div>
+
+        <div className="control" style={{ marginTop: 10 }}>
+          <div className="switch-row" style={{ paddingBottom: 2 }}>
+            <div className="sw-label">Presupuesto CAPEX</div>
+            <Switch
+              on={draft.capex_budget_musd != null}
+              onChange={(v) => set({ capex_budget_musd: v ? 40 : null })}
+            />
+          </div>
+          <input
+            type="number" min={0} step={5}
+            disabled={draft.capex_budget_musd == null}
+            value={draft.capex_budget_musd ?? ""}
+            placeholder="sin límite"
+            onChange={(e) => set({ capex_budget_musd: +e.target.value })}
+            aria-label="Presupuesto CAPEX en MUSD"
+          />
+          <p className="hint">
+            {draft.capex_budget_musd == null
+              ? "Sin límite: el optimizador invierte todo lo que sea rentable o necesario."
+              : `Máximo ${num(draft.capex_budget_musd, 0)} MUSD acumulados en el horizonte — bajo ~29 MUSD el plan empieza a recortar tecnologías.`}
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="control">
+          <label>Escenario de precios</label>
+          <div className="segmented" role="group" aria-label="Escenario de precios">
+            {PRICE_SCENARIOS.map((s) => (
+              <button
+                key={s.id}
+                className={draft.price_scenario === s.id ? "active" : ""}
+                onClick={() => set({ price_scenario: s.id })}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            Base: electricidad 78 USD/MWh (esc. 2%/año), gas 38 (3%/año), carbono 50 USD/t.
+          </p>
+        </div>
+
+        <div className="control">
+          <button className="btn-run" onClick={onRun} disabled={running}>
+            {running ? "Optimizando…" : "Ejecutar escenario"}
+          </button>
+          {dirty && !running && (
+            <p className="dirty-note">
+              Hay cambios sin ejecutar — los resultados de abajo son del escenario anterior.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

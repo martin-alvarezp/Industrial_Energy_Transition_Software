@@ -1,0 +1,132 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
+import Cockpit from "./components/Cockpit.jsx";
+import Explorer from "./components/Explorer.jsx";
+import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
+import { compute, computeViaMock } from "./lib/api.js";
+
+const TABS = [
+  { id: "builder", label: "Escenario" },
+  { id: "cockpit", label: "Cockpit" },
+  { id: "explorer", label: "Explorador" },
+];
+
+const initialTab = () => {
+  const t = new URLSearchParams(window.location.search).get("tab");
+  return TABS.some((x) => x.id === t) ? t : "builder";
+};
+
+export default function App() {
+  const [tab, setTab] = useState(initialTab);
+  const [draft, setDraft] = useState(DEFAULT_CONFIG);
+  const [applied, setApplied] = useState(DEFAULT_CONFIG);
+  const [running, setRunning] = useState(false);
+  // primer render instantáneo con mock; la API (si está viva) lo reemplaza
+  const [data, setData] = useState(() => computeViaMock(DEFAULT_CONFIG));
+
+  useEffect(() => {
+    let alive = true;
+    setRunning(true);
+    compute(DEFAULT_CONFIG).then((d) => {
+      if (!alive) return;
+      setData(d);
+      setApplied(DEFAULT_CONFIG);
+      setRunning(false);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(applied),
+    [draft, applied]
+  );
+
+  const onRun = useCallback(() => {
+    const cfg = draft;
+    setRunning(true);
+    compute(cfg).then((d) => {
+      setData(d);
+      setApplied(cfg);
+      setRunning(false);
+      setTab("cockpit");
+    });
+  }, [draft]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onRun();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onRun]);
+
+  const { source, result, reference, referenceLabel, bauFeasible, pareto, batch } = data;
+
+  return (
+    <>
+      <header className="app-header">
+        <div className="brand-row">
+          <div>
+            <h1 className="app-title">
+              IETO<span className="divider">·</span>Executive Cockpit
+            </h1>
+            <p className="app-subtitle">
+              Industrial Energy Transition Optimizer — plan de transición de mínimo VAN
+            </p>
+          </div>
+          <div className="meta-chips">
+            <span className={"chip " + (source === "api" ? "status-ok" : "")}>
+              {source === "api" ? "API real · HiGHS" : "datos mock"}
+            </span>
+            <span className={"chip " + (result.meta.feasible ? "status-ok" : "status-bad")}>
+              {result.meta.status}
+            </span>
+            <span className="chip mono">v.{result.meta.scenario_version}</span>
+            <span className="chip">sitio {result.meta.site} · {result.meta.horizon_years} años</span>
+          </div>
+        </div>
+        <nav className="tabs">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={"tab" + (tab === t.id ? " active" : "")}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <main className="app-main">
+        {tab === "builder" && (
+          <>
+            <p className="section-label">Construcción del escenario</p>
+            <ScenarioBuilder
+              draft={draft} setDraft={setDraft}
+              onRun={onRun} running={running} dirty={dirty}
+            />
+            <div style={{ height: 20 }} />
+            <div className={running ? "busy" : ""}>
+              <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} />
+            </div>
+          </>
+        )}
+
+        {tab === "cockpit" && (
+          <div className={running ? "busy" : ""}>
+            <p className="section-label">Cockpit ejecutivo</p>
+            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} />
+          </div>
+        )}
+
+        {tab === "explorer" && (
+          <div className={running ? "busy" : ""}>
+            <Explorer result={result} pareto={pareto} batch={batch} config={applied} />
+          </div>
+        )}
+      </main>
+    </>
+  );
+}

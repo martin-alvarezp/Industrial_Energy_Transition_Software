@@ -42,7 +42,7 @@ end
 
 _json_404(req::HTTP.Request) = _json_response(404,
     _error_payload("ruta no encontrada: $(req.method) $(req.target)",
-                   ["endpoints: GET /scenarios, POST /scenario, POST /pareto"]))
+                   ["endpoints: GET /scenarios, POST /scenario, POST /pareto, POST /export/xlsx"]))
 _json_405(req::HTTP.Request) = _json_response(405,
     _error_payload("método $(req.method) no permitido en $(req.target)"))
 
@@ -54,6 +54,8 @@ function build_router(data_dir::AbstractString)
                    req -> handle_scenario(req, data_dir))
     HTTP.register!(router, "POST", "/pareto",
                    req -> handle_pareto(req, data_dir))
+    HTTP.register!(router, "POST", "/export/xlsx",
+                   req -> handle_export_xlsx(req, data_dir))
     return router
 end
 

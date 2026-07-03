@@ -22,6 +22,7 @@ struct Results
     cost_breakdown::DataFrame           # §6 por año + descuento + npv
     emissions::DataFrame                # year, gross, net, caps, offsets, macc
     res_share::Vector{Float64}          # participación renovable por año
+    diagnostics::Vector{String}         # causas de infactibilidad (vacío si factible)
 end
 
 """
@@ -49,15 +50,16 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         fin.breakdown,
         extract_emissions_summary(im; shadow_prices),
         res_share_by_year(im),
+        String[],
     )
 end
 
 "Results vacío para un escenario no resuelto (infactible, time limit, ...)."
 function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
-                            status::Symbol)
+                            status::Symbol, diagnostics::Vector{String} = String[])
     return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
-                   DataFrame(), DataFrame(), DataFrame(), Float64[])
+                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics)
 end
 
 _fmt(x; d = 1) = isnan(x) ? "—" : string(round(x; digits = d))

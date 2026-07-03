@@ -121,18 +121,49 @@ function handle_scenario(req::HTTP.Request, data_dir::AbstractString)
     scenario in PREDEFINED_SCENARIOS ||
         throw(ApiError(400, "escenario desconocido '$scenario'",
                        ["disponibles: " * join(PREDEFINED_SCENARIOS, ", ")]))
-    include_dispatch = try
-        Bool(get(body, :include_dispatch, false))
-    catch
-        throw(ApiError(400, "include_dispatch debe ser booleano"))
-    end
+    include_dispatch = _bool_field(body, :include_dispatch, false)
+    shadow_prices = _bool_field(body, :shadow_prices, true)
 
     site, cfg = _load_site(body, data_dir)
     cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
     validate_scenario(cfg, site)   # ValidationError → 400 (middleware)
 
-    r = run_scenario(site, cfg; scenario, verbose = false)
+    r = run_scenario(site, cfg; scenario, verbose = false, shadow_prices)
     return _json_response(200, results_payload(r; site, include_dispatch))
+end
+
+_bool_field(body, key::Symbol, default::Bool) = try
+    Bool(get(body, key, default))
+catch
+    throw(ApiError(400, "$key debe ser booleano"))
+end
+
+"""
+POST /export/xlsx — mismo body que /scenario (sin include_dispatch). Corre el
+escenario y responde el workbook XLSX de 8 hojas (docs/api_contract.md §4)
+como descarga binaria. Un escenario infactible también exporta (meta +
+supuestos + diagnóstico en el Resumen).
+"""
+function handle_export_xlsx(req::HTTP.Request, data_dir::AbstractString)
+    body = _parse_body(req)
+    scenario = Symbol(get(body, :scenario, "emissions_cap"))
+    scenario in PREDEFINED_SCENARIOS ||
+        throw(ApiError(400, "escenario desconocido '$scenario'",
+                       ["disponibles: " * join(PREDEFINED_SCENARIOS, ", ")]))
+    site, cfg = _load_site(body, data_dir)
+    cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
+    validate_scenario(cfg, site)
+
+    r = run_scenario(site, cfg; scenario, verbose = false)
+    tmp = tempname() * ".xlsx"
+    export_xlsx(r, tmp; site)
+    bytes = read(tmp)
+    rm(tmp; force = true)
+    fname = "ieto_$(site.name)_$(scenario).xlsx"
+    return HTTP.Response(200, [
+        "Content-Type" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition" => "attachment; filename=\"$fname\"",
+    ], bytes)
 end
 
 """

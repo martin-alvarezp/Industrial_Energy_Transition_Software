@@ -241,6 +241,7 @@ function results_payload(r::Results;
         scenarios = scenarios === nothing ? nothing : _json_rows(scenarios),
         pareto = pareto === nothing ? nothing : _json_rows(pareto),
         dispatch = (feas && include_dispatch) ? _json_rows(r.dispatch) : nothing,
+        infeasibility = feas ? nothing : (hints = r.diagnostics,),
     )
 end
 

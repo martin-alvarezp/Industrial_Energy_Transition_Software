@@ -160,18 +160,33 @@ CORS habilitado (`Access-Control-Allow-Origin: *`, preflight OPTIONS → 204).
 Errores siempre en JSON: `{"error": {"message": "...", "details": ["..."]}}`
 con status 400 (input/validación), 404 (sitio o ruta), 405 o 500.
 
-| Endpoint         | Body (JSON)                                                        | Respuesta 200                                   |
-|------------------|--------------------------------------------------------------------|-------------------------------------------------|
-| `GET /scenarios` | —                                                                  | `{"scenarios": [{"name", "description"}, ...]}` |
-| `POST /scenario` | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false}` | el esquema del §2 (results_payload)             |
-| `POST /pareto`   | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
+| Endpoint            | Body (JSON)                                                        | Respuesta 200                                   |
+|---------------------|--------------------------------------------------------------------|-------------------------------------------------|
+| `GET /scenarios`    | —                                                                  | `{"scenarios": [{"name", "description"}, ...]}` |
+| `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true}` | el esquema del §2 (results_payload)             |
+| `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |
+| `POST /export/xlsx` | mismo body que `/scenario` (sin flags)                             | binario XLSX (§4) como `attachment`             |
 
 Notas: `site` es obligatorio (nombre de carpeta en `data/sample_sites/`, sin
 rutas); `scenario` default `emissions_cap`; `config_overrides` acepta
 cualquier campo de `scenario_config` (§2) y se valida campo a campo;
 `include_dispatch` default `false` en la API (la serie tidy pesa ~9×96×N
-filas). Un escenario infactible es una respuesta **200** con
-`meta.feasible = false` — los errores 4xx son de input, no de optimización.
+filas); `shadow_prices` default `true` — con `false` se omite el MACC (columna
+null) y la corrida se ahorra el re-solve del LP, útil para lotes/comparaciones.
+Un escenario infactible es una respuesta **200** con `meta.feasible = false` y
+el campo `infeasibility` poblado — los errores 4xx son de input, no de
+optimización:
+
+```jsonc
+"infeasibility": {          // solo cuando feasible = false; null si factible
+  "hints": [                // diagnóstico de src/solve/infeasibility_diagnostics.jl:
+                            // qué restricción/recurso falta y por cuánto
+    "piso de emisiones: en el año 4 el mejor caso físico deja 15407 t netas
+     (18126 brutas − 2719 de offsets) y el cap neto exige 5000 t (faltan
+     10407 t de abatimiento) — opciones: relajar la meta del año 4 a ≥ 15407 t; ..."
+  ]
+}
+```
 
 ## 4. Workbook XLSX (`export_xlsx`)
 

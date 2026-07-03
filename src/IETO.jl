@@ -48,6 +48,7 @@ include("results/results.jl")
 
 # solve: configuración de HiGHS, escenarios predefinidos y lote (SPEC §11-12)
 include("solve/solver_config.jl")
+include("solve/infeasibility_diagnostics.jl")
 include("solve/run_scenario.jl")
 include("solve/run_batch.jl")
 include("results/pareto.jl")
@@ -75,6 +76,7 @@ export add_constraints!, add_converter_relations!, add_carrier_balance!,
 # solve + results
 export SolverConfig, configure_solver!, solve!, run_scenario, apply_scenario,
        with_config, PREDEFINED_SCENARIOS, run_batch, pareto_sweep, export_table,
+       diagnose_infeasibility, diagnostic_messages, InfeasibilityFinding,
        Results, extract_results, infeasible_results, print_summary,
        extract_dispatch, extract_financials, extract_capacity,
        extract_emissions_summary, res_share_by_year,
