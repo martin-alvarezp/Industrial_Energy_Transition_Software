@@ -242,6 +242,18 @@ tarifario en el twin) · D2 (perfil solar por lat/lon del mapa) ·
 sin tocar el MILP. El round-trip del BESS calculado (90,2%) coincide exacto
 con η² del sitio (0,95²), validando los extractores.
 
+**R3 · Arranque en blanco (lógica de optimizador).** ✅ Se eliminó la autocarga
++ autoejecución del demo al abrir: mostraba resultados "fantasma" antes de que
+el usuario definiera nada, contradiciendo la lógica del producto (no hay
+resultados hasta fijar el sitio y correr). Ahora abre en la pestaña Sitio sin
+sitio ni resultados; el usuario carga uno guardado, parte del demo, o **crea uno
+nuevo desde cero** (`blankSite`), y las vistas de resultados muestran un estado
+vacío (`EmptyResults`) hasta el primer Ejecutar. Habilitó de paso un fix de
+backend (M3): un `site_payload` es un sitio stateless, así que se ignora el
+`allowed_techs` del config en disco (era de OTRO sitio y rompía runs de sitios
+nuevos o del demo con equipos borrados); al guardar un sitio nuevo, la config
+base se escribe sin `allowed_techs`. 987 tests verdes.
+
 ### v0.5 — "Multi-sitio y plataforma mínima suficiente"
 > Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el
 > uso real la exige (decisión revisada tras v0.4 — SSO/multi-tenant se

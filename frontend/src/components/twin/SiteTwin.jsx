@@ -17,7 +17,8 @@ const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar di
  * satelital con límites del sitio y equipos georreferenciados, editor
  * completo de equipos, y el site_json serializado listo para site_payload.
  */
-export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
+export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
+                                   onLoadSite, onNewSite, apiUp, config,
                                    onRun, running, twinIgnored }) {
   const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>"
   const [draftBoundary, setDraftBoundary] = useState([]);
@@ -25,7 +26,8 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
   const [selectedId, setSelectedId] = useState(null);
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
-  const [siteList, setSiteList] = useState([siteName ?? "demo"]);
+  const [siteList, setSiteList] = useState(["demo"]);
+  const [pickName, setPickName] = useState("demo");   // selección del chooser
   const [saveName, setSaveName] = useState("");
   const [saveMsg, setSaveMsg] = useState(null);       // {ok, text}
   const mapRef = useRef(null);
@@ -38,7 +40,47 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!twin) return <p className="card-sub">Cargando el sitio…</p>;
+  if (twinLoading) return <p className="card-sub">Cargando el sitio…</p>;
+  // sin sitio cargado: el usuario elige uno guardado, parte del demo, o crea uno
+  if (!twin)
+    return (
+      <div className="card no-site">
+        <h3 className="card-title">Empieza por tu sitio</h3>
+        <p className="card-sub">
+          IETO optimiza a partir de tu planta industrial. Carga un sitio
+          guardado, parte del ejemplo <em>demo</em>, o crea uno nuevo desde cero
+          — no hay resultados hasta que definas el sitio y ejecutes.
+        </p>
+        <div className="control">
+          <label>Cargar un sitio existente</label>
+          <div className="range-row">
+            <select
+              className="site-select" value={pickName}
+              onChange={(e) => setPickName(e.target.value)}
+              aria-label="sitio a cargar"
+            >
+              {siteList.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <button className="btn-run" style={{ width: "auto", padding: "8px 20px" }}
+                    onClick={() => onLoadSite(pickName)}>
+              Cargar
+            </button>
+          </div>
+        </div>
+        <div className="control" style={{ marginTop: 12 }}>
+          <label>o empezar de cero</label>
+          <button className="chart-toggle" onClick={() => onNewSite()}>
+            + Crear sitio nuevo
+          </button>
+        </div>
+        {apiUp === false && (
+          <p className="hint warn" style={{ marginTop: 10 }}>
+            Sin API: puedes mapear y editar, pero guardar y ejecutar requieren el
+            backend en 127.0.0.1:8080.
+          </p>
+        )}
+      </div>
+    );
   const { siteJson, layout, source } = twin;
   const patch = (p) => setTwin((t) => ({ ...t, dirty: true, ...p }));
   const patchLayout = (p) => patch({ layout: { ...layout, ...p } });
@@ -171,9 +213,12 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
                 onChange={(e) => onLoadSite(e.target.value)}
                 aria-label="sitio activo"
               >
+                {!siteList.includes(siteName) && (
+                  <option value={siteName}>{siteName} (nuevo · sin guardar)</option>
+                )}
                 {siteList.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              {siteName !== "demo" && source === "api" && (
+              {twin.saved && siteName !== "demo" && source === "api" && (
                 <button className="chart-toggle danger" title="eliminar este sitio"
                         onClick={doDelete}>
                   Eliminar

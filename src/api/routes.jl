@@ -80,6 +80,12 @@ function _load_site(body, data_dir::AbstractString)
                             "(esquema en docs/digital_twin_spec.md §7)"))
     site = site_from_json(payload; default_name = String(body.site))
     cfg = load_scenario_config(dir)
+    # el payload es un sitio STATELESS: la curación `allowed_techs` del disco es
+    # de OTRO sitio (el del directorio, del que solo tomamos el config base), y
+    # sus IDs pueden no existir en el payload (sitio nuevo, o demo con equipos
+    # borrados) → romperían la validación. Se vacía = todas las del payload
+    # permitidas; el frontend curará con allowed_techs cuando lo exponga.
+    cfg = with_config(cfg; allowed_techs = Symbol[])
     validate_site(site)   # ValidationError → 400 con la lista de problemas
     return site, cfg
 end
@@ -158,7 +164,11 @@ function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
         base = joinpath(data_dir, "demo", "scenario_config.yaml")
         isfile(base) || throw(ApiError(500,
             "no hay scenario_config base para el sitio nuevo (falta el del demo)"))
-        cp(base, yaml)
+        # config base SIN `allowed_techs`: esa curación lista IDs del demo y
+        # rompería runs de un sitio con otras tecnologías. Ausente = todas las
+        # del sitio permitidas (schema: default String[]).
+        keep = filter(l -> !startswith(lstrip(l), "allowed_techs:"), readlines(base))
+        write(yaml, join(keep, "\n") * "\n")
     end
     return _json_response(200, (saved = name, site_version = site_version(site),
                                 n_techs = length(all_tech_ids(site))))

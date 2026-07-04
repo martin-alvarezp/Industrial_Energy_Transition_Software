@@ -3,9 +3,10 @@ import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
 import Cockpit from "./components/Cockpit.jsx";
 import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
+import EmptyResults from "./components/EmptyResults.jsx";
 import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
-import { compute, computeViaMock, fetchSite } from "./lib/api.js";
-import { geoJSONToLayout } from "./lib/twin.js";
+import { compute, fetchSite, apiAvailable } from "./lib/api.js";
+import { geoJSONToLayout, blankSite } from "./lib/twin.js";
 
 const TABS = [
   { id: "site", label: "Sitio" },
@@ -16,7 +17,9 @@ const TABS = [
 
 const initialTab = () => {
   const t = new URLSearchParams(window.location.search).get("tab");
-  return TABS.some((x) => x.id === t) ? t : "builder";
+  // arranque en la pestaña Sitio: IETO no muestra resultados hasta que el
+  // usuario define su planta y ejecuta
+  return TABS.some((x) => x.id === t) ? t : "site";
 };
 
 export default function App() {
@@ -24,47 +27,55 @@ export default function App() {
   const [draft, setDraft] = useState(DEFAULT_CONFIG);
   const [applied, setApplied] = useState(DEFAULT_CONFIG);
   const [running, setRunning] = useState(false);
-  // primer render instantáneo con mock; la API (si está viva) lo reemplaza
-  const [data, setData] = useState(() => computeViaMock(DEFAULT_CONFIG));
-  // digital twin (tab Sitio): site_json + capa geográfica local
+  const [apiUp, setApiUp] = useState(null); // null = sin sondear · bool tras sondeo
+  // sin corrida aún: no hay resultados hasta el primer Ejecutar (data = null)
+  const [data, setData] = useState(null);
+  // digital twin (tab Sitio): null = sin sitio cargado
   const [twin, setTwin] = useState(null);
-  // sitio activo (guardables vía PUT /sites, fase 5) y el payload aplicado
-  const [siteName, setSiteName] = useState("demo");
+  const [twinLoading, setTwinLoading] = useState(false);
+  const [siteName, setSiteName] = useState(null);
   const [appliedPayload, setAppliedPayload] = useState(null);
+  // sitio EN DISCO usado como base de config en la última corrida (el nuevo sin
+  // guardar toma la del demo); las llamadas API posteriores (tornado, xlsx) lo usan
   const [appliedSite, setAppliedSite] = useState("demo");
-  // snapshot del site_json usado en la corrida vigente (perfiles, pesos,
-  // capacidades) — base de las métricas operacionales por equipo
+  // snapshot del site_json corrido (perfiles, pesos, capacidades) — base de las
+  // métricas por equipo y del tornado
   const [appliedSiteJson, setAppliedSiteJson] = useState(null);
 
+  // sondeo único de la API: alimenta el header y habilita guardar/ejecutar.
+  // NO autocarga un sitio ni autocorre — ese era el origen de los resultados
+  // "fantasma" al abrir.
+  useEffect(() => { apiAvailable().then(setApiUp); }, []);
+
   const loadTwin = useCallback((name) => {
+    setTwinLoading(true);
     setTwin(null);
-    return fetchSite(name).then(({ source, site }) => {
-      const { layout, site_version, ...siteJson } = site;
-      const full = { ...siteJson, site_version };
-      setSiteName(name);
-      setTwin({
-        siteJson: full, source, dirty: false,
-        layout: layout ? geoJSONToLayout(layout) :
-                { address: null, center: null, boundary: null, equipment: {} },
-      });
-      return full;
-    });
+    return fetchSite(name)
+      .then(({ source, site }) => {
+        const { layout, site_version, ...siteJson } = site;
+        const full = { ...siteJson, site_version };
+        setSiteName(name);
+        setTwin({
+          siteJson: full, source, dirty: false, saved: true,
+          layout: layout ? geoJSONToLayout(layout) :
+                  { address: null, center: null, boundary: null, equipment: {} },
+        });
+        setTwinLoading(false);
+        return full;
+      })
+      .catch((e) => { setTwinLoading(false); throw e; });
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    setRunning(true);
-    loadTwin("demo").then((siteJson) => {
-      if (alive) setAppliedSiteJson(siteJson);
+  // "crear sitio nuevo": esqueleto en memoria (dirty, sin guardar) para editar
+  const onNewSite = useCallback((name = "nuevo_sitio") => {
+    setSiteName(name);
+    setTwin({
+      siteJson: blankSite(name), source: apiUp ? "api" : "mock",
+      dirty: true, saved: false,
+      layout: { address: null, center: null, boundary: null, equipment: {} },
     });
-    compute(DEFAULT_CONFIG).then((d) => {
-      if (!alive) return;
-      setData(d);
-      setApplied(DEFAULT_CONFIG);
-      setRunning(false);
-    });
-    return () => { alive = false; };
-  }, [loadTwin]);
+    setTab("site");
+  }, [apiUp]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(applied),
@@ -72,17 +83,19 @@ export default function App() {
   );
 
   const onRun = useCallback(() => {
+    if (!twin) return; // sin sitio no hay nada que optimizar
     const cfg = draft;
-    // twin con ediciones → viaja como site_payload en todas las corridas
-    const payload = twin?.dirty ? twin.siteJson : null;
-    // snapshot del sitio usado (para métricas por equipo): el editado o el cargado
-    const snapshot = payload ?? twin?.siteJson ?? null;
+    // base de config en disco: el sitio guardado, o el demo para un sitio nuevo
+    const apiSite = twin.saved ? siteName : "demo";
+    // el sitio físico viaja como site_payload salvo que sea uno en disco intacto
+    const payload = !twin.saved || twin.dirty ? twin.siteJson : null;
+    const snapshot = payload ?? twin.siteJson ?? null;
     setRunning(true);
-    compute(cfg, payload, siteName).then((d) => {
+    compute(cfg, payload, apiSite).then((d) => {
       setData(d);
       setApplied(cfg);
       setAppliedPayload(payload);
-      setAppliedSite(siteName);
+      setAppliedSite(apiSite);
       setAppliedSiteJson(snapshot);
       setRunning(false);
       setTab("cockpit");
@@ -97,7 +110,14 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [onRun]);
 
-  const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } = data;
+  const hasResults = !!data;
+  const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } =
+    data ?? {};
+
+  const empty = (
+    <EmptyResults hasSite={!!twin} onGoToSite={() => setTab("site")}
+                  onRun={onRun} running={running} />
+  );
 
   return (
     <>
@@ -112,17 +132,27 @@ export default function App() {
             </p>
           </div>
           <div className="meta-chips">
-            <span className={"chip " + (source === "api" ? "status-ok" : "")}>
-              {source === "api" ? "API real · HiGHS" : "datos mock"}
+            <span className={"chip " + (apiUp ? "status-ok" : "")}>
+              {apiUp == null ? "conectando…" : apiUp ? "API real · HiGHS" : "datos mock"}
             </span>
-            <span className={"chip " + (result.meta.feasible ? "status-ok" : "status-bad")}>
-              {result.meta.status}
-            </span>
-            <span className="chip mono">v.{result.meta.scenario_version}</span>
-            <span className="chip">
-              sitio {result.meta.site}
-              {appliedPayload ? " (twin editado)" : ""} · {result.meta.horizon_years} años
-            </span>
+            {hasResults ? (
+              <>
+                <span className={"chip " + (result.meta.feasible ? "status-ok" : "status-bad")}>
+                  {result.meta.status}
+                </span>
+                <span className="chip mono">v.{result.meta.scenario_version}</span>
+                <span className="chip">
+                  sitio {result.meta.site}
+                  {appliedPayload ? " (twin editado)" : ""} · {result.meta.horizon_years} años
+                </span>
+              </>
+            ) : (
+              <span className="chip">
+                {twin
+                  ? `sitio ${siteName}${twin.saved ? "" : " (nuevo)"} · sin corrida`
+                  : "sin sitio cargado"}
+              </span>
+            )}
           </div>
         </div>
         <nav className="tabs">
@@ -146,10 +176,10 @@ export default function App() {
               como site_payload)
             </p>
             <SiteTwin
-              twin={twin} setTwin={setTwin}
-              siteName={siteName} onLoadSite={loadTwin}
-              config={applied} onRun={onRun} running={running}
-              twinIgnored={data.twinIgnored}
+              twin={twin} setTwin={setTwin} twinLoading={twinLoading}
+              siteName={siteName} onLoadSite={loadTwin} onNewSite={onNewSite}
+              apiUp={apiUp} config={applied} onRun={onRun} running={running}
+              twinIgnored={data?.twinIgnored}
             />
           </>
         )}
@@ -159,12 +189,14 @@ export default function App() {
             <p className="section-label">Construcción del escenario</p>
             <ScenarioBuilder
               draft={draft} setDraft={setDraft} applied={applied}
-              onRun={onRun} running={running} dirty={dirty}
+              onRun={onRun} running={running} dirty={dirty} hasSite={!!twin}
             />
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
               <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
-              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
+              {hasResults ? (
+                <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
+              ) : empty}
             </div>
           </>
         )}
@@ -172,14 +204,18 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
-            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
+            {hasResults ? (
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
+            ) : empty}
           </div>
         )}
 
         {tab === "explorer" && (
           <div className={running ? "busy" : ""}>
-            <Explorer result={result} pareto={pareto} batch={batch}
-                      config={applied} siteJson={appliedSiteJson} />
+            {hasResults ? (
+              <Explorer result={result} pareto={pareto} batch={batch}
+                        config={applied} siteJson={appliedSiteJson} />
+            ) : empty}
           </div>
         )}
       </main>

@@ -29,6 +29,53 @@ export function slugId(name, existingIds) {
   return id;
 }
 
+const EN_SEASONS = ["winter", "spring", "summer", "autumn"];
+const flat96 = (v) => Array(96).fill(v);
+
+/**
+ * Esqueleto de un sitio en blanco para "crear sitio nuevo": los carriers
+ * estándar, la conexión a la red y los bonos como fuentes no invertibles, y
+ * precios/factores base. Sin demanda ni equipos propios — el usuario los define.
+ * Vive en memoria (dirty) hasta "Guardar como"; corre como site_payload.
+ */
+export function blankSite(name = "nuevo_sitio") {
+  const src = (o) => ({
+    input_carrier: null, existing_capacity: 0, max_new_capacity: 0,
+    efficiency: 1, investable: false, capex_per_kw: 0, fixed_opex: 0,
+    variable_opex: 0, lifetime_years: 40, storage_hours: null, ports: null, ...o,
+  });
+  return {
+    name,
+    timesteps: EN_SEASONS.flatMap((se, s) =>
+      Array.from({ length: 24 }, (_, h) =>
+        ({ step_id: s * 24 + h + 1, season: se, hour: h, weight_hours: 91.25 }))),
+    carriers: [
+      { carrier_id: "co2e", name: "CO2 equivalent", unit: "tCO2e", category: "emissions" },
+      { carrier_id: "electricity", name: "Electricity", unit: "MWh", category: "energy" },
+      { carrier_id: "hot_water", name: "Hot water", unit: "MWh", category: "heat" },
+      { carrier_id: "natural_gas", name: "Natural gas", unit: "MWh", category: "fuel" },
+      { carrier_id: "offsets", name: "Carbon offsets", unit: "tCO2e", category: "offset" },
+    ],
+    technologies: [
+      src({ tech_id: "grid_import", name: "Conexión a la red", type: "source",
+            output_carrier: "electricity", existing_capacity: 25 }),
+      src({ tech_id: "offsets", name: "Bonos de carbono", type: "source",
+            output_carrier: "offsets", lifetime_years: 1 }),
+    ],
+    // solo demanda de electricidad (la red la cubre); el usuario agrega demanda
+    // de calor junto con el equipo que la produzca (validación: toda demanda
+    // necesita un productor)
+    demands: { electricity: flat96(0) },
+    prices: { electricity: flat96(80), grid_export: flat96(45), natural_gas: flat96(38) },
+    generation_profiles: {},
+    emission_factors: [
+      { carrier_id: "electricity", scope: "scope2", factor: 0.3 },
+      { carrier_id: "natural_gas", scope: "scope1", factor: 0.202 },
+    ],
+    site_version: null,
+  };
+}
+
 /** Equipo nuevo con defaults sensatos por tipo (catálogo §4 del twin spec). */
 export function blankEquipment(type, siteJson) {
   const carriers = siteJson.carriers.map((c) => c.carrier_id);

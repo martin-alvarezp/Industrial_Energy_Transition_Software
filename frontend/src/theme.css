@@ -398,3 +398,21 @@ input:disabled { background: var(--page); color: var(--muted); }
 /* leaflet: que el chrome del mapa combine con el producto */
 .leaflet-container { font-family: var(--font); }
 .leaflet-control-layers { border-radius: 10px !important; border: 1px solid var(--border) !important; }
+
+/* estado vacío de resultados (sin corrida) y chooser de sitio inicial */
+.empty-results {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 12px; padding: 56px 28px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px;
+}
+.empty-results .empty-glyph {
+  font-size: 40px; line-height: 1; opacity: 0.85;
+  filter: grayscale(0.1);
+}
+.empty-results h3 { margin: 0; font-size: 17px; color: var(--ink); }
+.empty-results p {
+  margin: 0; max-width: 52ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2);
+}
+.empty-results .btn-run { margin-top: 6px; }
+.no-site { max-width: 560px; }
+.no-site .control label { color: var(--ink-2); }

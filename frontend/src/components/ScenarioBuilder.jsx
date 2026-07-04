@@ -12,7 +12,7 @@ function Switch({ on, onChange, disabled }) {
 }
 
 /** Controles ejecutivos del escenario. `draft` es el config aún no ejecutado. */
-export default function ScenarioBuilder({ draft, setDraft, applied, onRun, running, dirty }) {
+export default function ScenarioBuilder({ draft, setDraft, applied, onRun, running, dirty, hasSite }) {
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
   const reduction = 1 - draft.emissions_cap_net_end / draft.emissions_cap_net_start;
   // H1 (docs/edge_cases.md): alargar el horizonte con la misma meta final
@@ -149,10 +149,15 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
         </div>
 
         <div className="control">
-          <button className="btn-run" onClick={onRun} disabled={running}>
+          <button className="btn-run" onClick={onRun} disabled={running || !hasSite}>
             {running ? "Optimizando…" : "Ejecutar escenario"}
           </button>
-          {dirty && !running && (
+          {!hasSite && (
+            <p className="hint warn">
+              Primero carga o crea un sitio en la pestaña Sitio.
+            </p>
+          )}
+          {hasSite && dirty && !running && (
             <p className="dirty-note">
               Hay cambios sin ejecutar — los resultados de abajo son del escenario anterior.
             </p>
