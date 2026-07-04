@@ -216,8 +216,16 @@ tarifario en el twin) · D2 (perfil solar por lat/lon del mapa) ·
   simple y descontado, TIR** del flujo incremental vs "no invertir" (BAU), con
   gráfico de flujo de caja anual + acumulado. Cuando el BAU es infactible
   (no invertir no es viable), lo dice como mensaje ejecutivo.
-- ⏳ **Tornado de sensibilidad** (M8): ±X% en gas/electricidad/CAPEX/demanda →
-  efecto en VAN — pendiente (orquestar ~6 corridas on-demand).
+- ✅ **Tornado de sensibilidad** (M8): ±X% (10/20/30 seleccionable) en precio de
+  electricidad, combustible, CAPEX y demanda → swing del VAN del plan
+  RE-OPTIMIZADO. On-demand (2 corridas por palanca en paralelo contra la API),
+  barra diverging centrada en el VAN vigente, ordenada por magnitud. Un extremo
+  infactible es un hallazgo, no un hueco: se titula explícito ("subir la demanda
+  20% vuelve el plan infactible") y ordena por el lado conocido. 100% frontend
+  (`lib/sensitivity.js` deriva las palancas del site_json por categoría de
+  carrier; `api.js` orquesta; `Tornado.jsx` renderiza). Verificado contra la API
+  real: monotonía del VAN OK en las tres palancas factibles; demanda +20% sale
+  infactible en el demo (el parque no cubre la demanda crecida).
 - ⏳ Memo ejecutivo PDF (P2) · comparación de estudios guardados (P1).
 
 **R2 · Vista ingeniería de planta (operación por equipo):** ✅ sección

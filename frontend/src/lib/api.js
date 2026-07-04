@@ -5,6 +5,7 @@ import {
   runScenario as mockScenario, runBau as mockBau,
   runPareto as mockPareto, runBatch as mockBatch, mockSiteJson,
 } from "./mockEngine.js";
+import { tornadoLevers, buildTornado } from "./sensitivity.js";
 
 const API_BASE = import.meta.env.VITE_IETO_API ?? "http://127.0.0.1:8080";
 
@@ -104,6 +105,36 @@ export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") 
     pareto: paretoResp.pareto,
     batch,
   };
+}
+
+/**
+ * Tornado de sensibilidad on-demand (vista C-suite): re-resuelve el escenario
+ * aplicado con cada palanca del sitio a ±pct y mide el swing del VAN del plan.
+ * 2 solves por palanca, todos en paralelo. `siteJson` es el snapshot del sitio
+ * corrido (el mismo que alimenta las métricas por equipo); `baselineNpv` es el
+ * VAN del plan vigente (result.kpis.npv), centro del tornado. Requiere API real
+ * — el mock ignora ediciones del sitio, así que la sensibilidad no aplica.
+ */
+export async function runTornado(cfg, siteJson, siteName = "demo", baselineNpv, pct = 0.2) {
+  const levers = tornadoLevers(siteJson);
+  if (!levers.length) return { pct, baselineNpv, rows: [] };
+  const scenario = scenarioName(cfg);
+  const overrides = toOverrides(cfg);
+  const solve = async (payload) => {
+    const r = await post("/scenario", {
+      site: siteName, scenario, config_overrides: overrides, site_payload: payload,
+    });
+    return r.meta.feasible ? r.kpis.npv : null;
+  };
+  const results = await Promise.all(
+    levers.map(async (lv) => {
+      const [lowNpv, highNpv] = await Promise.all([
+        solve(lv.apply(-pct)), solve(lv.apply(+pct)),
+      ]);
+      return { id: lv.id, label: lv.label, hint: lv.hint, lowNpv, highNpv };
+    })
+  );
+  return { pct, baselineNpv, rows: buildTornado(baselineNpv, results) };
 }
 
 /** Fallback local: el mock que reproduce el contrato. */

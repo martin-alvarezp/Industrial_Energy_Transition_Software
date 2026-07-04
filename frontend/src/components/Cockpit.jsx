@@ -2,13 +2,14 @@ import { useState } from "react";
 import KpiTile from "./KpiTile.jsx";
 import Narrative from "./Narrative.jsx";
 import InvestmentCase from "./InvestmentCase.jsx";
+import Tornado from "./Tornado.jsx";
 import EmissionsChart from "./charts/EmissionsChart.jsx";
 import CostChart from "./charts/CostChart.jsx";
 import { musd, pct, usdPerTon } from "../lib/format.js";
 import { downloadXlsx } from "../lib/api.js";
 
 /** Cockpit ejecutivo: 6 KPIs + narrativa + trayectoria y costos. */
-export default function Cockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName }) {
+export default function Cockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName, siteJson }) {
   if (!result.meta.feasible) {
     return (
       <div className="banner-infeasible">
@@ -29,12 +30,12 @@ export default function Cockpit({ result, reference, referenceLabel, bauFeasible
     <FeasibleCockpit
       result={result} reference={reference} referenceLabel={referenceLabel}
       bauFeasible={bauFeasible} bau={bau} config={config} source={source}
-      sitePayload={sitePayload} siteName={siteName}
+      sitePayload={sitePayload} siteName={siteName} siteJson={siteJson}
     />
   );
 }
 
-function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName }) {
+function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName, siteJson }) {
   const [downloading, setDownloading] = useState(false);
   const onXlsx = () => {
     setDownloading(true);
@@ -99,6 +100,12 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
 
       <p className="section-label">Caso de inversión</p>
       <InvestmentCase plan={result} bau={bau} referenceLabel={referenceLabel} />
+
+      <div style={{ height: 12 }} />
+      <Tornado
+        config={config} siteJson={siteJson} siteName={siteName}
+        baselineNpv={result.kpis.npv} source={source}
+      />
 
       <p className="section-label">Trayectoria y costos</p>
       <div className="grid cols-2">

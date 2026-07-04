@@ -164,7 +164,7 @@ export default function App() {
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
               <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
-              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
             </div>
           </>
         )}
@@ -172,7 +172,7 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
-            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
+            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
           </div>
         )}
 
