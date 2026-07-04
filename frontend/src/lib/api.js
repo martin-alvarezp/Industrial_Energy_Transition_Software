@@ -99,6 +99,7 @@ export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") 
     result,
     reference: compare[compareNames.indexOf("least_cost")],
     referenceLabel: "sin meta",
+    bau: bauResp,                       // caso base "no invertir" (§ inversión)
     bauFeasible: bauResp.meta.feasible,
     pareto: paretoResp.pareto,
     batch,
@@ -107,11 +108,13 @@ export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") 
 
 /** Fallback local: el mock que reproduce el contrato. */
 export function computeViaMock(cfg) {
+  const bau = mockBau(cfg);
   return {
     source: "mock",
     result: mockScenario(cfg),
-    reference: mockBau(cfg),
+    reference: bau,
     referenceLabel: "BAU",
+    bau,
     bauFeasible: true,
     pareto: mockPareto(cfg),
     batch: mockBatch(cfg),

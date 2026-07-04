@@ -32,30 +32,37 @@ export default function App() {
   const [siteName, setSiteName] = useState("demo");
   const [appliedPayload, setAppliedPayload] = useState(null);
   const [appliedSite, setAppliedSite] = useState("demo");
+  // snapshot del site_json usado en la corrida vigente (perfiles, pesos,
+  // capacidades) — base de las métricas operacionales por equipo
+  const [appliedSiteJson, setAppliedSiteJson] = useState(null);
 
   const loadTwin = useCallback((name) => {
     setTwin(null);
-    fetchSite(name).then(({ source, site }) => {
+    return fetchSite(name).then(({ source, site }) => {
       const { layout, site_version, ...siteJson } = site;
+      const full = { ...siteJson, site_version };
       setSiteName(name);
       setTwin({
-        siteJson: { ...siteJson, site_version }, source, dirty: false,
+        siteJson: full, source, dirty: false,
         layout: layout ? geoJSONToLayout(layout) :
                 { address: null, center: null, boundary: null, equipment: {} },
       });
+      return full;
     });
   }, []);
 
   useEffect(() => {
     let alive = true;
     setRunning(true);
+    loadTwin("demo").then((siteJson) => {
+      if (alive) setAppliedSiteJson(siteJson);
+    });
     compute(DEFAULT_CONFIG).then((d) => {
       if (!alive) return;
       setData(d);
       setApplied(DEFAULT_CONFIG);
       setRunning(false);
     });
-    loadTwin("demo");
     return () => { alive = false; };
   }, [loadTwin]);
 
@@ -68,12 +75,15 @@ export default function App() {
     const cfg = draft;
     // twin con ediciones → viaja como site_payload en todas las corridas
     const payload = twin?.dirty ? twin.siteJson : null;
+    // snapshot del sitio usado (para métricas por equipo): el editado o el cargado
+    const snapshot = payload ?? twin?.siteJson ?? null;
     setRunning(true);
     compute(cfg, payload, siteName).then((d) => {
       setData(d);
       setApplied(cfg);
       setAppliedPayload(payload);
       setAppliedSite(siteName);
+      setAppliedSiteJson(snapshot);
       setRunning(false);
       setTab("cockpit");
     });
@@ -87,7 +97,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [onRun]);
 
-  const { source, result, reference, referenceLabel, bauFeasible, pareto, batch } = data;
+  const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } = data;
 
   return (
     <>
@@ -154,7 +164,7 @@ export default function App() {
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
               <p className="section-label">Vista previa — cockpit del escenario ejecutado</p>
-              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
+              <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
             </div>
           </>
         )}
@@ -162,13 +172,14 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
-            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
+            <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} />
           </div>
         )}
 
         {tab === "explorer" && (
           <div className={running ? "busy" : ""}>
-            <Explorer result={result} pareto={pareto} batch={batch} config={applied} />
+            <Explorer result={result} pareto={pareto} batch={batch}
+                      config={applied} siteJson={appliedSiteJson} />
           </div>
         )}
       </main>

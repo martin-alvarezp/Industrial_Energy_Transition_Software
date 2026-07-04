@@ -212,30 +212,27 @@ tarifario en el twin) · D2 (perfil solar por lat/lon del mapa) ·
 > las preguntas técnicas de un ingeniero de planta sin salir de la app.
 
 **R1 · Vista C-suite (decisión de inversión):**
-- KPIs financieros que faltan: **payback simple y descontado, TIR del plan
-  incremental vs referencia, VAN incremental por tecnología**, plan de
-  capital por año (waterfall).
-- **Tornado de sensibilidad** (M8 adelantado): ±X% en gas/electricidad/
-  CAPEX/demanda → efecto en VAN y en el año de inversión — la pregunta
-  "¿y si el gas sube?" respondida en un gráfico.
-- **Memo ejecutivo exportable (PDF)**: narrativa + KPIs + roadmap + supuestos
-  firmados con las huellas de trazabilidad (P2).
-- Comparación de **estudios guardados** lado a lado (P1): decisión = comparar.
+- ✅ **Caso de inversión** en el Cockpit: VAN incremental, CAPEX, **payback
+  simple y descontado, TIR** del flujo incremental vs "no invertir" (BAU), con
+  gráfico de flujo de caja anual + acumulado. Cuando el BAU es infactible
+  (no invertir no es viable), lo dice como mensaje ejecutivo.
+- ⏳ **Tornado de sensibilidad** (M8): ±X% en gas/electricidad/CAPEX/demanda →
+  efecto en VAN — pendiente (orquestar ~6 corridas on-demand).
+- ⏳ Memo ejecutivo PDF (P2) · comparación de estudios guardados (P1).
 
-**R2 · Vista ingeniería de planta (operación por equipo):**
-- **BESS**: SOC por estación/año, ciclos equivalentes/año, throughput anual,
-  spread capturado (USD/MWh ciclado), horas a plena carga.
-- **PV**: factor de planta real vs teórico, **curtailment** por paso y
-  estación, coincidencia generación-demanda, autoconsumo vs inyección.
-- **Conversores/CHP**: horas equivalentes, factor de utilización, curva de
-  duración de carga por equipo, consumo específico.
-- **Balances por carrier**: diagrama de flujos anual (Sankey) y por estación.
-- **Flujo de caja por equipo**: cuánto aporta cada inversión al VAN
-  (descomposición), para defender cada línea del CAPEX.
+**R2 · Vista ingeniería de planta (operación por equipo):** ✅ sección
+"Ingeniería de planta" en el Explorador, con selector de equipo:
+- ✅ **BESS**: ciclos equivalentes/año, throughput, round-trip realizado,
+  utilización de SOC.
+- ✅ **PV**: factor de planta, curtailment (potencial cf·cap vs despacho).
+- ✅ **Conversores/CHP**: horas equivalentes a plena carga, utilización.
+- ✅ **Curva de duración de carga** por equipo.
+- ⏳ Sankey de flujos por carrier · flujo de caja por equipo · spread del BESS.
 
-*Nota de esfuerzo:* casi todo R1/R2 es frontend + extractores sobre datos que
-el motor **ya produce** (dispatch tidy completo, desglose §6, capacidades) —
-alto valor, costo medio-bajo, sin tocar el MILP.
+*Nota de esfuerzo confirmada:* R1/R2 se implementaron **100% en el frontend**
+(`lib/finance.js`, `lib/operations.js`) sobre datos que el motor ya produce —
+sin tocar el MILP. El round-trip del BESS calculado (90,2%) coincide exacto
+con η² del sitio (0,95²), validando los extractores.
 
 ### v0.5 — "Multi-sitio y plataforma mínima suficiente"
 > Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el

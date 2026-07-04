@@ -3,14 +3,15 @@ import ParetoChart from "./charts/ParetoChart.jsx";
 import DispatchChart from "./charts/DispatchChart.jsx";
 import Roadmap from "./Roadmap.jsx";
 import ScenarioCompare from "./ScenarioCompare.jsx";
+import PlantEngineering from "./PlantEngineering.jsx";
 import { dispatchDay, SEASONS } from "../lib/mockEngine.js";
 import { dayFromDispatch } from "../lib/api.js";
 
 /**
- * Results explorer: Pareto + roadmap + comparación (nivel horizonte) y, con su
- * propia fila de filtros encima (año · estación · vector), la operación diaria.
+ * Results explorer: Pareto + roadmap + comparación (nivel horizonte), la
+ * operación diaria, y la ingeniería de planta (métricas por equipo).
  */
-export default function Explorer({ result, pareto, batch, config }) {
+export default function Explorer({ result, pareto, batch, config, siteJson }) {
   const [year, setYear] = useState(1);
   const [season, setSeason] = useState("invierno");
   const [vector, setVector] = useState("electricidad");
@@ -71,6 +72,9 @@ export default function Explorer({ result, pareto, batch, config }) {
         </div>
       </div>
       <DispatchChart rows={rows} vector={vector} />
+
+      <p className="section-label">Ingeniería de planta — métricas por equipo</p>
+      <PlantEngineering result={result} siteJson={siteJson} year={safeYear} />
     </>
   );
 }
