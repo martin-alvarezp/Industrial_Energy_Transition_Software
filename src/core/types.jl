@@ -41,18 +41,49 @@ struct Source
     costs::TechCosts
 end
 
-"Conversor input→output con eficiencia constante (gas_boiler, electric_boiler, heat_pump/COP)."
+"Puerto de un conversor: carrier + tasa en MW por MW de la salida de referencia."
+struct ConverterPort
+    carrier::Symbol
+    ratio::Float64
+end
+
+"""
+Conversor multi-puerto (v0.3, roadmap M1). `outputs[1]` es la salida de
+REFERENCIA: la capacidad (MW) y el dispatch se miden ahí; cada puerto escala
+linealmente con el dispatch (input_j = ratio_j·d, output_k = ratio_k·d).
+
+- Caso clásico 1→1 con eficiencia η: `inputs=[(in, 1/η)]`, `outputs=[(out, 1.0)]`.
+- CHP (cogeneración): `inputs=[(natural_gas, 2.5)]`,
+  `outputs=[(electricity, 1.0), (hot_water, 1.2)]` (η_e 40%, η_th 48%).
+- También: electrolizadores (elec → H₂ + calor), chillers de absorción, etc.
+"""
 struct Converter
     id::Symbol
     name::String
-    input_carrier::Symbol
-    output_carrier::Symbol
-    efficiency::Float64           # output = input · efficiency (SPEC §7.3)
-    existing_capacity::Float64    # MW de output
+    inputs::Vector{ConverterPort}
+    outputs::Vector{ConverterPort}
+    existing_capacity::Float64    # MW de la salida de referencia
     max_new_capacity::Float64
     investable::Bool
     costs::TechCosts
 end
+
+# retro-compatibilidad 1→1: Converter(id, name, in, out, η, ex, mx, inv, costs)
+Converter(id::Symbol, name::AbstractString, inc::Symbol, outc::Symbol,
+          eff::Real, ex::Real, mx::Real, inv::Bool, costs::TechCosts) =
+    Converter(id, String(name), [ConverterPort(inc, 1.0 / eff)],
+              [ConverterPort(outc, 1.0)], Float64(ex), Float64(mx), inv, costs)
+
+"Carrier de entrada principal (el primero; Symbol(\"\") si no tiene)."
+primary_input(c::Converter) =
+    isempty(c.inputs) ? Symbol("") : c.inputs[1].carrier
+"Carrier de la salida de referencia."
+primary_output(c::Converter) = c.outputs[1].carrier
+"Eficiencia de referencia: salida de referencia / entrada principal."
+reference_efficiency(c::Converter) =
+    isempty(c.inputs) ? 1.0 : c.outputs[1].ratio / c.inputs[1].ratio
+"¿Tiene más de una entrada o salida (CHP y similares)?"
+is_multiport(c::Converter) = length(c.inputs) > 1 || length(c.outputs) > 1
 
 "Generador no despachable con perfil de factor de capacidad por paso (pv, SPEC §7.5)."
 struct Generator

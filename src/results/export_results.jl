@@ -61,10 +61,12 @@ function _assumptions_table(r::Results, site::Union{Site,Nothing})
             techrow!(s.id, "existing_capacity_mw", s.existing_capacity)
         end
         for c in values(site.converters)
-            techrow!(c.id, "tipo", "converter")
-            techrow!(c.id, "input_output",
-                     "$(c.input_carrier) → $(c.output_carrier)")
-            techrow!(c.id, "efficiency", c.efficiency)
+            techrow!(c.id, "tipo", is_multiport(c) ? "converter (multi-puerto)" : "converter")
+            io = string(join(("$(p.carrier)×$(p.ratio)" for p in c.inputs), " + "),
+                        " → ",
+                        join(("$(p.carrier)×$(p.ratio)" for p in c.outputs), " + "))
+            techrow!(c.id, "input_output", io)
+            techrow!(c.id, "efficiency_ref", reference_efficiency(c))
             techrow!(c.id, "existing_capacity_mw", c.existing_capacity)
             techrow!(c.id, "max_new_capacity_mw", c.max_new_capacity)
             techrow!(c.id, "capex_per_kw", c.costs.capex_per_kw)

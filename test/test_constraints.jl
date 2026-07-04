@@ -48,10 +48,11 @@ end
     JuMP.optimize!(m)
     @test JuMP.termination_status(m) == JuMP.MOI.OPTIMAL
 
-    # dispatch = demanda en cada paso (balance §7.1 + conversor §7.3)
+    # dispatch = demanda en cada paso (balance §7.1 + conversor §7.3);
+    # el input de gas es ratio·dispatch = dispatch/0.9 = 10 MW (multi-puerto)
     for s in 1:4
         @test JuMP.value(m[:dispatch][:gas_boiler, s, 1]) ≈ 9.0 atol = 1e-6
-        @test JuMP.value(m[:conv_input][:gas_boiler, s, 1]) ≈ 10.0 atol = 1e-6
+        @test JuMP.value(m[:dispatch][:gas_boiler, s, 1]) / 0.9 ≈ 10.0 atol = 1e-6
         @test JuMP.value(m[:grid_import_p][s, 1]) ≈ 0.0 atol = 1e-6
         @test JuMP.value(m[:grid_export_p][s, 1]) ≈ 0.0 atol = 1e-6
     end

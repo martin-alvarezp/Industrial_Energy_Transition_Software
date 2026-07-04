@@ -12,10 +12,12 @@ struct ModelParameters
     costs::Dict{Symbol,TechCosts}                    # por tecnología del modelo
     existing_capacity::Dict{Symbol,Float64}          # MW por tecnología
     max_new_capacity::Dict{Symbol,Float64}           # MW por tecnología candidata
-    efficiency::Dict{Symbol,Float64}                 # conversores (COP para heat_pump) y storages
+    efficiency::Dict{Symbol,Float64}                 # storages: η de un sentido
     cf_profile::Dict{Symbol,Vector{Float64}}         # generadores → [step]
     emission_factor::Dict{Tuple{Symbol,Symbol},Float64}  # (carrier, scope) → tCO₂e/MWh
-    fuel_converters::Dict{Symbol,Symbol}             # tech → carrier :fuel que compra (§6)
+    conv_inputs::Dict{Symbol,Vector{ConverterPort}}  # conversor → puertos de entrada
+    conv_outputs::Dict{Symbol,Vector{ConverterPort}} # conversor → puertos de salida
+    fuel_inputs::Vector{Tuple{Symbol,Symbol,Float64}} # (tech, fuel, ratio): compra §6
     emissions_cap_net::Vector{Float64}               # [y], trayectoria lineal (SPEC §8)
     grid_import_limit::Float64                       # MW (capacidad de grid_import)
     grid_export_limit::Float64                       # MW
@@ -68,12 +70,15 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     efficiency = Dict{Symbol,Float64}()
     cf_profile = Dict{Symbol,Vector{Float64}}()
 
+    conv_inputs = Dict{Symbol,Vector{ConverterPort}}()
+    conv_outputs = Dict{Symbol,Vector{ConverterPort}}()
     for id in sets.converters
         t = site.converters[id]
         costs[id] = t.costs
         existing[id] = t.existing_capacity
         max_new[id] = t.max_new_capacity
-        efficiency[id] = t.efficiency
+        conv_inputs[id] = t.inputs
+        conv_outputs[id] = t.outputs
     end
     for id in sets.generators
         t = site.generators[id]
@@ -92,14 +97,14 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
 
     ef = Dict((f.carrier, f.scope) => f.factor for f in site.emission_factors)
 
-    # Conversores que compran su carrier de entrada fuera del sistema (p. ej.
-    # gas_boiler ← natural_gas). La electricidad se compra vía grid_import_p.
-    fuel_convs = Dict{Symbol,Symbol}()
-    for id in sets.converters
-        ic = site.converters[id].input_carrier
-        if haskey(site.carriers, ic) && site.carriers[ic].category == :fuel &&
-           haskey(price, ic)
-            fuel_convs[id] = ic
+    # Puertos de entrada que compran combustible fuera del sistema (p. ej.
+    # gas_boiler ← natural_gas, o el gas de un CHP). La electricidad se
+    # compra/balancea vía grid_import_p.
+    fuel_inputs = Tuple{Symbol,Symbol,Float64}[]
+    for id in sets.converters, p in site.converters[id].inputs
+        if haskey(site.carriers, p.carrier) &&
+           site.carriers[p.carrier].category == :fuel && haskey(price, p.carrier)
+            push!(fuel_inputs, (id, p.carrier, p.ratio))
         end
     end
 
@@ -115,6 +120,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     export_limit = grid_limit
 
     return ModelParameters(weight, price, export_price, demand, discount, costs,
-                           existing, max_new, efficiency, cf_profile, ef, fuel_convs,
+                           existing, max_new, efficiency, cf_profile, ef,
+                           conv_inputs, conv_outputs, fuel_inputs,
                            cap_net, grid_limit, export_limit)
 end

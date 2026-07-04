@@ -21,25 +21,29 @@ function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParam
                 if site.carriers[c].category in (:energy, :heat)]
 
     dispatch = m[:dispatch]
-    conv_input = m[:conv_input]
     charge, discharge = m[:charge], m[:discharge]
     grid_import_p, grid_export_p = m[:grid_import_p], m[:grid_export_p]
 
     grid = get(site.sources, :grid_import, nothing)
     grid_carrier = grid === nothing ? :electricity : grid.output_carrier
 
-    # mapas carrier → tecnologías que lo producen/consumen/almacenan
-    producers = Dict(c => Symbol[] for c in balanced)
-    consumers = Dict(c => Symbol[] for c in balanced)
+    # mapas carrier → (tecnología, coeficiente): los conversores multi-puerto
+    # producen/consumen cada carrier proporcional a su tasa (§7.3 por puerto)
+    producers = Dict(c => Tuple{Symbol,Float64}[] for c in balanced)
+    consumers = Dict(c => Tuple{Symbol,Float64}[] for c in balanced)
     stores    = Dict(c => Symbol[] for c in balanced)
     for t in sets.converters
         cv = site.converters[t]
-        haskey(producers, cv.output_carrier) && push!(producers[cv.output_carrier], t)
-        haskey(consumers, cv.input_carrier)  && push!(consumers[cv.input_carrier], t)
+        for p in cv.outputs
+            haskey(producers, p.carrier) && push!(producers[p.carrier], (t, p.ratio))
+        end
+        for p in cv.inputs
+            haskey(consumers, p.carrier) && push!(consumers[p.carrier], (t, p.ratio))
+        end
     end
     for t in sets.generators
         g = site.generators[t]
-        haskey(producers, g.output_carrier) && push!(producers[g.output_carrier], t)
+        haskey(producers, g.output_carrier) && push!(producers[g.output_carrier], (t, 1.0))
     end
     for st in sets.storages
         sto = site.storages[st]
@@ -48,12 +52,12 @@ function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParam
 
     cons = Array{JuMP.ConstraintRef}(undef, length(balanced), length(steps), length(years))
     for (ci, c) in enumerate(balanced), s in steps, y in years
-        production = sum(dispatch[t, s, y] for t in producers[c]; init = 0.0)
+        production = sum(k[2] * dispatch[k[1], s, y] for k in producers[c]; init = 0.0)
         imported   = c == grid_carrier ? grid_import_p[s, y] : 0.0
         discharged = sum(discharge[st, s, y] for st in stores[c]; init = 0.0)
 
         demand     = haskey(params.demand, c) ? params.demand[c][s, y] : 0.0
-        consumed   = sum(conv_input[t, s, y] for t in consumers[c]; init = 0.0)
+        consumed   = sum(k[2] * dispatch[k[1], s, y] for k in consumers[c]; init = 0.0)
         charged    = sum(charge[st, s, y] for st in stores[c]; init = 0.0)
         exported   = c == grid_carrier ? grid_export_p[s, y] : 0.0
 

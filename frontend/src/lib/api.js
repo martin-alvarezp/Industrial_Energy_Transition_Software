@@ -15,7 +15,7 @@ async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
     const resp = await fetch(API_BASE + path, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: ctrl.signal,
     });
     const payload = await resp.json();
@@ -147,6 +147,11 @@ export async function saveSite(name, siteJson, layoutGeoJSON) {
     site_payload: siteJson,
     layout: layoutGeoJSON,
   }, { method: "PUT" });
+}
+
+/** DELETE /sites/{name}: elimina un sitio guardado (demo es intocable). */
+export async function deleteSite(name) {
+  return post(`/sites/${encodeURIComponent(name)}`, undefined, { method: "DELETE" });
 }
 
 /**

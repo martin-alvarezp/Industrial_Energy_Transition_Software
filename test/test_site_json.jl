@@ -15,7 +15,7 @@
     @test n_steps(site2) == 96
     @test Set(keys(site2.carriers)) == Set(keys(site.carriers))
     @test Set(all_tech_ids(site2)) == Set(all_tech_ids(site))
-    @test site2.converters[:heat_pump].efficiency == 3.5
+    @test reference_efficiency(site2.converters[:heat_pump]) == 3.5
     @test site2.storages[:battery].hours_ratio == 4.0     # viaja storage_hours
     @test site2.generators[:pv].cf_profile == site.generators[:pv].cf_profile
     @test site2.demands[:hot_water].values == site.demands[:hot_water].values

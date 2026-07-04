@@ -165,6 +165,22 @@ function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
 end
 
 """
+DELETE /sites/{name} — elimina un sitio guardado (sus CSVs + layout).
+`demo` es el dataset de referencia y no se puede borrar.
+"""
+function handle_delete_site(req::HTTP.Request, data_dir::AbstractString)
+    name = get(HTTP.getparams(req), "name", "")
+    occursin(r"^[A-Za-z0-9_\-]+$", name) ||
+        throw(ApiError(400, "nombre de sitio inválido '$name'"))
+    name == "demo" &&
+        throw(ApiError(403, "el sitio 'demo' es el dataset de referencia y no se puede eliminar"))
+    dir = joinpath(data_dir, name)
+    isdir(dir) || throw(ApiError(404, "sitio '$name' no encontrado"))
+    rm(dir; recursive = true, force = true)
+    return _json_response(200, (deleted = name,))
+end
+
+"""
 GET /sites/{name} — el sitio completo como JSON (esquema §7 del digital twin):
 el estado inicial de la tab Sitio. Incluye `layout` (GeoJSON de
 layout.geojson) si existe; null si no.

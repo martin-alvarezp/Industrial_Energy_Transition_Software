@@ -23,8 +23,8 @@ function extract_emissions_summary(im::IETOModel; shadow_prices::Bool = true)
     ef2 = get(params.emission_factor, (grid_carrier, :scope2), 0.0)
     ef1(fc) = get(params.emission_factor, (fc, :scope1), 0.0)
 
-    scope1 = [sum(ef1(fc) * JuMP.value(m[:conv_input][t, s, y]) * w[s]
-                  for (t, fc) in params.fuel_converters, s in steps; init = 0.0)
+    scope1 = [sum(ef1(p[2]) * p[3] * JuMP.value(m[:dispatch][p[1], s, y]) * w[s]
+                  for p in params.fuel_inputs, s in steps; init = 0.0)
               for y in years]
     scope2 = [sum(JuMP.value(m[:grid_import_p][s, y]) * w[s] for s in steps) * ef2
               for y in years]

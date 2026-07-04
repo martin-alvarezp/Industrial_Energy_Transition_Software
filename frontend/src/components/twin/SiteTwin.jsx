@@ -5,9 +5,9 @@ import EquipmentDrawer from "./EquipmentDrawer.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
-  removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON,
+  removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON, isMultiport,
 } from "../../lib/twin.js";
-import { validateTwin, listSites, saveSite } from "../../lib/api.js";
+import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
 
 const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar dirección
@@ -86,6 +86,13 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
       .finally(() => setValidating(false));
   };
 
+  const doDelete = () => {
+    if (!window.confirm(`¿Eliminar el sitio '${siteName}'? No se puede deshacer.`)) return;
+    deleteSite(siteName)
+      .then(() => { listSites().then(setSiteList); onLoadSite("demo"); })
+      .catch((e) => setSaveMsg({ ok: false, text: e.message }));
+  };
+
   const doSave = () => {
     const name = saveName.trim();
     saveSite(name, siteJson, layoutToGeoJSON(layout))
@@ -158,14 +165,22 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
         <div className="card">
           <div className="card-head">
             <h3 className="card-title">Sitio</h3>
-            <select
-              className="site-select" value={siteName}
-              onChange={(e) => onLoadSite(e.target.value)}
-              aria-label="sitio activo"
-            >
-              {siteList.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            {source !== "api" && <span className="chip">mock</span>}
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select
+                className="site-select" value={siteName}
+                onChange={(e) => onLoadSite(e.target.value)}
+                aria-label="sitio activo"
+              >
+                {siteList.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {siteName !== "demo" && source === "api" && (
+                <button className="chart-toggle danger" title="eliminar este sitio"
+                        onClick={doDelete}>
+                  Eliminar
+                </button>
+              )}
+              {source !== "api" && <span className="chip">mock</span>}
+            </div>
           </div>
           <AddressSearch
             onResult={({ address, center }) => {
@@ -232,10 +247,13 @@ export default function SiteTwin({ twin, setTwin, siteName, onLoadSite, config,
                 </span>
                 <button className="equip-name"
                         onClick={() => { setSelectedId(t.tech_id);
-                                         setDrawer({ tech: t, isNew: false }); }}>
+                          setDrawer({ tech: { ...t, ports_mode: isMultiport(t) },
+                                      isNew: false }); }}>
                   {t.name}
                   <span className="equip-sub">
-                    {t.input_carrier ? `${t.input_carrier} → ` : ""}{t.output_carrier}
+                    {isMultiport(t)
+                      ? `${t.ports.inputs.map((p) => p.carrier).join("+")} → ${t.ports.outputs.map((p) => p.carrier).join("+")}`
+                      : (t.input_carrier ? `${t.input_carrier} → ` : "") + (t.output_carrier ?? "")}
                     {" · "}{num(t.existing_capacity, 0)}
                     {t.max_new_capacity > 0 ? `+${num(t.max_new_capacity, 0)}` : ""} MW
                   </span>

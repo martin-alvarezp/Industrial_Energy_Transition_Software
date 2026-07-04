@@ -3,7 +3,7 @@
 
 const CORS_HEADERS = [
     "Access-Control-Allow-Origin" => "*",
-    "Access-Control-Allow-Methods" => "GET, POST, PUT, OPTIONS",
+    "Access-Control-Allow-Methods" => "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers" => "Content-Type",
 ]
 
@@ -84,6 +84,8 @@ function build_router(data_dir::AbstractString;
                    req -> handle_get_site(req, data_dir))
     HTTP.register!(router, "PUT", "/sites/{name}",
                    req -> handle_put_site(req, data_dir))
+    HTTP.register!(router, "DELETE", "/sites/{name}",
+                   req -> handle_delete_site(req, data_dir))
     HTTP.register!(router, "POST", "/scenario",
                    req -> handle_scenario(req, data_dir))
     HTTP.register!(router, "POST", "/pareto",

@@ -24,7 +24,7 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
                                     cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
     w = params.weight_hours
-    conv_input = m[:conv_input]
+    dispatch = m[:dispatch]
     grid_import_p = m[:grid_import_p]
     gross, net = m[:gross_emissions], m[:net_emissions]
     offset_buy = m[:offset_buy]
@@ -35,9 +35,10 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
     ef_scope1(fc) = get(params.emission_factor, (fc, :scope1), 0.0)
 
     # tCO₂e del año y: Σ combustible quemado · factor + Σ import de red · factor
+    # (combustible por puerto de entrada: ratio·dispatch — cubre CHP)
     annual_emissions = Dict(y =>
-        sum(ef_scope1(fc) * conv_input[t, s, y] * w[s]
-            for (t, fc) in params.fuel_converters, s in steps; init = 0.0) +
+        sum(ef_scope1(p[2]) * p[3] * dispatch[p[1], s, y] * w[s]
+            for p in params.fuel_inputs, s in steps; init = 0.0) +
         sum(ef_scope2 * grid_import_p[s, y] * w[s] for s in steps; init = 0.0)
         for y in years)
 

@@ -44,11 +44,12 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             for st in sets.storages, s in steps; init = 0.0))
 
     # EnergyPurchases_y = Σ_step (price_elec·grid_import_p + price_fuel·fuel_input)·weight
-    # donde fuel_input = dispatch/efficiency para los conversores a combustible.
+    # donde fuel_input = ratio·dispatch por cada puerto de entrada a combustible
+    # (multi-puerto: un CHP compra gas proporcional a su tasa de entrada).
     JuMP.@expression(m, energy_purchases_y[y in years],
         sum(price_elec[s, y] * grid_import_p[s, y] * w[s] for s in steps) +
-        sum(params.price[fc][s, y] * (dispatch[t, s, y] / params.efficiency[t]) * w[s]
-            for (t, fc) in params.fuel_converters, s in steps; init = 0.0))
+        sum(params.price[p[2]][s, y] * p[3] * dispatch[p[1], s, y] * w[s]
+            for p in params.fuel_inputs, s in steps; init = 0.0))
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y
     JuMP.@expression(m, carbon_cost_y[y in years], cfg.carbon_price * gross_emissions[y])

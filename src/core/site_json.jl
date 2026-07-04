@@ -63,7 +63,7 @@ _sorted_series(d::Dict{Symbol,Vector{Float64}}) =
     (; (k => d[k] for k in sort!(collect(keys(d))))...)
 
 function _tech_nt(id, name, type, inc, outc, existing, maxnew, eff, inv,
-                  c::TechCosts, storage_hours)
+                  c::TechCosts, storage_hours; ports = nothing)
     return (tech_id = String(id), name = name, type = type,
             input_carrier = inc === nothing ? nothing : String(inc),
             output_carrier = outc === nothing ? nothing : String(outc),
@@ -71,7 +71,15 @@ function _tech_nt(id, name, type, inc, outc, existing, maxnew, eff, inv,
             efficiency = eff, investable = inv,
             capex_per_kw = c.capex_per_kw, fixed_opex = c.fixed_opex,
             variable_opex = c.variable_opex, lifetime_years = c.lifetime_years,
-            storage_hours = storage_hours)
+            storage_hours = storage_hours, ports = ports)
+end
+
+# puertos de un conversor multi-puerto para el JSON (null en el caso 1→1,
+# que ya queda descrito por input_carrier/output_carrier/efficiency)
+function _converter_ports(c::Converter)
+    is_multiport(c) || return nothing
+    return (inputs = [(carrier = String(p.carrier), ratio = p.ratio) for p in c.inputs],
+            outputs = [(carrier = String(p.carrier), ratio = p.ratio) for p in c.outputs])
 end
 
 """
@@ -92,10 +100,11 @@ function site_json(site::Site)
     end
     for id in keys(site.converters)
         c = site.converters[id]
-        push!(techs, _tech_nt(id, c.name, "converter", c.input_carrier,
-                              c.output_carrier, c.existing_capacity,
-                              c.max_new_capacity, c.efficiency, c.investable,
-                              c.costs, nothing))
+        push!(techs, _tech_nt(id, c.name, "converter", primary_input(c),
+                              primary_output(c), c.existing_capacity,
+                              c.max_new_capacity, reference_efficiency(c),
+                              c.investable, c.costs, nothing;
+                              ports = _converter_ports(c)))
     end
     for id in keys(site.generators)
         g = site.generators[id]
@@ -208,7 +217,18 @@ function site_from_json(obj; default_name::AbstractString = "twin")
         if kind == :source
             sources[id] = Source(id, tname, outc, ex, mx, inv, costs)
         elseif kind == :converter
-            converters[id] = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
+            ports = _twin_get(t, :ports)
+            if ports !== nothing   # multi-puerto (CHP, electrolizador, …)
+                mkports(list, side) = [ConverterPort(
+                        Symbol(_twin_req(pt, :carrier, "$ctx.ports.$side")),
+                        _twin_num(_twin_req(pt, :ratio, "$ctx.ports.$side"), :ratio, ctx))
+                    for pt in list]
+                ins = mkports(_twin_req(ports, :inputs, "$ctx.ports"), "inputs")
+                outs = mkports(_twin_req(ports, :outputs, "$ctx.ports"), "outputs")
+                converters[id] = Converter(id, tname, ins, outs, ex, mx, inv, costs)
+            else
+                converters[id] = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
+            end
         elseif kind == :generator
             haskey(profiles, id) || throw(SchemaError(
                 "site_payload: falta generation_profiles['$id'] para el generador"))

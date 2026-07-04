@@ -400,7 +400,7 @@ function series96(fn) {
 export function mockSiteJson() {
   const ehf = (h) => (h >= 8 && h <= 19 ? 1.3 : h >= 20 && h <= 22 ? 1.1 : 0.8);
   const hhf = (h) => (h >= 6 && h <= 9 ? 1.3 : h >= 10 && h <= 18 ? 1.0 : 0.85);
-  const tech = (o) => ({ input_carrier: null, storage_hours: null, ...o });
+  const tech = (o) => ({ input_carrier: null, storage_hours: null, ports: null, ...o });
   return {
     name: "demo",
     timesteps: EN_SEASONS.flatMap((se, s) =>

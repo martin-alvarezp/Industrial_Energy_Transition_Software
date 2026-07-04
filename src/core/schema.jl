@@ -122,7 +122,17 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
         if kind == :source
             sources[id] = Source(id, name, outc, ex, mx, inv, c)
         elseif kind == :converter
-            converters[id] = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
+            # columna opcional ports (JSON): conversores multi-puerto (CHP…)
+            ports_raw = hasproperty(r, :ports) && !ismissing(r.ports) &&
+                        !isempty(strip(String(r.ports))) ? r.ports : nothing
+            if ports_raw !== nothing
+                pj = JSON3.read(String(ports_raw))
+                mk(list) = [ConverterPort(_sym(p.carrier), Float64(p.ratio)) for p in list]
+                converters[id] = Converter(id, name, mk(pj.inputs), mk(pj.outputs),
+                                           ex, mx, inv, c)
+            else
+                converters[id] = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
+            end
         elseif kind == :generator
             prof = get(profiles, id, Float64[])
             isempty(prof) && throw(SchemaError(

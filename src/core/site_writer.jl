@@ -36,7 +36,9 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         max_new_capacity = [t.max_new_capacity for t in techs],
         efficiency = [t.efficiency for t in techs],
         investable = [t.investable for t in techs],
-        storage_hours = [something(t.storage_hours, missing) for t in techs]))
+        storage_hours = [something(t.storage_hours, missing) for t in techs],
+        # puertos de conversores multi-puerto como JSON compacto (vacío si 1→1)
+        ports = [t.ports === nothing ? missing : JSON3.write(t.ports) for t in techs]))
 
     CSV.write(joinpath(dir, "technology_costs.csv"), DataFrame(
         tech_id = [t.tech_id for t in techs],

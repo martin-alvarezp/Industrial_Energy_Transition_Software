@@ -33,7 +33,6 @@ include("model/objective.jl")
 include("model/build_model.jl")
 
 # constraints: restricciones físicas y climáticas (SPEC §7-8)
-include("constraints/converters.jl")
 include("constraints/carrier_balance.jl")
 include("constraints/capacity.jl")
 include("constraints/generators.jl")
@@ -61,8 +60,9 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export Carrier, Source, Converter, Generator, Storage, Demand, PriceSeries,
-       EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts
+export Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
+       PriceSeries, EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts,
+       primary_input, primary_output, reference_efficiency, is_multiport
 # core API
 export load_site, load_scenario_config, load_and_validate,
        validate_site, validate_scenario, SchemaError, ValidationError,
@@ -72,7 +72,7 @@ export load_site, load_scenario_config, load_and_validate,
 export build_model, build_sets, build_parameters, add_variables!, set_objective!,
        expected_variable_count, IETOModel, ModelSets, ModelParameters
 # constraints
-export add_constraints!, add_converter_relations!, add_carrier_balance!,
+export add_constraints!, add_carrier_balance!,
        add_capacity_constraints!, add_generator_constraints!,
        add_storage_constraints!, add_grid_constraints!,
        add_emissions_constraints!, net_cap_shadow_prices

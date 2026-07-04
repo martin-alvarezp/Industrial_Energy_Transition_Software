@@ -140,6 +140,13 @@ end
         p_bad = copy(p); p_bad[:demands][:electricity] = fill(-1.0, 96)
         @test req("PUT", "/sites/otro", (site_payload = p_bad,)).status == 400
         @test !("otro" in JSON3.read(req("GET", "/sites").body).sites)
+
+        # DELETE: gestión de twins (crear/borrar entradas)
+        @test req("DELETE", "/sites/mi_planta").status == 200
+        @test !("mi_planta" in JSON3.read(req("GET", "/sites").body).sites)
+        @test req("GET", "/sites/mi_planta").status == 404
+        @test req("DELETE", "/sites/mi_planta").status == 404
+        @test req("DELETE", "/sites/demo").status == 403
     finally
         close(server)
     end

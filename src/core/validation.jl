@@ -63,14 +63,18 @@ function validate_site(site::Site)
         _check_nonneg!(problems, s.max_new_capacity, "technologies.csv[$(s.id)].max_new_capacity")
     end
     for c in values(site.converters)
-        _check_carrier!(problems, site.carriers, c.input_carrier,
-                        "technologies.csv[$(c.id)].input_carrier")
-        _check_carrier!(problems, site.carriers, c.output_carrier,
-                        "technologies.csv[$(c.id)].output_carrier")
+        isempty(c.inputs) && push!(problems,
+            "technologies.csv[$(c.id)]: un conversor necesita al menos un carrier de entrada")
+        isempty(c.outputs) && push!(problems,
+            "technologies.csv[$(c.id)]: un conversor necesita al menos un carrier de salida")
+        for p in vcat(c.inputs, c.outputs)
+            _check_carrier!(problems, site.carriers, p.carrier,
+                            "technologies.csv[$(c.id)] puerto '$(p.carrier)'")
+            p.ratio > 0 || push!(problems,
+                "technologies.csv[$(c.id)] puerto '$(p.carrier)': la tasa debe ser > 0 (valor: $(p.ratio))")
+        end
         _check_nonneg!(problems, c.existing_capacity, "technologies.csv[$(c.id)].existing_capacity")
         _check_nonneg!(problems, c.max_new_capacity, "technologies.csv[$(c.id)].max_new_capacity")
-        c.efficiency > 0 || push!(problems,
-            "technologies.csv[$(c.id)].efficiency: debe ser > 0 (valor: $(c.efficiency))")
     end
     for g in values(site.generators)
         _check_carrier!(problems, site.carriers, g.output_carrier,
@@ -124,9 +128,10 @@ function validate_site(site::Site)
     # todo carrier categoría :fuel consumido por un conversor necesita factor scope1;
     # toda fuente de electricidad importada necesita factor scope2 (SPEC §8).
     has_factor(c, s) = any(ef -> ef.carrier == c && ef.scope == s, site.emission_factors)
-    fuel_carriers = unique(c.input_carrier for c in values(site.converters)
-                           if haskey(site.carriers, c.input_carrier) &&
-                              site.carriers[c.input_carrier].category == :fuel)
+    fuel_carriers = unique(p.carrier for c in values(site.converters)
+                           for p in c.inputs
+                           if haskey(site.carriers, p.carrier) &&
+                              site.carriers[p.carrier].category == :fuel)
     for fc in fuel_carriers
         has_factor(fc, :scope1) || push!(problems,
             "emission_factors.csv: falta el factor scope1 del combustible '$fc'")
@@ -142,7 +147,8 @@ function validate_site(site::Site)
     # --- demandas cubiertas: cada carrier con demanda debe tener al menos un productor ---
     producers = Set{Symbol}()
     foreach(s -> push!(producers, s.output_carrier), values(site.sources))
-    foreach(c -> push!(producers, c.output_carrier), values(site.converters))
+    foreach(c -> foreach(p -> push!(producers, p.carrier), c.outputs),
+            values(site.converters))
     foreach(g -> push!(producers, g.output_carrier), values(site.generators))
     for d in values(site.demands)
         d.carrier in producers || push!(problems,

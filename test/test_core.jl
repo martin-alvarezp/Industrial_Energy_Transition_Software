@@ -27,7 +27,7 @@ replace_in_file(path, sub::Pair) = write(path, replace(read(path, String), sub))
     @test haskey(site.sources, :grid_import)
     @test haskey(site.converters, :gas_boiler)
     @test haskey(site.converters, :heat_pump)
-    @test site.converters[:heat_pump].efficiency == 3.5   # COP
+    @test reference_efficiency(site.converters[:heat_pump]) == 3.5   # COP
     @test haskey(site.generators, :pv)
     @test length(site.generators[:pv].cf_profile) == 96
     @test haskey(site.storages, :battery)

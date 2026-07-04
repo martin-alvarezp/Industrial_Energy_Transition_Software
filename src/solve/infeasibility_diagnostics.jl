@@ -45,7 +45,10 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         supply = 0.0
         for id in sets.converters
             cv = site.converters[id]
-            cv.output_carrier == c && (supply += cv.existing_capacity + cv.max_new_capacity)
+            for p in cv.outputs
+                p.carrier == c &&
+                    (supply += (cv.existing_capacity + cv.max_new_capacity) * p.ratio)
+            end
         end
         for id in sets.generators
             gn = site.generators[id]
@@ -74,19 +77,23 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     # rutas eléctricas al calor por niveles: (COP, capacidad máx), de mejor a
     # peor COP — electrificar más allá de la bomba de calor cae a la caldera
     # eléctrica (~COP 1), que consume mucha más electricidad
+    # cota analítica: consideramos solo conversores simples (1 in → 1 out) que
+    # producen calor. Un multi-puerto (CHP) no encaja en esta cota de
+    # electrificación; se ignora aquí (la cota sigue siendo válida como piso).
     elec_heat_tiers = Tuple{Float64,Float64}[]
     fuel_eff, fuel_ef1 = nothing, 0.0
     for id in sets.converters
         cv = site.converters[id]
-        cv.output_carrier in heat_carriers || continue
-        if cv.input_carrier == grid_carrier
-            push!(elec_heat_tiers,
-                  (cv.efficiency, cv.existing_capacity + cv.max_new_capacity))
-        elseif haskey(site.carriers, cv.input_carrier) &&
-               site.carriers[cv.input_carrier].category == :fuel
-            f = _factor(site, cv.input_carrier, :scope1)
-            if fuel_eff === nothing || f / cv.efficiency < fuel_ef1 / fuel_eff
-                fuel_eff, fuel_ef1 = cv.efficiency, f
+        is_multiport(cv) && continue
+        primary_output(cv) in heat_carriers || continue
+        cop = reference_efficiency(cv)
+        if primary_input(cv) == grid_carrier
+            push!(elec_heat_tiers, (cop, cv.existing_capacity + cv.max_new_capacity))
+        elseif haskey(site.carriers, primary_input(cv)) &&
+               site.carriers[primary_input(cv)].category == :fuel
+            f = _factor(site, primary_input(cv), :scope1)
+            if fuel_eff === nothing || f / cop < fuel_ef1 / fuel_eff
+                fuel_eff, fuel_ef1 = cop, f
             end
         end
     end

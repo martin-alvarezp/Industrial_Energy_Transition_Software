@@ -28,6 +28,41 @@ function Num({ value, onChange, ...rest }) {
   );
 }
 
+/** Editor de una lista de puertos (entradas o salidas de un multi-vector). */
+function PortList({ label, hint, ports, options, onChange }) {
+  const set = (i, patch) =>
+    onChange(ports.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  return (
+    <div className="control">
+      <label>{label}</label>
+      {hint && <p className="hint" style={{ marginTop: 0, marginBottom: 6 }}>{hint}</p>}
+      {ports.map((port, i) => (
+        <div className="range-row" key={i} style={{ marginBottom: 6 }}>
+          <select value={port.carrier}
+                  onChange={(e) => set(i, { carrier: e.target.value })}>
+            {options.map((c) => (
+              <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+            ))}
+          </select>
+          <span className="port-x">×</span>
+          <Num value={port.ratio} step={0.1} min={0}
+               style={{ width: 90 }}
+               onChange={(v) => set(i, { ratio: v })} />
+          <button className="chart-toggle danger" title="quitar puerto"
+                  disabled={ports.length <= 1}
+                  onClick={() => onChange(ports.filter((_, j) => j !== i))}>
+            −
+          </button>
+        </div>
+      ))}
+      <button className="chart-toggle"
+              onClick={() => onChange([...ports, { carrier: options[0].carrier_id, ratio: 1 }])}>
+        + puerto
+      </button>
+    </div>
+  );
+}
+
 /**
  * Editor de un equipo: TODOS los parámetros del catálogo §4 del twin spec —
  * los que el modelo usa (✅), los trazados (📋 vida útil) y los futuros (🔮,
@@ -73,24 +108,60 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                  onChange={(e) => set({ name: e.target.value })} />
         </Field>
         {draft.type === "converter" && (
-          <Field label="Vector de entrada → salida"
-                 hint="output = input × eficiencia (COP para bombas de calor)">
-            <div className="range-row">
-              <select value={draft.input_carrier ?? ""}
-                      onChange={(e) => set({ input_carrier: e.target.value })}>
-                {carrierOpts(["energy", "fuel", "heat"]).map((c) => (
-                  <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
-                ))}
-              </select>
-              <span style={{ color: "var(--muted)" }}>→</span>
-              <select value={draft.output_carrier ?? ""}
-                      onChange={(e) => set({ output_carrier: e.target.value })}>
-                {carrierOpts(["energy", "heat"]).map((c) => (
-                  <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
-                ))}
-              </select>
+          <>
+            <div className="switch-row">
+              <div>
+                <div className="sw-label">Multi-vector / cogeneración</div>
+                <div className="sw-note">
+                  varios vectores de entrada o salida (CHP, electrolizador…)
+                </div>
+              </div>
+              <button type="button" role="switch" aria-checked={!!draft.ports_mode}
+                      className={"switch" + (draft.ports_mode ? " on" : "")}
+                      onClick={() => set({ ports_mode: !draft.ports_mode })} />
             </div>
-          </Field>
+
+            {!draft.ports_mode ? (
+              <Field label="Vector de entrada → salida"
+                     hint="output = input × eficiencia (COP para bombas de calor)">
+                <div className="range-row">
+                  <select value={draft.input_carrier ?? ""}
+                          onChange={(e) => set({ input_carrier: e.target.value })}>
+                    {carrierOpts(["energy", "fuel", "heat"]).map((c) => (
+                      <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+                    ))}
+                  </select>
+                  <span style={{ color: "var(--muted)" }}>→</span>
+                  <select value={draft.output_carrier ?? ""}
+                          onChange={(e) => set({ output_carrier: e.target.value })}>
+                    {carrierOpts(["energy", "heat"]).map((c) => (
+                      <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+                    ))}
+                  </select>
+                </div>
+              </Field>
+            ) : (
+              <>
+                <PortList
+                  label="Entradas (carrier × MW por MW de la salida de referencia)"
+                  hint="la 1ª salida es la referencia: capacidad y despacho se miden ahí"
+                  ports={draft.ports?.inputs ?? []}
+                  options={carrierOpts(["energy", "fuel", "heat"])}
+                  onChange={(inputs) => set({ ports: { ...draft.ports, inputs } })}
+                />
+                <PortList
+                  label="Salidas (carrier × MW por MW de referencia)"
+                  ports={draft.ports?.outputs ?? []}
+                  options={carrierOpts(["energy", "heat"])}
+                  onChange={(outputs) => set({ ports: { ...draft.ports, outputs } })}
+                />
+                <p className="hint">
+                  Ej. CHP: entrada gas×2.5, salidas electricidad×1.0 + calor×1.2
+                  (η_e 40%, η_th 48%).
+                </p>
+              </>
+            )}
+          </>
         )}
         {draft.type !== "converter" && (
           <Field label={draft.type === "storage" ? "Carrier almacenado" : "Vector de salida"}>
@@ -104,7 +175,8 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
         )}
 
         <p className="drawer-section">Parámetros técnicos</p>
-        {draft.type !== "source" && draft.type !== "generator" && (
+        {draft.type !== "source" && draft.type !== "generator" &&
+         !(draft.type === "converter" && draft.ports_mode) && (
           <Field label={effLabel}
                  hint={draft.type === "storage" ? "η de un sentido: ida y vuelta = η²" : undefined}>
             <Num value={draft.efficiency} step={0.05} min={0.05}

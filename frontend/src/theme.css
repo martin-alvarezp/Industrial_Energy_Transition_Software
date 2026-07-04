@@ -393,6 +393,7 @@ input:disabled { background: var(--page); color: var(--muted); }
   width: auto; min-width: 130px; padding: 5px 8px; font-size: 12.5px;
   border: 1px solid var(--baseline); border-radius: 8px;
 }
+.port-x { color: var(--muted); font-weight: 650; }
 
 /* leaflet: que el chrome del mapa combine con el producto */
 .leaflet-container { font-family: var(--font); }

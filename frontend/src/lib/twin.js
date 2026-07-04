@@ -42,7 +42,11 @@ export function blankEquipment(type, siteJson) {
     variable_opex: 1.0, lifetime_years: 20, storage_hours: null,
   };
   if (type === "converter")
-    return { ...base, input_carrier: energy, output_carrier: heat, efficiency: 0.95 };
+    return { ...base, input_carrier: energy, output_carrier: heat,
+             efficiency: 0.95, ports_mode: false,
+             // plantilla de puertos por si el usuario activa multi-vector
+             ports: { inputs: [{ carrier: energy, ratio: 1 }],
+                      outputs: [{ carrier: heat, ratio: 1 }] } };
   if (type === "storage")
     return { ...base, input_carrier: energy, output_carrier: energy,
              efficiency: 0.95, storage_hours: 4 };
@@ -54,9 +58,15 @@ export function blankEquipment(type, siteJson) {
   return base;
 }
 
+/** Un conversor es multi-puerto si tiene el objeto `ports` con >1 entrada o salida. */
+export const isMultiport = (t) =>
+  !!t.ports && ((t.ports.inputs?.length ?? 0) + (t.ports.outputs?.length ?? 0)) > 2;
+
 /** Inserta/actualiza un equipo en el site_json (inmutable). */
 export function upsertTech(siteJson, tech) {
-  const { cf_constant, ...row } = tech;
+  const { cf_constant, ports_mode, ...row } = tech;
+  // conversor simple: sin ports (el backend lo describe con in/out/η)
+  if (row.type === "converter" && !ports_mode) row.ports = null;
   const techs = siteJson.technologies.filter((t) => t.tech_id !== row.tech_id);
   techs.push(row);
   techs.sort((a, b) => a.tech_id.localeCompare(b.tech_id));
@@ -88,25 +98,41 @@ export function removeTech(siteJson, techId) {
 export function techProblems(tech, siteJson) {
   const p = [];
   if (!tech.name?.trim()) p.push("falta el nombre");
-  if (!tech.output_carrier) p.push("falta el carrier de salida");
-  if (tech.type === "converter" && !tech.input_carrier)
-    p.push("un transformador necesita carrier de entrada");
-  if (tech.type === "converter" && tech.input_carrier === tech.output_carrier)
-    p.push("entrada y salida no pueden ser el mismo carrier");
-  if (!(tech.efficiency > 0)) p.push("la eficiencia/COP debe ser > 0");
   if (tech.existing_capacity < 0 || tech.max_new_capacity < 0)
     p.push("las capacidades deben ser ≥ 0");
   if (tech.investable && !(tech.max_new_capacity > 0))
     p.push("una candidata a inversión necesita capacidad máxima nueva > 0");
-  if (tech.type === "converter") {
-    const inCat = siteJson.carriers.find((c) => c.carrier_id === tech.input_carrier)?.category;
-    if (inCat === "fuel") {
-      if (!siteJson.prices?.[tech.input_carrier])
-        p.push(`el combustible '${tech.input_carrier}' no tiene precio en mercados`);
-      if (!siteJson.emission_factors?.some(
-            (f) => f.carrier_id === tech.input_carrier && f.scope === "scope1"))
-        p.push(`el combustible '${tech.input_carrier}' no tiene factor scope 1`);
+
+  const factorMissing = (carrier) => {
+    const cat = siteJson.carriers.find((c) => c.carrier_id === carrier)?.category;
+    if (cat !== "fuel") return;
+    if (!siteJson.prices?.[carrier])
+      p.push(`el combustible '${carrier}' no tiene precio en mercados`);
+    if (!siteJson.emission_factors?.some(
+          (f) => f.carrier_id === carrier && f.scope === "scope1"))
+      p.push(`el combustible '${carrier}' no tiene factor scope 1`);
+  };
+
+  if (tech.type === "converter" && tech.ports_mode) {
+    const ins = tech.ports?.inputs ?? [];
+    const outs = tech.ports?.outputs ?? [];
+    if (ins.length === 0) p.push("un transformador multi-vector necesita ≥1 entrada");
+    if (outs.length === 0) p.push("un transformador multi-vector necesita ≥1 salida");
+    for (const port of [...ins, ...outs]) {
+      if (!port.carrier) p.push("cada puerto necesita un carrier");
+      if (!(port.ratio > 0)) p.push(`la tasa de '${port.carrier}' debe ser > 0`);
     }
+    ins.forEach((port) => factorMissing(port.carrier));
+  } else if (tech.type === "converter") {
+    if (!tech.output_carrier) p.push("falta el carrier de salida");
+    if (!tech.input_carrier)
+      p.push("un transformador necesita carrier de entrada");
+    if (tech.input_carrier === tech.output_carrier)
+      p.push("entrada y salida no pueden ser el mismo carrier");
+    if (!(tech.efficiency > 0)) p.push("la eficiencia/COP debe ser > 0");
+    factorMissing(tech.input_carrier);
+  } else if (!tech.output_carrier) {
+    p.push("falta el carrier de salida");
   }
   return p;
 }
