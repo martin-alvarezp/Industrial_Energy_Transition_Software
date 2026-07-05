@@ -118,13 +118,71 @@ Requiere agregación que preserve puntas (día de punta por estación o paso
   explícita vs términos reales (hoy todo real — documentado pero rígido).
 - Financiamiento (deuda/leasing) como flujo — opcional.
 
+### M10 · Vectores energéticos definidos por el usuario (carriers abiertos)
+Hoy `Carrier` es un struct fijo (id, nombre, unidad, categoría) y el sitio
+demo trae los suyos cableados. Para client-ready el usuario **crea y
+parametriza sus propios vectores** desde el twin:
+- Biblioteca de partida: electricidad (por nivel de tensión si se quiere),
+  gas natural, hidrógeno, vapor saturado (por **nivel de presión**), calor
+  (por **niveles de temperatura definidos por el usuario**: 70 °C, 5 °C…),
+  frío, biomasa como **pellets** y como **chips**, diésel, agua caliente.
+- Atributos por carrier: unidad, categoría, **factor de emisión propio**
+  (scope 1 al quemarlo / scope 2 al comprarlo), nivel/calidad (presión,
+  temperatura), color para las vistas.
+- Los niveles (Heat·70C vs Heat·5C, Steam·2bar vs Steam·6.9bar) son carriers
+  distintos que se conectan solo vía conversores — así el MILP sigue lineal
+  y el Sankey los muestra como nodos separados (ver R4).
+Cambios: types/schema/site_json/twin drawer/validación. Absorbe el "creación
+de carriers" de P3.
+
+### M11 · Mercados de compra y venta (generaliza tarifas, export y offsets)
+Objeto `Market` creado por el usuario, N por sitio:
+- `carrier` + **dirección** (compra | venta) — reemplaza y generaliza
+  `grid_import`/`grid_export`/`Source`.
+- **Precio**: plano | serie horaria del año-plantilla (96) u 8760 |
+  **por año del horizonte** (serie de series: precio horario distinto en
+  2026 que en 2040); escalación %/año como atajo.
+- **Límites**: capacidad máx (MW), volumen anual (MWh/año), disponibilidad
+  por paso; topes regulatorios de inyección (de M2).
+- **Factor de emisión del mercado** (p.ej. red eléctrica; por año → cubre
+  la descarbonización exógena de M7).
+- **Offsets = un mercado más**: carrier `offset` con precio y
+  **disponibilidad anual** definidos por el usuario (sale de
+  `ScenarioConfig`, donde hoy es un escalar único).
+- M2 (cargos por potencia, net metering/billing) queda como el "modo
+  tarifa regulada" de un mercado de compra de electricidad.
+
+### M12 · Escenarios como capas con jerarquía (la unidad de estudio)
+Hoy hay 7 escenarios predefinidos que ajustan un `ScenarioConfig` global.
+Client-ready: el **escenario es un overlay con nombre** sobre el sitio, y
+todo parámetro/equipo/mercado puede fijarse **por escenario**:
+- **Resolución por jerarquía**: el usuario ordena escenarios (p.ej.
+  `Forzar CHP 2030` → `Economic Optimum` → `BaU`); un parámetro no definido
+  en la capa superior **cae a la siguiente** (herencia en cascada).
+- **Políticas de inversión por escenario**:
+  - *BaU*: sin equipos nuevos, **solo renovación de los existentes** al
+    fin de su vida útil (⚠ requiere M5 retiro/reemplazo) → evolución del TCO.
+  - *Economic Optimum*: optimiza libre sobre las opciones de inversión del
+    twin y los años del horizonte → estrategia de compras endógena.
+  - *Derivados*: **forzar** compra de un equipo en un año dado (fijar
+    `build[tech,year]=1`) y/o **prohibir** tecnologías (`allowed_techs` por
+    escenario) — p.ej. "CHP obligado 2028, PV prohibido".
+- Cada corrida guarda con qué escenario se generó (alimenta el selector de
+  corridas de R4).
+
+### M13 · Años calendario reales
+`base_year` en el sitio: el horizonte se define como **2026 → 2050**, no
+"próximos N años". Todas las vistas, series por año (M11), políticas de
+inversión (M12) y el XLSX hablan en años reales. Trivial en el motor
+(offset), transversal en UI/series/resultados.
+
 ---
 
 ## 3 · Brechas de DATOS e integraciones (prioridad 2)
 
 | # | Brecha | Nota |
 |---|---|---|
-| D1 | **Catálogo corporativo de tecnologías** versionado (costos por región/año, fuente) — hoy cada sitio tipea sus números; para uso global se necesita una biblioteca curada con override local | clave para consistencia entre países |
+| D1 | **Catálogo corporativo de tecnologías** versionado (costos por región/año, fuente) — hoy cada sitio tipea sus números; para uso global se necesita una biblioteca curada con override local. **Alcance client-ready** (todo cabe en Generator/Converter multi-puerto/Storage — es DATA, no modelo): · *Generación en sitio*: PV, **solar térmica**, **eólico**, generador diésel, CHP (motor/turbina gas), caldera a gas/biomasa (pellets|chips)/eléctrica, generador de vapor, **electrolizador** (elec → H₂ + calor). · *Conversión*: bomba de calor (aire/agua), chiller de compresión y de **absorción**, transformadores, válvula de expansión térmica, intercambiadores entre niveles de calor. · *Almacenamiento*: batería Li-ion, **térmico** (agua caliente/frío/hielo), acumulador de vapor, tanque H₂. · **Tecnologías propias del usuario**: crear una tech custom desde la UI definiendo puertos (carriers in/out con ratios), costos y vida útil | clave para consistencia entre países |
 | D2 | **Perfil solar automático por ubicación**: el twin ya tiene lat/lon → PVGIS/NASA POWER → cf_profile del PV sin que el usuario suba nada. Ídem temperatura para COP dependiente | quick win de alto impacto, encaja natural con el mapa |
 | D3 | Importador de **facturas/tarifas** (plantillas por distribuidora/país) y de series de medidores (CSV ya existe; agregar Excel y limpieza de huecos) | alimenta M2 |
 | D4 | Factores de emisión **oficiales por país/red** (IEA, EPA eGRID, RETC) actualizables, con vigencia y fuente en la trazabilidad | credibilidad ante auditoría |
@@ -139,9 +197,9 @@ Requiere agregación que preserve puntas (día de punta por estación o paso
   (borrador/aprobado). Es la unidad de trabajo del consultor.
 - **P2 Reporte ejecutivo exportable** (PDF/PPT) con la narrativa, gráficos y
   supuestos — lo que se le entrega al gerente del cliente; hoy solo XLSX.
-- **P3 UI faltante**: creación de **carriers** desde el twin (vapor, frío,
-  H₂); **editor tarifario** (M2); wizard de onboarding de sitio nuevo;
-  validación en vivo; deshacer.
+- **P3 UI faltante**: creación de **carriers** desde el twin → absorbida
+  por M10; **editor de mercados/tarifas** (M11/M2); wizard de onboarding de
+  sitio nuevo; validación en vivo; deshacer.
 - **P4 Global-ready UI**: i18n es/en (mínimo), unidades configurables,
   formatos de número por locale, zona horaria.
 - **P5 Twin**: área del polígono como techo sugerido de PV; varias plantas en
@@ -226,7 +284,8 @@ tarifario en el twin) · D2 (perfil solar por lat/lon del mapa) ·
   carrier; `api.js` orquesta; `Tornado.jsx` renderiza). Verificado contra la API
   real: monotonía del VAN OK en las tres palancas factibles; demanda +20% sale
   infactible en el demo (el parque no cubre la demanda crecida).
-- ⏳ Memo ejecutivo PDF (P2) · comparación de estudios guardados (P1).
+- ⏳ Memo ejecutivo PDF (P2) · comparación de estudios guardados (P1) —
+  **movidos a v0.7/v0.8** (necesitan corridas guardadas primero).
 
 **R2 · Vista ingeniería de planta (operación por equipo):** ✅ sección
 "Ingeniería de planta" en el Explorador, con selector de equipo:
@@ -235,7 +294,9 @@ tarifario en el twin) · D2 (perfil solar por lat/lon del mapa) ·
 - ✅ **PV**: factor de planta, curtailment (potencial cf·cap vs despacho).
 - ✅ **Conversores/CHP**: horas equivalentes a plena carga, utilización.
 - ✅ **Curva de duración de carga** por equipo.
-- ⏳ Sankey de flujos por carrier · flujo de caja por equipo · spread del BESS.
+- ⏳ Sankey de flujos por carrier · flujo de caja por equipo · spread del
+  BESS — **movidos a v0.8** (el Sankey se hace una vez con los carriers
+  abiertos de M10, no dos veces).
 
 *Nota de esfuerzo confirmada:* R1/R2 se implementaron **100% en el frontend**
 (`lib/finance.js`, `lib/operations.js`) sobre datos que el motor ya produce —
@@ -254,23 +315,87 @@ backend (M3): un `site_payload` es un sitio stateless, así que se ignora el
 nuevos o del demo con equipos borrados); al guardar un sitio nuevo, la config
 base se escribe sin `allowed_techs`. 987 tests verdes.
 
-### v0.5 — "Multi-sitio y plataforma mínima suficiente"
-> Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el
-> uso real la exige (decisión revisada tras v0.4 — SSO/multi-tenant se
-> difieren a tracción comercial).
+### Camino client-ready (re-corte 2026-07): v0.5 → v0.9
+> Redefinido a partir del requerimiento de dejar la herramienta lista para
+> presentar a clientes. La versión final debe tener: (a) vectores
+> energéticos abiertos y parametrizables, (b) mercados de compra/venta
+> creados por el usuario (incl. offsets), (c) escenarios con jerarquía y
+> políticas de inversión, (d) catálogo amplio de tecnologías + custom,
+> (e) operación por activo y opciones de simulación, (f) resultados
+> estratégicos: Summary con selector de corrida y timeline de medidas, y
+> Sankey de flujos por componente/tecnología/año (referencia visual: los
+> screenshots de herramienta comercial revisados el 2026-07-05).
+> El orden respeta dependencias: carriers → mercados → catálogo →
+> escenarios (necesita M5) → resultados (necesita corridas guardadas).
 
-D5 (portafolio multi-sitio y agregación corporativa) · M7 (red y carbono por
-año) · M9 parcial (impuestos/depreciación, multi-moneda) · S1+S3 mínimos
-(Docker + Postgres solo si hay >1 usuario concurrente) · S6 (CI) ·
-D1 (catálogo de tecnologías) cuando haya un segundo país usando.
+### v0.5 — "Vectores y mercados" 🔜
+> Criterio de salida: un usuario crea desde la UI un carrier nuevo (p.ej.
+> Heat·70C o pellets) con su factor de emisión, le cuelga un mercado de
+> compra con precio horario por año y otro de venta, corre y cuadra.
+
+M10 (carriers abiertos con niveles y factor de emisión) · M11 (mercados
+compra/venta; offsets como mercado; factor de red por año — absorbe la
+mitad de M7) · M13 (años calendario 2026-2050) · M2 (cargos por potencia +
+net metering/billing como modo tarifa del mercado eléctrico) + M6 parcial
+(día de punta — van juntos o no van, §8.3).
+
+### v0.6 — "Catálogo tecnológico" 🔜
+> Criterio: sala de máquinas industrial típica modelable sin tocar código:
+> CHP + caldera biomasa + bomba de calor + chiller absorción + electrolizador
+> + almacenamiento térmico/H₂, todo desde presets o creando techs propias.
+
+D1 alcance client-ready (presets de generación/conversión/almacenamiento
+listados en §3) · creador de tecnología custom multi-puerto en el twin ·
+D2 (perfil solar por lat/lon; habilita solar térmica y eólico con perfiles
+automáticos) · M4 parcial (disponibilidad por paso para conversores).
+
+### v0.7 — "Escenarios" 🔜
+> Criterio: el flujo BaU / Economic Optimum / "forzar CHP 2028 sin PV"
+> corre sobre el mismo sitio, con herencia en cascada entre escenarios y
+> comparación lado a lado.
+
+M5 (retiro/reemplazo endógeno + inversiones repetibles — prerequisito del
+BaU "solo renovación") · M12 (escenarios como capas con jerarquía, políticas
+forzar/prohibir por año) · P1 (corridas guardadas con nombre, notas y
+escenario de origen — la unidad que consume v0.8).
+
+### v0.8 — "Resultados que venden" 🔜
+> Criterio: la vista de resultados replica el estándar comercial de
+> referencia y un ingeniero puede auditar la operación de cada activo.
+
+- **Summary estratégico**: selector de corrida guardada, KPIs del horizonte
+  (inversión total, OPEX total, % reducción de emisiones vs año base, costo
+  total, nominal/real conmutables), resumen anual plegable y **timeline de
+  medidas** (equipo × año de compra/renovación, con íconos por tipo).
+- **Sankey de flujos energéticos**: por **componente** (cada equipo un
+  nodo) y por **tecnología** (agregado por tipo), con selector de **año** y
+  de agrupación; los niveles de carrier de M10 (Heat·70C, Steam·6.9bar,
+  Electricity·23kV) aparecen como nodos intermedios; pérdidas explícitas.
+- **Operación por activo** (completa R2): dispatch horario por equipo,
+  SOC de almacenamientos, curvas de duración, flujo de caja por equipo,
+  spread del BESS.
+- **Opciones de simulación expuestas**: forzar renovación de activos,
+  años de optimización en calendario real, resolución temporal, gap/tiempo
+  del solver.
+- P2 (memo ejecutivo PDF) · comparación entre corridas guardadas (cierra
+  los ⏳ de v0.4).
+
+### v0.9 — "Multi-sitio y plataforma mínima suficiente"
+> Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el
+> uso real la exige (SSO/multi-tenant se difieren a tracción comercial).
+
+D5 (portafolio multi-sitio y agregación corporativa) · M7 restante (precio
+de carbono por año, REC/GdO) · M9 parcial (impuestos/depreciación,
+multi-moneda) · S1+S3 mínimos (Docker + Postgres solo si hay >1 usuario
+concurrente) · S6 (CI) · D4 (factores oficiales por país).
 
 ### v1.0 — "Comercial"
 > Criterio: primer cliente externo pagando, con aislamiento multi-tenant y
 > benchmark publicado.
 
-S2+S4 (cola, SSO/roles, multi-tenant) · P4 (i18n/monedas) · M4+M5 (rampas
-opt-in, retiro/reemplazo) · D4 (factores oficiales) · S5+S7 (Nominatim
-propio, TLS, observabilidad) · C1-C4 · SLA de solve (S8 si hace falta).
+S2+S4 (cola, SSO/roles, multi-tenant) · P4 (i18n/monedas) · M4 restante
+(rampas/min-load opt-in) · S5+S7 (Nominatim propio, TLS, observabilidad) ·
+C1-C4 · SLA de solve (S8 si hace falta).
 
 ---
 
