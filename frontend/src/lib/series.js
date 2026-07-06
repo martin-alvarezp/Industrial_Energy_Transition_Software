@@ -68,9 +68,24 @@ export function aggregate8760(values, timesteps, hemisphere = "south") {
     bySeason[quarterSeason[q]] = sums.map((s) => s / days);
   }
 
-  const series = timesteps.map(
-    (t) => +((bySeason[t.season]?.[t.hour] ?? 0).toFixed(3))
-  );
+  // máximo horario real de cada estación (para pasos de PUNTA, M6: un par
+  // estación:hora duplicado es un paso de punta y toma la punta REGISTRADA
+  // del 8760, no el promedio ni un uplift manual)
+  const maxBySeason = {};
+  for (let q = 0; q < 4; q++) {
+    let mx = -Infinity;
+    for (let d = DAY_BOUNDS[q]; d < DAY_BOUNDS[q + 1]; d++)
+      for (let h = 0; h < 24; h++) mx = Math.max(mx, values[d * 24 + h]);
+    maxBySeason[quarterSeason[q]] = mx;
+  }
+  const seen = new Set();
+  const series = timesteps.map((t) => {
+    const k = `${t.season}:${t.hour}`;
+    const isPeak = seen.has(k);
+    seen.add(k);
+    const v = isPeak ? maxBySeason[t.season] : bySeason[t.season]?.[t.hour];
+    return +((v ?? 0).toFixed(3));
+  });
   const originalTotal = values.reduce((s, v) => s + v, 0);
   const aggTotal = timesteps.reduce(
     (s, t, i) => s + series[i] * t.weight_hours, 0);

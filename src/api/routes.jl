@@ -150,7 +150,7 @@ function handle_solar_profile(req::HTTP.Request)
           "lat=$(lat)&lon=$(lon)&pvcalculation=1&peakpower=1&loss=14" *
           "&optimalangles=1&startyear=2019&endyear=2019&outputformat=json"
     resp = try
-        HTTP.get(url; readtimeout = 30, retries = 1)
+        HTTP.get(url; request_timeout = 30, retries = 1)
     catch e
         throw(ApiError(502, "PVGIS no respondió (¿sin red o ubicación sin " *
                             "datos?): $(sprint(showerror, e))"))

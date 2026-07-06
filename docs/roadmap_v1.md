@@ -434,8 +434,22 @@ por el mismo camino del CSV (aggregate8760, hemisferio por signo de la
 latitud). Nota de privacidad heredada de Nominatim. Verificado en vivo:
 Santiago → cf medio 0.185, máx 0.86. Fleco: test guardado por red.
 
-⏳ Restan de v0.6: M4 parcial (disponibilidad por paso de conversores) ·
-creador de tech custom ya cubierto por los tipos genéricos multi-puerto.
+✅ **M4 parcial** — disponibilidad por paso para conversores
+(mantenciones): dispatch ≤ avail[step]·capacidad; viaja en
+generation_profiles (mismo CSV, clave tech_id); campo real en el drawer
+(deja de ser 🔮). 1124 tests.
+
+**v0.6 CERRADA** (D1a catálogo · D2 solar por lat/lon · M4 parcial; el
+creador custom ya estaba cubierto por los tipos genéricos multi-puerto).
+
+**Flecos resueltos en el cierre:** el neteo (M2b) pasa a EXPIRACIÓN POR
+PERÍODO (semántica estándar de neteo mensual/estacional: O_p ≤
+min(export_p, import_p), excedente expira; :year = un período anual) ·
+la punta (M6) ahora se toma REGISTRADA del CSV 8760 (máximo horario de la
+estación en los pasos de punta, en vez del uplift manual — que sigue
+disponible sin CSV) · test guardado de /solar_profile.
+**Fleco restante:** precios de mercado por año calendario → va con M12
+(escenarios), donde los parámetros ganan dimensión temporal/escenario.
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:
 > CHP + caldera biomasa + bomba de calor + chiller absorción + electrolizador
 > + almacenamiento térmico/H₂, todo desde presets o creando techs propias.

@@ -79,24 +79,21 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
         end
     end
 
-    # net metering (M2b): banco de energía por período de neteo. El crédito
-    # O_p netea importaciones del período (≤ compras pareadas); lo exportado
-    # no acreditado queda en el banco B_p, que EXPIRA al cierre del año
-    # (formulación lineal; el excedente expirado no se paga — conservador).
+    # net metering (M2b): neteo volumétrico POR PERÍODO con expiración — el
+    # crédito O_p ≤ min(exportado_p, importado pareado_p); el excedente del
+    # período EXPIRA sin pago (semántica estándar de neteo mensual/estacional;
+    # netting :year = un solo período anual). Lineal, sin banco arrastrado.
     nm_offset = Dict{Symbol,Any}()
     for (mk, periods) in params.nm_periods
         np = length(periods)
         O = JuMP.@variable(m, [1:np, years], lower_bound = 0.0,
                            base_name = "nm_offset_$mk")
-        B = JuMP.@variable(m, [1:np, years], lower_bound = 0.0,
-                           base_name = "nm_bank_$mk")
         for y in years, (pi, p) in enumerate(periods)
-            exported = sum(market_flow[mk, s, y] * w[s] for s in p)
-            imported = sum(market_flow[b, s, y] * w[s]
-                           for b in params.nm_buys[mk], s in p; init = 0.0)
-            JuMP.@constraint(m, O[pi, y] <= imported)
-            prev = pi == 1 ? 0.0 : B[pi-1, y]
-            JuMP.@constraint(m, B[pi, y] == prev + exported - O[pi, y])
+            JuMP.@constraint(m, O[pi, y] <=
+                sum(market_flow[mk, s, y] * w[s] for s in p))
+            JuMP.@constraint(m, O[pi, y] <=
+                sum(market_flow[b, s, y] * w[s]
+                    for b in params.nm_buys[mk], s in p; init = 0.0))
         end
         nm_offset[mk] = O
     end
