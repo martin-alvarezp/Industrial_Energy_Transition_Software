@@ -540,7 +540,7 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
         <EquipmentDrawer
           tech={drawer.tech} isNew={drawer.isNew} siteJson={siteJson}
           onSave={saveTech} onDelete={deleteTech}
-          onClose={() => setDrawer(null)}
+          onClose={() => setDrawer(null)} center={layout.center}
         />
       )}
       {carrierDrawer && (

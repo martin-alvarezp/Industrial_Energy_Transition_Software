@@ -31,6 +31,14 @@ async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
   }
 }
 
+/** GET /solar_profile (D2): 8760 cf horarios de PVGIS para la lat/lon. */
+export async function fetchSolarProfile(lat, lon) {
+  const resp = await fetch(`${API_BASE}/solar_profile?lat=${lat}&lon=${lon}`);
+  const payload = await resp.json();
+  if (!resp.ok) throw new Error(payload?.error?.message ?? `HTTP ${resp.status}`);
+  return payload;
+}
+
 /** Builder config → config_overrides del contrato (§3). */
 export function toOverrides(cfg) {
   return {

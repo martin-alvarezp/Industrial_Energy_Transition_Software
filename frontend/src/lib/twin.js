@@ -429,7 +429,7 @@ export const isMultiport = (t) =>
 
 /** Inserta/actualiza un equipo en el site_json (inmutable). */
 export function upsertTech(siteJson, tech) {
-  const { cf_constant, ports_mode, ...row } = tech;
+  const { cf_constant, cf_profile, ports_mode, ...row } = tech;
   // conversor simple: sin ports (el backend lo describe con in/out/η)
   if (row.type === "converter" && !ports_mode) row.ports = null;
   const techs = siteJson.technologies.filter((t) => t.tech_id !== row.tech_id);
@@ -441,7 +441,8 @@ export function upsertTech(siteJson, tech) {
     const existing = siteJson.generation_profiles?.[row.tech_id];
     out.generation_profiles = {
       ...siteJson.generation_profiles,
-      [row.tech_id]: existing ?? Array(nsteps).fill(cf_constant ?? 0.3),
+      // prioridad: perfil traído (PVGIS/CSV) > existente > plano inicial
+      [row.tech_id]: cf_profile ?? existing ?? Array(nsteps).fill(cf_constant ?? 0.3),
     };
   }
   return out;

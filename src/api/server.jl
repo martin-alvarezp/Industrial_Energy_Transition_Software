@@ -78,6 +78,7 @@ function build_router(data_dir::AbstractString;
                       static_dir::Union{Nothing,AbstractString} = nothing)
     router = HTTP.Router(_json_404, _json_405)
     HTTP.register!(router, "GET", "/scenarios", handle_scenarios)
+    HTTP.register!(router, "GET", "/solar_profile", handle_solar_profile)
     HTTP.register!(router, "GET", "/sites",
                    req -> handle_list_sites(req, data_dir))
     HTTP.register!(router, "GET", "/sites/{name}",

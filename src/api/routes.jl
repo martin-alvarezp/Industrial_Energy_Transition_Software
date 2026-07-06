@@ -131,6 +131,39 @@ handle_scenarios(::HTTP.Request) = _json_response(200,
     (scenarios = [(name = String(s), description = SCENARIO_DESCRIPTIONS[s])
                   for s in PREDEFINED_SCENARIOS],))
 
+"""
+GET /solar_profile?lat=..&lon=.. — proxy a PVGIS v5.2 (roadmap D2): la
+producción horaria de 1 kWp con inclinación óptima (año 2019, no bisiesto ⇒
+8760 valores de factor de capacidad en [0,1]). El twin la agrega al
+año-plantilla en el cliente (mismo camino que el CSV 8760). Es proxy porque
+CORS bloquea llamar al JRC desde el navegador. Privacidad: la lat/lon sale
+a un servicio público, igual que la búsqueda de direcciones (Nominatim) —
+la UI ya lo advierte.
+"""
+function handle_solar_profile(req::HTTP.Request)
+    q = HTTP.queryparams(HTTP.URI(req.target))
+    lat = tryparse(Float64, get(q, "lat", ""))
+    lon = tryparse(Float64, get(q, "lon", ""))
+    (lat === nothing || lon === nothing) &&
+        throw(ApiError(400, "solar_profile: faltan lat/lon numéricos"))
+    url = "https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?" *
+          "lat=$(lat)&lon=$(lon)&pvcalculation=1&peakpower=1&loss=14" *
+          "&optimalangles=1&startyear=2019&endyear=2019&outputformat=json"
+    resp = try
+        HTTP.get(url; readtimeout = 30, retries = 1)
+    catch e
+        throw(ApiError(502, "PVGIS no respondió (¿sin red o ubicación sin " *
+                            "datos?): $(sprint(showerror, e))"))
+    end
+    data = JSON3.read(resp.body)
+    cf = [Float64(h.P) / 1000.0 for h in data.outputs.hourly]
+    length(cf) == HOURS_PER_YEAR ||
+        throw(ApiError(502, "PVGIS devolvió $(length(cf)) horas (se esperaban 8760)"))
+    return _json_response(200, (lat = lat, lon = lon,
+                                source = "PVGIS v5.2 · TMY 2019 · 1 kWp óptimo",
+                                cf_hourly = cf))
+end
+
 "GET /sites — lista de sitios disponibles en data_dir."
 handle_list_sites(::HTTP.Request, data_dir::AbstractString) = _json_response(200,
     (sites = sort!([n for n in readdir(data_dir)

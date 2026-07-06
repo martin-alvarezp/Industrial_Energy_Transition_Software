@@ -425,6 +425,17 @@ precio de partida) — un chiller de absorción trae su "Frío · 5 °C". Los
 4 tipos genéricos siguen como "desde cero" (custom multi-puerto ya existía).
 Verificado E2E: chiller de absorción desde el catálogo + vector auto +
 payload válido contra la API.
+
+✅ **D2** — perfil solar por ubicación: `GET /solar_profile?lat&lon`, proxy
+del backend a PVGIS v5.2 (CORS bloquea el browser; TMY 2019, 1 kWp con
+inclinación óptima → 8760 cf). En el drawer del generador, "Traer perfil
+solar del sitio" usa la lat/lon del mapa y agrega el 8760 al año-plantilla
+por el mismo camino del CSV (aggregate8760, hemisferio por signo de la
+latitud). Nota de privacidad heredada de Nominatim. Verificado en vivo:
+Santiago → cf medio 0.185, máx 0.86. Fleco: test guardado por red.
+
+⏳ Restan de v0.6: M4 parcial (disponibilidad por paso de conversores) ·
+creador de tech custom ya cubierto por los tipos genéricos multi-puerto.
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:
 > CHP + caldera biomasa + bomba de calor + chiller absorción + electrolizador
 > + almacenamiento térmico/H₂, todo desde presets o creando techs propias.

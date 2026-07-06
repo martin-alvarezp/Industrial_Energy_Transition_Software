@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { TECH_TYPE_META, slugId, techProblems, carrierLabel, techRefs }
   from "../../lib/twin.js";
+import { fetchSolarProfile } from "../../lib/api.js";
+import { aggregate8760 } from "../../lib/series.js";
+import { num } from "../../lib/format.js";
 
 const FUTURE_PARAMS = [
   ["Disponibilidad por paso (mantenciones)", "requiere extensión del modelo"],
@@ -70,8 +73,23 @@ function PortList({ label, hint, ports, options, onChange }) {
  * deshabilitados con su porqué).
  */
 export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
-                                          onDelete, onClose }) {
+                                          onDelete, onClose, center }) {
   const [draft, setDraft] = useState(tech);
+  const [pvState, setPvState] = useState(null); // {loading} | {msg} | {error}
+  const loadPvgis = async () => {
+    setPvState({ loading: true });
+    try {
+      const [lat, lon] = center;
+      const r = await fetchSolarProfile(lat, lon);
+      const agg = aggregate8760(r.cf_hourly, siteJson.timesteps,
+                                lat < 0 ? "south" : "north");
+      const mean = agg.series.reduce((a, b) => a + b, 0) / agg.series.length;
+      setDraft((d) => ({ ...d, cf_profile: agg.series }));
+      setPvState({ msg: `✓ ${r.source} · cf medio ${num(mean, 3)} (se guarda al crear/guardar)` });
+    } catch (e) {
+      setPvState({ error: e.message });
+    }
+  };
   useEffect(() => setDraft(tech), [tech]);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -221,6 +239,19 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
           <Field label="Horas de almacenamiento (MWh por MW)">
             <Num value={draft.storage_hours ?? 4} step={0.5} min={0.5}
                  onChange={(v) => set({ storage_hours: v })} />
+          </Field>
+        )}
+        {draft.type === "generator" && (
+          <Field label="Perfil solar por ubicación (PVGIS · D2)"
+                 hint={center
+                   ? "usa la lat/lon del sitio en el mapa; la consulta sale al servicio público del JRC (misma advertencia que la búsqueda de direcciones)"
+                   : "primero ubica el sitio en el mapa (buscar dirección o navegar) para habilitar la consulta"}>
+            <button className="chart-toggle" disabled={!center || pvState?.loading}
+                    onClick={loadPvgis}>
+              {pvState?.loading ? "Consultando PVGIS…" : "Traer perfil solar del sitio"}
+            </button>
+            {pvState?.msg && <p className="hint">{pvState.msg}</p>}
+            {pvState?.error && <div className="drawer-problems">• {pvState.error}</div>}
           </Field>
         )}
         {draft.type === "generator" && (
