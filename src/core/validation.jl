@@ -43,8 +43,12 @@ function validate_site(site::Site)
     nsteps = n_steps(site)
 
     # --- año-plantilla ---
-    nsteps == STEPS_PER_YEAR || push!(problems,
-        "timesteps.csv: se esperaban $STEPS_PER_YEAR pasos (4 estaciones × 24 h), hay $nsteps")
+    # M6: el año-plantilla es configurable — 96 (4×24) es el default, y puede
+    # traer pasos de PUNTA extra por estación (la Σ de pesos = 8760 es el
+    # invariante físico). Un mínimo de 24 caza truncamientos accidentales.
+    nsteps >= 24 || push!(problems,
+        "timesteps.csv: se esperaban ≥ 24 pasos (default: $STEPS_PER_YEAR = " *
+        "4 estaciones × 24 h, más pasos de punta opcionales), hay $nsteps")
     total_h = sum(ts.weight_hours for ts in site.timesteps; init = 0.0)
     isapprox(total_h, HOURS_PER_YEAR; atol = 1e-6) || push!(problems,
         "timesteps.csv: Σ weight_hours = $total_h, debe ser $HOURS_PER_YEAR")

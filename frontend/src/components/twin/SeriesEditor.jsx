@@ -7,6 +7,8 @@ import {
   parseHourlyCsv, aggregate8760, flatSeries, seriesStats, seasonAverages,
 } from "../../lib/series.js";
 import { num } from "../../lib/format.js";
+import { hasPeakSteps, addPeakSteps, removePeakSteps, PEAK_HOURS }
+  from "../../lib/twin.js";
 
 const SEASON_ES = { winter: "invierno", spring: "primavera", summer: "verano",
                     autumn: "otoño" };
@@ -177,12 +179,47 @@ export default function SeriesEditor({ siteJson, patchSite }) {
         j === i ? { ...f, factor } : f),
     }));
 
+  const peaks = hasPeakSteps(siteJson);
+  const [uplift, setUplift] = useState(15);
+
   return (
     <>
       <p className="section-label">
         Demandas y mercados — CSV horario (8760) o valor plano; el año-plantilla
         resultante se escala por año con las tasas del escenario
       </p>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card-head">
+          <h3 className="card-title">
+            Pasos de punta por estación {peaks ? "· activos" : ""}
+          </h3>
+          {peaks ? (
+            <button className="chart-toggle danger"
+                    onClick={() => patchSite(removePeakSteps)}>
+              Quitar
+            </button>
+          ) : (
+            <div className="range-row">
+              <input type="number" min={0} max={100} step={1} value={uplift}
+                     style={{ width: 70 }} aria-label="factor de punta %"
+                     onChange={(e) => setUplift(+e.target.value)} />
+              <span style={{ fontSize: 12.5 }}>% sobre la hora peor</span>
+              <button className="chart-toggle"
+                      onClick={() => patchSite((sj) => addPeakSteps(sj, uplift))}>
+                Agregar punta
+              </button>
+            </div>
+          )}
+        </div>
+        <p className="card-sub">
+          El año-plantilla de días promedio subestima puntas: sin esto, los
+          cargos por demanda máxima dan falsa precisión (§8.3). Cada estación
+          gana un paso en su hora de mayor demanda ({PEAK_HOURS} h/año de peso,
+          Σ = 8760 se preserva) con la demanda × factor de punta — usa el dato
+          real de tu planta (punta registrada ÷ promedio de la hora peor).
+          {peaks && ` Año-plantilla actual: ${nsteps} pasos (incluye los de punta).`}
+        </p>
+      </div>
       <div className="grid cols-2">
         <div className="card">
           <h3 className="card-title">Demandas (MW por paso)</h3>

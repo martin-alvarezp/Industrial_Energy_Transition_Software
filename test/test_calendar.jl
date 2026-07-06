@@ -46,6 +46,39 @@ end
     @test years == [2026, 2027, 2028]
 end
 
+@testset "peak: paso de punta por estación (M6) alimenta el cargo M2" begin
+    # 1 estación de 24 h + 1 paso de punta (25 pasos): Σ pesos = 8760.
+    # Demanda plana 10, punta 11.5 (+15%); cargo 10 USD/kW·mes.
+    w = (8760.0 - 12.0) / 24.0
+    steps = [TimeStep(i, "all", i - 1, w) for i in 1:24]
+    push!(steps, TimeStep(25, "all", 18, 12.0))   # punta en la hora 18
+    carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy))
+    sources = Dict(:grid_import =>
+        Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, TC0))
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy,
+                               fill(80.0, 25), Inf, Inf, nothing, :grid_import,
+                               10.0))
+    dem = vcat(fill(10.0, 24), [11.5])
+    site = Site("peak", steps, carriers, sources, Dict{Symbol,Converter}(),
+                Dict{Symbol,Generator}(), Dict{Symbol,Storage}(),
+                Dict(:electricity => Demand(:electricity, dem)),
+                Dict{Symbol,PriceSeries}(),
+                [EmissionFactor(:electricity, :scope2, 0.3)], mkts)
+    cfg = ScenarioConfig(1, 0.08, Dict{Symbol,Float64}(), 0.0, 1e9, 1e9, 1e9,
+                         false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    # la validación relajada (M6) acepta ≠96 pasos con Σ = 8760
+    @test validate_site(site)
+    im = build_model(site, cfg)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    # el peak de la estación es la PUNTA (11.5), no el promedio (10):
+    # cargo anual = 10 USD/kW·mes · 1000 · 12 meses · 11.5 MW
+    @test JuMP.value(im.model[:demand_charges_y][1]) ≈
+          10 * 1000 * 12 * 11.5 rtol = 1e-6
+    # la energía apenas cambia: Σ pesos sigue siendo 8760
+    @test sum(ts.weight_hours for ts in site.timesteps) ≈ 8760.0
+end
+
 @testset "calendar: _scale_prices preserva y escala mercados (fix M11)" begin
     # high_gas debe encarecer el gas también cuando llega por mercado
     gas = Carrier(:gas, "Gas", "MWh", :fuel)

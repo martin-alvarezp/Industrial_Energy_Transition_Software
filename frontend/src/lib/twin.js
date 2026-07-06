@@ -453,6 +453,86 @@ export function marketProblems(draft, siteJson, isNew) {
   return p;
 }
 
+// ── Pasos de punta por estación (roadmap M6, acoplado a M2) ────────────────
+// El año-plantilla de días promedio SUBESTIMA puntas (§8.3): sin esto, los
+// cargos por demanda dan falsa precisión. Cada estación gana un paso extra
+// en su hora de mayor demanda, con peso pequeño y demanda con un factor de
+// punta explícito del usuario (dato de la planta, no invento del modelo).
+
+export const PEAK_HOURS = 12; // horas/año que representa el paso de punta
+
+const dupIdx = (ts) => {
+  const seen = new Set(), drop = [];
+  ts.forEach((t, i) => {
+    const k = `${t.season}:${t.hour}`;
+    if (seen.has(k)) drop.push(i); else seen.add(k);
+  });
+  return drop;
+};
+
+/** ¿El sitio ya tiene pasos de punta? (pares estación:hora duplicados) */
+export const hasPeakSteps = (siteJson) =>
+  dupIdx(siteJson.timesteps ?? []).length > 0;
+
+/** Agrega un paso de punta por estación: hora de mayor demanda total, peso
+ * PEAK_HOURS (descontado parejo del resto de la estación, Σ = 8760), demanda
+ * × (1 + uplift%) y precios/perfiles de esa misma hora. */
+export function addPeakSteps(siteJson, upliftPct = 15) {
+  if (hasPeakSteps(siteJson)) return siteJson;
+  const ts = siteJson.timesteps;
+  const seasons = [...new Set(ts.map((t) => t.season))];
+  const totals = ts.map((_, i) =>
+    Object.values(siteJson.demands ?? {}).reduce((a, v) => a + (v[i] ?? 0), 0));
+  const steps = ts.map((t) => ({ ...t }));
+  const peakIdx = [];
+  for (const se of seasons) {
+    const idxs = steps.flatMap((t, i) => (t.season === se ? [i] : []));
+    const iMax = idxs.reduce((a, b) => (totals[b] > totals[a] ? b : a), idxs[0]);
+    idxs.forEach((i) => { steps[i].weight_hours -= PEAK_HOURS / idxs.length; });
+    peakIdx.push(iMax);
+    steps.push({ step_id: 0, season: se, hour: ts[iMax].hour,
+                 weight_hours: PEAK_HOURS });
+  }
+  steps.forEach((t, i) => { t.step_id = i + 1; });
+  const up = 1 + upliftPct / 100;
+  const extend = (arr, f) => [...arr, ...peakIdx.map((i) => f(arr[i]))];
+  const mapS = (obj, f) => Object.fromEntries(
+    Object.entries(obj ?? {}).map(([k, v]) => [k, extend(v, f)]));
+  const out = {
+    ...siteJson, timesteps: steps,
+    demands: mapS(siteJson.demands, (x) => +(x * up).toFixed(6)),
+    prices: mapS(siteJson.prices, (x) => x),
+    generation_profiles: mapS(siteJson.generation_profiles, (x) => x),
+  };
+  if (siteJson.markets)
+    out.markets = siteJson.markets.map((mk) =>
+      ({ ...mk, price: extend(mk.price, (x) => x) }));
+  return out;
+}
+
+/** Quita los pasos de punta y devuelve su peso a la estación. */
+export function removePeakSteps(siteJson) {
+  const ts = siteJson.timesteps;
+  const drop = new Set(dupIdx(ts));
+  if (drop.size === 0) return siteJson;
+  const keep = ts.flatMap((_, i) => (drop.has(i) ? [] : [i]));
+  const steps = keep.map((i) => ({ ...ts[i] }));
+  for (const i of drop) {
+    const same = steps.filter((t) => t.season === ts[i].season);
+    same.forEach((t) => { t.weight_hours += ts[i].weight_hours / same.length; });
+  }
+  steps.forEach((t, j) => { t.step_id = j + 1; });
+  const cut = (arr) => keep.map((i) => arr[i]);
+  const mapS = (obj) => Object.fromEntries(
+    Object.entries(obj ?? {}).map(([k, v]) => [k, cut(v)]));
+  const out = { ...siteJson, timesteps: steps, demands: mapS(siteJson.demands),
+                prices: mapS(siteJson.prices),
+                generation_profiles: mapS(siteJson.generation_profiles) };
+  if (siteJson.markets)
+    out.markets = siteJson.markets.map((mk) => ({ ...mk, price: cut(mk.price) }));
+  return out;
+}
+
 /** Área del polígono límite en m² (shoelace sobre proyección local). */
 export function polygonAreaM2(pts) {
   if (!pts || pts.length < 3) return 0;

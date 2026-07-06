@@ -389,9 +389,19 @@ peak[mercado, estación, año] ≥ flujo, término propio en objetivo y desglose
 Verificado por API: 10 USD/kW·mes en el demo = 1.14 MUSD/año (NPV 75.77 →
 84.46). El optimizador ya VE el recorte de punta. 1096 tests.
 
+✅ **M6 parcial** — pasos de punta por estación: la validación deja de
+exigir 96 pasos (el invariante físico es Σ pesos = 8760; el motor ya era
+genérico) y el twin gana el toggle "Pasos de punta": cada estación suma un
+paso en su hora de mayor demanda (12 h/año de peso, descontado parejo del
+resto) con demanda × factor de punta EXPLÍCITO del usuario (dato de
+planta, no invento). Con esto el cargo M2a paga la punta real y no el
+promedio — se cierra la falsa precisión del §8.3. Verificado: el peak de
+la estación toma el paso de punta (11.5 vs 10 MW) y la UI genera 100
+pasos que la API valida. 1100 tests.
+
 ⏳ M2b (net metering/billing con período de neteo y banco; potencia
-contratada con penalización) + M6 parcial (día de punta — van juntos o no
-van, §8.3) · precios de mercado por año calendario (fleco de M11).
+contratada con penalización) · precios de mercado por año calendario
+(fleco de M11) · punta desde el CSV 8760 real (hoy el uplift es manual).
 
 ### v0.6 — "Catálogo tecnológico" 🔜
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:
