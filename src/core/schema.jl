@@ -182,12 +182,18 @@ function load_markets(dir::AbstractString, nsteps::Int)
                        Float64(r[col]) : nothing
         conn = hasproperty(r, :connection) && !ismissing(r.connection) &&
                !isempty(strip(String(r.connection))) ? _sym(r.connection) : Symbol("")
+        opt_sym(col, dflt) = hasproperty(r, col) && !ismissing(r[col]) &&
+                             !isempty(strip(String(r[col]))) ? _sym(r[col]) : dflt
         markets[id] = Market(id, String(r.name), _sym(r.carrier_id),
                              _sym(r.direction), prices[id],
                              something(opt_num(:max_power), Inf),
                              something(opt_num(:max_annual), Inf),
                              opt_num(:emission_factor), conn,
-                             something(opt_num(:demand_charge), 0.0))
+                             something(opt_num(:demand_charge), 0.0),
+                             something(opt_num(:contracted_power), Inf),
+                             something(opt_num(:excess_penalty), 0.0),
+                             opt_sym(:scheme, :billing),
+                             opt_sym(:netting, :year))
     end
     return markets
 end

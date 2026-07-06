@@ -39,7 +39,9 @@ function _scale_prices(site::Site, carrier::Symbol, factor::Float64)
         id => mk.carrier == carrier ?
               Market(mk.id, mk.name, mk.carrier, mk.direction,
                      mk.price .* factor, mk.max_power, mk.max_annual,
-                     mk.emission_factor, mk.connection, mk.demand_charge) : mk
+                     mk.emission_factor, mk.connection, mk.demand_charge,
+                     mk.contracted_power, mk.excess_penalty, mk.scheme,
+                     mk.netting) : mk
         for (id, mk) in site.markets)
     return Site(site.name, site.timesteps, site.carriers, site.sources,
                 site.converters, site.generators, site.storages, site.demands,

@@ -80,7 +80,13 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
             emission_factor = [something(mk.emission_factor, missing) for mk in mkts],
             connection = [something(mk.connection, missing) for mk in mkts],
             demand_charge = [something(get(mk, :demand_charge, nothing), missing)
-                             for mk in mkts]))
+                             for mk in mkts],
+            contracted_power = [something(get(mk, :contracted_power, nothing), missing)
+                                for mk in mkts],
+            excess_penalty = [something(get(mk, :excess_penalty, nothing), missing)
+                              for mk in mkts],
+            scheme = [something(get(mk, :scheme, nothing), missing) for mk in mkts],
+            netting = [something(get(mk, :netting, nothing), missing) for mk in mkts]))
         _write_series(joinpath(dir, "market_prices.csv"), :price,
                       (; (Symbol(mk.market_id) => mk.price for mk in mkts)...);
                       keycol = :market_id)

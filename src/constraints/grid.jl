@@ -57,16 +57,50 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
 
     # cargo por demanda máxima (M2): peak[mk, estación, año] ≥ flujo en cada
     # paso de la estación — el costo (USD/kW·mes) va en el objetivo. Solo se
-    # crean variables para mercados con cargo > 0.
+    # crean variables para mercados con cargo o penalización por exceso.
     charged = [mk for mk in sets.buy_markets
-               if get(params.market_demand_charge, mk, 0.0) > 0]
+               if get(params.market_demand_charge, mk, 0.0) > 0 ||
+                  (isfinite(get(params.market_contracted, mk, Inf)) &&
+                   get(params.market_excess_penalty, mk, 0.0) > 0)]
     nse = length(params.season_steps)
     if !isempty(charged)
         JuMP.@variable(m, market_peak[charged, 1:nse, years] >= 0)
         m[:market_peak_def] = JuMP.@constraint(m,
             [mk in charged, se in 1:nse, s in params.season_steps[se], y in years],
             market_peak[mk, se, y] >= market_flow[mk, s, y])
+        # potencia contratada (M2b): el exceso sobre la contratada se penaliza
+        over = [mk for mk in charged if isfinite(params.market_contracted[mk])]
+        if !isempty(over)
+            JuMP.@variable(m, market_excess[over, 1:nse, years] >= 0)
+            m[:market_excess_def] = JuMP.@constraint(m,
+                [mk in over, se in 1:nse, y in years],
+                market_excess[mk, se, y] >=
+                market_peak[mk, se, y] - params.market_contracted[mk])
+        end
     end
+
+    # net metering (M2b): banco de energía por período de neteo. El crédito
+    # O_p netea importaciones del período (≤ compras pareadas); lo exportado
+    # no acreditado queda en el banco B_p, que EXPIRA al cierre del año
+    # (formulación lineal; el excedente expirado no se paga — conservador).
+    nm_offset = Dict{Symbol,Any}()
+    for (mk, periods) in params.nm_periods
+        np = length(periods)
+        O = JuMP.@variable(m, [1:np, years], lower_bound = 0.0,
+                           base_name = "nm_offset_$mk")
+        B = JuMP.@variable(m, [1:np, years], lower_bound = 0.0,
+                           base_name = "nm_bank_$mk")
+        for y in years, (pi, p) in enumerate(periods)
+            exported = sum(market_flow[mk, s, y] * w[s] for s in p)
+            imported = sum(market_flow[b, s, y] * w[s]
+                           for b in params.nm_buys[mk], s in p; init = 0.0)
+            JuMP.@constraint(m, O[pi, y] <= imported)
+            prev = pi == 1 ? 0.0 : B[pi-1, y]
+            JuMP.@constraint(m, B[pi, y] == prev + exported - O[pi, y])
+        end
+        nm_offset[mk] = O
+    end
+    m[:nm_offset] = nm_offset
 
     return m
 end

@@ -178,6 +178,25 @@ function validate_site(site::Site)
         _check_nonneg!(problems, mk.demand_charge, "$ctx.demand_charge")
         mk.direction == :sell && mk.demand_charge > 0 && push!(problems,
             "$ctx: el cargo por demanda máxima aplica a mercados de COMPRA")
+        # M2b: potencia contratada y net metering
+        isfinite(mk.contracted_power) && mk.contracted_power <= 0 && push!(problems,
+            "$ctx: contracted_power debe ser > 0 (o vacío = cargo por punta)")
+        _check_nonneg!(problems, mk.excess_penalty, "$ctx.excess_penalty")
+        mk.direction == :sell && isfinite(mk.contracted_power) && push!(problems,
+            "$ctx: la potencia contratada aplica a mercados de COMPRA")
+        mk.scheme in (:billing, :net_metering) || push!(problems,
+            "$ctx: scheme '$(mk.scheme)' inválido (billing|net_metering)")
+        mk.netting in (:season, :year) || push!(problems,
+            "$ctx: netting '$(mk.netting)' inválido (season|year)")
+        if mk.scheme == :net_metering
+            mk.direction == :sell || push!(problems,
+                "$ctx: net_metering aplica a mercados de VENTA")
+            paired = any(mb.direction == :buy && mb.connection == mk.connection &&
+                         mb.carrier == mk.carrier for mb in values(site.markets))
+            paired || push!(problems,
+                "$ctx: net_metering necesita un mercado de COMPRA pareado " *
+                "(mismo carrier y misma conexión) cuyo retail acredite el neteo")
+        end
         if haskey(site.carriers, mk.carrier)
             cat = site.carriers[mk.carrier].category
             cat in (:emissions, :offset) && push!(problems,

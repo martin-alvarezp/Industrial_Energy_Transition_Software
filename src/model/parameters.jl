@@ -39,6 +39,12 @@ struct ModelParameters
     fixed_charges::Float64                           # USD/año, Σ cargos fijos de conexión
     market_demand_charge::Dict{Symbol,Float64}       # USD/kW·mes por mercado (M2)
     season_steps::Vector{Vector{Int}}                # pasos agrupados por estación
+    # ── M2b: potencia contratada y net metering ──
+    market_contracted::Dict{Symbol,Float64}          # MW contratados (Inf = por peak)
+    market_excess_penalty::Dict{Symbol,Float64}      # USD/kW·mes sobre el exceso
+    nm_periods::Dict{Symbol,Vector{Vector{Int}}}     # mercado nm → pasos por período
+    nm_retail::Dict{Symbol,Matrix{Float64}}          # mercado nm → retail medio [p, y]
+    nm_buys::Dict{Symbol,Vector{Symbol}}             # mercado nm → compras pareadas
 end
 
 function _scaled_matrix(base::Vector{Float64}, rate::Float64, years::UnitRange{Int})
@@ -178,6 +184,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     export_limit = sum(conn_export_limit[id] for (id, s) in site.sources
                        if s.output_carrier == grid_carrier; init = 0.0)
 
+    market_contracted = Dict(id => mk.contracted_power for (id, mk) in mkts)
+    market_excess_penalty = Dict(id => mk.excess_penalty for (id, mk) in mkts)
+
     # pasos agrupados por estación (para el peak tarifario, M2)
     season_order = String[]
     season_steps = Vector{Int}[]
@@ -191,6 +200,30 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         end
     end
 
+    # net metering (M2b): el crédito por kWh neteado vale el precio RETAIL
+    # medio (ponderado por horas) de las compras pareadas — las que comparten
+    # la conexión — en cada período de neteo (estaciones o año completo)
+    nm_periods = Dict{Symbol,Vector{Vector{Int}}}()
+    nm_retail = Dict{Symbol,Matrix{Float64}}()
+    nm_buys = Dict{Symbol,Vector{Symbol}}()
+    for (id, mk) in mkts
+        (mk.direction == :sell && mk.scheme == :net_metering) || continue
+        periods = mk.netting == :season ? season_steps : [collect(1:nsteps)]
+        buys = [b for (b, mb) in mkts
+                if mb.direction == :buy && mb.connection == mk.connection &&
+                   mb.carrier == mk.carrier]
+        retail = zeros(length(periods), length(years))
+        for (pi, p) in enumerate(periods), y in years
+            wsum = sum(weight[s] for s in p)
+            vals = [sum(market_price[b][s, y] * weight[s] for s in p) / wsum
+                    for b in buys]
+            retail[pi, y] = isempty(vals) ? 0.0 : sum(vals) / length(vals)
+        end
+        nm_periods[id] = periods
+        nm_retail[id] = retail
+        nm_buys[id] = buys
+    end
+
     return ModelParameters(weight, price, demand, discount, costs,
                            existing, max_new, efficiency, cf_profile, ef,
                            conv_inputs, conv_outputs, fuel_inputs,
@@ -199,5 +232,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            market_power_cap, market_annual_cap, market_ef,
                            conn_buy, conn_sell, conn_import_limit,
                            conn_export_limit, balanced, grid_carrier,
-                           fixed_charges, market_demand_charge, season_steps)
+                           fixed_charges, market_demand_charge, season_steps,
+                           market_contracted, market_excess_penalty,
+                           nm_periods, nm_retail, nm_buys)
 end

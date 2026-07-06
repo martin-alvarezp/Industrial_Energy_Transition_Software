@@ -120,6 +120,44 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
           <OptNum value={draft.max_annual} step={100} min={0} placeholder="sin tope"
                   onChange={(v) => set({ max_annual: v })} />
         </Field>
+        {draft.direction === "sell" && (
+          <Field label="Esquema de venta"
+                 hint={draft.scheme === "net_metering"
+                   ? "el kWh exportado acredita kWh comprados (a precio retail medio) dentro del período de neteo; el excedente va a un banco que expira al cierre del año"
+                   : "net billing: cada kWh exportado se paga al precio de inyección de este contrato"}>
+            <div className="range-row">
+              <select value={draft.scheme ?? "billing"}
+                      onChange={(e) => set({ scheme:
+                        e.target.value === "billing" ? null : e.target.value })}>
+                <option value="billing">Net billing (precio de inyección)</option>
+                <option value="net_metering">Net metering (neteo a retail)</option>
+              </select>
+              {draft.scheme === "net_metering" && (
+                <select value={draft.netting ?? "year"}
+                        onChange={(e) => set({ netting:
+                          e.target.value === "year" ? null : e.target.value })}>
+                  <option value="year">neteo anual</option>
+                  <option value="season">neteo por estación</option>
+                </select>
+              )}
+            </div>
+          </Field>
+        )}
+        {draft.direction === "buy" && (
+          <Field label="Potencia contratada (MW, opcional)"
+                 hint="con contratada, el cargo paga los kW contratados y el exceso paga la penalización">
+            <OptNum value={draft.contracted_power} step={1} min={0}
+                    placeholder="sin contratar (cargo por punta)"
+                    onChange={(v) => set({ contracted_power: v })} />
+          </Field>
+        )}
+        {draft.direction === "buy" && draft.contracted_power != null && (
+          <Field label="Penalización por exceso (USD/kW·mes)">
+            <OptNum value={draft.excess_penalty} step={0.5} min={0}
+                    placeholder="0"
+                    onChange={(v) => set({ excess_penalty: v })} />
+          </Field>
+        )}
         {draft.direction === "buy" && (
           <Field label="Cargo por demanda máxima (USD/kW·mes, opcional)"
                  hint="paga la punta de compra de cada estación — en clientes industriales suele ser 20-40% de la factura. Ojo (§8.3): el año-plantilla de días promedio subestima puntas; el día de punta llega con M6">

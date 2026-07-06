@@ -399,9 +399,18 @@ promedio — se cierra la falsa precisión del §8.3. Verificado: el peak de
 la estación toma el paso de punta (11.5 vs 10 MW) y la UI genera 100
 pasos que la API valida. 1100 tests.
 
-⏳ M2b (net metering/billing con período de neteo y banco; potencia
-contratada con penalización) · precios de mercado por año calendario
-(fleco de M11) · punta desde el CSV 8760 real (hoy el uplift es manual).
+✅ **M2b** — net metering y potencia contratada: la venta gana `scheme`
+(:billing | :net_metering) y `netting` (:season | :year): el kWh exportado
+acredita compras pareadas (misma conexión) a precio RETAIL medio del
+período, con banco de energía lineal que arrastra entre períodos y EXPIRA
+al cierre del año sin pago (conservador). La compra gana
+`contracted_power` + `excess_penalty`: el cargo paga los kW contratados y
+el exceso paga la penalización. Verificado por API: demo con neteo
+estacional + contratada 8 MW → cargos 1.29 MUSD/año. 1116 tests.
+
+**v0.5 CERRADA** (M10·M11·M13·M2a·M6·M2b). Flecos anotados: precios de
+mercado por año calendario (M11) · punta desde el CSV 8760 real (hoy el
+uplift es manual) · neteo con expiración por período (hoy expira anual).
 
 ### v0.6 — "Catálogo tecnológico" 🔜
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:

@@ -365,6 +365,7 @@ export function blankMarket(siteJson) {
     market_id: "", name: "", carrier_id, direction: "buy",
     price_flat: 80, max_power: null, max_annual: null,
     emission_factor: null, demand_charge: null,
+    contracted_power: null, excess_penalty: null, scheme: null, netting: null,
     connection: connectionsFor(siteJson, carrier_id)[0]?.tech_id ?? null,
   };
 }
@@ -399,7 +400,8 @@ export function upsertMarket(siteJson, draft) {
   const { price_flat, ...row } = draft;
   const nsteps = siteJson.timesteps?.length ?? 96;
   if (!row.price) row.price = Array(nsteps).fill(price_flat ?? 0);
-  ["max_power", "max_annual", "emission_factor", "connection", "demand_charge"].forEach((k) => {
+  ["max_power", "max_annual", "emission_factor", "connection", "demand_charge",
+   "contracted_power", "excess_penalty", "scheme", "netting"].forEach((k) => {
     if (row[k] == null || row[k] === "") row[k] = null;
   });
   const base = (siteJson.markets ?? []).length > 0

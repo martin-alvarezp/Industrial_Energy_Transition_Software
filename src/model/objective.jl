@@ -51,24 +51,45 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(params.price[p[2]][s, y] * p[3] * dispatch[p[1], s, y] * w[s]
             for p in params.fuel_inputs, s in steps; init = 0.0))
 
-    # DemandCharges_y (M2): Σ mercados con cargo · USD/kW·mes · kW de punta
-    # por estación · meses de la estación (12/n_estaciones)
-    charged = [mk for mk in sets.buy_markets
-               if get(params.market_demand_charge, mk, 0.0) > 0]
+    # DemandCharges_y (M2/M2b): por estación y mercado con cargo,
+    # · sin potencia contratada: USD/kW·mes · kW de punta;
+    # · con contratada: USD/kW·mes · kW contratados (constante) +
+    #   excess_penalty · kW de exceso sobre la contratada.
     nse = length(params.season_steps)
     months_per_season = 12.0 / max(nse, 1)
+    contracted(mk) = get(params.market_contracted, mk, Inf)
+    charged = [mk for mk in sets.buy_markets
+               if get(params.market_demand_charge, mk, 0.0) > 0 ||
+                  (isfinite(contracted(mk)) &&
+                   get(params.market_excess_penalty, mk, 0.0) > 0)]
+    dc_term(mk, se, y) = begin
+        c = params.market_demand_charge[mk] * KW_PER_MW * months_per_season
+        if isfinite(contracted(mk))
+            c * contracted(mk) +
+            params.market_excess_penalty[mk] * KW_PER_MW * months_per_season *
+            m[:market_excess][mk, se, y]
+        else
+            c * m[:market_peak][mk, se, y]
+        end
+    end
     JuMP.@expression(m, demand_charges_y[y in years],
         isempty(charged) ? JuMP.AffExpr(0.0) :
-        sum(params.market_demand_charge[mk] * KW_PER_MW * months_per_season *
-            m[:market_peak][mk, se, y]
-            for mk in charged, se in 1:nse))
+        sum(dc_term(mk, se, y) for mk in charged, se in 1:nse))
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     JuMP.@expression(m, carbon_cost_y[y in years], cfg.carbon_price * gross_emissions[y])
     JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
+    # ventas :billing pagan su precio de inyección; las :net_metering (M2b)
+    # ingresan el crédito neteado O_p · retail medio del período (el banco
+    # que expira no se paga)
+    billing_sells = [mk for mk in sets.sell_markets
+                     if !haskey(params.nm_periods, mk)]
     JuMP.@expression(m, export_revenue_y[y in years],
         sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
-            for mk in sets.sell_markets, s in steps; init = 0.0))
+            for mk in billing_sells, s in steps; init = 0.0) +
+        sum(params.nm_retail[mk][pi, y] * m[:nm_offset][mk][pi, y]
+            for (mk, periods) in params.nm_periods
+            for pi in eachindex(periods); init = 0.0))
 
     # Valor residual (opcional, cfg.salvage_value): crédito lineal al fin del
     # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,

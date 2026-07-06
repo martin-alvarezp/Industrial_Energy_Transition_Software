@@ -157,6 +157,95 @@ end
     @test load_site(dir).markets[:buy].demand_charge == 12.0
 end
 
+@testset "markets: net metering — el neteo acredita a retail y el banco expira (M2b)" begin
+    # PV solo en los pasos 1-2 (excedente 4 MW); pasos 3-4 importan 4 MW.
+    # Neteo anual: todo lo exportado acredita las importaciones a retail 50.
+    mkts = Dict(
+        :buy  => mkbuy(:buy, :electricity, 50.0),
+        :sell => Market(:sell, "NM", :electricity, :sell, fill(0.0, 4),
+                        Inf, Inf, nothing, :grid_import, 0.0,
+                        Inf, 0.0, :net_metering, :year))
+    site, cfg = market_site(; markets = mkts, demand = 4.0, gen_cap = 8.0)
+    site = Site(site.name, site.timesteps, site.carriers, site.sources,
+                site.converters,
+                Dict(:pv => Generator(:pv, "PV", :electricity, 8.0, 0.0, false,
+                                      TC0, [1.0, 1.0, 0.0, 0.0])),
+                site.storages, site.demands, site.prices,
+                site.emission_factors, site.markets)
+    im = build_model(site, cfg)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    w = 8760 / 4
+    # exporta 4 MW × 2 pasos; importa 4 MW × 2 pasos → neteo completo: el
+    # crédito cancela el costo de la energía. (Los flujos brutos no son
+    # únicos: comprar y vender simultáneo a retail es un wash de costo 0,
+    # por eso se asierta el NETO y una cota inferior del crédito.)
+    rev = JuMP.value(im.model[:export_revenue_y][1])
+    buy = JuMP.value(im.model[:energy_purchases_y][1])
+    @test buy - rev ≈ 0.0 atol = 1e-4
+    @test rev >= 8 * w * 50 - 1e-4     # al menos el excedente real neteado
+
+    # sin compras que netear (PV cubre todo): el banco expira sin pago
+    mkts2 = Dict(
+        :buy  => mkbuy(:buy, :electricity, 50.0),
+        :sell => Market(:sell, "NM", :electricity, :sell, fill(0.0, 4),
+                        Inf, Inf, nothing, :grid_import, 0.0,
+                        Inf, 0.0, :net_metering, :year))
+    site2, _ = market_site(; markets = mkts2, demand = 4.0, gen_cap = 8.0)
+    im2 = build_model(site2, cfg)
+    JuMP.optimize!(im2.model)
+    @test JuMP.value(im2.model[:export_revenue_y][1]) ≈ 0.0 atol = 1e-6
+end
+
+@testset "markets: potencia contratada con penalización por exceso (M2b)" begin
+    # demanda [10,4,4,4]; contratada 8 MW, cargo 10, penalización 25
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy,
+                               fill(80.0, 4), Inf, Inf, nothing, :grid_import,
+                               10.0, 8.0, 25.0, :billing, :year))
+    site, cfg = market_site(; markets = mkts, demand = 4.0)
+    site = Site(site.name, site.timesteps, site.carriers, site.sources,
+                site.converters, site.generators, site.storages,
+                Dict(:electricity => Demand(:electricity, [10.0, 4.0, 4.0, 4.0])),
+                site.prices, site.emission_factors, site.markets)
+    im = build_model(site, cfg)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    # cargo = 10·1000·12·8 (contratada) + 25·1000·12·2 (exceso 10−8)
+    @test JuMP.value(im.model[:demand_charges_y][1]) ≈
+          10 * 1000 * 12 * 8 + 25 * 1000 * 12 * 2 rtol = 1e-6
+end
+
+@testset "markets: M2b round-trip y validación" begin
+    mkts = Dict(
+        :buy  => Market(:buy, "Compra", :electricity, :buy, fill(80.0, 4),
+                        Inf, Inf, nothing, :grid_import, 10.0, 8.0, 25.0,
+                        :billing, :year),
+        :sell => Market(:sell, "NM", :electricity, :sell, fill(0.0, 4),
+                        Inf, Inf, nothing, :grid_import, 0.0,
+                        Inf, 0.0, :net_metering, :season))
+    site, _ = market_site(; markets = mkts)
+    site2 = site_from_json(JSON3.read(JSON3.write(site_json(site))))
+    @test site2.markets[:buy].contracted_power == 8.0
+    @test site2.markets[:buy].excess_penalty == 25.0
+    @test site2.markets[:sell].scheme == :net_metering
+    @test site2.markets[:sell].netting == :season
+    @test site_version(site2) == site_version(site)
+    dir = mktempdir(); save_site(dir, site)
+    site3 = load_site(dir)
+    @test site3.markets[:sell].scheme == :net_metering
+    @test site3.markets[:buy].contracted_power == 8.0
+    @test site_version(site3) == site_version(site)
+
+    # net metering sin compra pareada → error claro
+    bad = Dict(:sell => Market(:s, "NM", :electricity, :sell, fill(0.0, 4),
+                               Inf, Inf, nothing, :grid_import, 0.0,
+                               Inf, 0.0, :net_metering, :year))
+    site4, _ = market_site(; markets = bad)
+    err = try validate_site(site4) catch e; e end
+    @test err isa ValidationError
+    @test any(occursin("mercado de COMPRA pareado", p) for p in err.problems)
+end
+
 @testset "markets: round-trip JSON y CSV" begin
     mkts = Dict(
         :cheap => mkbuy(:cheap, :electricity, 30.0; max_power = 4.0,

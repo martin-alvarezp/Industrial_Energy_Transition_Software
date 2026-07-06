@@ -106,13 +106,27 @@ struct Market
     connection::Symbol                      # Source por la que fluye; "" = directa
     demand_charge::Float64                  # USD/kW·mes por demanda máxima (M2);
                                             # peak por estación×año, 0 = sin cargo
+    contracted_power::Float64               # MW contratados (compra): con valor
+                                            # finito, el cargo paga la contratada
+                                            # y el exceso paga excess_penalty
+    excess_penalty::Float64                 # USD/kW·mes sobre peak − contratada
+    scheme::Symbol                          # venta: :billing (precio de inyección,
+                                            # default) | :net_metering (crédito a
+                                            # precio retail con banco de energía)
+    netting::Symbol                         # período de neteo del net metering:
+                                            # :season | :year
 end
 
-# retro-compatibilidad (9 campos): sin cargo por demanda
+# retro-compatibilidad: 9 campos (M11) y 10 campos (M2a)
 Market(id::Symbol, name::AbstractString, c::Symbol, dir::Symbol,
        price::Vector{Float64}, mp::Real, ma::Real,
        ef::Union{Float64,Nothing}, conn::Symbol) =
-    Market(id, String(name), c, dir, price, Float64(mp), Float64(ma), ef, conn, 0.0)
+    Market(id, name, c, dir, price, mp, ma, ef, conn, 0.0)
+Market(id::Symbol, name::AbstractString, c::Symbol, dir::Symbol,
+       price::Vector{Float64}, mp::Real, ma::Real,
+       ef::Union{Float64,Nothing}, conn::Symbol, dc::Real) =
+    Market(id, String(name), c, dir, price, Float64(mp), Float64(ma), ef, conn,
+           Float64(dc), Inf, 0.0, :billing, :year)
 
 "Puerto de un conversor: carrier + tasa en MW por MW de la salida de referencia."
 struct ConverterPort
