@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { TECH_TYPE_META, slugId, techProblems } from "../../lib/twin.js";
+import { TECH_TYPE_META, slugId, techProblems, carrierLabel } from "../../lib/twin.js";
 
 const FUTURE_PARAMS = [
   ["Disponibilidad por paso (mantenciones)", "requiere extensión del modelo"],
@@ -41,7 +41,7 @@ function PortList({ label, hint, ports, options, onChange }) {
           <select value={port.carrier}
                   onChange={(e) => set(i, { carrier: e.target.value })}>
             {options.map((c) => (
-              <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+              <option key={c.carrier_id} value={c.carrier_id}>{carrierLabel(c)}</option>
             ))}
           </select>
           <span className="port-x">×</span>
@@ -127,15 +127,15 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                 <div className="range-row">
                   <select value={draft.input_carrier ?? ""}
                           onChange={(e) => set({ input_carrier: e.target.value })}>
-                    {carrierOpts(["energy", "fuel", "heat"]).map((c) => (
-                      <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+                    {carrierOpts(["energy", "fuel", "heat", "cooling"]).map((c) => (
+                      <option key={c.carrier_id} value={c.carrier_id}>{carrierLabel(c)}</option>
                     ))}
                   </select>
                   <span style={{ color: "var(--muted)" }}>→</span>
                   <select value={draft.output_carrier ?? ""}
                           onChange={(e) => set({ output_carrier: e.target.value })}>
-                    {carrierOpts(["energy", "heat"]).map((c) => (
-                      <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+                    {carrierOpts(["energy", "heat", "cooling"]).map((c) => (
+                      <option key={c.carrier_id} value={c.carrier_id}>{carrierLabel(c)}</option>
                     ))}
                   </select>
                 </div>
@@ -146,13 +146,13 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                   label="Entradas (carrier × MW por MW de la salida de referencia)"
                   hint="la 1ª salida es la referencia: capacidad y despacho se miden ahí"
                   ports={draft.ports?.inputs ?? []}
-                  options={carrierOpts(["energy", "fuel", "heat"])}
+                  options={carrierOpts(["energy", "fuel", "heat", "cooling"])}
                   onChange={(inputs) => set({ ports: { ...draft.ports, inputs } })}
                 />
                 <PortList
                   label="Salidas (carrier × MW por MW de referencia)"
                   ports={draft.ports?.outputs ?? []}
-                  options={carrierOpts(["energy", "heat"])}
+                  options={carrierOpts(["energy", "heat", "cooling"])}
                   onChange={(outputs) => set({ ports: { ...draft.ports, outputs } })}
                 />
                 <p className="hint">
@@ -167,8 +167,8 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
           <Field label={draft.type === "storage" ? "Carrier almacenado" : "Vector de salida"}>
             <select value={draft.output_carrier ?? ""}
                     onChange={(e) => set({ output_carrier: e.target.value })}>
-              {carrierOpts(["energy", "heat", "offset"]).map((c) => (
-                <option key={c.carrier_id} value={c.carrier_id}>{c.carrier_id}</option>
+              {carrierOpts(["energy", "heat", "cooling", "offset"]).map((c) => (
+                <option key={c.carrier_id} value={c.carrier_id}>{carrierLabel(c)}</option>
               ))}
             </select>
           </Field>

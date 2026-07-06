@@ -74,8 +74,11 @@ end
 
 function load_carriers(dir::AbstractString)
     df = read_site_csv(dir, "carriers.csv")
+    # columnas opcionales level/color (roadmap M10): display, el motor las ignora
+    opt(r, col) = hasproperty(r, col) && !ismissing(r[col]) ? String(r[col]) : ""
     return Dict(_sym(r.carrier_id) =>
-        Carrier(_sym(r.carrier_id), String(r.name), String(r.unit), _sym(r.category))
+        Carrier(_sym(r.carrier_id), String(r.name), String(r.unit),
+                _sym(r.category), opt(r, :level), opt(r, :color))
         for r in eachrow(df))
 end
 

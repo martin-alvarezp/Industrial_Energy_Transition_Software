@@ -160,7 +160,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
     });
 
   const demandable = carriers
-    .filter((c) => ["energy", "heat"].includes(c.category))
+    .filter((c) => ["energy", "heat", "cooling"].includes(c.category))
     .map((c) => c.carrier_id)
     .filter((c) => !siteJson.demands[c]);
   const priceable = [

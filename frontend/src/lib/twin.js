@@ -20,6 +20,153 @@ export const techColor = (t) =>
   KNOWN_COLORS[t.tech_id] ?? TECH_TYPE_META[t.type]?.color ?? "#86938f";
 export const techGlyph = (t) => TECH_TYPE_META[t.type]?.glyph ?? "•";
 
+// ── Vectores energéticos (roadmap M10) ─────────────────────────────────────
+// Semántica de cada categoría en el motor (types.jl: CARRIER_CATEGORIES).
+export const CARRIER_CATEGORY_META = {
+  energy:    { label: "Energía",     color: "#2b62c4",
+               hint: "lleva balance nodal por paso (electricidad, H₂…)" },
+  heat:      { label: "Calor",       color: "#b3305f",
+               hint: "balance nodal; cada nivel de temperatura/presión es un vector aparte" },
+  cooling:   { label: "Frío",        color: "#2a9dab",
+               hint: "balance nodal; lo producen chillers/bombas de calor" },
+  fuel:      { label: "Combustible", color: "#7a6120",
+               hint: "se compra fuera del sistema al precio de su serie (necesita precio y factor scope 1)" },
+  emissions: { label: "Emisiones",   color: "#5a5f63",
+               hint: "contabilidad climática — no lleva balance" },
+  offset:    { label: "Offsets",     color: "#3c7a44",
+               hint: "compensaciones compradas — motor de emisiones" },
+};
+
+export const carrierColor = (c) =>
+  c?.color || CARRIER_CATEGORY_META[c?.category]?.color || "#86938f";
+
+/** Etiqueta legible de un vector: nombre · nivel (fallback: id). */
+export const carrierLabel = (c) =>
+  c?.name ? `${c.name}${c.level ? ` · ${c.level}` : ""}` : c?.carrier_id ?? "";
+
+/**
+ * Biblioteca de vectores de partida: el usuario crea los suyos desde aquí y
+ * ajusta parámetros (nivel, factor de emisión, precio) en el drawer.
+ * `factors`: factores de emisión sugeridos (tCO₂e/MWh); `price`: precio plano
+ * sugerido (USD/MWh) para combustibles — editable antes de crear.
+ */
+export const CARRIER_PRESETS = [
+  { key: "electricity", label: "Electricidad",
+    carrier: { name: "Electricidad", unit: "MWh", category: "energy" },
+    factors: [{ scope: "scope2", factor: 0.3 }] },
+  { key: "heat", label: "Calor (nivel de temperatura)", askLevel: "70 °C",
+    carrier: { name: "Calor", unit: "MWh", category: "heat" }, factors: [] },
+  { key: "steam", label: "Vapor saturado (nivel de presión)", askLevel: "6.9 bar",
+    carrier: { name: "Vapor saturado", unit: "MWh", category: "heat" }, factors: [] },
+  { key: "hot_water", label: "Agua caliente",
+    carrier: { name: "Agua caliente", unit: "MWh", category: "heat" }, factors: [] },
+  { key: "cooling", label: "Frío (nivel de temperatura)", askLevel: "5 °C",
+    carrier: { name: "Frío", unit: "MWh", category: "cooling" }, factors: [] },
+  { key: "natural_gas", label: "Gas natural",
+    carrier: { name: "Gas natural", unit: "MWh", category: "fuel" },
+    factors: [{ scope: "scope1", factor: 0.202 }], price: 38 },
+  { key: "hydrogen", label: "Hidrógeno",
+    carrier: { name: "Hidrógeno", unit: "MWh", category: "energy" }, factors: [] },
+  { key: "diesel", label: "Diésel",
+    carrier: { name: "Diésel", unit: "MWh", category: "fuel" },
+    factors: [{ scope: "scope1", factor: 0.267 }], price: 95 },
+  { key: "pellets", label: "Biomasa · pellets",
+    carrier: { name: "Pellets de biomasa", unit: "MWh", category: "fuel" },
+    factors: [{ scope: "scope1", factor: 0.02 }], price: 42 },
+  { key: "chips", label: "Biomasa · chips",
+    carrier: { name: "Chips de biomasa", unit: "MWh", category: "fuel" },
+    factors: [{ scope: "scope1", factor: 0.02 }], price: 26 },
+  { key: "custom", label: "Otro (definir desde cero)",
+    carrier: { name: "", unit: "MWh", category: "energy" }, factors: [] },
+];
+
+/** Vector nuevo a partir de un preset, listo para el drawer. */
+export function blankCarrier(presetKey) {
+  const p = CARRIER_PRESETS.find((x) => x.key === presetKey) ?? CARRIER_PRESETS.at(-1);
+  return {
+    carrier: { carrier_id: "", level: p.askLevel ?? "", color: "", ...p.carrier },
+    factors: { scope1: p.factors.find((f) => f.scope === "scope1")?.factor ?? 0,
+               scope2: p.factors.find((f) => f.scope === "scope2")?.factor ?? 0 },
+    price: p.price ?? null,
+  };
+}
+
+/** Dónde se usa un carrier (bloquea el borrado con referencias legibles). */
+export function carrierRefs(siteJson, id) {
+  const refs = [];
+  for (const t of siteJson.technologies) {
+    const ports = [...(t.ports?.inputs ?? []), ...(t.ports?.outputs ?? [])];
+    if (t.input_carrier === id || t.output_carrier === id ||
+        ports.some((p) => p.carrier === id))
+      refs.push(`el equipo '${t.name || t.tech_id}'`);
+  }
+  if (siteJson.demands?.[id]) refs.push("una serie de demanda");
+  return refs;
+}
+
+/**
+ * Inserta/actualiza un vector (inmutable). `factors` = {scope1, scope2} en
+ * tCO₂e/MWh (0 ⇒ sin factor); `flatPrice` solo se aplica si el carrier aún
+ * no tiene serie de precios (las series se editan en la sección Series).
+ */
+export function upsertCarrier(siteJson, { carrier, factors, price }) {
+  const row = { ...carrier };
+  ["level", "color"].forEach((k) => { if (!row[k]) delete row[k]; });
+  const carriers = siteJson.carriers.filter((c) => c.carrier_id !== row.carrier_id);
+  carriers.push(row);
+  carriers.sort((a, b) => a.carrier_id.localeCompare(b.carrier_id));
+
+  const efs = (siteJson.emission_factors ?? [])
+    .filter((f) => f.carrier_id !== row.carrier_id);
+  for (const scope of ["scope1", "scope2"]) {
+    if (factors?.[scope] > 0)
+      efs.push({ carrier_id: row.carrier_id, scope, factor: factors[scope] });
+  }
+  efs.sort((a, b) => a.carrier_id.localeCompare(b.carrier_id) ||
+                     a.scope.localeCompare(b.scope));
+
+  const out = { ...siteJson, carriers, emission_factors: efs };
+  if (price != null && !siteJson.prices?.[row.carrier_id]) {
+    const nsteps = siteJson.timesteps?.length ?? 96;
+    out.prices = { ...siteJson.prices,
+                   [row.carrier_id]: Array(nsteps).fill(price) };
+  }
+  return out;
+}
+
+/** Elimina un vector y sus datos asociados (series y factores propios). */
+export function removeCarrier(siteJson, id) {
+  const { [id]: _d, ...demands } = siteJson.demands ?? {};
+  const { [id]: _p, ...prices } = siteJson.prices ?? {};
+  return {
+    ...siteJson,
+    carriers: siteJson.carriers.filter((c) => c.carrier_id !== id),
+    demands, prices,
+    emission_factors:
+      (siteJson.emission_factors ?? []).filter((f) => f.carrier_id !== id),
+  };
+}
+
+/** Validación ligera de un vector (la de verdad es validate_site). */
+export function carrierProblems(draft, siteJson, isNew) {
+  const p = [];
+  const { carrier, factors } = draft;
+  if (!carrier.name?.trim()) p.push("falta el nombre");
+  if (!carrier.unit?.trim()) p.push("falta la unidad");
+  if (!CARRIER_CATEGORY_META[carrier.category]) p.push("categoría inválida");
+  if (factors.scope1 < 0 || factors.scope2 < 0)
+    p.push("los factores de emisión deben ser ≥ 0");
+  if (carrier.category === "fuel" && !(factors.scope1 > 0))
+    p.push("un combustible necesita factor scope 1 (tCO₂e/MWh quemado)");
+  if (isNew) {
+    const id = carrier.carrier_id ||
+      slugId(carrier.name + (carrier.level ? ` ${carrier.level}` : ""), []);
+    if (siteJson.carriers.some((c) => c.carrier_id === id))
+      p.push(`ya existe un vector '${id}' — cambia el nombre o el nivel`);
+  }
+  return p;
+}
+
 /** id único estilo snake_case a partir del nombre. */
 export function slugId(name, existingIds) {
   let base = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")

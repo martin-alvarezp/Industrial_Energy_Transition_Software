@@ -19,11 +19,16 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         hour = [t.hour for t in sj.timesteps],
         weight_hours = [t.weight_hours for t in sj.timesteps]))
 
+    # level/color son claves opcionales de la forma canónica (site_json)
+    _opt(c, k) = String(something(get(c, k, nothing), "")) |>
+                 (s -> isempty(s) ? missing : s)
     CSV.write(joinpath(dir, "carriers.csv"), DataFrame(
         carrier_id = [c.carrier_id for c in sj.carriers],
         name = [c.name for c in sj.carriers],
         unit = [c.unit for c in sj.carriers],
-        category = [c.category for c in sj.carriers]))
+        category = [c.category for c in sj.carriers],
+        level = [_opt(c, :level) for c in sj.carriers],
+        color = [_opt(c, :color) for c in sj.carriers]))
 
     techs = sj.technologies
     CSV.write(joinpath(dir, "technologies.csv"), DataFrame(

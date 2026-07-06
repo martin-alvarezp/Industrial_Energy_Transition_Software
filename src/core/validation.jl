@@ -55,6 +55,14 @@ function validate_site(site::Site)
             "timesteps.csv: hour del paso $(ts.id) fuera de 0..23 (valor: $(ts.hour))")
     end
 
+    # --- carriers: categoría conocida (una categoría desconocida dejaría al
+    # carrier fuera del balance en silencio) ---
+    for c in values(site.carriers)
+        c.category in CARRIER_CATEGORIES || push!(problems,
+            "carriers.csv[$(c.id)]: categoría '$(c.category)' inválida " *
+            "(use $(join(CARRIER_CATEGORIES, "|")))")
+    end
+
     # --- tecnologías: carriers referenciados, capacidades y eficiencias ---
     for s in values(site.sources)
         _check_carrier!(problems, site.carriers, s.output_carrier,
@@ -102,6 +110,14 @@ function validate_site(site::Site)
         _check_series!(problems, d.values, nsteps, "demands.csv[$(d.carrier)]")
         all(v -> isnan(v) || v >= 0, d.values) || push!(problems,
             "demands.csv[$(d.carrier)]: contiene demandas negativas")
+        # una demanda sobre un carrier sin balance quedaría ignorada en silencio
+        if haskey(site.carriers, d.carrier) && !is_balanced(site.carriers[d.carrier])
+            push!(problems,
+                "demands.csv[$(d.carrier)]: la categoría " *
+                "'$(site.carriers[d.carrier].category)' no lleva balance — solo " *
+                "$(join(BALANCED_CATEGORIES, "|")) admiten demanda (la demanda " *
+                "directa de combustibles llega con los mercados, roadmap M11)")
+        end
     end
     for p in values(site.prices)
         p.carrier in SPECIAL_PRICE_SERIES ||

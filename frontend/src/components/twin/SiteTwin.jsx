@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import TwinMap from "./TwinMap.jsx";
 import AddressSearch from "./AddressSearch.jsx";
 import EquipmentDrawer from "./EquipmentDrawer.jsx";
+import CarrierDrawer from "./CarrierDrawer.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
   removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON, isMultiport,
+  CARRIER_CATEGORY_META, CARRIER_PRESETS, carrierColor, blankCarrier,
+  upsertCarrier, removeCarrier,
 } from "../../lib/twin.js";
 import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
@@ -23,6 +26,7 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
   const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>"
   const [draftBoundary, setDraftBoundary] = useState([]);
   const [drawer, setDrawer] = useState(null);        // {tech, isNew}
+  const [carrierDrawer, setCarrierDrawer] = useState(null); // {draft, isNew}
   const [selectedId, setSelectedId] = useState(null);
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
@@ -119,6 +123,26 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
             layout: { ...layout, equipment } });
     setDrawer(null);
     setSelectedId(null);
+  };
+
+  const saveCarrier = (draft) => {
+    patchSite((sj) => upsertCarrier(sj, draft));
+    setCarrierDrawer(null);
+  };
+  const deleteCarrier = (id) => {
+    patchSite((sj) => removeCarrier(sj, id));
+    setCarrierDrawer(null);
+  };
+  const openCarrier = (c) => {
+    const f = (scope) =>
+      siteJson.emission_factors?.find(
+        (x) => x.carrier_id === c.carrier_id && x.scope === scope)?.factor ?? 0;
+    setCarrierDrawer({
+      draft: { carrier: { level: "", color: "", ...c },
+               factors: { scope1: f("scope1"), scope2: f("scope2") },
+               price: null },
+      isNew: false,
+    });
   };
 
   const doValidate = () => {
@@ -280,6 +304,52 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
         <div className="card">
           <div className="card-head">
             <h3 className="card-title">
+              Vectores energéticos ({siteJson.carriers.length})
+            </h3>
+          </div>
+          <div className="equip-list">
+            {siteJson.carriers.map((c) => {
+              const efs = (siteJson.emission_factors ?? [])
+                .filter((f) => f.carrier_id === c.carrier_id);
+              return (
+                <div key={c.carrier_id} className="equip-row">
+                  <span className="equip-dot" style={{ "--c": carrierColor(c) }}>
+                    ●
+                  </span>
+                  <button className="equip-name" onClick={() => openCarrier(c)}>
+                    {c.name}{c.level ? ` · ${c.level}` : ""}
+                    <span className="equip-sub">
+                      {CARRIER_CATEGORY_META[c.category]?.label ?? c.category}
+                      {" · "}{c.unit}
+                      {efs.map((f) =>
+                        ` · ${f.scope === "scope1" ? "S1" : "S2"} ${f.factor} tCO₂e/MWh`)}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="equip-new">
+            <select
+              className="site-select" value=""
+              aria-label="agregar vector energético"
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setCarrierDrawer({ draft: blankCarrier(e.target.value), isNew: true });
+                e.target.value = "";
+              }}
+            >
+              <option value="">+ Agregar vector…</option>
+              {CARRIER_PRESETS.map((p) => (
+                <option key={p.key} value={p.key}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <h3 className="card-title">
               Equipos ({siteJson.technologies.length}) · {placedCount} en el mapa
             </h3>
           </div>
@@ -387,6 +457,14 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
           tech={drawer.tech} isNew={drawer.isNew} siteJson={siteJson}
           onSave={saveTech} onDelete={deleteTech}
           onClose={() => setDrawer(null)}
+        />
+      )}
+      {carrierDrawer && (
+        <CarrierDrawer
+          draft={carrierDrawer.draft} isNew={carrierDrawer.isNew}
+          siteJson={siteJson}
+          onSave={saveCarrier} onDelete={deleteCarrier}
+          onClose={() => setCarrierDrawer(null)}
         />
       )}
     </div>

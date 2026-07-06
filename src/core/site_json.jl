@@ -121,9 +121,15 @@ function site_json(site::Site)
     end
     sort!(techs; by = t -> t.tech_id)
 
-    carriers = [(carrier_id = String(c.id), name = c.name, unit = c.unit,
-                 category = String(c.category))
-                for c in values(site.carriers)]
+    # level/color solo si están definidos: mantiene la forma canónica (y la
+    # huella site_version) de los sitios que no usan estos campos de display
+    carriers = [begin
+            nt = (carrier_id = String(c.id), name = c.name, unit = c.unit,
+                  category = String(c.category))
+            isempty(c.level) || (nt = merge(nt, (level = c.level,)))
+            isempty(c.color) || (nt = merge(nt, (color = c.color,)))
+            nt
+        end for c in values(site.carriers)]
     sort!(carriers; by = c -> c.carrier_id)
 
     factors = [(carrier_id = String(f.carrier), scope = String(f.scope),
@@ -178,9 +184,13 @@ function site_from_json(obj; default_name::AbstractString = "twin")
     carriers = Dict{Symbol,Carrier}()
     for c in carriers_raw
         id = Symbol(_twin_req(c, :carrier_id, "carriers"))
+        level = _twin_get(c, :level)
+        color = _twin_get(c, :color)
         carriers[id] = Carrier(id, String(_twin_req(c, :name, "carriers[$id]")),
                                String(_twin_req(c, :unit, "carriers[$id]")),
-                               Symbol(_twin_req(c, :category, "carriers[$id]")))
+                               Symbol(_twin_req(c, :category, "carriers[$id]")),
+                               level === nothing ? "" : String(level),
+                               color === nothing ? "" : String(color))
     end
 
     profiles = Dict{Symbol,Vector{Float64}}()

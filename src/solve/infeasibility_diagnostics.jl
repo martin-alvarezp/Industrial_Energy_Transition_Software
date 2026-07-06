@@ -69,8 +69,10 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     end
 
     # ── 2 · piso de emisiones vs trayectoria del cap ──
+    # térmicos = calor + frío: un chiller eléctrico (elec → cooling, COP) entra
+    # a la cota igual que una bomba de calor — sigue siendo un piso válido
     heat_carriers = [c for c in sets.demand_carriers
-                     if site.carriers[c].category == :heat]
+                     if site.carriers[c].category in (:heat, :cooling)]
     elec_carriers = [c for c in sets.demand_carriers
                      if site.carriers[c].category == :energy && c == grid_carrier]
 

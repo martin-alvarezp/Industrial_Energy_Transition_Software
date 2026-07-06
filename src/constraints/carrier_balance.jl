@@ -1,11 +1,11 @@
 # Balance por carrier, paso y año (SPEC §7.1):
 #   producción + import + descarga == demanda + consumo de conversión + carga + export
 #
-# Llevan balance los carriers de categoría :energy y :heat. Los combustibles
-# (:fuel) se compran directamente (su costo va en el objetivo, §6) y los carriers
-# climáticos (:emissions, :offset) se manejan en el motor de emisiones (§7.7-§8,
-# prompt posterior). Las pérdidas de storage viven en la ecuación de SOC (§7.4);
-# la red no tiene pérdidas en el MVP.
+# Llevan balance los carriers de BALANCED_CATEGORIES (:energy, :heat, :cooling).
+# Los combustibles (:fuel) se compran directamente (su costo va en el objetivo,
+# §6) y los carriers climáticos (:emissions, :offset) se manejan en el motor de
+# emisiones (§7.7-§8). Las pérdidas de storage viven en la ecuación de SOC
+# (§7.4); la red no tiene pérdidas en el MVP.
 
 """
     add_carrier_balance!(m, sets, params, site) -> m
@@ -17,8 +17,7 @@ de red entra al balance del carrier de salida de la fuente `grid_import`
 function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                               site::Site)
     steps, years = sets.steps, sets.years
-    balanced = [c for c in sets.carriers
-                if site.carriers[c].category in (:energy, :heat)]
+    balanced = [c for c in sets.carriers if is_balanced(site.carriers[c])]
 
     dispatch = m[:dispatch]
     charge, discharge = m[:charge], m[:discharge]

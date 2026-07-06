@@ -42,9 +42,17 @@ Lo que el usuario describe (vector de entrada → vector de salida + parámetros
 | `generator` | Generador con perfil | recurso renovable → carrier (PV con cf horario) |
 | `storage` | Almacenamiento | carrier ↔ mismo carrier (batería, estanque térmico) |
 
-Los **carriers** también son editables (son datos, no código — SPEC §15): el
-usuario puede crear `steam`, `cold`, etc.; el motor ya los soporta si tienen
-productor, demanda y factores coherentes.
+Los **carriers** también son editables (son datos, no código — SPEC §15) y
+desde v0.5 (roadmap M10) se crean desde la UI con una biblioteca de presets
+(electricidad, gas, H₂, vapor por presión, calor/frío por temperatura,
+pellets, chips, diésel…). Campos: `carrier_id`, `name`, `unit`, `category`
+(`energy|fuel|heat|cooling|emissions|offset` — energy/heat/cooling llevan
+balance nodal; fuel se compra por precio; emissions/offset son del motor de
+emisiones) y los opcionales de display `level` ("70 °C", "6.9 bar") y `color`
+(hex). Niveles distintos de un mismo portador son carriers distintos que solo
+se conectan vía conversores. Los factores de emisión (scope1/scope2) se editan
+junto al carrier. `level`/`color` solo entran al site_json cuando no están
+vacíos (la huella `site_version` de sitios sin estos campos no cambia).
 
 ## 4. Catálogo de parámetros por equipo
 

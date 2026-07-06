@@ -10,13 +10,40 @@ struct TimeStep
     weight_hours::Float64   # Σ sobre los 96 pasos = 8760
 end
 
-"Vector energético o climático (electricity, natural_gas, hot_water, co2e, offsets)."
+"""
+Vector energético o climático (electricity, natural_gas, hot_water, co2e,
+offsets). Los vectores son DATOS del usuario (roadmap M10): niveles distintos
+de un mismo portador (Heat·70C vs Heat·5C, vapor a 2 vs 6.9 bar) se modelan
+como carriers separados que solo se conectan vía conversores — el MILP sigue
+lineal y cada nivel es un nodo propio del balance.
+"""
 struct Carrier
     id::Symbol
     name::String
     unit::String        # p. ej. "MWh", "tCO2e"
-    category::Symbol    # :energy, :fuel, :heat, :emissions, :offset
+    category::Symbol    # ver CARRIER_CATEGORIES
+    level::String       # calidad/nivel para mostrar ("70 °C", "6.9 bar"); "" si no aplica
+    color::String       # color hex para las vistas; "" ⇒ color por categoría
 end
+
+# retro-compatibilidad: los 4 campos originales, sin nivel ni color
+Carrier(id::Symbol, name::AbstractString, unit::AbstractString, category::Symbol) =
+    Carrier(id, String(name), String(unit), category, "", "")
+
+"""
+Categorías válidas de carrier y su semántica en el motor:
+- `:energy`, `:heat`, `:cooling` → llevan balance nodal por paso (§7.1).
+- `:fuel` → se compra fuera del sistema al precio de su serie cuando un
+  conversor lo consume (§6); sin balance.
+- `:emissions`, `:offset` → motor de emisiones (§7.7-§8); sin balance.
+"""
+const CARRIER_CATEGORIES = (:energy, :fuel, :heat, :cooling, :emissions, :offset)
+
+"Categorías cuyo carrier lleva balance nodal producción == consumo (§7.1)."
+const BALANCED_CATEGORIES = (:energy, :heat, :cooling)
+
+"¿El carrier lleva balance nodal?"
+is_balanced(c::Carrier) = c.category in BALANCED_CATEGORIES
 
 "Costos unitarios de una tecnología (technology_costs.csv, SPEC §9)."
 struct TechCosts

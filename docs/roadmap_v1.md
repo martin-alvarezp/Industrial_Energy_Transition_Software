@@ -328,12 +328,22 @@ base se escribe sin `allowed_techs`. 987 tests verdes.
 > El orden respeta dependencias: carriers → mercados → catálogo →
 > escenarios (necesita M5) → resultados (necesita corridas guardadas).
 
-### v0.5 — "Vectores y mercados" 🔜
+### v0.5 — "Vectores y mercados" ← en curso
 > Criterio de salida: un usuario crea desde la UI un carrier nuevo (p.ej.
 > Heat·70C o pellets) con su factor de emisión, le cuelga un mercado de
 > compra con precio horario por año y otro de venta, corre y cuadra.
 
-M10 (carriers abiertos con niveles y factor de emisión) · M11 (mercados
+✅ **M10** — carriers abiertos: `Carrier` gana `level`/`color` opcionales
+(round-trip completo JSON↔CSV sin alterar huellas de sitios existentes),
+nace la categoría `:cooling` con balance nodal (el diagnóstico de
+infactibilidad la suma a la cota térmica), categoría desconocida o demanda
+sobre carrier sin balance pasan a ser `ValidationError` (antes se ignoraban
+en silencio), y el twin gana el panel "Vectores energéticos": crear desde
+11 presets (calor/vapor/frío por nivel, H₂, pellets, chips, diésel…) o
+desde cero, editar factores de emisión por vector, precio plano de partida
+para combustibles, y borrado bloqueado con referencias legibles. 1019 tests.
+
+⏳ M11 (mercados
 compra/venta; offsets como mercado; factor de red por año — absorbe la
 mitad de M7) · M13 (años calendario 2026-2050) · M2 (cargos por potencia +
 net metering/billing como modo tarifa del mercado eléctrico) + M6 parcial
