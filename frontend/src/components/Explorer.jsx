@@ -11,7 +11,10 @@ import { dayFromDispatch } from "../lib/api.js";
  * Results explorer: Pareto + roadmap + comparación (nivel horizonte), la
  * operación diaria, y la ingeniería de planta (métricas por equipo).
  */
+import { calYear } from "../lib/format.js";
+
 export default function Explorer({ result, pareto, batch, config, siteJson }) {
+  const baseYear = result?.meta?.base_year ?? 0;
   const [year, setYear] = useState(1);
   const [season, setSeason] = useState("invierno");
   const [vector, setVector] = useState("electricidad");
@@ -38,7 +41,7 @@ export default function Explorer({ result, pareto, batch, config, siteJson }) {
   return (
     <>
       <p className="section-label">Decisiones del horizonte</p>
-      <Roadmap investments={result.investments} horizon={N} />
+      <Roadmap investments={result.investments} horizon={N} baseYear={baseYear} />
       <div style={{ height: 16 }} />
       <div className="grid cols-2">
         <ParetoChart pareto={pareto} />
@@ -51,7 +54,7 @@ export default function Explorer({ result, pareto, batch, config, siteJson }) {
           <label htmlFor="f-year">Año</label>
           <select id="f-year" value={safeYear} onChange={(e) => setYear(+e.target.value)}>
             {Array.from({ length: N }, (_, i) => i + 1).map((y) => (
-              <option key={y} value={y}>Año {y}</option>
+              <option key={y} value={y}>Año {calYear(baseYear, y)}</option>
             ))}
           </select>
         </div>

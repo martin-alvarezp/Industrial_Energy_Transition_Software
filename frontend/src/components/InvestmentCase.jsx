@@ -5,7 +5,7 @@ import {
 import KpiTile from "./KpiTile.jsx";
 import ChartCard, { VizTooltip } from "./ChartCard.jsx";
 import { investmentCase } from "../lib/finance.js";
-import { musd, pct, num } from "../lib/format.js";
+import { musd, pct, num, calYear } from "../lib/format.js";
 
 /**
  * Caso de inversión (vista C-suite): payback, TIR y VAN incremental del plan
@@ -13,6 +13,7 @@ import { musd, pct, num } from "../lib/format.js";
  * costos anual que el motor ya produce.
  */
 export default function InvestmentCase({ plan, bau, referenceLabel }) {
+  const baseYear = plan?.meta?.base_year ?? 0;
   const discount = plan.cost_breakdown.map((r) => r.discount_factor);
 
   // BAU infactible = no invertir no es viable: mensaje ejecutivo, no un hueco
@@ -37,17 +38,17 @@ export default function InvestmentCase({ plan, bau, referenceLabel }) {
   const paybackLabel = ic.all_positive
     ? "inmediato"
     : ic.payback_simple
-      ? `año ${ic.payback_simple.year}`
+      ? `año ${calYear(baseYear, ic.payback_simple.year)}`
       : `> ${plan.meta.horizon_years} años`;
   const paybackNote = ic.payback_discounted
-    ? `descontado: año ${ic.payback_discounted.year}`
+    ? `descontado: año ${calYear(baseYear, ic.payback_discounted.year)}`
     : "no se recupera descontado en el horizonte";
   const irrLabel = ic.irr == null
     ? (ic.all_positive ? "siempre positivo" : "n/d")
     : pct(ic.irr, 1);
 
   const data = ic.cashflow.map((c, i) => ({
-    year: c.year, cashflow: c.cashflow, cum: ic.cumulative[i].cum,
+    year: calYear(baseYear, c.year), cashflow: c.cashflow, cum: ic.cumulative[i].cum,
   }));
   const positive = "var(--s-pv)";   // ahorro
   const negative = "var(--s-gas)";  // desembolso

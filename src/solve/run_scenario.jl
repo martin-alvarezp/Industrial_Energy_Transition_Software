@@ -25,14 +25,25 @@ function with_config(cfg::ScenarioConfig; kwargs...)
     return ScenarioConfig((vals[f] for f in fieldnames(ScenarioConfig))...)
 end
 
-"Site con la serie de precios de `carrier` multiplicada por `factor`."
+"""
+Site con los precios de `carrier` multiplicados por `factor` — tanto la serie
+legacy de `prices` como los MERCADOS explícitos de ese carrier (M11): un
+escenario high_gas debe encarecer el gas venga por donde venga.
+"""
 function _scale_prices(site::Site, carrier::Symbol, factor::Float64)
-    haskey(site.prices, carrier) || return site
     prices = copy(site.prices)
-    prices[carrier] = PriceSeries(carrier, site.prices[carrier].values .* factor)
+    if haskey(prices, carrier)
+        prices[carrier] = PriceSeries(carrier, prices[carrier].values .* factor)
+    end
+    markets = Dict{Symbol,Market}(
+        id => mk.carrier == carrier ?
+              Market(mk.id, mk.name, mk.carrier, mk.direction,
+                     mk.price .* factor, mk.max_power, mk.max_annual,
+                     mk.emission_factor, mk.connection) : mk
+        for (id, mk) in site.markets)
     return Site(site.name, site.timesteps, site.carriers, site.sources,
                 site.converters, site.generators, site.storages, site.demands,
-                prices, site.emission_factors)
+                prices, site.emission_factors, markets)
 end
 
 """

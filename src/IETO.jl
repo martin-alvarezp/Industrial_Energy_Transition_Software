@@ -68,7 +68,7 @@ export Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
 # core API
 export load_site, load_scenario_config, load_and_validate,
        validate_site, validate_scenario, SchemaError, ValidationError,
-       emissions_cap_net, n_steps, all_tech_ids, find_tech,
+       emissions_cap_net, n_steps, all_tech_ids, find_tech, calendar_year,
        site_json, site_from_json, site_version, default_timesteps, save_site
 # model API
 export build_model, build_sets, build_parameters, add_variables!, set_objective!,

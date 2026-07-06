@@ -3,7 +3,7 @@ import {
   CartesianGrid, Tooltip, ReferenceDot,
 } from "recharts";
 import ChartCard, { Legend, VizTooltip } from "../ChartCard.jsx";
-import { tons, num } from "../../lib/format.js";
+import { tons, num, calYear } from "../../lib/format.js";
 
 const C = {
   net: "var(--s-pv)",       // la serie que importa: acento
@@ -12,9 +12,9 @@ const C = {
 };
 
 /** Trayectoria de emisiones: neta (acento) vs bruta (contexto) contra el cap. */
-export default function EmissionsChart({ emissions }) {
+export default function EmissionsChart({ emissions, baseYear = 0 }) {
   const data = emissions.map((e) => ({
-    year: e.year, gross: e.gross, net: e.net, cap: e.cap_net,
+    year: calYear(baseYear, e.year), gross: e.gross, net: e.net, cap: e.cap_net,
   }));
   const last = data[data.length - 1];
 

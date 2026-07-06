@@ -374,9 +374,19 @@ opcionales en el contrato de datos. 1075 tests.
 mercado es constante) · offsets como mercado (se resuelve con M12: hoy son
 política del escenario).
 
-⏳ M13 (años calendario 2026-2050) · M2 (cargos por potencia +
-net metering/billing como modo tarifa del mercado eléctrico) + M6 parcial
-(día de punta — van juntos o no van, §8.3).
+✅ **M13** — años calendario: `base_year` en el ScenarioConfig (0 = relativo
+legacy; entra a la huella del escenario y a los overrides de la API); el
+MILP sigue interno en años 1..N y el calendario es etiquetado — meta de
+resultados con `base_year`, hojas XLSX con columna year en años reales, y
+el frontend completo habla en calendario: el builder define el horizonte
+como "2026 → 2035", y narrativa/KPIs/gráficos/selectores muestran años
+reales (`calYear`). De paso, fix a `_scale_prices` (M11): reconstruía el
+Site sin mercados y no escalaba sus precios — high_gas ahora encarece el
+gas venga por donde venga. 1090 tests.
+
+⏳ M2 (cargos por potencia + net metering/billing como modo tarifa del
+mercado eléctrico) + M6 parcial (día de punta — van juntos o no van, §8.3)
+· precios de mercado por año calendario (fleco de M11, ahora desbloqueado).
 
 ### v0.6 — "Catálogo tecnológico" 🔜
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:

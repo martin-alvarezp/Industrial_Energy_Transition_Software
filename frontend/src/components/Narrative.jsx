@@ -1,9 +1,10 @@
 import { musd, tons, pct, usdPerTon } from "../lib/format.js";
 import { TECH_LABELS } from "../lib/mockEngine.js";
-import { num } from "../lib/format.js";
+import { num, calYear } from "../lib/format.js";
 
 /** Narrativa ejecutiva generada por reglas desde el payload del contrato. */
 export default function Narrative({ result, reference, referenceLabel, bauFeasible, config }) {
+  const baseYear = result?.meta?.base_year ?? 0;
   if (!result.meta.feasible) return null;
   const k = result.kpis;
   const em = result.emissions;
@@ -13,7 +14,7 @@ export default function Narrative({ result, reference, referenceLabel, bauFeasib
 
   // 1 · el plan
   const invs = result.investments
-    .map((i) => `${TECH_LABELS[i.tech] ?? i.tech} (${num(i.mw, 1)} MW, año ${i.year})`)
+    .map((i) => `${TECH_LABELS[i.tech] ?? i.tech} (${num(i.mw, 1)} MW, año ${calYear(baseYear, i.year)})`)
     .join(", ");
   const notBuilt = ["pv", "heat_pump", "battery", "electric_boiler"].filter(
     (t) => !result.investments.some((i) => i.tech === t)
@@ -39,12 +40,12 @@ export default function Narrative({ result, reference, referenceLabel, bauFeasib
     const offShare = em[em.length - 1].offsets / em[em.length - 1].gross;
     paragraphs.push(
       <>
-        La restricción de emisiones empieza a atar en el <strong>año {bindYear}</strong>;
+        La restricción de emisiones empieza a atar en el <strong>año {calYear(baseYear, bindYear)}</strong>;
         desde ahí el costo marginal de abatimiento llega a{" "}
         <strong>{usdPerTon(finalMacc)}</strong> al final del horizonte.{" "}
         {config.allow_offsets ? (
           <>
-            Los offsets cubren <strong>{pct(offShare)}</strong> del bruto en el año {N} —
+            Los offsets cubren <strong>{pct(offShare)}</strong> del bruto en el año {calYear(baseYear, N)} —
             dependencia {offShare > 0.12 ? <strong>al tope del 15% permitido</strong> : "moderada"}.
           </>
         ) : (

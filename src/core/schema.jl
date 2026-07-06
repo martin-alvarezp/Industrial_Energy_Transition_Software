@@ -272,5 +272,6 @@ function load_scenario_config(path::AbstractString)
         Bool(get(d, "allow_new_fossil", false)),
         allowed,
         Bool(get(d, "salvage_value", false)),
+        Int(get(d, "base_year", 0)),
     )
 end

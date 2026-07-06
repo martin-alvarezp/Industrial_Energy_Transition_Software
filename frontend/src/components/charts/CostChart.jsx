@@ -2,7 +2,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import ChartCard, { Legend, VizTooltip } from "../ChartCard.jsx";
-import { musd, num } from "../../lib/format.js";
+import { musd, num, calYear } from "../../lib/format.js";
 
 // Componentes de costo (identidad → categórico, orden fijo por slot)
 const SERIES = [
@@ -13,9 +13,9 @@ const SERIES = [
 ];
 
 /** Desglose del costo anual (§6 del SPEC), apilado por componente. */
-export default function CostChart({ costs }) {
+export default function CostChart({ costs, baseYear = 0 }) {
   const data = costs.map((c) => ({
-    year: c.year,
+    year: calYear(baseYear, c.year),
     capex: c.capex,
     opex: c.fixed_opex + c.var_opex,
     energy: c.energy_purchases,

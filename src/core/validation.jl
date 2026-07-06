@@ -249,6 +249,9 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     cfg.capex_budget === nothing ||
         _check_nonneg!(problems, cfg.capex_budget, "scenario_config.yaml: capex_budget")
+    cfg.base_year == 0 || 1900 <= cfg.base_year <= 2200 || push!(problems,
+        "scenario_config.yaml: base_year debe ser 0 (relativo) o un año " *
+        "calendario 1900-2200 (valor: $(cfg.base_year))")
 
     for c in keys(cfg.price_escalation)
         haskey(site.carriers, c) || push!(problems,

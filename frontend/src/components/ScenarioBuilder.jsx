@@ -26,19 +26,29 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
     <div className="builder-grid">
       <div className="card">
         <div className="control">
-          <label htmlFor="horizon">Horizonte de planificación</label>
+          <label htmlFor="horizon">Horizonte de planificación (años calendario)</label>
           <div className="range-row">
             <input
-              id="horizon" type="range" min={1} max={20} step={1}
-              value={draft.horizon_years}
-              onChange={(e) => set({ horizon_years: +e.target.value })}
+              id="horizon" type="number" min={2000} max={2200} step={1}
+              value={draft.base_year}
+              aria-label="año base"
+              onChange={(e) => set({ base_year: +e.target.value })}
+            />
+            <span style={{ color: "var(--muted)" }}>→</span>
+            <input
+              type="number" step={1}
+              min={draft.base_year} max={draft.base_year + 19}
+              value={draft.base_year + draft.horizon_years - 1}
+              aria-label="año final"
+              onChange={(e) => set({ horizon_years:
+                Math.max(1, +e.target.value - draft.base_year + 1) })}
             />
             <span className="range-value">{draft.horizon_years} años</span>
           </div>
           <p className={"hint" + (draft.horizon_years > 15 ? " warn" : "")}>
             {draft.horizon_years > 15
               ? "Sobre 15 años la guía de complejidad (§14) pide validar tiempos de resolución del optimizador."
-              : "El modelo decide cuándo invertir en cada tecnología dentro de este horizonte (§14: slider 1–20)."}
+              : "El modelo decide en qué año calendario invertir en cada tecnología dentro de este horizonte (§14: 1–20 años)."}
           </p>
         </div>
 

@@ -5,11 +5,12 @@ import InvestmentCase from "./InvestmentCase.jsx";
 import Tornado from "./Tornado.jsx";
 import EmissionsChart from "./charts/EmissionsChart.jsx";
 import CostChart from "./charts/CostChart.jsx";
-import { musd, pct, usdPerTon } from "../lib/format.js";
+import { musd, pct, usdPerTon, calYear } from "../lib/format.js";
 import { downloadXlsx } from "../lib/api.js";
 
 /** Cockpit ejecutivo: 6 KPIs + narrativa + trayectoria y costos. */
 export default function Cockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName, siteJson }) {
+  const baseYear = result?.meta?.base_year ?? 0;
   if (!result.meta.feasible) {
     return (
       <div className="banner-infeasible">
@@ -36,6 +37,7 @@ export default function Cockpit({ result, reference, referenceLabel, bauFeasible
 }
 
 function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, config, source, sitePayload, siteName, siteJson }) {
+  const baseYear = result?.meta?.base_year ?? 0;
   const [downloading, setDownloading] = useState(false);
   const onXlsx = () => {
     setDownloading(true);
@@ -73,7 +75,7 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
         <KpiTile
           label="Reducción de emisiones"
           value={pct(netRed, 0)}
-          note={`netas vs ${referenceLabel} en el año ${result.meta.horizon_years} · brutas ${pct(grossRed, 0)}`}
+          note={`netas vs ${referenceLabel} en ${calYear(baseYear, result.meta.horizon_years)} · brutas ${pct(grossRed, 0)}`}
         />
         <KpiTile
           label="Dependencia de offsets"
@@ -88,7 +90,7 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
         <KpiTile
           label="RES share final"
           value={pct(k.res_share_final)}
-          delta={{ value: resDelta, text: pct(Math.abs(resDelta)), vs: "año 1" }}
+          delta={{ value: resDelta, text: pct(Math.abs(resDelta)), vs: `año ${calYear(baseYear, 1)}` }}
         />
       </div>
 
@@ -109,8 +111,8 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
 
       <p className="section-label">Trayectoria y costos</p>
       <div className="grid cols-2">
-        <EmissionsChart emissions={em} />
-        <CostChart costs={result.cost_breakdown} />
+        <EmissionsChart emissions={em} baseYear={baseYear} />
+        <CostChart costs={result.cost_breakdown} baseYear={baseYear} />
       </div>
 
       <div style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center" }}>

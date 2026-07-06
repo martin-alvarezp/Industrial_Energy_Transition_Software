@@ -1,6 +1,6 @@
 import ChartCard from "./ChartCard.jsx";
 import { TECH_LABELS } from "../lib/mockEngine.js";
-import { num } from "../lib/format.js";
+import { num, calYear } from "../lib/format.js";
 
 const TECH_COLORS = {
   pv: "#008165",
@@ -11,7 +11,7 @@ const TECH_COLORS = {
 const ORDER = ["pv", "heat_pump", "battery", "electric_boiler"];
 
 /** Roadmap tecnológico: línea de tiempo con el año de entrada por tecnología. */
-export default function Roadmap({ investments, horizon }) {
+export default function Roadmap({ investments, horizon, baseYear = 0 }) {
   const byTech = Object.fromEntries(investments.map((i) => [i.tech, i]));
   const years = Array.from({ length: horizon }, (_, i) => i + 1);
 
@@ -22,7 +22,7 @@ export default function Roadmap({ investments, horizon }) {
       table={{
         columns: [
           { key: "tech", label: "Tecnología", fmt: (v) => TECH_LABELS[v] ?? v },
-          { key: "year", label: "Año de inversión", fmt: (v) => (v == null ? "no se invierte" : v) },
+          { key: "year", label: "Año de inversión", fmt: (v) => (v == null ? "no se invierte" : calYear(baseYear, v)) },
           { key: "mw", label: "MW", fmt: (v) => (v == null ? "—" : num(v, 1)) },
         ],
         rows: ORDER.map((t) => ({
@@ -64,7 +64,7 @@ export default function Roadmap({ investments, horizon }) {
                       className="roadmap-label"
                       style={{ left: `${((inv.year - 0.4) / horizon) * 100}%` }}
                     >
-                      año {inv.year} · {num(inv.mw, 1)} MW
+                      año {calYear(baseYear, inv.year)} · {num(inv.mw, 1)} MW
                     </span>
                   </>
                 ) : (

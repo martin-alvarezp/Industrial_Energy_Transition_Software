@@ -31,6 +31,7 @@ const TECHS = {
 
 export const DEFAULT_CONFIG = {
   horizon_years: 10,
+  base_year: 2026, // año calendario del año 1 (M13); 0 = relativo
   emissions_cap_net_start: 42_000,
   emissions_cap_net_end: 20_000,
   allow_offsets: true,
@@ -274,6 +275,7 @@ export function runScenario(config) {
       status: feasible ? "OPTIMAL" : "INFEASIBLE",
       feasible,
       horizon_years: config.horizon_years,
+      base_year: config.base_year ?? 0,
     },
     assumptions: { scenario_config: { ...config }, log: [] },
     kpis: feasible

@@ -5,7 +5,7 @@ import {
 import ChartCard, { VizTooltip } from "./ChartCard.jsx";
 import KpiTile from "./KpiTile.jsx";
 import { operableTechs, metricsFor, loadDuration } from "../lib/operations.js";
-import { num, pct } from "../lib/format.js";
+import { num, pct, calYear } from "../lib/format.js";
 
 const TYPE_LABEL = { storage: "Almacenamiento", generator: "Generador", converter: "Conversor" };
 
@@ -57,6 +57,7 @@ function MetricTiles({ m }) {
  * API (el mock no lo produce).
  */
 export default function PlantEngineering({ result, siteJson, year }) {
+  const baseYear = result?.meta?.base_year ?? 0;
   const techs = useMemo(
     () => operableTechs(result.dispatch, siteJson),
     [result.dispatch, siteJson]
@@ -99,7 +100,7 @@ export default function PlantEngineering({ result, siteJson, year }) {
       <div style={{ height: 16 }} />
       <ChartCard
         title={`Curva de duración — ${tech.name}`}
-        sub={`${flow === "discharge" ? "descarga" : "salida"} ordenada de mayor a menor contra las horas del año (año ${year})`}
+        sub={`${flow === "discharge" ? "descarga" : "salida"} ordenada de mayor a menor contra las horas del año (año ${calYear(baseYear, year)})`}
         table={{
           columns: [
             { key: "hours", label: "Horas ≥", fmt: (v) => num(v, 0) },

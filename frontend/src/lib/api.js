@@ -35,6 +35,7 @@ async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
 export function toOverrides(cfg) {
   return {
     horizon_years: cfg.horizon_years,
+    base_year: cfg.base_year ?? 0,
     emissions_cap_net_start: cfg.emissions_cap_net_start,
     emissions_cap_net_end: cfg.emissions_cap_net_end,
     allow_offsets: cfg.allow_offsets,

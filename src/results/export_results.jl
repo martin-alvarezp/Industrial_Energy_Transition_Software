@@ -25,6 +25,7 @@ _meta(r::Results) = (
     status = String(r.status),
     feasible = r.feasible,
     horizon_years = r.horizon_years,
+    base_year = r.config.base_year,   # 0 = horizonte relativo (M13)
 )
 
 "Valor de config legible para la tabla de supuestos."
@@ -148,6 +149,14 @@ end
 
 _placeholder(note::String) = DataFrame(nota = [note])
 
+"Columna year en años calendario (M13) si el config trae base_year."
+function _with_calendar(df::DataFrame, cfg::ScenarioConfig)
+    (cfg.base_year > 0 && :year in propertynames(df)) || return df
+    out = copy(df)
+    out.year = [y isa Integer ? calendar_year(cfg, y) : y for y in out.year]
+    return out
+end
+
 """
     export_xlsx(r::Results, path; site=nothing, scenarios=nothing, pareto=nothing)
         -> path
@@ -180,7 +189,8 @@ function export_xlsx(r::Results, path::AbstractString;
         "Supuestos"    => _assumptions_table(r, site),
     ]
     XLSX.writetable(path,
-                    [name => _xlsx_ready(df) for (name, df) in sheets]...;
+                    [name => _xlsx_ready(_with_calendar(df, r.config))
+                     for (name, df) in sheets]...;
                     overwrite = true)
     return path
 end

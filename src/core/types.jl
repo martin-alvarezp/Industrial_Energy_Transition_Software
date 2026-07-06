@@ -215,11 +215,19 @@ struct ScenarioConfig
     allow_new_fossil::Bool
     allowed_techs::Vector{Symbol}
     salvage_value::Bool                      # crédito por vida útil no consumida al año N
+    base_year::Int                           # año calendario del año 1 (M13);
+                                             # 0 = horizonte relativo (legacy)
 end
 
-# retro-compatibilidad: los 15 campos originales, salvage_value = false
+# retro-compatibilidad: 15 campos → sin salvage ni calendario; 16 → sin calendario
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, false)
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, false, 0)
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv::Bool) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv, 0)
+
+"Año calendario del año relativo y (y=1 es base_year); y si no hay calendario."
+calendar_year(cfg::ScenarioConfig, y::Integer) =
+    cfg.base_year > 0 ? cfg.base_year + y - 1 : Int(y)
 
 """
 Trayectoria lineal del cap neto (SPEC §8):
