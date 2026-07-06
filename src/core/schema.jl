@@ -138,13 +138,16 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
             # columna opcional ports (JSON): conversores multi-puerto (CHP…)
             ports_raw = hasproperty(r, :ports) && !ismissing(r.ports) &&
                         !isempty(strip(String(r.ports))) ? r.ports : nothing
+            avail = get(profiles, id, Float64[])
             if ports_raw !== nothing
                 pj = JSON3.read(String(ports_raw))
                 mk(list) = [ConverterPort(_sym(p.carrier), Float64(p.ratio)) for p in list]
                 converters[id] = Converter(id, name, mk(pj.inputs), mk(pj.outputs),
-                                           ex, mx, inv, c)
+                                           Float64(ex), Float64(mx), inv, c, avail)
             else
-                converters[id] = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
+                base = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
+                converters[id] = Converter(id, name, base.inputs, base.outputs,
+                                           Float64(ex), Float64(mx), inv, c, avail)
             end
         elseif kind == :generator
             prof = get(profiles, id, Float64[])

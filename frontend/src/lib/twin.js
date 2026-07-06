@@ -429,13 +429,23 @@ export const isMultiport = (t) =>
 
 /** Inserta/actualiza un equipo en el site_json (inmutable). */
 export function upsertTech(siteJson, tech) {
-  const { cf_constant, cf_profile, ports_mode, ...row } = tech;
+  const { cf_constant, cf_profile, availability_constant, ports_mode, ...row } = tech;
   // conversor simple: sin ports (el backend lo describe con in/out/η)
   if (row.type === "converter" && !ports_mode) row.ports = null;
   const techs = siteJson.technologies.filter((t) => t.tech_id !== row.tech_id);
   techs.push(row);
   techs.sort((a, b) => a.tech_id.localeCompare(b.tech_id));
   const out = { ...siteJson, technologies: techs };
+  if (tech.type === "converter") {
+    // disponibilidad por paso (M4): viaja en generation_profiles con la
+    // clave del equipo; 1.0 (o vacío) = disponible siempre ⇒ sin entrada
+    const nsteps = siteJson.timesteps?.length ?? 96;
+    const av = availability_constant;
+    const { [row.tech_id]: _prev, ...rest } = siteJson.generation_profiles ?? {};
+    out.generation_profiles = av != null && av < 1
+      ? { ...rest, [row.tech_id]: Array(nsteps).fill(+(+av).toFixed(3)) }
+      : rest;
+  }
   if (tech.type === "generator") {
     const nsteps = siteJson.timesteps?.length ?? 96;
     const existing = siteJson.generation_profiles?.[row.tech_id];

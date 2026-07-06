@@ -151,8 +151,11 @@ function site_json(site::Site)
         technologies = techs,
         demands = _sorted_series(Dict(c => d.values for (c, d) in site.demands)),
         prices = _sorted_series(Dict(c => p.values for (c, p) in site.prices)),
-        generation_profiles = _sorted_series(
-            Dict(Symbol(id) => g.cf_profile for (id, g) in site.generators)),
+        generation_profiles = _sorted_series(merge(
+            Dict(Symbol(id) => g.cf_profile for (id, g) in site.generators),
+            # disponibilidad de conversores (M4): mismo mapa, clave = tech_id
+            Dict(Symbol(id) => c.availability for (id, c) in site.converters
+                 if !isempty(c.availability)))),
         emission_factors = factors,
     )
     isempty(site.markets) && return base   # clave ausente = huella legacy
@@ -263,9 +266,14 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                     for pt in list]
                 ins = mkports(_twin_req(ports, :inputs, "$ctx.ports"), "inputs")
                 outs = mkports(_twin_req(ports, :outputs, "$ctx.ports"), "outputs")
-                converters[id] = Converter(id, tname, ins, outs, ex, mx, inv, costs)
+                converters[id] = Converter(id, tname, ins, outs, Float64(ex),
+                                           Float64(mx), inv, costs,
+                                           get(profiles, id, Float64[]))
             else
-                converters[id] = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
+                base = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
+                converters[id] = Converter(id, tname, base.inputs, base.outputs,
+                                           Float64(ex), Float64(mx), inv, costs,
+                                           get(profiles, id, Float64[]))
             end
         elseif kind == :generator
             haskey(profiles, id) || throw(SchemaError(

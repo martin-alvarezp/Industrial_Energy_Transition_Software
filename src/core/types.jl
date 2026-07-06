@@ -153,7 +153,16 @@ struct Converter
     max_new_capacity::Float64
     investable::Bool
     costs::TechCosts
+    availability::Vector{Float64} # por paso en [0,1] (mantenciones, M4);
+                                  # vacío = disponible siempre
 end
+
+# retro-compatibilidad (8 campos): disponible siempre
+Converter(id::Symbol, name::AbstractString, ins::Vector{ConverterPort},
+          outs::Vector{ConverterPort}, ex::Real, mx::Real, inv::Bool,
+          costs::TechCosts) =
+    Converter(id, String(name), ins, outs, Float64(ex), Float64(mx), inv,
+              costs, Float64[])
 
 # retro-compatibilidad 1→1: Converter(id, name, in, out, η, ex, mx, inv, costs)
 Converter(id::Symbol, name::AbstractString, inc::Symbol, outc::Symbol,

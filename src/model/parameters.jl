@@ -31,6 +31,7 @@ struct ModelParameters
     market_ef::Dict{Symbol,Float64}                  # tCO₂e/MWh comprado (resuelto)
     conn_buy::Dict{Symbol,Vector{Symbol}}            # conexión → mercados de compra
     conn_sell::Dict{Symbol,Vector{Symbol}}           # conexión → mercados de venta
+    conv_availability::Dict{Symbol,Vector{Float64}}  # conversor → [step] en [0,1] (M4)
     conn_import_limit::Dict{Symbol,Float64}          # MW por conexión (0 si excluida)
     conn_export_limit::Dict{Symbol,Float64}
     balanced_carriers::Vector{Symbol}                # con balance nodal (incluye fuel
@@ -89,6 +90,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
 
     conv_inputs = Dict{Symbol,Vector{ConverterPort}}()
     conv_outputs = Dict{Symbol,Vector{ConverterPort}}()
+    conv_availability = Dict{Symbol,Vector{Float64}}()
     for id in sets.converters
         t = site.converters[id]
         costs[id] = t.costs
@@ -96,6 +98,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         max_new[id] = t.max_new_capacity
         conv_inputs[id] = t.inputs
         conv_outputs[id] = t.outputs
+        isempty(t.availability) || (conv_availability[id] = t.availability)
     end
     for id in sets.generators
         t = site.generators[id]
@@ -230,7 +233,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            cap_net, grid_limit, export_limit,
                            market_price, market_carrier, market_dir,
                            market_power_cap, market_annual_cap, market_ef,
-                           conn_buy, conn_sell, conn_import_limit,
+                           conn_buy, conn_sell, conv_availability, conn_import_limit,
                            conn_export_limit, balanced, grid_carrier,
                            fixed_charges, market_demand_charge, season_steps,
                            market_contracted, market_excess_penalty,

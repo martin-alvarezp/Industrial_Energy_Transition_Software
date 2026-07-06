@@ -111,3 +111,49 @@ end
     @test err isa ValidationError
     @test any(occursin("no lleva balance", p) for p in err.problems)
 end
+
+@testset "M4: disponibilidad por paso acota el despacho del conversor" begin
+    # chiller 8 MW, demanda de frío 6; disponibilidad 0.5 ⇒ tope 4 → infactible
+    site, cfg = cooling_site()
+    ch = site.converters[:chiller]
+    remake(av) = Site(site.name, site.timesteps, site.carriers, site.sources,
+        Dict(:chiller => Converter(:chiller, ch.name, ch.inputs, ch.outputs,
+                                   8.0, 0.0, false, ch.costs, fill(av, 4))),
+        site.generators, site.storages, site.demands, site.prices,
+        site.emission_factors)
+    im = build_model(remake(0.5), cfg)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.INFEASIBLE
+    # con 0.9 ⇒ tope 7.2 ≥ 6 → factible
+    site3 = remake(0.9)
+    im3 = build_model(site3, cfg)
+    JuMP.optimize!(im3.model)
+    @test JuMP.termination_status(im3.model) == JuMP.MOI.OPTIMAL
+
+    # round-trip: la disponibilidad viaja en generation_profiles
+    sj = site_json(site3)
+    @test collect(sj.generation_profiles.chiller) == fill(0.9, 4)
+    site4 = site_from_json(JSON3.read(JSON3.write(sj)))
+    @test site4.converters[:chiller].availability == fill(0.9, 4)
+    @test site_version(site4) == site_version(site3)
+    dir = mktempdir()
+    save_site(dir, site3)
+    @test load_site(dir).converters[:chiller].availability == fill(0.9, 4)
+end
+
+@testset "api: /solar_profile (proxy PVGIS — salta sin red)" begin
+    req = HTTP.Request("GET", "/solar_profile?lat=-33.45&lon=-70.66")
+    resp = try
+        IETO.handle_solar_profile(req)
+    catch e
+        @info "PVGIS inaccesible (sin red?) — test saltado"
+        nothing
+    end
+    if resp === nothing
+        @test_skip "PVGIS inaccesible"
+    else
+        body = JSON3.read(collect(codeunits(String(resp.body))))
+        @test length(body.cf_hourly) == 8760
+        @test all(0 .<= collect(body.cf_hourly) .<= 1.3)
+    end
+end

@@ -6,7 +6,6 @@ import { aggregate8760 } from "../../lib/series.js";
 import { num } from "../../lib/format.js";
 
 const FUTURE_PARAMS = [
-  ["Disponibilidad por paso (mantenciones)", "requiere extensión del modelo"],
   ["Carga mínima / rampas", "Lote D del SPEC"],
   ["Degradación de eficiencia", "no-goal del MVP (§15)"],
   ["Año más temprano de inversión", "requiere extensión del modelo"],
@@ -235,6 +234,16 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
           <Num value={draft.max_new_capacity} step={1} min={0}
                onChange={(v) => set({ max_new_capacity: v })} />
         </Field>
+        {draft.type === "converter" && (
+          <Field label="Disponibilidad (fracción, mantenciones · M4)"
+                 hint="1 = siempre disponible; 0.9 = 10% del tiempo en mantención — el despacho queda acotado a disponibilidad × capacidad en cada paso">
+            <Num value={draft.availability_constant ??
+                        (() => { const p = siteJson.generation_profiles?.[draft.tech_id];
+                                 return p ? +(p.reduce((a, b) => a + b, 0) / p.length).toFixed(3) : 1; })()}
+                 step={0.05} min={0} max={1}
+                 onChange={(v) => set({ availability_constant: v })} />
+          </Field>
+        )}
         {draft.type === "storage" && (
           <Field label="Horas de almacenamiento (MWh por MW)">
             <Num value={draft.storage_hours ?? 4} step={0.5} min={0.5}

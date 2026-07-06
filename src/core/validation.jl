@@ -87,6 +87,12 @@ function validate_site(site::Site)
         end
         _check_nonneg!(problems, c.existing_capacity, "technologies.csv[$(c.id)].existing_capacity")
         _check_nonneg!(problems, c.max_new_capacity, "technologies.csv[$(c.id)].max_new_capacity")
+        if !isempty(c.availability)
+            _check_series!(problems, c.availability, nsteps,
+                           "generation_profiles.csv[$(c.id)] (disponibilidad)")
+            all(v -> isnan(v) || (0 <= v <= 1), c.availability) || push!(problems,
+                "generation_profiles.csv[$(c.id)]: la disponibilidad debe estar en [0,1]")
+        end
     end
     for g in values(site.generators)
         _check_carrier!(problems, site.carriers, g.output_carrier,
