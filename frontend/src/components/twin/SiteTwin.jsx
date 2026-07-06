@@ -10,7 +10,7 @@ import {
   removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON, isMultiport,
   CARRIER_CATEGORY_META, CARRIER_PRESETS, carrierColor, blankCarrier,
   upsertCarrier, removeCarrier, MARKET_DIR_META, blankMarket, upsertMarket,
-  removeMarket, carrierLabel,
+  removeMarket, carrierLabel, TECH_PRESETS, blankFromPreset,
 } from "../../lib/twin.js";
 import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
@@ -439,13 +439,40 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
             ))}
           </div>
           <div className="equip-new">
-            {Object.entries(TECH_TYPE_META).map(([type, m]) => (
-              <button key={type} className="chart-toggle"
-                      onClick={() => setDrawer({
-                        tech: blankEquipment(type, siteJson), isNew: true })}>
-                + {m.glyph} {m.label}
-              </button>
-            ))}
+            <select
+              className="site-select" value=""
+              aria-label="agregar equipo desde el catálogo"
+              onChange={(e) => {
+                const v = e.target.value;
+                e.target.value = "";
+                if (!v) return;
+                if (v.startsWith("raw:")) {
+                  setDrawer({ tech: blankEquipment(v.slice(4), siteJson),
+                              isNew: true });
+                  return;
+                }
+                const r = blankFromPreset(v, siteJson);
+                if (!r) return;
+                if (r.added.length > 0) patch({ siteJson: r.siteJson });
+                setDrawer({ tech: r.tech, isNew: true, baseSite: r.siteJson });
+              }}
+            >
+              <option value="">+ Agregar equipo (catálogo)…</option>
+              {["Generación", "Conversión", "Almacenamiento"].map((g) => (
+                <optgroup key={g} label={g}>
+                  {TECH_PRESETS.filter((p) => p.group === g).map((p) => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+              <optgroup label="Desde cero">
+                {Object.entries(TECH_TYPE_META).map(([type, m]) => (
+                  <option key={type} value={`raw:${type}`}>
+                    {m.glyph} {m.label} genérico
+                  </option>
+                ))}
+              </optgroup>
+            </select>
           </div>
         </div>
 

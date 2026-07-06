@@ -412,7 +412,19 @@ estacional + contratada 8 MW → cargos 1.29 MUSD/año. 1116 tests.
 mercado por año calendario (M11) · punta desde el CSV 8760 real (hoy el
 uplift es manual) · neteo con expiración por período (hoy expira anual).
 
-### v0.6 — "Catálogo tecnológico" 🔜
+### v0.6 — "Catálogo tecnológico" ← en curso
+
+✅ **D1a** — catálogo de equipos en el twin: 20 presets industriales con
+parámetros de screening (Generación: PV, solar térmica, eólico, generador
+diésel, CHP a gas, electrolizador · Conversión: calderas gas/vapor/pellets/
+chips/eléctrica, bomba de calor, chillers de compresión y absorción,
+intercambiador vapor→agua · Almacenamiento: Li-ion, estanque térmico,
+hielo, tanque H₂, acumulador de vapor). Cada preset declara sus vectores
+CANÓNICOS y el twin los crea solos si faltan (con factor de emisión y
+precio de partida) — un chiller de absorción trae su "Frío · 5 °C". Los
+4 tipos genéricos siguen como "desde cero" (custom multi-puerto ya existía).
+Verificado E2E: chiller de absorción desde el catálogo + vector auto +
+payload válido contra la API.
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:
 > CHP + caldera biomasa + bomba de calor + chiller absorción + electrolizador
 > + almacenamiento térmico/H₂, todo desde presets o creando techs propias.

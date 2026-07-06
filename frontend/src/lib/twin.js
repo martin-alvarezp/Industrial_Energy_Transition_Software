@@ -184,6 +184,169 @@ export function slugId(name, existingIds) {
   return id;
 }
 
+// ── Catálogo tecnológico (roadmap v0.6 · D1) ───────────────────────────────
+// Presets de equipos industriales con parámetros de screening (costos USD/kW
+// 2026, eficiencias/COP típicos) — el usuario ajusta en el drawer. Cada
+// preset declara los vectores CANÓNICOS que necesita; si el sitio no los
+// tiene, se crean solos (con factor de emisión y precio de partida).
+
+export const CANONICAL_CARRIERS = {
+  electricity: { name: "Electricidad", unit: "MWh", category: "energy",
+                 factors: { scope2: 0.3 } },
+  natural_gas: { name: "Gas natural", unit: "MWh", category: "fuel",
+                 factors: { scope1: 0.202 }, price: 38 },
+  hot_water:   { name: "Agua caliente", unit: "MWh", category: "heat", factors: {} },
+  steam:       { name: "Vapor saturado", unit: "MWh", category: "heat",
+                 level: "6.9 bar", factors: {} },
+  cooling:     { name: "Frío", unit: "MWh", category: "cooling",
+                 level: "5 °C", factors: {} },
+  hydrogen:    { name: "Hidrógeno", unit: "MWh", category: "energy", factors: {} },
+  diesel:      { name: "Diésel", unit: "MWh", category: "fuel",
+                 factors: { scope1: 0.267 }, price: 95 },
+  pellets:     { name: "Pellets de biomasa", unit: "MWh", category: "fuel",
+                 factors: { scope1: 0.02 }, price: 42 },
+  chips:       { name: "Chips de biomasa", unit: "MWh", category: "fuel",
+                 factors: { scope1: 0.02 }, price: 26 },
+};
+
+/** Asegura que existan los carriers canónicos; devuelve el site actualizado. */
+export function ensureCarriers(siteJson, ids) {
+  let sj = siteJson;
+  const added = [];
+  for (const id of ids) {
+    if (sj.carriers.some((c) => c.carrier_id === id)) continue;
+    const c = CANONICAL_CARRIERS[id];
+    if (!c) continue;
+    sj = upsertCarrier(sj, {
+      carrier: { carrier_id: id, name: c.name, unit: c.unit,
+                 category: c.category, level: c.level ?? "", color: "" },
+      factors: { scope1: c.factors.scope1 ?? 0, scope2: c.factors.scope2 ?? 0 },
+      price: c.price ?? null,
+    });
+    added.push(c.name);
+  }
+  return { siteJson: sj, added };
+}
+
+const P = (carrier, ratio) => ({ carrier, ratio });
+export const TECH_PRESETS = [
+  // ── Generación en sitio ──
+  { key: "pv", group: "Generación", label: "Solar PV", type: "generator",
+    needs: ["electricity"],
+    tech: { output_carrier: "electricity", cf_constant: 0.22, capex_per_kw: 750,
+            fixed_opex: 12_000, variable_opex: 0, lifetime_years: 30 } },
+  { key: "solar_thermal", group: "Generación", label: "Solar térmica", type: "generator",
+    needs: ["hot_water"],
+    tech: { output_carrier: "hot_water", cf_constant: 0.3, capex_per_kw: 450,
+            fixed_opex: 8_000, variable_opex: 0, lifetime_years: 25 } },
+  { key: "wind", group: "Generación", label: "Eólico", type: "generator",
+    needs: ["electricity"],
+    tech: { output_carrier: "electricity", cf_constant: 0.35, capex_per_kw: 1_300,
+            fixed_opex: 35_000, variable_opex: 0, lifetime_years: 25 } },
+  { key: "diesel_gen", group: "Generación", label: "Generador diésel", type: "converter",
+    needs: ["diesel", "electricity"],
+    tech: { input_carrier: "diesel", output_carrier: "electricity",
+            efficiency: 0.38, capex_per_kw: 800, fixed_opex: 15_000,
+            variable_opex: 8, lifetime_years: 20 } },
+  { key: "chp_gas", group: "Generación", label: "CHP a gas (cogeneración)",
+    type: "converter", needs: ["natural_gas", "electricity", "hot_water"],
+    tech: { ports_mode: true,
+            ports: { inputs: [P("natural_gas", 2.5)],
+                     outputs: [P("electricity", 1.0), P("hot_water", 1.2)] },
+            capex_per_kw: 1_100, fixed_opex: 25_000, variable_opex: 6,
+            lifetime_years: 20 } },
+  { key: "electrolyzer", group: "Generación", label: "Electrolizador (H₂)",
+    type: "converter", needs: ["electricity", "hydrogen", "hot_water"],
+    tech: { ports_mode: true,
+            ports: { inputs: [P("electricity", 1.47)],
+                     outputs: [P("hydrogen", 1.0), P("hot_water", 0.15)] },
+            capex_per_kw: 1_500, fixed_opex: 30_000, variable_opex: 1,
+            lifetime_years: 15 } },
+  // ── Calderas y conversión térmica ──
+  { key: "gas_boiler", group: "Conversión", label: "Caldera a gas (agua caliente)",
+    type: "converter", needs: ["natural_gas", "hot_water"],
+    tech: { input_carrier: "natural_gas", output_carrier: "hot_water",
+            efficiency: 0.92, capex_per_kw: 120, fixed_opex: 2_000,
+            variable_opex: 1, lifetime_years: 25 } },
+  { key: "steam_boiler", group: "Conversión", label: "Generador de vapor a gas",
+    type: "converter", needs: ["natural_gas", "steam"],
+    tech: { input_carrier: "natural_gas", output_carrier: "steam",
+            efficiency: 0.9, capex_per_kw: 150, fixed_opex: 3_000,
+            variable_opex: 1.5, lifetime_years: 25 } },
+  { key: "biomass_boiler", group: "Conversión", label: "Caldera a pellets",
+    type: "converter", needs: ["pellets", "hot_water"],
+    tech: { input_carrier: "pellets", output_carrier: "hot_water",
+            efficiency: 0.85, capex_per_kw: 550, fixed_opex: 12_000,
+            variable_opex: 3, lifetime_years: 20 } },
+  { key: "chips_boiler", group: "Conversión", label: "Caldera a chips (vapor)",
+    type: "converter", needs: ["chips", "steam"],
+    tech: { input_carrier: "chips", output_carrier: "steam",
+            efficiency: 0.82, capex_per_kw: 700, fixed_opex: 18_000,
+            variable_opex: 4, lifetime_years: 20 } },
+  { key: "electric_boiler", group: "Conversión", label: "Caldera eléctrica",
+    type: "converter", needs: ["electricity", "hot_water"],
+    tech: { input_carrier: "electricity", output_carrier: "hot_water",
+            efficiency: 0.99, capex_per_kw: 150, fixed_opex: 2_500,
+            variable_opex: 0.5, lifetime_years: 20 } },
+  { key: "heat_pump", group: "Conversión", label: "Bomba de calor (aire/agua)",
+    type: "converter", needs: ["electricity", "hot_water"],
+    tech: { input_carrier: "electricity", output_carrier: "hot_water",
+            efficiency: 3.5, capex_per_kw: 600, fixed_opex: 8_000,
+            variable_opex: 1, lifetime_years: 18 } },
+  { key: "chiller_comp", group: "Conversión", label: "Chiller de compresión",
+    type: "converter", needs: ["electricity", "cooling"],
+    tech: { input_carrier: "electricity", output_carrier: "cooling",
+            efficiency: 4.0, capex_per_kw: 300, fixed_opex: 5_000,
+            variable_opex: 0.8, lifetime_years: 15 } },
+  { key: "chiller_abs", group: "Conversión", label: "Chiller de absorción",
+    type: "converter", needs: ["hot_water", "cooling"],
+    tech: { input_carrier: "hot_water", output_carrier: "cooling",
+            efficiency: 0.75, capex_per_kw: 450, fixed_opex: 7_000,
+            variable_opex: 0.5, lifetime_years: 20 } },
+  { key: "steam_hx", group: "Conversión", label: "Intercambiador vapor → agua caliente",
+    type: "converter", needs: ["steam", "hot_water"],
+    tech: { input_carrier: "steam", output_carrier: "hot_water",
+            efficiency: 0.98, capex_per_kw: 80, fixed_opex: 1_000,
+            variable_opex: 0.1, lifetime_years: 25 } },
+  // ── Almacenamiento ──
+  { key: "battery", group: "Almacenamiento", label: "Batería Li-ion", type: "storage",
+    needs: ["electricity"],
+    tech: { output_carrier: "electricity", efficiency: 0.95, storage_hours: 4,
+            capex_per_kw: 350, fixed_opex: 5_000, variable_opex: 0.5,
+            lifetime_years: 12 } },
+  { key: "thermal_tank", group: "Almacenamiento", label: "Estanque térmico (agua caliente)",
+    type: "storage", needs: ["hot_water"],
+    tech: { output_carrier: "hot_water", efficiency: 0.98, storage_hours: 8,
+            capex_per_kw: 30, fixed_opex: 500, variable_opex: 0.05,
+            lifetime_years: 25 } },
+  { key: "ice_storage", group: "Almacenamiento", label: "Almacenamiento de hielo",
+    type: "storage", needs: ["cooling"],
+    tech: { output_carrier: "cooling", efficiency: 0.9, storage_hours: 6,
+            capex_per_kw: 120, fixed_opex: 1_500, variable_opex: 0.2,
+            lifetime_years: 20 } },
+  { key: "h2_tank", group: "Almacenamiento", label: "Tanque de H₂", type: "storage",
+    needs: ["hydrogen"],
+    tech: { output_carrier: "hydrogen", efficiency: 0.98, storage_hours: 24,
+            capex_per_kw: 500, fixed_opex: 4_000, variable_opex: 0.1,
+            lifetime_years: 20 } },
+  { key: "steam_acc", group: "Almacenamiento", label: "Acumulador de vapor",
+    type: "storage", needs: ["steam"],
+    tech: { output_carrier: "steam", efficiency: 0.95, storage_hours: 2,
+            capex_per_kw: 60, fixed_opex: 800, variable_opex: 0.1,
+            lifetime_years: 25 } },
+];
+
+/** Equipo desde preset: asegura sus carriers y prellena el drawer. */
+export function blankFromPreset(presetKey, siteJson) {
+  const p = TECH_PRESETS.find((x) => x.key === presetKey);
+  if (!p) return null;
+  const ensured = ensureCarriers(siteJson, p.needs);
+  const base = blankEquipment(p.type, ensured.siteJson);
+  const tech = { ...base, ...p.tech, name: p.label };
+  if (p.type === "storage") tech.input_carrier = tech.output_carrier;
+  return { siteJson: ensured.siteJson, tech, added: ensured.added };
+}
+
 const EN_SEASONS = ["winter", "spring", "summer", "autumn"];
 const flat96 = (v) => Array(96).fill(v);
 
