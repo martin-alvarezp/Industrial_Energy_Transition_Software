@@ -18,7 +18,7 @@ export default function CostChart({ costs, baseYear = 0 }) {
     year: calYear(baseYear, c.year),
     capex: c.capex,
     opex: c.fixed_opex + c.var_opex,
-    energy: c.energy_purchases,
+    energy: c.energy_purchases + (c.demand_charges ?? 0),
     climate: c.carbon_cost + c.offset_cost,
     total: c.total,
   }));

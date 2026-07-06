@@ -384,9 +384,14 @@ reales (`calYear`). De paso, fix a `_scale_prices` (M11): reconstruía el
 Site sin mercados y no escalaba sus precios — high_gas ahora encarece el
 gas venga por donde venga. 1090 tests.
 
-⏳ M2 (cargos por potencia + net metering/billing como modo tarifa del
-mercado eléctrico) + M6 parcial (día de punta — van juntos o no van, §8.3)
-· precios de mercado por año calendario (fleco de M11, ahora desbloqueado).
+✅ **M2a** — cargos por demanda máxima: `Market.demand_charge` (USD/kW·mes),
+peak[mercado, estación, año] ≥ flujo, término propio en objetivo y desglose.
+Verificado por API: 10 USD/kW·mes en el demo = 1.14 MUSD/año (NPV 75.77 →
+84.46). El optimizador ya VE el recorte de punta. 1096 tests.
+
+⏳ M2b (net metering/billing con período de neteo y banco; potencia
+contratada con penalización) + M6 parcial (día de punta — van juntos o no
+van, §8.3) · precios de mercado por año calendario (fleco de M11).
 
 ### v0.6 — "Catálogo tecnológico" 🔜
 > Criterio: sala de máquinas industrial típica modelable sin tocar código:

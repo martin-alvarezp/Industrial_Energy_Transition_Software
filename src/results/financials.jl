@@ -19,12 +19,14 @@ function extract_financials(im::IETOModel)
         fixed_opex       = component(:fixed_opex_y),
         var_opex         = component(:var_opex_y),
         energy_purchases = component(:energy_purchases_y),
+        demand_charges   = component(:demand_charges_y),   # tarifario M2
         carbon_cost      = component(:carbon_cost_y),
         offset_cost      = component(:offset_cost_y),
         export_revenue   = component(:export_revenue_y),
     )
     df.total = df.capex .+ df.fixed_opex .+ df.var_opex .+ df.energy_purchases .+
-               df.carbon_cost .+ df.offset_cost .- df.export_revenue
+               df.demand_charges .+ df.carbon_cost .+ df.offset_cost .-
+               df.export_revenue
     # valor residual: crédito único al fin del horizonte (0 si está apagado),
     # incluido en total/npv del año N para que Σ npv == VAN del objetivo
     salvage = haskey(JuMP.object_dictionary(m), :salvage_credit) ?

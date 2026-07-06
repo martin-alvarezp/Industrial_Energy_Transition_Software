@@ -120,6 +120,14 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
           <OptNum value={draft.max_annual} step={100} min={0} placeholder="sin tope"
                   onChange={(v) => set({ max_annual: v })} />
         </Field>
+        {draft.direction === "buy" && (
+          <Field label="Cargo por demanda máxima (USD/kW·mes, opcional)"
+                 hint="paga la punta de compra de cada estación — en clientes industriales suele ser 20-40% de la factura. Ojo (§8.3): el año-plantilla de días promedio subestima puntas; el día de punta llega con M6">
+            <OptNum value={draft.demand_charge} step={0.5} min={0}
+                    placeholder="sin cargo"
+                    onChange={(v) => set({ demand_charge: v })} />
+          </Field>
+        )}
         {draft.direction === "buy" && cat !== "fuel" && (
           <Field label="Factor de emisión del contrato (tCO₂e/MWh, opcional)"
                  hint="p. ej. un PPA verde certificado: 0 — si se omite, hereda el factor scope 2 del vector">

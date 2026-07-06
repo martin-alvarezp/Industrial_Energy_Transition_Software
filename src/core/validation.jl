@@ -171,6 +171,9 @@ function validate_site(site::Site)
         mk.max_annual > 0 || push!(problems, "$ctx: max_annual debe ser > 0")
         mk.emission_factor === nothing ||
             _check_nonneg!(problems, mk.emission_factor, "$ctx.emission_factor")
+        _check_nonneg!(problems, mk.demand_charge, "$ctx.demand_charge")
+        mk.direction == :sell && mk.demand_charge > 0 && push!(problems,
+            "$ctx: el cargo por demanda máxima aplica a mercados de COMPRA")
         if haskey(site.carriers, mk.carrier)
             cat = site.carriers[mk.carrier].category
             cat in (:emissions, :offset) && push!(problems,

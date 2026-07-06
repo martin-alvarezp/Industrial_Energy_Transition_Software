@@ -78,7 +78,9 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
             max_power = [something(mk.max_power, missing) for mk in mkts],
             max_annual = [something(mk.max_annual, missing) for mk in mkts],
             emission_factor = [something(mk.emission_factor, missing) for mk in mkts],
-            connection = [something(mk.connection, missing) for mk in mkts]))
+            connection = [something(mk.connection, missing) for mk in mkts],
+            demand_charge = [something(get(mk, :demand_charge, nothing), missing)
+                             for mk in mkts]))
         _write_series(joinpath(dir, "market_prices.csv"), :price,
                       (; (Symbol(mk.market_id) => mk.price for mk in mkts)...);
                       keycol = :market_id)

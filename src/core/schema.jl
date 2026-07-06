@@ -186,7 +186,8 @@ function load_markets(dir::AbstractString, nsteps::Int)
                              _sym(r.direction), prices[id],
                              something(opt_num(:max_power), Inf),
                              something(opt_num(:max_annual), Inf),
-                             opt_num(:emission_factor), conn)
+                             opt_num(:emission_factor), conn,
+                             something(opt_num(:demand_charge), 0.0))
     end
     return markets
 end

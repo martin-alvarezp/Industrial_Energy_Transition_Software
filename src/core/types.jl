@@ -104,7 +104,15 @@ struct Market
     max_annual::Float64                     # MWh/año (Inf = sin tope)
     emission_factor::Union{Float64,Nothing} # tCO₂e/MWh comprado; nothing = hereda
     connection::Symbol                      # Source por la que fluye; "" = directa
+    demand_charge::Float64                  # USD/kW·mes por demanda máxima (M2);
+                                            # peak por estación×año, 0 = sin cargo
 end
+
+# retro-compatibilidad (9 campos): sin cargo por demanda
+Market(id::Symbol, name::AbstractString, c::Symbol, dir::Symbol,
+       price::Vector{Float64}, mp::Real, ma::Real,
+       ef::Union{Float64,Nothing}, conn::Symbol) =
+    Market(id, String(name), c, dir, price, Float64(mp), Float64(ma), ef, conn, 0.0)
 
 "Puerto de un conversor: carrier + tasa en MW por MW de la salida de referencia."
 struct ConverterPort

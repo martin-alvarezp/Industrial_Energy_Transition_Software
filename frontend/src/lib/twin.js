@@ -364,7 +364,7 @@ export function blankMarket(siteJson) {
   return {
     market_id: "", name: "", carrier_id, direction: "buy",
     price_flat: 80, max_power: null, max_annual: null,
-    emission_factor: null,
+    emission_factor: null, demand_charge: null,
     connection: connectionsFor(siteJson, carrier_id)[0]?.tech_id ?? null,
   };
 }
@@ -399,7 +399,7 @@ export function upsertMarket(siteJson, draft) {
   const { price_flat, ...row } = draft;
   const nsteps = siteJson.timesteps?.length ?? 96;
   if (!row.price) row.price = Array(nsteps).fill(price_flat ?? 0);
-  ["max_power", "max_annual", "emission_factor", "connection"].forEach((k) => {
+  ["max_power", "max_annual", "emission_factor", "connection", "demand_charge"].forEach((k) => {
     if (row[k] == null || row[k] === "") row[k] = null;
   });
   const base = (siteJson.markets ?? []).length > 0
@@ -438,7 +438,8 @@ export function marketProblems(draft, siteJson, isNew) {
   }
   for (const [k, label] of [["max_power", "tope de potencia"],
                             ["max_annual", "tope anual"],
-                            ["emission_factor", "factor de emisión"]]) {
+                            ["emission_factor", "factor de emisión"],
+                            ["demand_charge", "cargo por demanda"]]) {
     if (draft[k] != null && draft[k] !== "" && !(+draft[k] >= 0))
       p.push(`el ${label} debe ser ≥ 0`);
   }

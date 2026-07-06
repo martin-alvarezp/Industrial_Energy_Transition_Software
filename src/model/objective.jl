@@ -51,6 +51,18 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(params.price[p[2]][s, y] * p[3] * dispatch[p[1], s, y] * w[s]
             for p in params.fuel_inputs, s in steps; init = 0.0))
 
+    # DemandCharges_y (M2): Σ mercados con cargo · USD/kW·mes · kW de punta
+    # por estación · meses de la estación (12/n_estaciones)
+    charged = [mk for mk in sets.buy_markets
+               if get(params.market_demand_charge, mk, 0.0) > 0]
+    nse = length(params.season_steps)
+    months_per_season = 12.0 / max(nse, 1)
+    JuMP.@expression(m, demand_charges_y[y in years],
+        isempty(charged) ? JuMP.AffExpr(0.0) :
+        sum(params.market_demand_charge[mk] * KW_PER_MW * months_per_season *
+            m[:market_peak][mk, se, y]
+            for mk in charged, se in 1:nse))
+
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     JuMP.@expression(m, carbon_cost_y[y in years], cfg.carbon_price * gross_emissions[y])
     JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
@@ -73,7 +85,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@objective(m, Min,
         sum(params.discount[y] *
             (capex_y[y] + fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
-             carbon_cost_y[y] + offset_cost_y[y] - export_revenue_y[y])
+             demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
+             export_revenue_y[y])
             for y in years) - params.discount[end] * salvage_credit)
 
     return m

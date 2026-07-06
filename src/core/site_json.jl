@@ -163,7 +163,8 @@ function site_json(site::Site)
              max_power = isfinite(mk.max_power) ? mk.max_power : nothing,
              max_annual = isfinite(mk.max_annual) ? mk.max_annual : nothing,
              emission_factor = mk.emission_factor,
-             connection = mk.connection == Symbol("") ? nothing : String(mk.connection))
+             connection = mk.connection == Symbol("") ? nothing : String(mk.connection),
+             demand_charge = mk.demand_charge == 0.0 ? nothing : mk.demand_charge)
             for mk in values(site.markets)]
     sort!(mkts; by = x -> x.market_id)
     return merge(base, (markets = mkts,))
@@ -325,7 +326,8 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 maxp === nothing ? Inf : _twin_num(maxp, :max_power, ctx),
                 maxa === nothing ? Inf : _twin_num(maxa, :max_annual, ctx),
                 efr === nothing ? nothing : _twin_num(efr, :emission_factor, ctx),
-                conn === nothing || conn == "" ? Symbol("") : Symbol(conn))
+                conn === nothing || conn == "" ? Symbol("") : Symbol(conn),
+                something(_twin_get(mk, :demand_charge), 0.0) |> Float64)
         end
     end
 

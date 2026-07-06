@@ -37,6 +37,8 @@ struct ModelParameters
                                                      # con mercado de compra)
     grid_carrier::Symbol                             # carrier de la red legacy
     fixed_charges::Float64                           # USD/año, Σ cargos fijos de conexión
+    market_demand_charge::Dict{Symbol,Float64}       # USD/kW·mes por mercado (M2)
+    season_steps::Vector{Vector{Int}}                # pasos agrupados por estación
 end
 
 function _scaled_matrix(base::Vector{Float64}, rate::Float64, years::UnitRange{Int})
@@ -117,6 +119,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     market_power_cap = Dict{Symbol,Float64}()
     market_annual_cap = Dict{Symbol,Float64}()
     market_ef = Dict{Symbol,Float64}()
+    market_demand_charge = Dict{Symbol,Float64}()
     conn_buy = Dict{Symbol,Vector{Symbol}}()
     conn_sell = Dict{Symbol,Vector{Symbol}}()
     for id in sort!(collect(keys(mkts)))
@@ -131,6 +134,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         # propio; los combustibles emiten scope 1 al quemarse, no al comprarse
         market_ef[id] = mk.direction == :buy && !is_fuel(mk.carrier) ?
             something(mk.emission_factor, ef_lookup(mk.carrier, :scope2)) : 0.0
+        market_demand_charge[id] = mk.direction == :buy ? mk.demand_charge : 0.0
         if mk.connection != Symbol("")
             side = mk.direction == :buy ? conn_buy : conn_sell
             push!(get!(() -> Symbol[], side, mk.connection), id)
@@ -174,6 +178,19 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     export_limit = sum(conn_export_limit[id] for (id, s) in site.sources
                        if s.output_carrier == grid_carrier; init = 0.0)
 
+    # pasos agrupados por estación (para el peak tarifario, M2)
+    season_order = String[]
+    season_steps = Vector{Int}[]
+    for ts in site.timesteps
+        i = findfirst(==(ts.season), season_order)
+        if i === nothing
+            push!(season_order, ts.season)
+            push!(season_steps, Int[ts.id])
+        else
+            push!(season_steps[i], ts.id)
+        end
+    end
+
     return ModelParameters(weight, price, demand, discount, costs,
                            existing, max_new, efficiency, cf_profile, ef,
                            conv_inputs, conv_outputs, fuel_inputs,
@@ -182,5 +199,5 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            market_power_cap, market_annual_cap, market_ef,
                            conn_buy, conn_sell, conn_import_limit,
                            conn_export_limit, balanced, grid_carrier,
-                           fixed_charges)
+                           fixed_charges, market_demand_charge, season_steps)
 end

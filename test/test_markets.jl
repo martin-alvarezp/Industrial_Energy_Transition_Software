@@ -130,6 +130,33 @@ end
     @test JuMP.value(im.model[:fixed_opex_y][1]) ≈ 12345.0 rtol = 1e-9
 end
 
+@testset "markets: cargo por demanda máxima (M2)" begin
+    # demanda variable [10,4,4,4]; cargo 12 USD/kW·mes; 1 estación ⇒ 12 meses
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy,
+                               fill(80.0, 4), Inf, Inf, nothing, :grid_import,
+                               12.0))
+    site, cfg = market_site(; markets = mkts, demand = 4.0)
+    site = Site(site.name, site.timesteps, site.carriers, site.sources,
+                site.converters, site.generators, site.storages,
+                Dict(:electricity => Demand(:electricity, [10.0, 4.0, 4.0, 4.0])),
+                site.prices, site.emission_factors, site.markets)
+    im = build_model(site, cfg)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    # peak de la única estación = 10 MW ⇒ cargo anual = 12 · 1000 · 12 · 10
+    @test JuMP.value(im.model[:demand_charges_y][1]) ≈ 12 * 1000 * 12 * 10 rtol = 1e-6
+    # el desglose financiero lo incluye y cuadra con el VAN
+    r = extract_results(im; shadow_prices = false)
+    @test r.cost_breakdown.demand_charges[1] ≈ 1_440_000 rtol = 1e-6
+    @test sum(r.cost_breakdown.npv) ≈ JuMP.objective_value(im.model) rtol = 1e-6
+
+    # round-trip del campo
+    site2 = site_from_json(JSON3.read(JSON3.write(site_json(site))))
+    @test site2.markets[:buy].demand_charge == 12.0
+    dir = mktempdir(); save_site(dir, site)
+    @test load_site(dir).markets[:buy].demand_charge == 12.0
+end
+
 @testset "markets: round-trip JSON y CSV" begin
     mkts = Dict(
         :cheap => mkbuy(:cheap, :electricity, 30.0; max_power = 4.0,
