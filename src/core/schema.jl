@@ -13,6 +13,10 @@ const SITE_FILES = [
 ]
 
 const REQUIRED_COLUMNS = Dict(
+    # markets.csv / market_prices.csv son OPCIONALES (M11): sin ellos rige el
+    # esquema legacy (prices.csv del carrier de red + grid_export)
+    "markets.csv"             => [:market_id, :name, :carrier_id, :direction],
+    "market_prices.csv"       => [:step_id, :market_id, :price],
     "timesteps.csv"           => [:step_id, :season, :hour, :weight_hours],
     "carriers.csv"            => [:carrier_id, :name, :unit, :category],
     "technologies.csv"        => [:tech_id, :name, :type, :input_carrier, :output_carrier,
@@ -123,7 +127,13 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
         inv = _bool(r.investable, "technologies.csv[$id].investable")
 
         if kind == :source
-            sources[id] = Source(id, name, outc, ex, mx, inv, c)
+            # columnas opcionales de conexión (M11); default legacy:
+            # export = import, sin cargos fijos
+            num_or(col, dflt) = hasproperty(r, col) && !ismissing(r[col]) ?
+                                Float64(r[col]) : dflt
+            sources[id] = Source(id, name, outc, ex, mx, inv, c,
+                                 num_or(:export_capacity, ex),
+                                 num_or(:fixed_charge, 0.0))
         elseif kind == :converter
             # columna opcional ports (JSON): conversores multi-puerto (CHP…)
             ports_raw = hasproperty(r, :ports) && !ismissing(r.ports) &&
@@ -153,6 +163,32 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
         end
     end
     return sources, converters, generators, storages
+end
+
+"Mercados (M11): markets.csv + market_prices.csv, ambos opcionales."
+function load_markets(dir::AbstractString, nsteps::Int)
+    isfile(joinpath(dir, "markets.csv")) || return Dict{Symbol,Market}()
+    df = read_site_csv(dir, "markets.csv")
+    isfile(joinpath(dir, "market_prices.csv")) ||
+        throw(SchemaError("markets.csv existe pero falta market_prices.csv"))
+    prices = _series_by_key(read_site_csv(dir, "market_prices.csv"),
+                            :market_id, :price, nsteps, "market_prices.csv")
+    markets = Dict{Symbol,Market}()
+    for r in eachrow(df)
+        id = _sym(r.market_id)
+        haskey(prices, id) || throw(SchemaError(
+            "market_prices.csv: falta la serie de precios del mercado '$id'"))
+        opt_num(col) = hasproperty(r, col) && !ismissing(r[col]) ?
+                       Float64(r[col]) : nothing
+        conn = hasproperty(r, :connection) && !ismissing(r.connection) &&
+               !isempty(strip(String(r.connection))) ? _sym(r.connection) : Symbol("")
+        markets[id] = Market(id, String(r.name), _sym(r.carrier_id),
+                             _sym(r.direction), prices[id],
+                             something(opt_num(:max_power), Inf),
+                             something(opt_num(:max_annual), Inf),
+                             opt_num(:emission_factor), conn)
+    end
+    return markets
 end
 
 function load_emission_factors(dir::AbstractString)
@@ -186,9 +222,10 @@ function load_site(dir::AbstractString; name::AbstractString = basename(abspath(
     prices = Dict(c => PriceSeries(c, v) for (c, v) in price_series)
 
     factors = load_emission_factors(dir)
+    markets = load_markets(dir, nsteps)
 
     return Site(String(name), steps, carriers, sources, converters, generators,
-                storages, demands, prices, factors)
+                storages, demands, prices, factors, markets)
 end
 
 _get_num(d::Dict, key::String, default) = Float64(get(d, key, default))

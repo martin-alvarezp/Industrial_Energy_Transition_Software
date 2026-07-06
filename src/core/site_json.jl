@@ -94,9 +94,16 @@ function site_json(site::Site)
     techs = NamedTuple[]
     for id in keys(site.sources)
         s = site.sources[id]
-        push!(techs, _tech_nt(id, s.name, "source", nothing, s.output_carrier,
-                              s.existing_capacity, s.max_new_capacity, 1.0,
-                              s.investable, s.costs, nothing))
+        nt = _tech_nt(id, s.name, "source", nothing, s.output_carrier,
+                      s.existing_capacity, s.max_new_capacity, 1.0,
+                      s.investable, s.costs, nothing)
+        # campos de conexión (M11) solo si difieren del default legacy
+        # (export = import, sin cargos): la huella de sitios viejos no cambia
+        s.export_capacity == s.existing_capacity ||
+            (nt = merge(nt, (export_capacity = s.export_capacity,)))
+        s.fixed_charge == 0.0 ||
+            (nt = merge(nt, (fixed_charge = s.fixed_charge,)))
+        push!(techs, nt)
     end
     for id in keys(site.converters)
         c = site.converters[id]
@@ -136,7 +143,7 @@ function site_json(site::Site)
                 factor = f.factor) for f in site.emission_factors]
     sort!(factors; by = f -> (f.carrier_id, f.scope))
 
-    return (
+    base = (
         name = site.name,
         timesteps = [(step_id = t.id, season = t.season, hour = t.hour,
                       weight_hours = t.weight_hours) for t in site.timesteps],
@@ -148,6 +155,18 @@ function site_json(site::Site)
             Dict(Symbol(id) => g.cf_profile for (id, g) in site.generators)),
         emission_factors = factors,
     )
+    isempty(site.markets) && return base   # clave ausente = huella legacy
+
+    mkts = [(market_id = String(mk.id), name = mk.name,
+             carrier_id = String(mk.carrier), direction = String(mk.direction),
+             price = mk.price,
+             max_power = isfinite(mk.max_power) ? mk.max_power : nothing,
+             max_annual = isfinite(mk.max_annual) ? mk.max_annual : nothing,
+             emission_factor = mk.emission_factor,
+             connection = mk.connection == Symbol("") ? nothing : String(mk.connection))
+            for mk in values(site.markets)]
+    sort!(mkts; by = x -> x.market_id)
+    return merge(base, (markets = mkts,))
 end
 
 """
@@ -225,7 +244,11 @@ function site_from_json(obj; default_name::AbstractString = "twin")
             _twin_int(_twin_req(t, :lifetime_years, ctx), :lifetime_years, ctx))
 
         if kind == :source
-            sources[id] = Source(id, tname, outc, ex, mx, inv, costs)
+            expc_raw = _twin_get(t, :export_capacity)
+            expc = expc_raw === nothing ? ex : _twin_num(expc_raw, :export_capacity, ctx)
+            fch_raw = _twin_get(t, :fixed_charge)
+            fch = fch_raw === nothing ? 0.0 : _twin_num(fch_raw, :fixed_charge, ctx)
+            sources[id] = Source(id, tname, outc, ex, mx, inv, costs, expc, fch)
         elseif kind == :converter
             ports = _twin_get(t, :ports)
             if ports !== nothing   # multi-puerto (CHP, electrolizador, …)
@@ -284,8 +307,30 @@ function site_from_json(obj; default_name::AbstractString = "twin")
         end
     end
 
+    markets = Dict{Symbol,Market}()
+    mkt_raw = _twin_get(obj, :markets)
+    if mkt_raw !== nothing
+        for mk in mkt_raw
+            id = Symbol(_twin_req(mk, :market_id, "markets"))
+            ctx = "markets[$id]"
+            maxp = _twin_get(mk, :max_power)
+            maxa = _twin_get(mk, :max_annual)
+            efr = _twin_get(mk, :emission_factor)
+            conn = _twin_get(mk, :connection)
+            markets[id] = Market(id,
+                String(something(_twin_get(mk, :name), String(id))),
+                Symbol(_twin_req(mk, :carrier_id, ctx)),
+                Symbol(_twin_req(mk, :direction, ctx)),
+                _series_vec(_twin_req(mk, :price, ctx), "$ctx.price"),
+                maxp === nothing ? Inf : _twin_num(maxp, :max_power, ctx),
+                maxa === nothing ? Inf : _twin_num(maxa, :max_annual, ctx),
+                efr === nothing ? nothing : _twin_num(efr, :emission_factor, ctx),
+                conn === nothing || conn == "" ? Symbol("") : Symbol(conn))
+        end
+    end
+
     return Site(name, steps, carriers, sources, converters, generators,
-                storages, demands, prices, factors)
+                storages, demands, prices, factors, markets)
 end
 
 """

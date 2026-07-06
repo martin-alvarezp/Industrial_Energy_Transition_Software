@@ -80,11 +80,14 @@
     @test JuMP.coefficient(obj, m[:gross_emissions][1]) ≈ 50.0 / 1.08
     @test JuMP.coefficient(obj, m[:offset_buy][1]) ≈ 80.0 / 1.08
 
-    # export con ingreso (signo negativo) y precio escalado de electricidad en compras
+    # export con ingreso (signo negativo) y precio escalado de electricidad en
+    # compras — vía los mercados sintetizados del esquema legacy (M11):
+    # grid_import_p/grid_export_p son ahora expresiones sobre market_flow
     s_peak = 9   # winter, hora 8 (pico)
     w = 8760 / 96
-    @test JuMP.coefficient(obj, m[:grid_export_p][s_peak, 1]) ≈ -45.0 * w / 1.08
-    @test JuMP.coefficient(obj, m[:grid_import_p][s_peak, 2]) ≈
+    @test JuMP.coefficient(obj, m[:market_flow][:grid_sell, s_peak, 1]) ≈
+          -45.0 * w / 1.08
+    @test JuMP.coefficient(obj, m[:market_flow][:grid_buy, s_peak, 2]) ≈
           105.0 * 1.02 * w / 1.08^2   # price_elec·(1+esc)^(y−1), descontado
 
     # trayectoria del cap neto precalculada (SPEC §8)

@@ -208,6 +208,24 @@ export default function SeriesEditor({ siteJson, patchSite }) {
           <AddSeries options={priceable}
                      onAdd={(c) => setSeries("prices", c, flatSeries(nsteps, 0))} />
 
+          {(siteJson.markets ?? []).length > 0 && (
+            <>
+              <h3 className="card-title" style={{ marginTop: 18 }}>
+                Precios por contrato (mercados)
+              </h3>
+              {siteJson.markets.map((mk) => (
+                <SeriesRow key={mk.market_id} id={`markets:${mk.market_id}`}
+                           label={`${mk.name} (${mk.direction === "buy" ? "compra" : "venta"} · ${mk.carrier_id})`}
+                           unit="USD/MWh" values={mk.price} timesteps={ts}
+                           onChange={(nv) => patchSite((sj) => ({
+                             ...sj,
+                             markets: sj.markets.map((x) =>
+                               x.market_id === mk.market_id ? { ...x, price: nv } : x),
+                           }))} />
+              ))}
+            </>
+          )}
+
           <h3 className="card-title" style={{ marginTop: 18 }}>
             Factores de emisión (tCO₂e/MWh)
           </h3>

@@ -31,6 +31,7 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         color = [_opt(c, :color) for c in sj.carriers]))
 
     techs = sj.technologies
+    optnum(t, k) = something(get(t, k, nothing), missing)
     CSV.write(joinpath(dir, "technologies.csv"), DataFrame(
         tech_id = [t.tech_id for t in techs],
         name = [t.name for t in techs],
@@ -43,7 +44,10 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         investable = [t.investable for t in techs],
         storage_hours = [something(t.storage_hours, missing) for t in techs],
         # puertos de conversores multi-puerto como JSON compacto (vacío si 1→1)
-        ports = [t.ports === nothing ? missing : JSON3.write(t.ports) for t in techs]))
+        ports = [t.ports === nothing ? missing : JSON3.write(t.ports) for t in techs],
+        # conexión de red (M11): claves opcionales de la forma canónica
+        export_capacity = [optnum(t, :export_capacity) for t in techs],
+        fixed_charge = [optnum(t, :fixed_charge) for t in techs]))
 
     CSV.write(joinpath(dir, "technology_costs.csv"), DataFrame(
         tech_id = [t.tech_id for t in techs],
@@ -61,6 +65,29 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         carrier_id = [f.carrier_id for f in sj.emission_factors],
         scope = [f.scope for f in sj.emission_factors],
         factor = [f.factor for f in sj.emission_factors]))
+
+    # mercados (M11): dos CSV opcionales; sin mercados no se escriben (y se
+    # limpian los de un guardado anterior para que save → load sea fiel)
+    mkts = get(sj, :markets, nothing)
+    if mkts !== nothing && !isempty(mkts)
+        CSV.write(joinpath(dir, "markets.csv"), DataFrame(
+            market_id = [mk.market_id for mk in mkts],
+            name = [mk.name for mk in mkts],
+            carrier_id = [mk.carrier_id for mk in mkts],
+            direction = [mk.direction for mk in mkts],
+            max_power = [something(mk.max_power, missing) for mk in mkts],
+            max_annual = [something(mk.max_annual, missing) for mk in mkts],
+            emission_factor = [something(mk.emission_factor, missing) for mk in mkts],
+            connection = [something(mk.connection, missing) for mk in mkts]))
+        _write_series(joinpath(dir, "market_prices.csv"), :price,
+                      (; (Symbol(mk.market_id) => mk.price for mk in mkts)...);
+                      keycol = :market_id)
+    else
+        for f in ("markets.csv", "market_prices.csv")
+            p = joinpath(dir, f)
+            isfile(p) && rm(p)
+        end
+    end
 
     layout !== nothing &&
         open(io -> JSON3.write(io, layout), joinpath(dir, "layout.geojson"), "w")

@@ -63,7 +63,8 @@ include("api/server.jl")
 export Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
        PriceSeries, EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts,
        primary_input, primary_output, reference_efficiency, is_multiport,
-       CARRIER_CATEGORIES, BALANCED_CATEGORIES, is_balanced
+       CARRIER_CATEGORIES, BALANCED_CATEGORIES, is_balanced,
+       Market, effective_markets
 # core API
 export load_site, load_scenario_config, load_and_validate,
        validate_site, validate_scenario, SchemaError, ValidationError,

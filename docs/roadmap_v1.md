@@ -136,9 +136,19 @@ Cambios: types/schema/site_json/twin drawer/validación. Absorbe el "creación
 de carriers" de P3.
 
 ### M11 · Mercados de compra y venta (generaliza tarifas, export y offsets)
+**Dos objetos distintos** (decisión 2026-07-05): la **conexión de red**
+(`GridConnection`, evolución del `Source`) es el ACTIVO FÍSICO — capacidad
+de entrada y de salida (independientes), cargos fijos de conexión, todo lo
+propio de la conexión — y es el cuello por donde fluye el vector. El
+**mercado** (`Market`) es el CONTRATO COMERCIAL sobre un carrier: compra o
+venta a un precio, con sus volúmenes. N mercados pueden colgar de una misma
+conexión (dos contratos de compra de electricidad + venta spot); la suma de
+sus flujos respeta la capacidad física de la conexión. Un mercado sin
+conexión física (offsets) fluye directo.
+
 Objeto `Market` creado por el usuario, N por sitio:
-- `carrier` + **dirección** (compra | venta) — reemplaza y generaliza
-  `grid_import`/`grid_export`/`Source`.
+- `carrier` + **dirección** (compra | venta) — junto a `GridConnection`
+  reemplaza y generaliza `grid_import`/`grid_export`/precio implícito.
 - **Precio**: plano | serie horaria del año-plantilla (96) u 8760 |
   **por año del horizonte** (serie de series: precio horario distinto en
   2026 que en 2040); escalación %/año como atajo.
@@ -343,9 +353,28 @@ en silencio), y el twin gana el panel "Vectores energéticos": crear desde
 desde cero, editar factores de emisión por vector, precio plano de partida
 para combustibles, y borrado bloqueado con referencias legibles. 1019 tests.
 
-⏳ M11 (mercados
-compra/venta; offsets como mercado; factor de red por año — absorbe la
-mitad de M7) · M13 (años calendario 2026-2050) · M2 (cargos por potencia +
+✅ **M11 núcleo** — mercados y conexiones: `Market` (contrato compra|venta
+por carrier: serie de precios 96, topes de potencia MW y volumen anual MWh,
+factor de emisión propio con herencia del carrier) + `Source` evoluciona a
+conexión de red (capacidad de EXPORT independiente del import, cargos fijos
+USD/año al OPEX fijo). N mercados por conexión; la suma de flujos respeta la
+capacidad física. Un combustible con mercado pasa a llevar balance nodal
+(compras == consumo; scope 1 al quemarse, nunca scope 2). Retro-compat
+exacta: sin mercados explícitos se sintetizan desde `prices` + `grid_export`
+(mismo NPV del demo al centavo; `grid_import_p/grid_export_p` viven como
+expresiones — el contrato de resultados no cambió). El twin gana el panel
+Mercados (crear/editar contratos, precios horarios por contrato en Series,
+factor del contrato p.ej. PPA verde = 0) y la conexión expone export/cargos
+en su drawer; al crear el primer mercado explícito se materializan los
+legacy (nada desaparece en silencio). markets.csv + market_prices.csv
+opcionales en el contrato de datos. 1075 tests.
+
+**Pendientes de M11** (dependen de otros ítems): precio por año calendario
+(serie de series — con M13) · factor de red POR AÑO (M7, hoy el factor del
+mercado es constante) · offsets como mercado (se resuelve con M12: hoy son
+política del escenario).
+
+⏳ M13 (años calendario 2026-2050) · M2 (cargos por potencia +
 net metering/billing como modo tarifa del mercado eléctrico) + M6 parcial
 (día de punta — van juntos o no van, §8.3).
 

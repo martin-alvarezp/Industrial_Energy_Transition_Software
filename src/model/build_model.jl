@@ -35,14 +35,14 @@ end
     expected_variable_count(sets) -> Int
 
 Conteo esperado de variables escalares según SPEC §5 — útil para verificar la
-construcción: dispatch + new_capacity + build + 3·storage + 2·grid + offset_buy
-+ gross/net emissions.
+construcción: dispatch + new_capacity + build + 3·storage + mercados (M11;
+la red legacy son 2 mercados sintetizados) + offset_buy + gross/net emissions.
 """
 function expected_variable_count(sets::ModelSets)
     S, Y = length(sets.steps), length(sets.years)
     return length(sets.dispatch_techs) * S * Y +   # dispatch
            length(sets.candidates) * Y * 2 +       # new_capacity + build
            length(sets.storages) * S * Y * 3 +     # soc, charge, discharge
-           S * Y * 2 +                             # grid_import_p, grid_export_p
+           length(sets.markets) * S * Y +          # market_flow
            Y * 3                                   # offset_buy, gross, net
 end

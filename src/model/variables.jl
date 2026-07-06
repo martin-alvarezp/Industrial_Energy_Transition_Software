@@ -23,9 +23,20 @@ function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
     JuMP.@variable(m, charge[sets.storages, steps, years] >= 0)
     JuMP.@variable(m, discharge[sets.storages, steps, years] >= 0)
 
-    # Red eléctrica.
-    JuMP.@variable(m, grid_import_p[steps, years] >= 0)
-    JuMP.@variable(m, grid_export_p[steps, years] >= 0)
+    # Mercados (M11): flujo comprado/vendido por mercado, paso y año.
+    JuMP.@variable(m, market_flow[sets.markets, steps, years] >= 0)
+
+    # Red legacy como EXPRESIONES: import/export del carrier de red = suma de
+    # los flujos de sus mercados con conexión. Mantiene el contrato de
+    # resultados (extract_dispatch/emissions leen m[:grid_import_p] como antes).
+    gb = [mk for mk in sets.buy_markets
+          if params.market_carrier[mk] == params.grid_carrier]
+    gs = [mk for mk in sets.sell_markets
+          if params.market_carrier[mk] == params.grid_carrier]
+    JuMP.@expression(m, grid_import_p[s in steps, y in years],
+        sum(market_flow[mk, s, y] for mk in gb; init = 0.0))
+    JuMP.@expression(m, grid_export_p[s in steps, y in years],
+        sum(market_flow[mk, s, y] for mk in gs; init = 0.0))
 
     # Clima: offsets comprados y emisiones anuales.
     JuMP.@variable(m, offset_buy[years] >= 0)

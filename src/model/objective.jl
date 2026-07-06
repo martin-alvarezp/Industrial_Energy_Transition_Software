@@ -17,12 +17,10 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     new_capacity = m[:new_capacity]
     available_capacity = m[:available_capacity]
     discharge = m[:discharge]
-    grid_import_p = m[:grid_import_p]
-    grid_export_p = m[:grid_export_p]
+    market_flow = m[:market_flow]
     offset_buy = m[:offset_buy]
     gross_emissions = m[:gross_emissions]
 
-    price_elec = params.price[:electricity]
     all_techs = vcat(sets.dispatch_techs, sets.storages)
 
     # CAPEX_y = Σ_tech capex_per_kw · 1000 · new_capacity[tech,y]
@@ -31,9 +29,10 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             for t in sets.candidates; init = 0.0))
 
     # FixedOPEX_y = Σ_tech fixed_opex · available_capacity[tech,y]
+    #             + cargos fijos de las conexiones de red (USD/año, M11)
     JuMP.@expression(m, fixed_opex_y[y in years],
         sum(params.costs[t].fixed_opex * available_capacity[t, y]
-            for t in all_techs; init = 0.0))
+            for t in all_techs; init = 0.0) + params.fixed_charges)
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)
@@ -43,19 +42,21 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(params.costs[st].variable_opex * discharge[st, s, y] * w[s]
             for st in sets.storages, s in steps; init = 0.0))
 
-    # EnergyPurchases_y = Σ_step (price_elec·grid_import_p + price_fuel·fuel_input)·weight
-    # donde fuel_input = ratio·dispatch por cada puerto de entrada a combustible
-    # (multi-puerto: un CHP compra gas proporcional a su tasa de entrada).
+    # EnergyPurchases_y = Σ mercados de compra (precio·flujo·peso, M11)
+    #                   + compra implícita de combustibles SIN mercado
+    # (fuel_input = ratio·dispatch por puerto de entrada; cubre CHP).
     JuMP.@expression(m, energy_purchases_y[y in years],
-        sum(price_elec[s, y] * grid_import_p[s, y] * w[s] for s in steps) +
+        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
+            for mk in sets.buy_markets, s in steps; init = 0.0) +
         sum(params.price[p[2]][s, y] * p[3] * dispatch[p[1], s, y] * w[s]
             for p in params.fuel_inputs, s in steps; init = 0.0))
 
-    # CarbonCost_y + OffsetCost_y − ExportRevenue_y
+    # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     JuMP.@expression(m, carbon_cost_y[y in years], cfg.carbon_price * gross_emissions[y])
     JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
     JuMP.@expression(m, export_revenue_y[y in years],
-        sum(params.export_price[s, y] * grid_export_p[s, y] * w[s] for s in steps))
+        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
+            for mk in sets.sell_markets, s in steps; init = 0.0))
 
     # Valor residual (opcional, cfg.salvage_value): crédito lineal al fin del
     # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,

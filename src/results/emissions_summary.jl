@@ -18,16 +18,10 @@ function extract_emissions_summary(im::IETOModel; shadow_prices::Bool = true)
     w = params.weight_hours
     macc = shadow_prices ? net_cap_shadow_prices(im) : fill(NaN, length(years))
 
-    grid = get(im.site.sources, :grid_import, nothing)
-    grid_carrier = grid === nothing ? :electricity : grid.output_carrier
-    ef2 = get(params.emission_factor, (grid_carrier, :scope2), 0.0)
-    ef1(fc) = get(params.emission_factor, (fc, :scope1), 0.0)
-
-    scope1 = [sum(ef1(p[2]) * p[3] * JuMP.value(m[:dispatch][p[1], s, y]) * w[s]
-                  for p in params.fuel_inputs, s in steps; init = 0.0)
-              for y in years]
-    scope2 = [sum(JuMP.value(m[:grid_import_p][s, y]) * w[s] for s in steps) * ef2
-              for y in years]
+    # mismas expresiones que definen gross_emissions_def (§8): cuadran por
+    # construcción, incluidos los mercados con factor propio (M11)
+    scope1 = [JuMP.value(m[:scope1_y][y]) for y in years]
+    scope2 = [JuMP.value(m[:scope2_y][y]) for y in years]
 
     return DataFrame(
         year      = collect(years),

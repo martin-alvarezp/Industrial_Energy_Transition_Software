@@ -107,11 +107,21 @@ reconcilia ambas vistas:
 - 🔮 preparado para *overrides* por año (series custom, no-goal §15): el
   esquema JSON del §7 ya admite `year` opcional en las series.
 
-**5.2 Mercados** — por carrier comprado: serie de precios del año-plantilla
-(mismo editor de curvas), **escalación anual** por carrier; serie especial de
-**precio de export** (`grid_export`); mercado de carbono (precio) y de
-**offsets** (precio, disponibilidad anual, tope de share). Import CSV igual
-que demandas.
+**5.2 Mercados** (v0.5, roadmap M11) — objetos `Market`: contratos de
+COMPRA o VENTA por carrier, N por sitio, cada uno con serie de precios 96
+(editable en Series: plano o CSV 8760), topes opcionales de potencia
+(MW/paso) y volumen (MWh/año), factor de emisión propio (p.ej. PPA verde
+= 0; si se omite hereda el scope 2 del carrier) y la **conexión de red**
+por la que fluye. La conexión (source) es el ACTIVO FÍSICO: capacidad de
+entrada y de salida independientes + cargos fijos (USD/año); la suma de
+los flujos de sus mercados respeta su capacidad. Un combustible puede
+tener mercado directo (camión, sin conexión) y pasa a llevar balance.
+Sin mercados explícitos rige el esquema legacy (serie del carrier de red
++ `grid_export`), que el motor sintetiza como 2 mercados equivalentes; al
+crear el primer mercado en la UI, los legacy se materializan como filas.
+La escalación anual sigue siendo por carrier (escenario). El mercado de
+carbono (precio) y los **offsets** (precio, disponibilidad, share) siguen
+en el escenario hasta M12.
 
 **5.3 Factores de emisión** — tabla (carrier, scope, tCO₂e/MWh): scope 1 por
 combustible, scope 2 de la red (location-based). 🔮 factor de red por año

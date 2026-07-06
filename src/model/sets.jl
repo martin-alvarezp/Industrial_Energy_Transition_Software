@@ -13,6 +13,9 @@ struct ModelSets
     candidates::Vector{Symbol}       # tecnologías investable (new_capacity/build)
     carriers::Vector{Symbol}
     demand_carriers::Vector{Symbol}
+    markets::Vector{Symbol}          # contratos de compra/venta (M11; incluye
+    buy_markets::Vector{Symbol}      # los sintetizados del esquema legacy)
+    sell_markets::Vector{Symbol}
 end
 
 """
@@ -39,6 +42,9 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         site.storages[id].investable && push!(candidates, id)
     end
 
+    mkts = effective_markets(site)
+    mkt_ids = sort!(collect(keys(mkts)))
+
     return ModelSets(
         1:n_steps(site),
         1:cfg.horizon_years,
@@ -49,5 +55,8 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         candidates,
         sort!(collect(keys(site.carriers))),
         sort!(collect(keys(site.demands))),
+        mkt_ids,
+        [id for id in mkt_ids if mkts[id].direction == :buy],
+        [id for id in mkt_ids if mkts[id].direction == :sell],
     )
 end

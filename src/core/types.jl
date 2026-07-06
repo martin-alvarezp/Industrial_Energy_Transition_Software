@@ -54,18 +54,56 @@ struct TechCosts
 end
 
 """
-Fuente: importa un carrier desde fuera del sistema (grid_import, offsets).
-Sin carrier de entrada; el costo de la energía viene de `prices.csv` o del
-`offset_price` del escenario.
+Fuente / conexión de red: el ACTIVO FÍSICO por el que un carrier entra o sale
+del sitio (roadmap M11). Es distinta del mercado ([`Market`](@ref)): la
+conexión pone las capacidades físicas (import y export, independientes) y los
+cargos fijos; los mercados son los contratos comerciales que fluyen por ella.
+`existing_capacity` es la capacidad de ENTRADA (import); `export_capacity` la
+de SALIDA. Legacy: sin mercados definidos, el costo de la energía viene de
+`prices.csv` (+ `grid_export`) o del `offset_price` del escenario.
 """
 struct Source
     id::Symbol
     name::String
     output_carrier::Symbol
-    existing_capacity::Float64    # MW
+    existing_capacity::Float64    # MW de entrada (import)
     max_new_capacity::Float64     # MW
     investable::Bool
     costs::TechCosts
+    export_capacity::Float64      # MW de salida (venta a red)
+    fixed_charge::Float64         # USD/año, cargos fijos de la conexión
+end
+
+# retro-compatibilidad (7 campos): export = import (comportamiento del MVP),
+# sin cargos fijos
+Source(id::Symbol, name::AbstractString, outc::Symbol, ex::Real, mx::Real,
+       inv::Bool, costs::TechCosts) =
+    Source(id, String(name), outc, Float64(ex), Float64(mx), inv, costs,
+           Float64(ex), 0.0)
+
+"""
+Mercado: contrato comercial de COMPRA o VENTA de un carrier (roadmap M11).
+N mercados pueden colgar de una misma conexión ([`Source`](@ref)); la suma de
+sus flujos respeta la capacidad física de la conexión. Un mercado sin conexión
+(`connection == Symbol("")`) fluye directo. La escalación de precios por año
+viene del escenario (`price_escalation[carrier]`), igual que las series.
+
+- Un mercado de compra sobre un carrier `:fuel` reemplaza la compra implícita
+  por `prices.csv`: el carrier pasa a llevar balance (compras == consumo).
+- `emission_factor`: tCO₂e/MWh comprado (scope 2 del mercado, p.ej. factor de
+  la red); `nothing` hereda el factor scope2 del carrier. Ignorado en venta y
+  en combustibles (su scope 1 se contabiliza al quemarlos).
+"""
+struct Market
+    id::Symbol
+    name::String
+    carrier::Symbol
+    direction::Symbol                       # :buy | :sell
+    price::Vector{Float64}                  # serie 96, USD/MWh
+    max_power::Float64                      # MW por paso (Inf = sin tope propio)
+    max_annual::Float64                     # MWh/año (Inf = sin tope)
+    emission_factor::Union{Float64,Nothing} # tCO₂e/MWh comprado; nothing = hereda
+    connection::Symbol                      # Source por la que fluye; "" = directa
 end
 
 "Puerto de un conversor: carrier + tasa en MW por MW de la salida de referencia."
@@ -206,9 +244,41 @@ struct Site
     demands::Dict{Symbol,Demand}             # por carrier
     prices::Dict{Symbol,PriceSeries}         # por carrier (puede incluir :grid_export)
     emission_factors::Vector{EmissionFactor}
+    markets::Dict{Symbol,Market}             # contratos de compra/venta (M11)
 end
 
+# retro-compatibilidad (10 campos): sitio sin mercados explícitos
+Site(name, ts, carriers, sources, converters, generators, storages,
+     demands, prices, emission_factors) =
+    Site(name, ts, carriers, sources, converters, generators, storages,
+         demands, prices, emission_factors, Dict{Symbol,Market}())
+
 n_steps(site::Site) = length(site.timesteps)
+
+"""
+Mercados efectivos del sitio: los explícitos si hay, o los sintetizados desde
+el esquema legacy (serie `prices[carrier de la red]` = compra por la conexión
+`grid_import`; serie `grid_export` = venta por la misma conexión). Mantiene la
+equivalencia exacta con el MVP mientras los sitios migran a mercados.
+"""
+function effective_markets(site::Site)
+    isempty(site.markets) || return site.markets
+    mkts = Dict{Symbol,Market}()
+    grid = get(site.sources, :grid_import, nothing)
+    grid === nothing && return mkts
+    c = grid.output_carrier
+    if haskey(site.prices, c)
+        mkts[:grid_buy] = Market(:grid_buy, "Compra de red", c, :buy,
+                                 site.prices[c].values, Inf, Inf, nothing,
+                                 :grid_import)
+    end
+    if haskey(site.prices, :grid_export)
+        mkts[:grid_sell] = Market(:grid_sell, "Venta a red", c, :sell,
+                                  site.prices[:grid_export].values, Inf, Inf,
+                                  nothing, :grid_import)
+    end
+    return mkts
+end
 
 "Todos los ids de tecnología del sitio, en cualquier categoría."
 all_tech_ids(site::Site) = vcat(

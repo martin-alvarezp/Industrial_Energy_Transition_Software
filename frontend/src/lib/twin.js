@@ -101,8 +101,16 @@ export function carrierRefs(siteJson, id) {
       refs.push(`el equipo '${t.name || t.tech_id}'`);
   }
   if (siteJson.demands?.[id]) refs.push("una serie de demanda");
+  for (const mk of siteJson.markets ?? [])
+    if (mk.carrier_id === id) refs.push(`el mercado '${mk.name || mk.market_id}'`);
   return refs;
 }
+
+/** Mercados que fluyen por una conexión (bloquea borrar el source). */
+export const techRefs = (siteJson, techId) =>
+  (siteJson.markets ?? [])
+    .filter((mk) => mk.connection === techId)
+    .map((mk) => `el mercado '${mk.name || mk.market_id}'`);
 
 /**
  * Inserta/actualiza un vector (inmutable). `factors` = {scope1, scope2} en
@@ -331,6 +339,119 @@ export function techProblems(tech, siteJson) {
   return p;
 }
 
+// ── Mercados y conexiones (roadmap M11) ────────────────────────────────────
+// La CONEXIÓN (source) es el activo físico: capacidades de entrada/salida y
+// cargos fijos. El MERCADO es el contrato comercial (compra|venta, precio,
+// volúmenes) que fluye por ella. N mercados por conexión.
+
+export const MARKET_DIR_META = {
+  buy:  { label: "Compra", glyph: "↓", color: "#2b62c4" },
+  sell: { label: "Venta",  glyph: "↑", color: "#3c7a44" },
+};
+
+const BALANCED_CATS = ["energy", "heat", "cooling"];
+
+/** Conexiones (sources) que transportan un carrier. */
+export const connectionsFor = (siteJson, carrierId) =>
+  siteJson.technologies.filter(
+    (t) => t.type === "source" && t.output_carrier === carrierId);
+
+/** Mercado nuevo con defaults sensatos para el drawer. */
+export function blankMarket(siteJson) {
+  const carrier = siteJson.carriers.find(
+    (c) => BALANCED_CATS.includes(c.category) || c.category === "fuel");
+  const carrier_id = carrier?.carrier_id ?? "";
+  return {
+    market_id: "", name: "", carrier_id, direction: "buy",
+    price_flat: 80, max_power: null, max_annual: null,
+    emission_factor: null,
+    connection: connectionsFor(siteJson, carrier_id)[0]?.tech_id ?? null,
+  };
+}
+
+/** Mercados que el motor sintetiza en modo legacy (espejo de
+ * effective_markets): compra por la serie del carrier de la red + venta por
+ * grid_export. Se materializan al crear el primer mercado explícito para que
+ * nada cambie en silencio. */
+export function legacyMarkets(siteJson) {
+  const grid = siteJson.technologies.find((t) => t.tech_id === "grid_import");
+  if (!grid) return [];
+  const c = grid.output_carrier;
+  const out = [];
+  if (siteJson.prices?.[c])
+    out.push({ market_id: "grid_buy", name: "Compra de red", carrier_id: c,
+               direction: "buy", price: siteJson.prices[c],
+               max_power: null, max_annual: null, emission_factor: null,
+               connection: "grid_import" });
+  if (siteJson.prices?.grid_export)
+    out.push({ market_id: "grid_sell", name: "Venta a red", carrier_id: c,
+               direction: "sell", price: siteJson.prices.grid_export,
+               max_power: null, max_annual: null, emission_factor: null,
+               connection: "grid_import" });
+  return out;
+}
+
+/** Inserta/actualiza un mercado (inmutable). `price_flat` crea la serie si
+ * el mercado aún no tiene una (luego editable por paso en Series). Al pasar
+ * de 0 a 1 mercados, materializa primero los legacy (los mercados explícitos
+ * REEMPLAZAN al esquema clásico — que no desaparezca nada en silencio). */
+export function upsertMarket(siteJson, draft) {
+  const { price_flat, ...row } = draft;
+  const nsteps = siteJson.timesteps?.length ?? 96;
+  if (!row.price) row.price = Array(nsteps).fill(price_flat ?? 0);
+  ["max_power", "max_annual", "emission_factor", "connection"].forEach((k) => {
+    if (row[k] == null || row[k] === "") row[k] = null;
+  });
+  const base = (siteJson.markets ?? []).length > 0
+    ? siteJson.markets : legacyMarkets(siteJson);
+  const markets = base.filter((mk) => mk.market_id !== row.market_id);
+  markets.push(row);
+  markets.sort((a, b) => a.market_id.localeCompare(b.market_id));
+  return { ...siteJson, markets };
+}
+
+export const removeMarket = (siteJson, id) => ({
+  ...siteJson,
+  markets: (siteJson.markets ?? []).filter((mk) => mk.market_id !== id),
+});
+
+/** Validación ligera de un mercado (espejo de validate_site, M11). */
+export function marketProblems(draft, siteJson, isNew) {
+  const p = [];
+  if (!draft.name?.trim()) p.push("falta el nombre");
+  const c = siteJson.carriers.find((x) => x.carrier_id === draft.carrier_id);
+  if (!c) p.push("falta el vector del contrato");
+  else {
+    if (["emissions", "offset"].includes(c.category))
+      p.push("los offsets/emisiones no se comercian como mercado (van en el escenario)");
+    if (draft.direction === "sell" && !BALANCED_CATS.includes(c.category))
+      p.push(`no se puede vender '${c.carrier_id}' (categoría sin balance)`);
+    if (BALANCED_CATS.includes(c.category) && !draft.connection)
+      p.push("un vector con balance necesita una conexión de red (el activo físico)");
+  }
+  if (draft.connection) {
+    const conn = siteJson.technologies.find((t) => t.tech_id === draft.connection);
+    if (!conn || conn.type !== "source")
+      p.push(`la conexión '${draft.connection}' no existe como conexión externa`);
+    else if (conn.output_carrier !== draft.carrier_id)
+      p.push(`la conexión '${draft.connection}' transporta '${conn.output_carrier}', no '${draft.carrier_id}'`);
+  }
+  for (const [k, label] of [["max_power", "tope de potencia"],
+                            ["max_annual", "tope anual"],
+                            ["emission_factor", "factor de emisión"]]) {
+    if (draft[k] != null && draft[k] !== "" && !(+draft[k] >= 0))
+      p.push(`el ${label} debe ser ≥ 0`);
+  }
+  if (draft.price_flat != null && !(+draft.price_flat >= 0) && !draft.price)
+    p.push("el precio debe ser ≥ 0");
+  if (isNew) {
+    const id = draft.market_id || slugId(draft.name, []);
+    if ((siteJson.markets ?? []).some((mk) => mk.market_id === id))
+      p.push(`ya existe un mercado '${id}' — cambia el nombre`);
+  }
+  return p;
+}
+
 /** Área del polígono límite en m² (shoelace sobre proyección local). */
 export function polygonAreaM2(pts) {
   if (!pts || pts.length < 3) return 0;
@@ -403,5 +524,7 @@ export function serializedPreview(siteJson) {
     prices: mapShort(siteJson.prices),
     generation_profiles: mapShort(siteJson.generation_profiles),
     emission_factors: siteJson.emission_factors,
+    markets: (siteJson.markets ?? []).map((mk) =>
+      ({ ...mk, price: short(mk.price) })),
   };
 }

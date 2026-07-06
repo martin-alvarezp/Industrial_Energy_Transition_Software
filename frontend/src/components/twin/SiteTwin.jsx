@@ -3,12 +3,14 @@ import TwinMap from "./TwinMap.jsx";
 import AddressSearch from "./AddressSearch.jsx";
 import EquipmentDrawer from "./EquipmentDrawer.jsx";
 import CarrierDrawer from "./CarrierDrawer.jsx";
+import MarketDrawer from "./MarketDrawer.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
   removeTech, polygonAreaM2, serializedPreview, layoutToGeoJSON, isMultiport,
   CARRIER_CATEGORY_META, CARRIER_PRESETS, carrierColor, blankCarrier,
-  upsertCarrier, removeCarrier,
+  upsertCarrier, removeCarrier, MARKET_DIR_META, blankMarket, upsertMarket,
+  removeMarket, carrierLabel,
 } from "../../lib/twin.js";
 import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
 import { num } from "../../lib/format.js";
@@ -27,6 +29,7 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
   const [draftBoundary, setDraftBoundary] = useState([]);
   const [drawer, setDrawer] = useState(null);        // {tech, isNew}
   const [carrierDrawer, setCarrierDrawer] = useState(null); // {draft, isNew}
+  const [marketDrawer, setMarketDrawer] = useState(null);   // {draft, isNew}
   const [selectedId, setSelectedId] = useState(null);
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
@@ -143,6 +146,15 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
                price: null },
       isNew: false,
     });
+  };
+
+  const saveMarket = (draft) => {
+    patchSite((sj) => upsertMarket(sj, draft));
+    setMarketDrawer(null);
+  };
+  const deleteMarket = (id) => {
+    patchSite((sj) => removeMarket(sj, id));
+    setMarketDrawer(null);
   };
 
   const doValidate = () => {
@@ -350,6 +362,51 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
         <div className="card">
           <div className="card-head">
             <h3 className="card-title">
+              Mercados ({(siteJson.markets ?? []).length})
+            </h3>
+          </div>
+          {(siteJson.markets ?? []).length === 0 && (
+            <p className="card-sub">
+              Sin mercados explícitos: rige el esquema clásico (serie de precio
+              del carrier de la red + <code>grid_export</code>). Crea mercados
+              para contratos múltiples, topes de volumen o factores propios.
+            </p>
+          )}
+          <div className="equip-list">
+            {(siteJson.markets ?? []).map((mk) => {
+              const c = siteJson.carriers.find((x) => x.carrier_id === mk.carrier_id);
+              const dir = MARKET_DIR_META[mk.direction];
+              const pmin = Math.min(...(mk.price ?? [0]));
+              const pmax = Math.max(...(mk.price ?? [0]));
+              return (
+                <div key={mk.market_id} className="equip-row">
+                  <span className="equip-dot" style={{ "--c": dir?.color }}>
+                    {dir?.glyph}
+                  </span>
+                  <button className="equip-name"
+                          onClick={() => setMarketDrawer({ draft: { ...mk }, isNew: false })}>
+                    {mk.name}
+                    <span className="equip-sub">
+                      {dir?.label} · {carrierLabel(c) ?? mk.carrier_id}
+                      {" · "}{pmin === pmax ? `${pmin}` : `${pmin}–${pmax}`} USD/MWh
+                      {mk.connection ? ` · vía ${mk.connection}` : " · directa"}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="equip-new">
+            <button className="chart-toggle"
+                    onClick={() => setMarketDrawer({ draft: blankMarket(siteJson), isNew: true })}>
+              + ↕ Mercado (compra/venta)
+            </button>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <h3 className="card-title">
               Equipos ({siteJson.technologies.length}) · {placedCount} en el mapa
             </h3>
           </div>
@@ -465,6 +522,14 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
           siteJson={siteJson}
           onSave={saveCarrier} onDelete={deleteCarrier}
           onClose={() => setCarrierDrawer(null)}
+        />
+      )}
+      {marketDrawer && (
+        <MarketDrawer
+          draft={marketDrawer.draft} isNew={marketDrawer.isNew}
+          siteJson={siteJson}
+          onSave={saveMarket} onDelete={deleteMarket}
+          onClose={() => setMarketDrawer(null)}
         />
       )}
     </div>

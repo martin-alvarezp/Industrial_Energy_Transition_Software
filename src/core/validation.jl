@@ -160,12 +160,62 @@ function validate_site(site::Site)
         end
     end
 
-    # --- demandas cubiertas: cada carrier con demanda debe tener al menos un productor ---
+    # --- mercados (M11): contratos coherentes con carriers y conexiones ---
+    for mk in values(site.markets)
+        ctx = "markets.csv[$(mk.id)]"
+        mk.direction in (:buy, :sell) || push!(problems,
+            "$ctx: direction '$(mk.direction)' inválida (buy|sell)")
+        _check_carrier!(problems, site.carriers, mk.carrier, ctx)
+        _check_series!(problems, mk.price, nsteps, "$ctx.price")
+        mk.max_power > 0 || push!(problems, "$ctx: max_power debe ser > 0")
+        mk.max_annual > 0 || push!(problems, "$ctx: max_annual debe ser > 0")
+        mk.emission_factor === nothing ||
+            _check_nonneg!(problems, mk.emission_factor, "$ctx.emission_factor")
+        if haskey(site.carriers, mk.carrier)
+            cat = site.carriers[mk.carrier].category
+            cat in (:emissions, :offset) && push!(problems,
+                "$ctx: los offsets/emisiones no se comercian como mercado " *
+                "(usa los offsets del escenario)")
+            mk.direction == :sell && !is_balanced(site.carriers[mk.carrier]) &&
+                push!(problems,
+                    "$ctx: no se puede VENDER '$(mk.carrier)' (categoría $cat " *
+                    "sin balance — solo se venden carriers con balance nodal)")
+            # un carrier con balance entra/sale por un activo físico; un
+            # combustible puede llegar directo (camión de pellets/diésel)
+            if is_balanced(site.carriers[mk.carrier]) && mk.connection == Symbol("")
+                push!(problems,
+                    "$ctx: un mercado de '$(mk.carrier)' necesita una conexión " *
+                    "de red (el activo físico por el que entra/sale)")
+            end
+        end
+        if mk.connection != Symbol("")
+            if !haskey(site.sources, mk.connection)
+                push!(problems,
+                    "$ctx: la conexión '$(mk.connection)' no existe como fuente")
+            elseif site.sources[mk.connection].output_carrier != mk.carrier
+                push!(problems,
+                    "$ctx: la conexión '$(mk.connection)' es de " *
+                    "'$(site.sources[mk.connection].output_carrier)', no de '$(mk.carrier)'")
+            end
+        end
+    end
+    for s in values(site.sources)
+        _check_nonneg!(problems, s.export_capacity,
+                       "technologies.csv[$(s.id)].export_capacity")
+        _check_nonneg!(problems, s.fixed_charge,
+                       "technologies.csv[$(s.id)].fixed_charge")
+    end
+
+    # --- demandas cubiertas: cada carrier con demanda debe tener al menos un
+    # productor (una tecnología o un mercado de compra) ---
     producers = Set{Symbol}()
     foreach(s -> push!(producers, s.output_carrier), values(site.sources))
     foreach(c -> foreach(p -> push!(producers, p.carrier), c.outputs),
             values(site.converters))
     foreach(g -> push!(producers, g.output_carrier), values(site.generators))
+    for mk in values(site.markets)
+        mk.direction == :buy && push!(producers, mk.carrier)
+    end
     for d in values(site.demands)
         d.carrier in producers || push!(problems,
             "demands.csv: el carrier '$(d.carrier)' tiene demanda pero ninguna tecnología lo produce")

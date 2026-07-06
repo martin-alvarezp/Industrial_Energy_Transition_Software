@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { TECH_TYPE_META, slugId, techProblems, carrierLabel } from "../../lib/twin.js";
+import { TECH_TYPE_META, slugId, techProblems, carrierLabel, techRefs }
+  from "../../lib/twin.js";
 
 const FUTURE_PARAMS = [
   ["Disponibilidad por paso (mantenciones)", "requiere extensión del modelo"],
@@ -185,12 +186,32 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
         )}
         <Field
           label={draft.type === "source"
-                 ? "Capacidad de conexión (límite import/export, MW)"
+                 ? "Capacidad de entrada (import, MW)"
                  : "Capacidad existente (MW)"}
         >
           <Num value={draft.existing_capacity} step={1} min={0}
                onChange={(v) => set({ existing_capacity: v })} />
         </Field>
+        {draft.type === "source" && (
+          <>
+            <Field label="Capacidad de salida (export, MW)"
+                   hint="independiente de la entrada — tope físico de venta; vacío = igual a la entrada">
+              <input type="number" step={1} min={0}
+                     value={draft.export_capacity ?? ""}
+                     placeholder={`= entrada (${draft.existing_capacity})`}
+                     onChange={(e) => set({ export_capacity:
+                       e.target.value === "" ? null : +e.target.value })} />
+            </Field>
+            <Field label="Cargos fijos de conexión (USD/año)"
+                   hint="peajes, potencia contratada, arriendo de empalme — entran al OPEX fijo anual">
+              <input type="number" step={100} min={0}
+                     value={draft.fixed_charge ?? ""}
+                     placeholder="0"
+                     onChange={(e) => set({ fixed_charge:
+                       e.target.value === "" ? null : +e.target.value })} />
+            </Field>
+          </>
+        )}
         <Field label="Capacidad máxima nueva (MW)"
                hint="techo de lo que el optimizador puede construir">
           <Num value={draft.max_new_capacity} step={1} min={0}
@@ -261,11 +282,17 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                   disabled={problems.length > 0} onClick={save}>
             {isNew ? "Crear equipo" : "Guardar cambios"}
           </button>
-          {!isNew && (
-            <button className="chart-toggle danger" onClick={() => onDelete(draft.tech_id)}>
-              Eliminar
-            </button>
-          )}
+          {!isNew && (() => {
+            const refs = techRefs(siteJson, draft.tech_id);
+            return (
+              <button className="chart-toggle danger" disabled={refs.length > 0}
+                      title={refs.length > 0
+                        ? `en uso por ${refs.join(", ")}` : "eliminar este equipo"}
+                      onClick={() => onDelete(draft.tech_id)}>
+                Eliminar
+              </button>
+            );
+          })()}
         </div>
       </aside>
     </div>

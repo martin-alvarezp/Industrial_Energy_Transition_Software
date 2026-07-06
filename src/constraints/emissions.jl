@@ -25,25 +25,32 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
     steps, years = sets.steps, sets.years
     w = params.weight_hours
     dispatch = m[:dispatch]
-    grid_import_p = m[:grid_import_p]
+    market_flow = m[:market_flow]
     gross, net = m[:gross_emissions], m[:net_emissions]
     offset_buy = m[:offset_buy]
 
-    grid = get(site.sources, :grid_import, nothing)
-    grid_carrier = grid === nothing ? :electricity : grid.output_carrier
-    ef_scope2 = get(params.emission_factor, (grid_carrier, :scope2), 0.0)
     ef_scope1(fc) = get(params.emission_factor, (fc, :scope1), 0.0)
 
-    # tCO₂e del año y: Σ combustible quemado · factor + Σ import de red · factor
-    # (combustible por puerto de entrada: ratio·dispatch — cubre CHP)
-    annual_emissions = Dict(y =>
+    # Scope 1: combustible quemado · factor — tanto el comprado implícito
+    # (fuel_inputs) como el que llega por mercado (el consumo del conversor es
+    # el mismo dispatch·ratio; el balance garantiza compras == consumo).
+    fuel_ports = [(id, p.carrier, p.ratio)
+                  for id in sets.converters
+                  for p in params.conv_inputs[id]
+                  if haskey(site.carriers, p.carrier) &&
+                     site.carriers[p.carrier].category == :fuel]
+    JuMP.@expression(m, scope1_y[y in years],
         sum(ef_scope1(p[2]) * p[3] * dispatch[p[1], s, y] * w[s]
-            for p in params.fuel_inputs, s in steps; init = 0.0) +
-        sum(ef_scope2 * grid_import_p[s, y] * w[s] for s in steps; init = 0.0)
-        for y in years)
+            for p in fuel_ports, s in steps; init = 0.0))
+
+    # Scope 2: compras de mercado · factor del mercado (propio o heredado del
+    # carrier; 0 en combustibles — su scope 1 ya se contó al quemarlos)
+    JuMP.@expression(m, scope2_y[y in years],
+        sum(params.market_ef[mk] * market_flow[mk, s, y] * w[s]
+            for mk in sets.buy_markets, s in steps; init = 0.0))
 
     m[:gross_emissions_def] = JuMP.@constraint(m, [y in years],
-        gross[y] == annual_emissions[y])
+        gross[y] == scope1_y[y] + scope2_y[y])
 
     m[:net_emissions_def] = JuMP.@constraint(m, [y in years],
         net[y] == gross[y] - offset_buy[y])
