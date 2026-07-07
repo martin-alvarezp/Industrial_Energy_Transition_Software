@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
 import Cockpit from "./components/Cockpit.jsx";
 import RunManager from "./components/RunManager.jsx";
+import SummaryView from "./components/SummaryView.jsx";
 import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
 import EmptyResults from "./components/EmptyResults.jsx";
@@ -13,6 +14,7 @@ const TABS = [
   { id: "site", label: "Sitio" },
   { id: "builder", label: "Escenario" },
   { id: "cockpit", label: "Cockpit" },
+  { id: "summary", label: "Summary" },
   { id: "explorer", label: "Explorador" },
 ];
 
@@ -115,9 +117,12 @@ export default function App() {
 
   const onLoadRun = (rec) => {
     setData({ ...rec.payload, source: "saved" });
+    if (rec.payload.site_snapshot) setAppliedSiteJson(rec.payload.site_snapshot);
     setViewingSaved(rec.name);
-    setTab("cockpit");
   };
+
+  // el bundle guardado incluye el snapshot del sitio (topología del Sankey)
+  const bundleToSave = data ? { ...data, site_snapshot: appliedSiteJson } : null;
 
   const hasResults = !!data;
   const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } =
@@ -215,11 +220,27 @@ export default function App() {
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
             {(twin || hasResults) && apiUp !== false && (
-              <RunManager siteName={appliedSite} data={data}
+              <RunManager siteName={appliedSite} data={bundleToSave}
                           viewingSaved={viewingSaved} onLoadRun={onLoadRun} />
             )}
             {hasResults ? (
               <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
+            ) : empty}
+          </div>
+        )}
+
+        {tab === "summary" && (
+          <div className={running ? "busy" : ""}>
+            <p className="section-label">
+              Summary — la corrida a desplegar se elige en Corridas guardadas
+            </p>
+            {(twin || hasResults) && apiUp !== false && (
+              <RunManager siteName={appliedSite} data={bundleToSave}
+                          viewingSaved={viewingSaved} onLoadRun={onLoadRun} />
+            )}
+            {hasResults ? (
+              <SummaryView result={result} siteJson={appliedSiteJson}
+                           referenceLabel={referenceLabel} />
             ) : empty}
           </div>
         )}

@@ -506,7 +506,29 @@ BaU "solo renovación") · M12 (escenarios como capas con jerarquía, políticas
 forzar/prohibir por año) · P1 (corridas guardadas con nombre, notas y
 escenario de origen — la unidad que consume v0.8).
 
-### v0.8 — "Resultados que venden" 🔜
+### v0.8 — "Resultados que venden" ← en curso
+
+✅ **Summary + Sankey** (el estándar comercial de referencia):
+- Pestaña **Summary**: selector de corrida guardada arriba (P1), KPIs del
+  horizonte (inversión, OPEX, reducción de emisiones año final vs base,
+  costo total + VAN), resumen anual plegable (desglose completo, incl.
+  cargos de punta) y **timeline de medidas** (equipo × año calendario de
+  compra, con glifo y MW).
+- **Sankey de flujos energéticos** (lib/flows.js + Recharts): compras →
+  vectores → equipos → demandas/ventas con **pérdidas explícitas**, por
+  año (selector) y con agrupación Componente | Tecnología (firma
+  in→out). Los puertos multi-vector (CHP) y los combustibles con mercado
+  salen de la topología del twin × dispatch tidy. El storage aparece por
+  sus pérdidas de round-trip (la energía anual ciclada duplicaría el
+  balance; los ciclos viven en Ingeniería de planta).
+- El bundle guardado incluye el snapshot del sitio: recargar una corrida
+  reconstruye también su Sankey.
+Verificado E2E: pestaña Summary sobre el demo con KPIs, medidas (batería
+8.8 + PV 30 + bomba 10.7 en 2026) y Sankey trazado.
+
+⏳ Restan de v0.8: comparación entre corridas guardadas · P2 memo PDF ·
+flujo de caja por equipo y spread del BESS (cierre de R2) · escenarios-capa
+a backend.
 > Criterio: la vista de resultados replica el estándar comercial de
 > referencia y un ingeniero puede auditar la operación de cada activo.
 
