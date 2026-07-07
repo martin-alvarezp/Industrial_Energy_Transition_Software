@@ -49,6 +49,10 @@ export function toOverrides(cfg) {
     allow_offsets: cfg.allow_offsets,
     allow_new_fossil: cfg.allow_new_fossil,
     salvage_value: cfg.salvage_value ?? false,
+    renew_existing: cfg.renew_existing ?? false,
+    repeat_investments: cfg.repeat_investments ?? false,
+    forced_builds: (cfg.forced_builds ?? []).map((f) =>
+      ({ tech: f.tech, year: +f.year, mw: +f.mw })),
     capex_budget: cfg.capex_budget_musd == null ? null : cfg.capex_budget_musd * 1e6,
   };
 }

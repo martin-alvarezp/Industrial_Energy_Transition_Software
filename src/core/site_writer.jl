@@ -47,7 +47,9 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         ports = [t.ports === nothing ? missing : JSON3.write(t.ports) for t in techs],
         # conexión de red (M11): claves opcionales de la forma canónica
         export_capacity = [optnum(t, :export_capacity) for t in techs],
-        fixed_charge = [optnum(t, :fixed_charge) for t in techs]))
+        fixed_charge = [optnum(t, :fixed_charge) for t in techs],
+        # vida útil restante del existente (M5): clave opcional
+        remaining_life = [optnum(t, :remaining_life) for t in techs]))
 
     CSV.write(joinpath(dir, "technology_costs.csv"), DataFrame(
         tech_id = [t.tech_id for t in techs],

@@ -97,6 +97,9 @@ _coerce(::Type{Vector{Symbol}}, v) = Symbol[Symbol(x) for x in v]
 _coerce(::Type{Union{Float64,Nothing}}, v) = v === nothing ? nothing : Float64(v)
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
+_coerce(::Type{Vector{Tuple{Symbol,Int,Float64}}}, v) =
+    Tuple{Symbol,Int,Float64}[(Symbol(x.tech), Int(x.year), Float64(x.mw))
+                              for x in v]
 
 """
 Aplica `config_overrides` del request sobre el ScenarioConfig del sitio,

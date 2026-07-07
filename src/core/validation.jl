@@ -294,6 +294,29 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         t in known || push!(problems,
             "scenario_config.yaml: allowed_techs referencia la tecnología desconocida '$t'")
     end
+    # M12: compras forzadas coherentes con el sitio y el horizonte
+    for (t, yr, mw) in cfg.forced_builds
+        tech = find_tech(site, t)
+        if tech === nothing
+            push!(problems, "forced_builds: la tecnología '$t' no existe en el sitio")
+            continue
+        end
+        yrel = cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : yr
+        1 <= yrel <= cfg.horizon_years || push!(problems,
+            "forced_builds['$t']: el año $yr cae fuera del horizonte " *
+            "($(calendar_year(cfg, 1))-$(calendar_year(cfg, cfg.horizon_years)))")
+        mw > 0 || push!(problems, "forced_builds['$t']: los MW deben ser > 0")
+        tech isa Source && push!(problems,
+            "forced_builds['$t']: las conexiones no son candidatas a inversión")
+        if !(tech isa Source)
+            tech.investable || push!(problems,
+                "forced_builds['$t']: la tecnología no es candidata a inversión " *
+                "(marca 'candidata a inversión' en el twin)")
+            mw <= tech.max_new_capacity || push!(problems,
+                "forced_builds['$t']: $mw MW excede max_new_capacity " *
+                "($(tech.max_new_capacity) MW)")
+        end
+    end
 
     isempty(problems) || throw(ValidationError(problems))
     return true

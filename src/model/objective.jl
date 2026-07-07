@@ -23,10 +23,11 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
 
     all_techs = vcat(sets.dispatch_techs, sets.storages)
 
-    # CAPEX_y = Σ_tech capex_per_kw · 1000 · new_capacity[tech,y]
+    # CAPEX_y = Σ_tech capex·1000·new_capacity + renovaciones determinísticas
+    # del parque existente (M5, renew_existing)
     JuMP.@expression(m, capex_y[y in years],
         sum(params.costs[t].capex_per_kw * KW_PER_MW * new_capacity[t, y]
-            for t in sets.candidates; init = 0.0))
+            for t in sets.candidates; init = 0.0) + params.renewal_capex[y])
 
     # FixedOPEX_y = Σ_tech fixed_opex · available_capacity[tech,y]
     #             + cargos fijos de las conexiones de red (USD/año, M11)

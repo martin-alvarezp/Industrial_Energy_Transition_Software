@@ -459,7 +459,25 @@ listados en §3) · creador de tecnología custom multi-puerto en el twin ·
 D2 (perfil solar por lat/lon; habilita solar térmica y eólico con perfiles
 automáticos) · M4 parcial (disponibilidad por paso para conversores).
 
-### v0.7 — "Escenarios" 🔜
+### v0.7 — "Escenarios" ← en curso
+
+✅ **M5 + M12 motor** — ciclo de vida y políticas de inversión:
+- `remaining_life` por tecnología (0 = no retira): el activo EXISTENTE
+  retira al vencer su vida restante; las construcciones NUEVAS viven
+  `lifetime_years` desde su año de compra (ventanas en available_capacity).
+- **Renovación determinística** (`renew_existing`, el BaU "solo
+  renovación"): al vencer, el existente se recompra pagando su CAPEX — y
+  cada vida útil después — sin nuevas binarias; la capacidad nunca cae y
+  el TCO muestra las recompras.
+- **Inversiones repetibles** (`repeat_investments`): levanta el "a lo más
+  una compra" (reemplazo endógeno, módulos incrementales).
+- **Compras forzadas** (`forced_builds`: tech, año CALENDARIO, MW):
+  new_capacity ≥ MW fuerza build=1 vía el link, sin fijar binarias;
+  validación completa (existe, candidata, en horizonte, ≤ max_new).
+- UI: vida restante en el drawer del equipo; switches de renovación y
+  repetibles en el builder; overrides por la API (plumbing fieldnames).
+Verificado por API: forzar PV 2028 en el demo desplaza la compra al año 3
+y muestra el PRECIO de la política (NPV 75.77 → 76.81 MUSD). 1147 tests.
 > Criterio: el flujo BaU / Economic Optimum / "forzar CHP 2028 sin PV"
 > corre sobre el mismo sitio, con herencia en cascada entre escenarios y
 > comparación lado a lado.

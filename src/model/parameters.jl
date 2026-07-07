@@ -43,6 +43,11 @@ struct ModelParameters
     # ── M2b: potencia contratada y net metering ──
     market_contracted::Dict{Symbol,Float64}          # MW contratados (Inf = por peak)
     market_excess_penalty::Dict{Symbol,Float64}      # USD/kW·mes sobre el exceso
+    remaining_life::Dict{Symbol,Int}                 # vida restante del existente (M5)
+    renew_existing::Bool                             # BaU renovación (M5)
+    repeat_investments::Bool                         # inversiones repetibles (M5)
+    renewal_capex::Vector{Float64}                   # [y] USD de renovaciones determinísticas
+    forced_builds::Vector{Tuple{Symbol,Int,Float64}} # (tech, año RELATIVO, MW) (M12)
     nm_periods::Dict{Symbol,Vector{Vector{Int}}}     # mercado nm → pasos por período
     nm_retail::Dict{Symbol,Matrix{Float64}}          # mercado nm → retail medio [p, y]
     nm_buys::Dict{Symbol,Vector{Symbol}}             # mercado nm → compras pareadas
@@ -91,6 +96,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     conv_inputs = Dict{Symbol,Vector{ConverterPort}}()
     conv_outputs = Dict{Symbol,Vector{ConverterPort}}()
     conv_availability = Dict{Symbol,Vector{Float64}}()
+    remaining_life = Dict{Symbol,Int}()
     for id in sets.converters
         t = site.converters[id]
         costs[id] = t.costs
@@ -99,6 +105,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         conv_inputs[id] = t.inputs
         conv_outputs[id] = t.outputs
         isempty(t.availability) || (conv_availability[id] = t.availability)
+        remaining_life[id] = t.remaining_life
     end
     for id in sets.generators
         t = site.generators[id]
@@ -106,6 +113,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         existing[id] = t.existing_capacity
         max_new[id] = t.max_new_capacity
         cf_profile[id] = t.cf_profile
+        remaining_life[id] = t.remaining_life
     end
     for id in sets.storages
         t = site.storages[id]
@@ -113,6 +121,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         existing[id] = t.existing_capacity
         max_new[id] = t.max_new_capacity
         efficiency[id] = t.efficiency
+        remaining_life[id] = t.remaining_life
     end
 
     ef = Dict((f.carrier, f.scope) => f.factor for f in site.emission_factors)
@@ -203,6 +212,30 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         end
     end
 
+    # ── ciclo de vida (M5) ──
+    # renovación determinística: con renew_existing, el activo existente que
+    # vence (remaining_life > 0) se recompra al vencer — y cada vida útil
+    # después — pagando su CAPEX; la capacidad nunca cae (BaU renovación).
+    N = cfg.horizon_years
+    renewal_capex = zeros(N)
+    if cfg.renew_existing
+        for (id, rl) in remaining_life
+            (rl > 0 && existing[id] > 0) || continue
+            y = rl + 1
+            while y <= N
+                renewal_capex[y] += costs[id].capex_per_kw * KW_PER_MW * existing[id]
+                y += max(costs[id].lifetime_years, 1)
+            end
+        end
+    end
+
+    # compras forzadas (M12): año calendario → relativo si hay base_year
+    forced = Tuple{Symbol,Int,Float64}[]
+    for (t, yr, mw) in cfg.forced_builds
+        yrel = cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : yr
+        push!(forced, (t, yrel, Float64(mw)))
+    end
+
     # net metering (M2b): el crédito por kWh neteado vale el precio RETAIL
     # medio (ponderado por horas) de las compras pareadas — las que comparten
     # la conexión — en cada período de neteo (estaciones o año completo)
@@ -237,5 +270,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            conn_export_limit, balanced, grid_carrier,
                            fixed_charges, market_demand_charge, season_steps,
                            market_contracted, market_excess_penalty,
+                           remaining_life, cfg.renew_existing,
+                           cfg.repeat_investments, renewal_capex, forced,
                            nm_periods, nm_retail, nm_buys)
 end

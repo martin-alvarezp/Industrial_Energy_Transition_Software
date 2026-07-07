@@ -155,14 +155,21 @@ struct Converter
     costs::TechCosts
     availability::Vector{Float64} # por paso en [0,1] (mantenciones, M4);
                                   # vacío = disponible siempre
+    remaining_life::Int           # años de vida útil del activo EXISTENTE (M5);
+                                  # 0 = no retira en el horizonte (legacy)
 end
 
-# retro-compatibilidad (8 campos): disponible siempre
+# retro-compatibilidad: 9 campos (M4) y 8 campos (pre-M4)
+Converter(id::Symbol, name::AbstractString, ins::Vector{ConverterPort},
+          outs::Vector{ConverterPort}, ex::Real, mx::Real, inv::Bool,
+          costs::TechCosts, avail::Vector{Float64}) =
+    Converter(id, String(name), ins, outs, Float64(ex), Float64(mx), inv,
+              costs, avail, 0)
 Converter(id::Symbol, name::AbstractString, ins::Vector{ConverterPort},
           outs::Vector{ConverterPort}, ex::Real, mx::Real, inv::Bool,
           costs::TechCosts) =
     Converter(id, String(name), ins, outs, Float64(ex), Float64(mx), inv,
-              costs, Float64[])
+              costs, Float64[], 0)
 
 # retro-compatibilidad 1→1: Converter(id, name, in, out, η, ex, mx, inv, costs)
 Converter(id::Symbol, name::AbstractString, inc::Symbol, outc::Symbol,
@@ -191,7 +198,12 @@ struct Generator
     investable::Bool
     costs::TechCosts
     cf_profile::Vector{Float64}   # 96 valores en [0,1], indexados por step_id
+    remaining_life::Int           # vida útil restante del existente (M5); 0 = no retira
 end
+
+Generator(id::Symbol, name::AbstractString, outc::Symbol, ex::Real, mx::Real,
+          inv::Bool, costs::TechCosts, cf::Vector{Float64}) =
+    Generator(id, String(name), outc, Float64(ex), Float64(mx), inv, costs, cf, 0)
 
 "Almacenamiento con eficiencia de ida (η aplica a carga y descarga, SPEC §7.4)."
 struct Storage
@@ -204,7 +216,13 @@ struct Storage
     hours_ratio::Float64          # MWh de energía por MW de potencia (MVP: fijo)
     investable::Bool
     costs::TechCosts
+    remaining_life::Int           # vida útil restante del existente (M5); 0 = no retira
 end
+
+Storage(id::Symbol, name::AbstractString, c::Symbol, eff::Real, ex::Real,
+        mx::Real, hr::Real, inv::Bool, costs::TechCosts) =
+    Storage(id, String(name), c, Float64(eff), Float64(ex), Float64(mx),
+            Float64(hr), inv, costs, 0)
 
 "Demanda base del año-plantilla para un carrier (se escala por año, SPEC §4)."
 struct Demand
@@ -248,13 +266,26 @@ struct ScenarioConfig
     salvage_value::Bool                      # crédito por vida útil no consumida al año N
     base_year::Int                           # año calendario del año 1 (M13);
                                              # 0 = horizonte relativo (legacy)
+    # ── ciclo de vida y políticas de inversión (M5/M12) ──
+    renew_existing::Bool                     # BaU renovación: al vencer la vida
+                                             # restante, el existente se recompra
+                                             # (CAPEX determinístico) y sigue
+    repeat_investments::Bool                 # permite invertir >1 vez por tech
+    forced_builds::Vector{Tuple{Symbol,Int,Float64}}  # (tech, año, MW mínimos);
+                                             # año calendario si hay base_year
 end
 
-# retro-compatibilidad: 15 campos → sin salvage ni calendario; 16 → sin calendario
+# retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, false, 0)
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   false, 0, false, false, Tuple{Symbol,Int,Float64}[])
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv::Bool) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv, 0)
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, 0, false, false, Tuple{Symbol,Int,Float64}[])
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), false, false, Tuple{Symbol,Int,Float64}[])
 
 "Año calendario del año relativo y (y=1 es base_year); y si no hay calendario."
 calendar_year(cfg::ScenarioConfig, y::Integer) =

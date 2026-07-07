@@ -125,6 +125,8 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
         mx = Float64(r.max_new_capacity)
         eff = Float64(r.efficiency)
         inv = _bool(r.investable, "technologies.csv[$id].investable")
+        rlife = hasproperty(r, :remaining_life) && !ismissing(r.remaining_life) ?
+                Int(r.remaining_life) : 0
 
         if kind == :source
             # columnas opcionales de conexión (M11); default legacy:
@@ -143,23 +145,27 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
                 pj = JSON3.read(String(ports_raw))
                 mk(list) = [ConverterPort(_sym(p.carrier), Float64(p.ratio)) for p in list]
                 converters[id] = Converter(id, name, mk(pj.inputs), mk(pj.outputs),
-                                           Float64(ex), Float64(mx), inv, c, avail)
+                                           Float64(ex), Float64(mx), inv, c,
+                                           avail, rlife)
             else
                 base = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
                 converters[id] = Converter(id, name, base.inputs, base.outputs,
-                                           Float64(ex), Float64(mx), inv, c, avail)
+                                           Float64(ex), Float64(mx), inv, c,
+                                           avail, rlife)
             end
         elseif kind == :generator
             prof = get(profiles, id, Float64[])
             isempty(prof) && throw(SchemaError(
                 "generation_profiles.csv: falta el perfil del generador '$id'"))
-            generators[id] = Generator(id, name, outc, ex, mx, inv, c, prof)
+            generators[id] = Generator(id, name, outc, Float64(ex), Float64(mx),
+                                       inv, c, prof, rlife)
         elseif kind == :storage
             # columna opcional storage_hours (MWh por MW); default 4 h
             hours = hasproperty(r, :storage_hours) && !ismissing(r.storage_hours) ?
                     Float64(r.storage_hours) : DEFAULT_STORAGE_HOURS
-            storages[id] = Storage(id, name, outc == Symbol("") ? inc : outc, eff,
-                                   ex, mx, hours, inv, c)
+            storages[id] = Storage(id, name, outc == Symbol("") ? inc : outc,
+                                   Float64(eff), Float64(ex), Float64(mx),
+                                   hours, inv, c, rlife)
         else
             throw(SchemaError("technologies.csv: type desconocido '$kind' para '$id' " *
                               "(esperado: source|converter|generator|storage)"))
@@ -283,5 +289,10 @@ function load_scenario_config(path::AbstractString)
         allowed,
         Bool(get(d, "salvage_value", false)),
         Int(get(d, "base_year", 0)),
+        Bool(get(d, "renew_existing", false)),
+        Bool(get(d, "repeat_investments", false)),
+        Tuple{Symbol,Int,Float64}[
+            (Symbol(f["tech"]), Int(f["year"]), Float64(f["mw"]))
+            for f in get(d, "forced_builds", [])],
     )
 end

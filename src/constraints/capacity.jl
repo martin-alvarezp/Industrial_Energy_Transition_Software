@@ -28,8 +28,19 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     m[:new_capacity_link] = JuMP.@constraint(m, [t in sets.candidates, y in years],
         new_capacity[t, y] <= params.max_new_capacity[t] * build[t, y])
 
-    m[:build_once] = JuMP.@constraint(m, [t in sets.candidates],
-        sum(build[t, y] for y in years) <= 1)
+    # M5: con inversiones repetibles (reemplazo endógeno al vencer la vida
+    # útil, módulos incrementales) no se limita el número de compras
+    if !params.repeat_investments
+        m[:build_once] = JuMP.@constraint(m, [t in sets.candidates],
+            sum(build[t, y] for y in years) <= 1)
+    end
+
+    # M12: compras forzadas del escenario — new_capacity[t,y] ≥ MW fuerza
+    # build[t,y] = 1 vía new_capacity_link (sin fijar binarias)
+    forced = [f for f in params.forced_builds
+              if f[1] in sets.candidates && 1 <= f[2] <= last(years)]
+    m[:forced_builds] = [JuMP.@constraint(m,
+        m[:new_capacity][t, y] >= mw) for (t, y, mw) in forced]
 
     return m
 end

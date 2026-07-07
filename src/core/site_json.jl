@@ -105,26 +105,28 @@ function site_json(site::Site)
             (nt = merge(nt, (fixed_charge = s.fixed_charge,)))
         push!(techs, nt)
     end
+    rlife(nt, x) = x.remaining_life == 0 ? nt :
+                   merge(nt, (remaining_life = x.remaining_life,))
     for id in keys(site.converters)
         c = site.converters[id]
-        push!(techs, _tech_nt(id, c.name, "converter", primary_input(c),
+        push!(techs, rlife(_tech_nt(id, c.name, "converter", primary_input(c),
                               primary_output(c), c.existing_capacity,
                               c.max_new_capacity, reference_efficiency(c),
                               c.investable, c.costs, nothing;
-                              ports = _converter_ports(c)))
+                              ports = _converter_ports(c)), c))
     end
     for id in keys(site.generators)
         g = site.generators[id]
-        push!(techs, _tech_nt(id, g.name, "generator", nothing, g.output_carrier,
+        push!(techs, rlife(_tech_nt(id, g.name, "generator", nothing, g.output_carrier,
                               g.existing_capacity, g.max_new_capacity, 1.0,
-                              g.investable, g.costs, nothing))
+                              g.investable, g.costs, nothing), g))
     end
     for id in keys(site.storages)
         st = site.storages[id]
-        push!(techs, _tech_nt(id, st.name, "storage", st.carrier, st.carrier,
+        push!(techs, rlife(_tech_nt(id, st.name, "storage", st.carrier, st.carrier,
                               st.existing_capacity, st.max_new_capacity,
                               st.efficiency, st.investable, st.costs,
-                              st.hours_ratio))
+                              st.hours_ratio), st))
     end
     sort!(techs; by = t -> t.tech_id)
 
@@ -250,6 +252,8 @@ function site_from_json(obj; default_name::AbstractString = "twin")
             _twin_num(_twin_req(t, :fixed_opex, ctx), :fixed_opex, ctx),
             _twin_num(_twin_req(t, :variable_opex, ctx), :variable_opex, ctx),
             _twin_int(_twin_req(t, :lifetime_years, ctx), :lifetime_years, ctx))
+        rlife_raw = _twin_get(t, :remaining_life)
+        rlife = rlife_raw === nothing ? 0 : _twin_int(rlife_raw, :remaining_life, ctx)
 
         if kind == :source
             expc_raw = _twin_get(t, :export_capacity)
@@ -268,23 +272,24 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 outs = mkports(_twin_req(ports, :outputs, "$ctx.ports"), "outputs")
                 converters[id] = Converter(id, tname, ins, outs, Float64(ex),
                                            Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]))
+                                           get(profiles, id, Float64[]), rlife)
             else
                 base = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
                 converters[id] = Converter(id, tname, base.inputs, base.outputs,
                                            Float64(ex), Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]))
+                                           get(profiles, id, Float64[]), rlife)
             end
         elseif kind == :generator
             haskey(profiles, id) || throw(SchemaError(
                 "site_payload: falta generation_profiles['$id'] para el generador"))
-            generators[id] = Generator(id, tname, outc, ex, mx, inv, costs,
-                                       profiles[id])
+            generators[id] = Generator(id, tname, outc, Float64(ex), Float64(mx),
+                                       inv, costs, profiles[id], rlife)
         elseif kind == :storage
             hours = _twin_num(something(_twin_get(t, :storage_hours),
                                         DEFAULT_STORAGE_HOURS), :storage_hours, ctx)
             storages[id] = Storage(id, tname, outc == Symbol("") ? inc : outc,
-                                   eff, ex, mx, hours, inv, costs)
+                                   Float64(eff), Float64(ex), Float64(mx),
+                                   hours, inv, costs, rlife)
         else
             throw(SchemaError("site_payload: type desconocido '$kind' en $ctx " *
                               "(esperado: source|converter|generator|storage)"))

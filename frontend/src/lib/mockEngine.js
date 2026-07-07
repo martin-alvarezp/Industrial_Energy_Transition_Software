@@ -38,6 +38,9 @@ export const DEFAULT_CONFIG = {
   capex_budget_musd: 40, // null = sin límite
   allow_new_fossil: false,
   salvage_value: false, // valor residual al año final (fase 5)
+  renew_existing: false, // BaU renovación (M5)
+  repeat_investments: false, // inversiones repetibles (M5)
+  forced_builds: [], // [{tech, year (calendario), mw}] (M12)
   price_scenario: "base", // base | high_gas | high_carbon
 };
 

@@ -104,6 +104,34 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
 
         <div className="switch-row">
           <div>
+            <div className="sw-label">Renovar equipos existentes (BaU)</div>
+            <div className="sw-note">
+              al vencer su vida restante se recompran (CAPEX determinístico) y
+              siguen operando — sin esto, el activo con vida declarada retira
+            </div>
+          </div>
+          <Switch
+            on={draft.renew_existing ?? false}
+            onChange={(v) => set({ renew_existing: v })}
+          />
+        </div>
+
+        <div className="switch-row">
+          <div>
+            <div className="sw-label">Inversiones repetibles</div>
+            <div className="sw-note">
+              permite comprar una tecnología más de una vez (reemplazo endógeno,
+              módulos incrementales) — default: a lo más una compra
+            </div>
+          </div>
+          <Switch
+            on={draft.repeat_investments ?? false}
+            onChange={(v) => set({ repeat_investments: v })}
+          />
+        </div>
+
+        <div className="switch-row">
+          <div>
             <div className="sw-label">Valor residual al año final</div>
             <div className="sw-note">
               acredita la vida útil no consumida: capex·(vida−años usados)/vida

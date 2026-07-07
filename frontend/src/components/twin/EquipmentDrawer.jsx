@@ -300,10 +300,17 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                onChange={(v) => set({ variable_opex: v })} />
         </Field>
         <Field label="Vida útil (años)"
-               hint="📋 hoy se traza en los supuestos; el valor residual al fin del horizonte es una extensión planificada (fase 5)">
+               hint="vida de las construcciones NUEVAS: viven lifetime desde su año de compra (M5); también alimenta el valor residual">
           <Num value={draft.lifetime_years} step={1} min={1}
                onChange={(v) => set({ lifetime_years: Math.round(v) })} />
         </Field>
+        {draft.type !== "source" && (
+          <Field label="Vida útil RESTANTE del existente (años · M5)"
+                 hint="0 = no retira en el horizonte; con vida declarada, el activo existente retira al vencer (o se renueva pagando CAPEX si el escenario activa 'renovar existentes')">
+            <Num value={draft.remaining_life ?? 0} step={1} min={0}
+                 onChange={(v) => set({ remaining_life: Math.round(v) })} />
+          </Field>
+        )}
 
         <p className="drawer-section">Extensiones futuras 🔮</p>
         {FUTURE_PARAMS.map(([label, why]) => (

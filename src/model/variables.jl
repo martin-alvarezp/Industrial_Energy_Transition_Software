@@ -43,12 +43,19 @@ function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
     JuMP.@variable(m, gross_emissions[years] >= 0)
     JuMP.@variable(m, net_emissions[years] >= 0)
 
-    # available_capacity[tech,y] = existing + Σ_{y'≤y} new_capacity (SPEC §5).
-    # Para tecnologías no candidatas es la constante existente.
+    # available_capacity[tech,y] (M5): el existente vive hasta su vida útil
+    # restante (0 = no retira; con renew_existing se renueva y nunca cae) y
+    # cada construcción nueva vive lifetime_years desde su año.
     techs = vcat(sets.dispatch_techs, sets.storages)
+    alive(t, y) = begin
+        rl = get(params.remaining_life, t, 0)
+        rl == 0 || params.renew_existing || y <= rl
+    end
     JuMP.@expression(m, available_capacity[t in techs, y in years],
-        params.existing_capacity[t] +
-        (t in sets.candidates ? sum(new_capacity[t, yp] for yp in 1:y) : 0.0))
+        (alive(t, y) ? params.existing_capacity[t] : 0.0) +
+        (t in sets.candidates ?
+         sum(new_capacity[t, yp] for yp in 1:y
+             if y - yp < params.costs[t].lifetime_years; init = 0.0) : 0.0))
 
     return m
 end
