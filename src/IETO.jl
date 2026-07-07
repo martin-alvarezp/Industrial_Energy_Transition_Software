@@ -54,6 +54,7 @@ include("solve/run_scenario.jl")
 include("solve/run_batch.jl")
 include("results/pareto.jl")
 include("results/export_results.jl")
+include("app_main.jl")
 
 # api HTTP thin (SPEC §12)
 include("api/routes.jl")
@@ -87,7 +88,7 @@ export SolverConfig, configure_solver!, solve!, run_scenario, apply_scenario,
        extract_emissions_summary, res_share_by_year,
        export_xlsx, export_json, results_payload, scenario_version
 # api
-export start_server, build_router, ApiError
+export start_server, build_router, ApiError, julia_main
 # unidades
 export HOURS_PER_YEAR, STEPS_PER_YEAR, KW_PER_MW,
        kw_to_mw, mw_to_kw, capex_total, energy_mwh, discount_factor, escalate
