@@ -583,6 +583,19 @@ de electrificación a 15-20 años (§M7). REC/GdO quedan para v1.0.
 motor web + build) y pages.yml (deploy a GitHub Pages); activos al primer
 push del usuario.
 
+✅ **D4** — factores oficiales por país: catálogo de 25 factores de red
+(scope 2 location-based, Ember 2023, referenciales de screening y
+editables) seleccionable en el drawer del vector; `EmissionFactor.source`
+lleva FUENTE Y VIGENCIA a la trazabilidad (supuestos del XLSX/memo:
+"0.29 — Ember 2023 · Chile (SEN)"), con round-trip completo JSON/CSV y
+huellas legacy estables. Para auditoría, el hint dirige al factor
+regulatorio vigente (RETC/eGRID/AIB).
+
+**v0.9 CERRADA** (M7 · D5 · S6 · M9 parcial · D4). Lo que resta del
+roadmap es v1.0 comercial: C1 (benchmark — necesita el primer caso real),
+S2/S4 (cola y multi-tenant — solo si el hosting compartido lo exige),
+P4 i18n, M4 restante (rampas opt-in) y los flecos anotados.
+
 ✅ **M9 parcial** — finanzas de verdad: `tax_rate` con costo after-tax
 (CAPEX + (1−t)·OPEX − t·depreciación lineal de inversiones nuevas;
 `depreciation_years`, 0 = vida útil; renovaciones sin escudo,

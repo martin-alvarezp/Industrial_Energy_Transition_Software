@@ -141,9 +141,12 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
     const f = (scope) =>
       siteJson.emission_factors?.find(
         (x) => x.carrier_id === c.carrier_id && x.scope === scope)?.factor ?? 0;
+    const s2row = siteJson.emission_factors?.find(
+      (x) => x.carrier_id === c.carrier_id && x.scope === "scope2");
     setCarrierDrawer({
       draft: { carrier: { level: "", color: "", ...c },
                factors: { scope1: f("scope1"), scope2: f("scope2") },
+               scope2_source: s2row?.source ?? null,
                price: null },
       isNew: false,
     });

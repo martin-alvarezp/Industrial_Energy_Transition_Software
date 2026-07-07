@@ -66,7 +66,8 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
     CSV.write(joinpath(dir, "emission_factors.csv"), DataFrame(
         carrier_id = [f.carrier_id for f in sj.emission_factors],
         scope = [f.scope for f in sj.emission_factors],
-        factor = [f.factor for f in sj.emission_factors]))
+        factor = [f.factor for f in sj.emission_factors],
+        source = [_opt(f, :source) for f in sj.emission_factors]))
 
     # mercados (M11): dos CSV opcionales; sin mercados no se escriben (y se
     # limpian los de un guardado anterior para que save → load sea fiel)

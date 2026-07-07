@@ -91,7 +91,8 @@ function _assumptions_table(r::Results, site::Union{Site,Nothing})
             techrow!(st.id, "capex_per_kw", st.costs.capex_per_kw)
         end
         for ef in site.emission_factors
-            row!("emission_factor", "$(ef.carrier) ($(ef.scope))", ef.factor)
+            row!("emission_factor", "$(ef.carrier) ($(ef.scope))",
+                 isempty(ef.source) ? ef.factor : "$(ef.factor) — $(ef.source)")
         end
     end
     return DataFrame(categoria = cat, clave = key, valor = val)

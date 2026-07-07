@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   CARRIER_CATEGORY_META, carrierColor, carrierProblems, carrierRefs, slugId,
 } from "../../lib/twin.js";
+import { GRID_FACTORS, gridFactorLabel } from "../../lib/gridFactors.js";
 
 function Field({ label, hint, children }) {
   return (
@@ -102,10 +103,32 @@ export default function CarrierDrawer({ draft: initial, isNew, siteJson,
                  onChange={(e) => setFactors({ scope1: +e.target.value || 0 })} />
         </Field>
         <Field label="Scope 2 — al comprarlo de la red"
-               hint="electricidad importada: factor de la red">
+               hint={draft.scope2_source
+                 ? `fuente: ${draft.scope2_source} — queda en la trazabilidad de la corrida`
+                 : "electricidad importada: factor de la red"}>
           <input type="number" step={0.001} min={0} value={draft.factors.scope2}
-                 onChange={(e) => setFactors({ scope2: +e.target.value || 0 })} />
+                 onChange={(e) => setDraft((d) => ({ ...d,
+                   scope2_source: null,
+                   factors: { ...d.factors, scope2: +e.target.value || 0 } }))} />
         </Field>
+        {c.category === "energy" && (
+          <Field label="Factor oficial de red por país (D4)"
+                 hint="valores referenciales de screening (intensidad de generación, Ember) — para auditoría usa el factor vigente de tu regulador y edítalo arriba">
+            <select value="" aria-label="factor oficial por país"
+                    onChange={(e) => {
+                      const g = GRID_FACTORS.find((x) => x.code === e.target.value);
+                      if (!g) return;
+                      setDraft((d) => ({ ...d,
+                        scope2_source: `${g.fuente} · ${g.pais}`,
+                        factors: { ...d.factors, scope2: g.factor } }));
+                    }}>
+              <option value="">usar factor oficial…</option>
+              {GRID_FACTORS.map((g) => (
+                <option key={g.code} value={g.code}>{gridFactorLabel(g)}</option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         {showFlatPrice && (
           <>

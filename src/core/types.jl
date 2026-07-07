@@ -236,12 +236,20 @@ struct PriceSeries
     values::Vector{Float64}       # 96 valores
 end
 
-"Factor de emisión de un carrier: scope1 (combustión) o scope2 (electricidad importada)."
+"""
+Factor de emisión de un carrier: scope1 (combustión) o scope2 (electricidad
+importada). `source` (D4): fuente y vigencia del dato oficial ("Ember 2023 ·
+Chile SEN") — viaja a la trazabilidad (supuestos del XLSX/memo); "" = propio.
+"""
 struct EmissionFactor
     carrier::Symbol
     scope::Symbol                 # :scope1 | :scope2
     factor::Float64               # tCO₂e/MWh
+    source::String                # fuente/vigencia; "" = dato propio
 end
+
+EmissionFactor(c::Symbol, s::Symbol, f::Real) =
+    EmissionFactor(c, s, Float64(f), "")
 
 """
 Configuración de escenario (scenario_config.yaml, SPEC §9).

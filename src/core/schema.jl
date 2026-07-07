@@ -209,7 +209,9 @@ end
 
 function load_emission_factors(dir::AbstractString)
     df = read_site_csv(dir, "emission_factors.csv")
-    return [EmissionFactor(_sym(r.carrier_id), _sym(r.scope), Float64(r.factor))
+    src(r) = hasproperty(r, :source) && !ismissing(r.source) ? String(r.source) : ""
+    return [EmissionFactor(_sym(r.carrier_id), _sym(r.scope), Float64(r.factor),
+                           src(r))
             for r in eachrow(df)]
 end
 

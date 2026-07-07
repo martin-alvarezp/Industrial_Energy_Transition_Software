@@ -157,3 +157,24 @@ end
         @test all(0 .<= collect(body.cf_hourly) .<= 1.3)
     end
 end
+
+@testset "D4: la fuente del factor oficial sobrevive los round-trips" begin
+    site, _ = cooling_site()
+    site = Site(site.name, site.timesteps, site.carriers, site.sources,
+                site.converters, site.generators, site.storages, site.demands,
+                site.prices,
+                [EmissionFactor(:electricity, :scope2, 0.29, "Ember 2023 · Chile (SEN)")],
+                site.markets)
+    sj = site_json(site)
+    row = only(f for f in sj.emission_factors if f.scope == "scope2")
+    @test row.source == "Ember 2023 · Chile (SEN)"
+    site2 = site_from_json(JSON3.read(JSON3.write(sj)))
+    @test site2.emission_factors[1].source == "Ember 2023 · Chile (SEN)"
+    @test site_version(site2) == site_version(site)
+    dir = mktempdir()
+    save_site(dir, site)
+    @test load_site(dir).emission_factors[1].source == "Ember 2023 · Chile (SEN)"
+    # sin fuente: la clave no aparece (huellas legacy estables)
+    site0, _ = cooling_site()
+    @test !haskey(site_json(site0).emission_factors[1], :source)
+end

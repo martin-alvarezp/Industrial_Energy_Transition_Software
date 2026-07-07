@@ -141,8 +141,12 @@ function site_json(site::Site)
         end for c in values(site.carriers)]
     sort!(carriers; by = c -> c.carrier_id)
 
-    factors = [(carrier_id = String(f.carrier), scope = String(f.scope),
-                factor = f.factor) for f in site.emission_factors]
+    # source (D4) solo si está definido — huellas legacy estables
+    factors = [begin
+            nt = (carrier_id = String(f.carrier), scope = String(f.scope),
+                  factor = f.factor)
+            isempty(f.source) ? nt : merge(nt, (source = f.source,))
+        end for f in site.emission_factors]
     sort!(factors; by = f -> (f.carrier_id, f.scope))
 
     base = (
@@ -321,7 +325,8 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 Symbol(_twin_req(f, :carrier_id, "emission_factors")),
                 Symbol(_twin_req(f, :scope, "emission_factors")),
                 _twin_num(_twin_req(f, :factor, "emission_factors"), :factor,
-                          "emission_factors")))
+                          "emission_factors"),
+                String(something(_twin_get(f, :source), ""))))
         end
     end
 

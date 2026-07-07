@@ -117,7 +117,7 @@ export const techRefs = (siteJson, techId) =>
  * tCO₂e/MWh (0 ⇒ sin factor); `flatPrice` solo se aplica si el carrier aún
  * no tiene serie de precios (las series se editan en la sección Series).
  */
-export function upsertCarrier(siteJson, { carrier, factors, price }) {
+export function upsertCarrier(siteJson, { carrier, factors, price, scope2_source }) {
   const row = { ...carrier };
   ["level", "color"].forEach((k) => { if (!row[k]) delete row[k]; });
   const carriers = siteJson.carriers.filter((c) => c.carrier_id !== row.carrier_id);
@@ -127,8 +127,11 @@ export function upsertCarrier(siteJson, { carrier, factors, price }) {
   const efs = (siteJson.emission_factors ?? [])
     .filter((f) => f.carrier_id !== row.carrier_id);
   for (const scope of ["scope1", "scope2"]) {
-    if (factors?.[scope] > 0)
-      efs.push({ carrier_id: row.carrier_id, scope, factor: factors[scope] });
+    if (factors?.[scope] > 0) {
+      const ef = { carrier_id: row.carrier_id, scope, factor: factors[scope] };
+      if (scope === "scope2" && scope2_source) ef.source = scope2_source;
+      efs.push(ef);
+    }
   }
   efs.sort((a, b) => a.carrier_id.localeCompare(b.carrier_id) ||
                      a.scope.localeCompare(b.scope));
