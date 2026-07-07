@@ -21,7 +21,10 @@ create_app(root, dest;
 share = joinpath(dest, "share", "ieto")
 mkpath(share)
 cp(joinpath(root, "frontend", "dist"), joinpath(share, "dist"); force = true)
-cp(joinpath(root, "data", "sample_sites"), joinpath(share, "sites"); force = true)
+# solo el sitio demo viaja en la distribución (los demás son datos locales)
+mkpath(joinpath(share, "sites"))
+cp(joinpath(root, "data", "sample_sites", "demo"),
+   joinpath(share, "sites", "demo"); force = true)
 cp(joinpath(root, "launcher", "ieto.ico"), joinpath(share, "ieto.ico"); force = true)
 
 # README del zip
