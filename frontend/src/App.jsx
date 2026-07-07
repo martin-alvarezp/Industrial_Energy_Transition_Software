@@ -255,6 +255,13 @@ export default function App() {
           </div>
         )}
       </main>
+      <footer style={{ maxWidth: 1320, margin: "0 auto", padding: "0 36px 22px",
+                       fontSize: 10.5, color: "var(--muted)", letterSpacing: "0.02em" }}>
+        IETO · creada por <strong>Martín Álvarez</strong> · codesarrollada con{" "}
+        <strong>Fable 5 de Claude</strong> (Anthropic) · dudas, feedback o
+        comentarios: <a href="mailto:martin.021299@gmail.com"
+        style={{ color: "var(--brand-700)" }}>martin.021299@gmail.com</a>
+      </footer>
     </>
   );
 }

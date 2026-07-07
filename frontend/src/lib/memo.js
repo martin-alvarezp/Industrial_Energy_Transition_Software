@@ -90,7 +90,8 @@ ${inv.length ? `<table><tr><th>Medida</th><th class="r">Año</th><th class="r">T
 (precios, factores de emisión, parámetros por equipo y mercados) están en la
 hoja «Supuestos» del XLSX exportable y quedan trazados por las huellas del
 encabezado. Generado con IETO.</p>
-<div class="foot">IETO · Industrial Energy Transition Optimizer — memo
+<div class="foot">IETO · creada por Martín Álvarez · codesarrollada con
+Fable 5 de Claude (Anthropic) · contacto: martin.021299@gmail.com — memo
 generado desde la corrida; los números cuadran con el XLSX por construcción.</div>
 </body></html>`;
 }
