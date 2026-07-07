@@ -13,6 +13,7 @@ import {
   removeMarket, carrierLabel, TECH_PRESETS, blankFromPreset,
 } from "../../lib/twin.js";
 import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
+import Icon, { techIconKey } from "../Icon.jsx";
 import { num } from "../../lib/format.js";
 
 const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar dirección
@@ -415,7 +416,7 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
               <div key={t.tech_id}
                    className={"equip-row" + (t.tech_id === selectedId ? " selected" : "")}>
                 <span className="equip-dot" style={{ "--c": techColor(t) }}>
-                  {techGlyph(t)}
+                  <Icon name={techIconKey(t)} size={14} />
                 </span>
                 <button className="equip-name"
                         onClick={() => { setSelectedId(t.tech_id);

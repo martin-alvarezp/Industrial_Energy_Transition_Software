@@ -5,8 +5,28 @@ import { VizTooltip } from "./ChartCard.jsx";
 import { buildFlows } from "../lib/flows.js";
 import CompareRuns from "./CompareRuns.jsx";
 import { openMemo } from "../lib/memo.js";
-import { techGlyph } from "../lib/twin.js";
+import Icon, { techIconKey } from "./Icon.jsx";
+import { techColor } from "../lib/twin.js";
 import { musd, pct, num, calYear } from "../lib/format.js";
+
+/** Hilo del Sankey: tintado por su nodo ORIGEN, con hover que lo resalta. */
+function FlowLink({ sourceX, targetX, sourceY, targetY, sourceControlX,
+                    targetControlX, linkWidth, index, payload,
+                    hovered, setHovered }) {
+  const color = payload?.source?.color ?? "#9aa7a3";
+  const dim = hovered != null && hovered !== index;
+  return (
+    <path
+      d={`M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}`}
+      fill="none" stroke={color}
+      strokeWidth={Math.max(linkWidth, 1)}
+      strokeOpacity={dim ? 0.07 : hovered === index ? 0.55 : 0.28}
+      style={{ transition: "stroke-opacity 0.12s" }}
+      onMouseEnter={() => setHovered(index)}
+      onMouseLeave={() => setHovered(null)}
+    />
+  );
+}
 
 /** Nodo del Sankey: rectángulo con el color de su entidad + etiqueta. */
 function FlowNode({ x, y, width, height, payload, containerWidth }) {
@@ -29,6 +49,7 @@ function EnergyFlow({ result, siteJson, baseYear }) {
   const N = result.meta.horizon_years;
   const [year, setYear] = useState(1);
   const [mode, setMode] = useState("component");
+  const [hovered, setHovered] = useState(null);
   const data = useMemo(() => {
     try {
       const f = buildFlows(siteJson, result.dispatch ?? [], year, mode);
@@ -68,7 +89,7 @@ function EnergyFlow({ result, siteJson, baseYear }) {
         <ResponsiveContainer width="100%" height={520}>
           <Sankey data={data} node={<FlowNode />} nodeWidth={12} nodePadding={18}
                   margin={{ top: 12, right: 170, bottom: 12, left: 12 }}
-                  link={{ stroke: "#8fa5a0", strokeOpacity: 0.35 }}>
+                  link={<FlowLink hovered={hovered} setHovered={setHovered} />}>
             <Tooltip content={<VizTooltip valueFmt={(v) => `${num(v, 0)} MWh`} />} />
           </Sankey>
         </ResponsiveContainer>
@@ -83,45 +104,49 @@ function MeasuresTimeline({ result, siteJson, baseYear }) {
   const inv = result.investments ?? [];
   if (inv.length === 0)
     return <p className="card-sub">el plan no compra equipos nuevos</p>;
-  const nameOf = (id) =>
-    siteJson?.technologies?.find((t) => t.tech_id === id)?.name ?? id;
-  const glyphOf = (id) => {
-    const t = siteJson?.technologies?.find((x) => x.tech_id === id);
-    return t ? techGlyph(t) : "●";
-  };
+  const techOf = (id) => siteJson?.technologies?.find((t) => t.tech_id === id);
   const years = Array.from({ length: N }, (_, i) => i + 1);
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table className="data-table" style={{ width: "100%", fontSize: 12 }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left" }}>Medida</th>
-            {years.map((y) => (
-              <th key={y} style={{ textAlign: "center", color: "var(--muted)" }}>
-                {calYear(baseYear, y)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {inv.map((i) => (
-            <tr key={i.tech}>
-              <td style={{ whiteSpace: "nowrap" }}>{nameOf(i.tech)}</td>
-              {years.map((y) => (
-                <td key={y} style={{ textAlign: "center",
-                                     borderLeft: "1px solid var(--grid, #eee)" }}>
-                  {y === i.year
-                    ? <span title={`${num(i.mw, 1)} MW`}>{glyphOf(i.tech)} {num(i.mw, 1)}</span>
-                    : ""}
-                </td>
-              ))}
-            </tr>
+    <div className="roadmap">
+      {inv.map((i) => {
+        const t = techOf(i.tech);
+        const color = t ? techColor(t) : "var(--brand)";
+        const left = ((i.year - 1) / N) * 100;
+        const width = ((N - i.year + 1) / N) * 100;
+        return (
+          <div className="roadmap-row" key={i.tech}>
+            <span className="roadmap-tech" style={{ display: "flex",
+                  alignItems: "center", gap: 7 }}>
+              <span style={{ color, display: "inline-flex" }}>
+                <Icon name={techIconKey(t)} />
+              </span>
+              {t?.name ?? i.tech}
+            </span>
+            <div className="roadmap-track">
+              <div className="roadmap-bar"
+                   style={{ left: `${left}%`, width: `${width}%`, background: color }} />
+              <div className="roadmap-cell" style={{ left: `${left}%`, width: 0 }}>
+                <span className="roadmap-dot" style={{ background: color }} />
+              </div>
+              <span className="roadmap-label" style={{ left: `${left}%` }}>
+                {calYear(baseYear, i.year)} · {num(i.mw, 1)} MW
+              </span>
+            </div>
+          </div>
+        );
+      })}
+      <div className="roadmap-axis">
+        <span />
+        <div className="ticks">
+          {years.filter((y) => N <= 12 || y % 2 === 1).map((y) => (
+            <span key={y}>{calYear(baseYear, y)}</span>
           ))}
-        </tbody>
-      </table>
+        </div>
+      </div>
       <p className="footnote">
-        {glyphOf(inv[0]?.tech)} = compra (MW) en ese año calendario — con
-        inversiones repetibles se muestra el último año de compra por equipo
+        marcador = año de compra; la barra cubre la operación hasta el fin del
+        horizonte — con inversiones repetibles se muestra el último año de
+        compra por equipo
       </p>
     </div>
   );

@@ -47,13 +47,13 @@ export default function RunManager({ siteName, data, viewingSaved, onLoadRun }) 
   };
 
   return (
-    <div className="card" style={{ marginBottom: 14 }}>
-      <div className="card-head">
-        <h3 className="card-title">
-          Corridas guardadas{viewingSaved ? ` · viendo '${viewingSaved}'` : ""}
-        </h3>
-      </div>
-      <div className="range-row" style={{ flexWrap: "wrap", gap: 8 }}>
+    <div className="filter-row" style={{ alignItems: "center", gap: 10 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em",
+                     textTransform: "uppercase", color: "var(--muted)",
+                     whiteSpace: "nowrap" }}>
+        Corridas{viewingSaved ? ` · viendo '${viewingSaved}'` : ""}
+      </span>
+      <div className="range-row" style={{ flexWrap: "wrap", gap: 8, flex: 1 }}>
         {data && !viewingSaved && (
           <>
             <input type="text" placeholder="nombre de esta corrida…"
@@ -88,17 +88,17 @@ export default function RunManager({ siteName, data, viewingSaved, onLoadRun }) 
           </>
         )}
         {runs.length === 0 && !data && (
-          <p className="card-sub" style={{ margin: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>
             aún no hay corridas guardadas para este sitio
-          </p>
+          </span>
+        )}
+        {msg && (
+          <span style={{ fontSize: 12, fontWeight: 570,
+                         color: msg.ok ? "var(--brand-700)" : "var(--crit)" }}>
+            {msg.ok ? "✓ " : "• "}{msg.text}
+          </span>
         )}
       </div>
-      {msg && (
-        <div className={msg.ok ? "twin-valid" : "drawer-problems"}
-             style={{ marginTop: 8 }}>
-          {msg.ok ? "✓ " : "• "}{msg.text}
-        </div>
-      )}
     </div>
   );
 }
