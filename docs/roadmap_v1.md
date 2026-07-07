@@ -538,6 +538,15 @@ Verificado E2E: pestaña Summary sobre el demo con KPIs, medidas (batería
   descarga − de carga sobre la serie de compra, tile en Ingeniería de
   planta.
 
+✅ **Suite de aseguramiento** (calidad para clientes): oráculos de
+solución conocida (VAN de forma cerrada, orden de mérito, cadenas
+multi-nivel, decisión de inversión, renovación multi-ciclo, no-arbitraje),
+invariantes sobre el demo (balance físico paso a paso, desglose == VAN en
+los 7 escenarios, monotonía de relajación, determinismo, XLSX == JSON),
+robustez de la API (input hostil → 4xx claros), y el camino dorado E2E
+consolidado (`npm run verify:e2e`, 12 pasos). 1202 tests.
+**docs/verification.md** documenta la suite para compartir con clientes.
+
 **v0.8 CERRADA.** Flecos → v0.9: escenarios-capa a backend · precios por
 año calendario · inversiones repetidas en results (solo muestra el último
 año) · memo con gráficos (hoy es tabular).
