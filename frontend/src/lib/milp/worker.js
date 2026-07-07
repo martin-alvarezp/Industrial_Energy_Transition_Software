@@ -6,15 +6,16 @@ import highsLoader from "highs";
 import { computeViaWeb } from "./engine.js";
 
 let highsPromise = null;
-const getHighs = () => (highsPromise ??= highsLoader({
-  // el .wasm se sirve como asset estático (frontend/public/highs.wasm)
-  locateFile: (f) => `${self.location.origin}${import.meta.env.BASE_URL ?? "/"}${f}`,
+// la URL del .wasm llega resuelta desde el hilo principal (relativa a la
+// página — funciona en raíz y bajo subpath de GitHub Pages)
+const getHighs = (wasmUrl) => (highsPromise ??= highsLoader({
+  locateFile: () => wasmUrl,
 }));
 
 self.onmessage = async (e) => {
-  const { cfg, siteJson } = e.data;
+  const { cfg, siteJson, wasmUrl } = e.data;
   try {
-    const highs = await getHighs();
+    const highs = await getHighs(wasmUrl);
     const bundle = computeViaWeb(highs, cfg, siteJson,
       (progress) => self.postMessage({ progress }));
     self.postMessage({ bundle });

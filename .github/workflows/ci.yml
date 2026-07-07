@@ -1,0 +1,26 @@
+# CI de IETO (S6): suite Julia completa + equivalencia del motor web + build.
+name: ci
+on:
+  push: { branches: [master, main] }
+  pull_request:
+jobs:
+  julia-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with: { version: "1.12" }
+      - uses: julia-actions/cache@v2
+      - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+  web-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run verify:wasm   # motor JS ≡ motor Julia (fixtures dorados)
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend

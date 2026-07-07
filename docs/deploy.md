@@ -13,7 +13,28 @@ sin Node, sin permisos de administrador. Sus sitios y corridas viven en
 `%LOCALAPPDATA%\IETO\data` (el zip puede quedar en carpetas de solo
 lectura); el puerto se cambia con la variable `IETO_PORT`.
 
-## 2 · Publicación online — evaluación de arquitecturas
+## 2 · Publicación online GRATIS (GitHub Pages + motor en el navegador) — LISTA
+
+La app publicada como estático resuelve el MILP **en el navegador del
+visitante** (HiGHS WebAssembly, ~13 optimizaciones del demo en 8 s). Pasos
+para publicar (una sola vez, requiere cuenta GitHub gratuita):
+
+```bash
+# 1. crear el repositorio en github.com (público, sin inicializar)
+git remote add origin https://github.com/TU_USUARIO/ieto.git
+git push -u origin master
+# 2. en github.com → Settings → Pages → Source: "GitHub Actions"
+```
+
+El workflow `.github/workflows/pages.yml` construye y publica
+`frontend/dist` en cada push → `https://TU_USUARIO.github.io/ieto/`.
+`ci.yml` corre además la suite Julia completa y la equivalencia del motor
+web (`verify:wasm`) en cada push. En modo web no hay corridas guardadas,
+XLSX ni tornado (requieren la API) — los botones lo explican; todo lo
+demás (twin, catálogo, mercados, escenarios, Summary, Sankey, memo)
+funciona completo con atribución y contacto en el footer.
+
+## 2b · Evaluación de arquitecturas (referencia)
 
 La física del producto: **cada corrida resuelve un MILP**. Quién pone esa
 CPU define la arquitectura:

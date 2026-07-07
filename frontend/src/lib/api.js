@@ -192,7 +192,9 @@ export function computeViaWebEngine(cfg, siteJson, onProgress) {
       else resolve(e.data.bundle);
     };
     _webWorker.onerror = (e) => { clearTimeout(timer); reject(new Error(e.message)); };
-    _webWorker.postMessage({ cfg, siteJson });
+    const wasmUrl = new URL(`${import.meta.env.BASE_URL}highs.wasm`,
+                            window.location.href).href;
+    _webWorker.postMessage({ cfg, siteJson, wasmUrl });
   });
 }
 
