@@ -7,7 +7,10 @@ import {
 } from "./mockEngine.js";
 import { tornadoLevers, buildTornado } from "./sensitivity.js";
 
-const API_BASE = import.meta.env.VITE_IETO_API ?? "http://127.0.0.1:8080";
+// API same-origin por default: el escritorio/portable sirven UI+API juntos;
+// publicada como estático (GitHub Pages) no hay API ⇒ motor web (HiGHS wasm).
+// Para desarrollo con vite dev: VITE_IETO_API=http://127.0.0.1:8080
+const API_BASE = import.meta.env.VITE_IETO_API ?? "";
 
 async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
   const ctrl = new AbortController();
@@ -88,7 +91,9 @@ export async function apiAvailable() {
     const timer = setTimeout(() => ctrl.abort(), 2_000);
     const resp = await fetch(API_BASE + "/scenarios", { signal: ctrl.signal });
     clearTimeout(timer);
-    return resp.ok;
+    // un hosting estático (SPA fallback) devuelve HTML con 200: no es la API
+    return resp.ok &&
+           (resp.headers.get("content-type") ?? "").includes("application/json");
   } catch {
     return false;
   }
@@ -171,6 +176,26 @@ export async function runTornado(cfg, siteJson, siteName = "demo", baselineNpv, 
   return { pct, baselineNpv, rows: buildTornado(baselineNpv, results) };
 }
 
+// ── motor WEB: HiGHS en WebAssembly dentro de un Worker (deploy.md B) ──
+let _webWorker = null;
+export function computeViaWebEngine(cfg, siteJson, onProgress) {
+  return new Promise((resolve, reject) => {
+    try {
+      _webWorker ??= new Worker(new URL("./milp/worker.js", import.meta.url),
+                                { type: "module" });
+    } catch (e) { reject(e); return; }
+    const timer = setTimeout(() => reject(new Error("motor web: timeout")), 300_000);
+    _webWorker.onmessage = (e) => {
+      if (e.data.progress) { onProgress?.(e.data.progress); return; }
+      clearTimeout(timer);
+      if (e.data.error) reject(new Error(e.data.error));
+      else resolve(e.data.bundle);
+    };
+    _webWorker.onerror = (e) => { clearTimeout(timer); reject(new Error(e.message)); };
+    _webWorker.postMessage({ cfg, siteJson });
+  });
+}
+
 /** Fallback local: el mock que reproduce el contrato. */
 export function computeViaMock(cfg) {
   const bau = mockBau(cfg);
@@ -186,13 +211,24 @@ export function computeViaMock(cfg) {
   };
 }
 
-/** API si responde; si no, mock (la UI muestra la fuente). */
-export async function compute(cfg, sitePayload = null, siteName = "demo") {
+/** API si responde; si no, el motor WEB (HiGHS en tu navegador — resuelve
+ * de verdad el sitio editado); último recurso, el mock. */
+export async function compute(cfg, sitePayload = null, siteName = "demo",
+                              snapshot = null, onProgress = null) {
   if (await apiAvailable()) {
     try {
       return await computeViaApi(cfg, sitePayload, siteName);
     } catch (err) {
-      console.warn("IETO API falló, usando mock:", err);
+      console.warn("IETO API falló:", err);
+    }
+  }
+  // sin API: el motor web resuelve el SITIO REAL (payload o snapshot del twin)
+  const webSite = sitePayload ?? snapshot;
+  if (webSite && typeof Worker !== "undefined") {
+    try {
+      return await computeViaWebEngine(cfg, webSite, onProgress);
+    } catch (err) {
+      console.warn("motor web falló, usando mock:", err);
     }
   }
   // el mock no consume ediciones del twin: se marca para que la UI lo diga

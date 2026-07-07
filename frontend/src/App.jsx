@@ -95,7 +95,7 @@ export default function App() {
     const payload = !twin.saved || twin.dirty ? twin.siteJson : null;
     const snapshot = payload ?? twin.siteJson ?? null;
     setRunning(true);
-    compute(cfg, payload, apiSite).then((d) => {
+    compute(cfg, payload, apiSite, snapshot).then((d) => {
       setData(d);
       setViewingSaved(null);
       setApplied(cfg);
@@ -146,8 +146,11 @@ export default function App() {
             </p>
           </div>
           <div className="meta-chips">
-            <span className={"chip " + (apiUp ? "status-ok" : "")}>
-              {apiUp == null ? "conectando…" : apiUp ? "API real · HiGHS" : "datos mock"}
+            <span className={"chip " + (apiUp || source === "web" ? "status-ok" : "")}>
+              {apiUp == null ? "conectando…"
+                : apiUp ? "API real · HiGHS"
+                : source === "web" ? "HiGHS en tu navegador"
+                : "modo web · HiGHS local"}
             </span>
             {hasResults ? (
               <>

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import highsLoader from "highs";
 import { buildLP } from "../src/lib/milp/lp.js";
+import { extractPayload } from "../src/lib/milp/extract.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, "..", "golden");
@@ -28,10 +29,15 @@ for (const f of readdirSync(goldenDir).filter((x) => x.endsWith(".json"))) {
     } else {
       const npv = sol.ObjectiveValue + constant;
       const rel = Math.abs(npv - g.expected_npv) / Math.abs(g.expected_npv);
-      ok = sol.Status === "Optimal" && rel < 1e-6;
+      // extracción: el payload debe cuadrar con el solver por construcción
+      const pay = extractPayload(g.site, g.config, sol, constant, g.name);
+      const relPay = Math.abs(pay.kpis.npv - npv) / Math.abs(npv);
+      const emisOk = pay.emissions.every((e) =>
+        Math.abs(e.gross - (e.scope1 + e.scope2)) < 1e-5);
+      ok = sol.Status === "Optimal" && rel < 1e-6 && relPay < 1e-6 && emisOk;
       detail = `julia ${g.expected_npv.toFixed(2)} · wasm ${npv.toFixed(2)} · ` +
-               `Δrel ${rel.toExponential(1)} · ${meta.rows} filas, ` +
-               `${meta.binaries} binarias · ${secs}s`;
+               `Δrel ${rel.toExponential(1)} · payload Δ ${relPay.toExponential(1)}` +
+               `${emisOk ? "" : " · EMISIONES NO CUADRAN"} · ${meta.binaries} bin · ${secs}s`;
     }
   } catch (e) {
     ok = false;
