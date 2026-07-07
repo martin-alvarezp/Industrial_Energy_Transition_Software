@@ -3,6 +3,7 @@ import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
 import Cockpit from "./components/Cockpit.jsx";
 import RunManager from "./components/RunManager.jsx";
 import SummaryView from "./components/SummaryView.jsx";
+import PortfolioView from "./components/PortfolioView.jsx";
 import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
 import EmptyResults from "./components/EmptyResults.jsx";
@@ -16,6 +17,7 @@ const TABS = [
   { id: "cockpit", label: "Cockpit" },
   { id: "summary", label: "Summary" },
   { id: "explorer", label: "Explorador" },
+  { id: "portfolio", label: "Portafolio" },
 ];
 
 const initialTab = () => {
@@ -247,6 +249,15 @@ export default function App() {
                            siteName={appliedSite} runName={viewingSaved} />
             ) : empty}
           </div>
+        )}
+
+        {tab === "portfolio" && (
+          <>
+            <p className="section-label">
+              Portafolio corporativo — N sitios, un escenario, KPIs de grupo
+            </p>
+            <PortfolioView apiUp={apiUp} draft={draft} />
+          </>
         )}
 
         {tab === "explorer" && (

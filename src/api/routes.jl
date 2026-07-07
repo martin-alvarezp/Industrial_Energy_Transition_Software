@@ -253,6 +253,73 @@ function handle_delete_run(req::HTTP.Request, runs_dir::AbstractString)
     return _json_response(200, (deleted = id,))
 end
 
+"""
+POST /portfolio — portafolio corporativo (roadmap D5): corre el MISMO
+escenario/config sobre N sitios guardados y agrega los KPIs de grupo.
+```json
+{"sites": ["planta_a", "planta_b"], "scenario": "emissions_cap",
+ "config_overrides": {"horizon_years": 10}}
+```
+Devuelve una fila por sitio (meta + kpis + inversiones) y el agregado
+corporativo (VAN, CAPEX, emisiones netas finales, offsets, factibilidad).
+"""
+function handle_portfolio(req::HTTP.Request, data_dir::AbstractString)
+    body = _parse_body(req)
+    haskey(body, :sites) || throw(ApiError(400, "falta 'sites' (lista de nombres)"))
+    names = String[String(x) for x in body.sites]
+    1 <= length(names) <= 25 ||
+        throw(ApiError(400, "sites debe traer entre 1 y 25 sitios"))
+    scenario = Symbol(get(body, :scenario, "emissions_cap"))
+    scenario in PREDEFINED_SCENARIOS ||
+        throw(ApiError(400, "escenario desconocido '$scenario'",
+                       ["disponibles: " * join(PREDEFINED_SCENARIOS, ", ")]))
+
+    rows = []
+    agg = Dict(:npv => 0.0, :total_capex => 0.0, :final_net => 0.0,
+               :final_gross => 0.0, :total_offsets => 0.0)
+    feas = 0
+    for name in names
+        dir = _site_dir(name, data_dir)
+        site, cfg = load_and_validate(dir)
+        cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
+        validate_scenario(cfg, site)
+        r = run_scenario(site, cfg; scenario, verbose = false,
+                         shadow_prices = false)
+        inv = r.feasible ?
+            [(tech = t, year = y,
+              mw = sum(r.new_capacity.mw[r.new_capacity.tech .== t]))
+             for (t, y) in sort(collect(r.investment_year); by = last)] : []
+        push!(rows, (site = name, feasible = r.feasible,
+                     status = String(r.status),
+                     npv = r.feasible ? r.npv : nothing,
+                     total_capex = r.feasible ? r.total_capex : nothing,
+                     final_net_emissions = r.feasible ?
+                         r.emissions.net[end] : nothing,
+                     total_offsets = r.feasible ?
+                         sum(r.emissions.offsets) : nothing,
+                     investments = inv,
+                     base_year = cfg.base_year,
+                     horizon_years = cfg.horizon_years))
+        if r.feasible
+            feas += 1
+            agg[:npv] += r.npv
+            agg[:total_capex] += r.total_capex
+            agg[:final_net] += r.emissions.net[end]
+            agg[:final_gross] += r.emissions.gross[end]
+            agg[:total_offsets] += sum(r.emissions.offsets)
+        end
+    end
+    return _json_response(200, (
+        scenario = String(scenario),
+        sites = rows,
+        aggregate = (npv = agg[:npv], total_capex = agg[:total_capex],
+                     final_net_emissions = agg[:final_net],
+                     final_gross_emissions = agg[:final_gross],
+                     total_offsets = agg[:total_offsets],
+                     feasible_sites = feas, total_sites = length(names)),
+    ))
+end
+
 "GET /sites — lista de sitios disponibles en data_dir."
 handle_list_sites(::HTTP.Request, data_dir::AbstractString) = _json_response(200,
     (sites = sort!([n for n in readdir(data_dir)

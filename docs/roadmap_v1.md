@@ -579,7 +579,17 @@ del carrier de red siguen la trayectoria; un contrato con factor PROPIO —
 PPA verde — queda fijo, como corresponde). Validación de largos, overrides
 por API, YAML. Oráculos exactos A7/A8. 1210 tests. Cierra la distorsión
 de electrificación a 15-20 años (§M7). REC/GdO quedan para v1.0.
-Pendiente: CI (S6) espera un remote de GitHub — el repo es local.
+✅ **S6 CI** — .github/workflows/ci.yml (suite Julia + equivalencia del
+motor web + build) y pages.yml (deploy a GitHub Pages); activos al primer
+push del usuario.
+
+✅ **D5** — portafolio multi-sitio: POST /portfolio corre el mismo
+escenario/config sobre N sitios guardados y agrega el grupo (VAN, CAPEX,
+emisiones netas/brutas finales, offsets, factibilidad); pestaña
+"Portafolio" con selección de sitios, escenario, KPIs de grupo y tabla
+por sitio (estado, medidas, % del VAN del grupo). El agregado es la suma
+exacta de las corridas individuales (test D5). Requiere API real (los
+sitios viven en disco) — la versión web lo dice explícito.
 > Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el
 > uso real la exige (SSO/multi-tenant se difieren a tracción comercial).
 

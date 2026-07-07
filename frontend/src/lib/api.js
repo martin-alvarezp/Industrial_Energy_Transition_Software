@@ -237,6 +237,11 @@ export async function compute(cfg, sitePayload = null, siteName = "demo",
   return { ...computeViaMock(cfg), twinIgnored: !!sitePayload || siteName !== "demo" };
 }
 
+/** POST /portfolio (D5): mismo escenario sobre N sitios + agregado grupo. */
+export const runPortfolio = (sites, scenario, cfg) =>
+  post("/portfolio", { sites, scenario, config_overrides: toOverrides(cfg) },
+       { timeoutMs: 600_000 });
+
 /** GET /sites: sitios guardados disponibles. Sin API → solo demo. */
 export async function listSites() {
   if (!(await apiAvailable())) return ["demo"];

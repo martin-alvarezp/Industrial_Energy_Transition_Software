@@ -99,6 +99,8 @@ function build_router(data_dir::AbstractString;
                    req -> handle_delete_site(req, data_dir))
     HTTP.register!(router, "POST", "/scenario",
                    req -> handle_scenario(req, data_dir))
+    HTTP.register!(router, "POST", "/portfolio",
+                   req -> handle_portfolio(req, data_dir))
     HTTP.register!(router, "POST", "/pareto",
                    req -> handle_pareto(req, data_dir))
     HTTP.register!(router, "POST", "/export/xlsx",
