@@ -58,6 +58,16 @@ export function operableTechs(dispatch, siteJson) {
                     a.name.localeCompare(b.name));
 }
 
+/** Precio de la electricidad por paso (serie base del carrier de red o del
+ * mercado de compra explícito) — para el spread del BESS. */
+function elecPriceByStep(siteJson) {
+  const grid = siteJson?.technologies?.find((t) => t.tech_id === "grid_import");
+  const cid = grid?.output_carrier ?? "electricity";
+  const mk = (siteJson?.markets ?? []).find(
+    (m) => m.direction === "buy" && m.carrier_id === cid);
+  return mk?.price ?? siteJson?.prices?.[cid] ?? null;
+}
+
 /** BESS: throughput, ciclos equivalentes, round-trip realizado, rango de SOC. */
 export function bessMetrics(dispatch, capacity, siteJson, tech, year) {
   const w = stepWeights(siteJson);
@@ -76,6 +86,23 @@ export function bessMetrics(dispatch, capacity, siteJson, tech, year) {
     round_trip: chgE > 1e-6 ? dischE / chgE : null,
     soc_max_mwh: soc.length ? Math.max(...soc) : 0,
     soc_util: energyCap > 0 && soc.length ? Math.max(...soc) / energyCap : 0,
+    // spread realizado (R2): precio medio ponderado de descarga − de carga,
+    // sobre la serie base de precios (la escalación anual no cambia el spread
+    // relativo dentro del año-plantilla)
+    spread: (() => {
+      const p = elecPriceByStep(siteJson);
+      if (!p) return null;
+      const wavg = (s) => {
+        let e = 0, v = 0;
+        for (const [step, mw] of Object.entries(s)) {
+          const ww = w[step - 1] ?? 0;
+          e += mw * ww; v += mw * ww * (p[step - 1] ?? 0);
+        }
+        return e > 1e-6 ? v / e : null;
+      };
+      const pd = wavg(discharge), pc = wavg(charge);
+      return pd != null && pc != null ? pd - pc : null;
+    })(),
   };
 }
 

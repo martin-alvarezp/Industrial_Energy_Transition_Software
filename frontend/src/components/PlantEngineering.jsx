@@ -18,6 +18,9 @@ function MetricTiles({ m }) {
                  note={`${num(m.energy_capacity_mwh, 0)} MWh`} />
         <KpiTile label="Ciclos equivalentes" value={num(m.equivalent_cycles, 0)}
                  note="plenos por año" />
+        <KpiTile label="Spread realizado"
+                 value={m.spread == null ? "—" : `${num(m.spread, 1)} USD/MWh`}
+                 note="precio medio de descarga − de carga" />
         <KpiTile label="Throughput" value={`${num(m.throughput_mwh / 1000, 1)} GWh`}
                  note="energía descargada/año" />
         <KpiTile label="Round-trip real"

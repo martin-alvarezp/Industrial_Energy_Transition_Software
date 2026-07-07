@@ -3,6 +3,8 @@ import { ResponsiveContainer, Sankey, Tooltip, Rectangle, Layer } from "recharts
 import KpiTile from "./KpiTile.jsx";
 import { VizTooltip } from "./ChartCard.jsx";
 import { buildFlows } from "../lib/flows.js";
+import CompareRuns from "./CompareRuns.jsx";
+import { openMemo } from "../lib/memo.js";
 import { techGlyph } from "../lib/twin.js";
 import { musd, pct, num, calYear } from "../lib/format.js";
 
@@ -130,7 +132,7 @@ function MeasuresTimeline({ result, siteJson, baseYear }) {
  * anual plegable, timeline de medidas y Sankey de flujos por año. La corrida
  * a mostrar se elige arriba (Corridas guardadas, P1).
  */
-export default function SummaryView({ result, siteJson, referenceLabel }) {
+export default function SummaryView({ result, siteJson, referenceLabel, bundle, siteName, runName }) {
   const baseYear = result?.meta?.base_year ?? 0;
   const cb = result.cost_breakdown ?? [];
   const em = result.emissions ?? [];
@@ -141,6 +143,12 @@ export default function SummaryView({ result, siteJson, referenceLabel }) {
 
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button className="chart-toggle"
+                onClick={() => openMemo(bundle ?? { result }, siteName ?? "sitio", runName)}>
+          📄 Memo ejecutivo (PDF)
+        </button>
+      </div>
       <div className="kpi-grid">
         <KpiTile label="Inversión total" value={musd(result.kpis.total_capex)}
                  note={`${(result.investments ?? []).length} medida(s) en ${N} años`} />
@@ -203,6 +211,9 @@ export default function SummaryView({ result, siteJson, referenceLabel }) {
           ver los flujos energéticos
         </p>
       )}
+
+      <div style={{ height: 14 }} />
+      <CompareRuns siteName={siteName} />
     </>
   );
 }

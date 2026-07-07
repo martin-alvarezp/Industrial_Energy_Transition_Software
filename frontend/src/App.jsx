@@ -240,7 +240,8 @@ export default function App() {
             )}
             {hasResults ? (
               <SummaryView result={result} siteJson={appliedSiteJson}
-                           referenceLabel={referenceLabel} />
+                           referenceLabel={referenceLabel} bundle={bundleToSave}
+                           siteName={appliedSite} runName={viewingSaved} />
             ) : empty}
           </div>
         )}

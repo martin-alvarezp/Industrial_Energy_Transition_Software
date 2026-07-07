@@ -526,9 +526,21 @@ escenario de origen — la unidad que consume v0.8).
 Verificado E2E: pestaña Summary sobre el demo con KPIs, medidas (batería
 8.8 + PV 30 + bomba 10.7 en 2026) y Sankey trazado.
 
-⏳ Restan de v0.8: comparación entre corridas guardadas · P2 memo PDF ·
-flujo de caja por equipo y spread del BESS (cierre de R2) · escenarios-capa
-a backend.
+✅ **Comparación + memo + cierre R2**:
+- **Comparar corridas** (Summary): checkboxes sobre las guardadas → tabla
+  lado a lado (escenario, horizonte, factibilidad, VAN, CAPEX, OPEX,
+  emisiones, medidas) con **Δ VAN vs la primera** — el precio de cada
+  política/escenario en una línea.
+- **P2 memo ejecutivo**: HTML imprimible autocontenido generado del bundle
+  (KPIs, plan de inversión, evolución anual, huellas de trazabilidad) →
+  PDF vía Ctrl+P. Botón en Summary.
+- **Spread realizado del BESS** (cierra R2): precio medio ponderado de
+  descarga − de carga sobre la serie de compra, tile en Ingeniería de
+  planta.
+
+**v0.8 CERRADA.** Flecos → v0.9: escenarios-capa a backend · precios por
+año calendario · inversiones repetidas en results (solo muestra el último
+año) · memo con gráficos (hoy es tabular).
 > Criterio: la vista de resultados replica el estándar comercial de
 > referencia y un ingeniero puede auditar la operación de cada activo.
 
