@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ScenarioBuilder from "./components/ScenarioBuilder.jsx";
 import Cockpit from "./components/Cockpit.jsx";
+import RunManager from "./components/RunManager.jsx";
 import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
 import EmptyResults from "./components/EmptyResults.jsx";
@@ -41,6 +42,7 @@ export default function App() {
   // snapshot del site_json corrido (perfiles, pesos, capacidades) — base de las
   // métricas por equipo y del tornado
   const [appliedSiteJson, setAppliedSiteJson] = useState(null);
+  const [viewingSaved, setViewingSaved] = useState(null); // nombre de la corrida cargada
 
   // sondeo único de la API: alimenta el header y habilita guardar/ejecutar.
   // NO autocarga un sitio ni autocorre — ese era el origen de los resultados
@@ -93,6 +95,7 @@ export default function App() {
     setRunning(true);
     compute(cfg, payload, apiSite).then((d) => {
       setData(d);
+      setViewingSaved(null);
       setApplied(cfg);
       setAppliedPayload(payload);
       setAppliedSite(apiSite);
@@ -109,6 +112,12 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onRun]);
+
+  const onLoadRun = (rec) => {
+    setData({ ...rec.payload, source: "saved" });
+    setViewingSaved(rec.name);
+    setTab("cockpit");
+  };
 
   const hasResults = !!data;
   const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } =
@@ -190,6 +199,7 @@ export default function App() {
             <ScenarioBuilder
               draft={draft} setDraft={setDraft} applied={applied}
               onRun={onRun} running={running} dirty={dirty} hasSite={!!twin}
+              siteJson={twin?.siteJson} siteName={siteName}
             />
             <div style={{ height: 20 }} />
             <div className={running ? "busy" : ""}>
@@ -204,6 +214,10 @@ export default function App() {
         {tab === "cockpit" && (
           <div className={running ? "busy" : ""}>
             <p className="section-label">Cockpit ejecutivo</p>
+            {(twin || hasResults) && apiUp !== false && (
+              <RunManager siteName={appliedSite} data={data}
+                          viewingSaved={viewingSaved} onLoadRun={onLoadRun} />
+            )}
             {hasResults ? (
               <Cockpit result={result} reference={reference} referenceLabel={referenceLabel} bauFeasible={bauFeasible} bau={bau} config={applied} source={source} sitePayload={appliedPayload} siteName={appliedSite} siteJson={appliedSiteJson} />
             ) : empty}

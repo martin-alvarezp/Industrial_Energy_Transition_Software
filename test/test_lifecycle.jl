@@ -119,3 +119,33 @@ end
     @test !haskey(only(t for t in site_json(site0).technologies
                        if t.tech_id == "chiller"), :remaining_life)
 end
+
+@testset "P1: corridas guardadas (endpoints /runs)" begin
+    runs_dir = mktempdir()
+    jread(resp) = JSON3.read(collect(codeunits(String(resp.body))))
+
+    body = JSON3.write((site = "demo", name = "Mi corrida EO", notes = "prueba",
+        payload = (result = (meta = (scenario = "least_cost", feasible = true,
+                                     base_year = 2026),
+                             kpis = (npv = 7.5e7,)),)))
+    resp = IETO.handle_save_run(
+        HTTP.Request("POST", "/runs", ["Content-Type" => "application/json"], body),
+        runs_dir)
+    @test jread(resp).saved == "mi_corrida_eo"
+
+    lst = jread(IETO.handle_list_runs(HTTP.Request("GET", "/runs?site=demo"), runs_dir))
+    @test length(lst.runs) == 1
+    @test lst.runs[1].name == "Mi corrida EO"
+    @test lst.runs[1].scenario == "least_cost"
+    @test lst.runs[1].npv ≈ 7.5e7
+
+    # GET y DELETE por id via router (usa getparams)
+    router = build_router(dirname(DEMO_DIR); runs_dir = runs_dir)
+    rec = jread(router(HTTP.Request("GET", "/runs/mi_corrida_eo?site=demo")))
+    @test rec.payload.result.kpis.npv ≈ 7.5e7
+    @test rec.notes == "prueba"
+    del = jread(router(HTTP.Request("DELETE", "/runs/mi_corrida_eo?site=demo")))
+    @test del.deleted == "mi_corrida_eo"
+    lst2 = jread(IETO.handle_list_runs(HTTP.Request("GET", "/runs?site=demo"), runs_dir))
+    @test isempty(lst2.runs)
+end

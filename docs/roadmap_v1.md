@@ -478,6 +478,25 @@ automáticos) · M4 parcial (disponibilidad por paso para conversores).
   repetibles en el builder; overrides por la API (plumbing fieldnames).
 Verificado por API: forzar PV 2028 en el demo desplaza la compra al año 3
 y muestra el PRECIO de la política (NPV 75.77 → 76.81 MUSD). 1147 tests.
+
+✅ **M12 UI + P1** — escenarios y corridas guardadas:
+- **Editor de compras forzadas** en el builder (candidata × año calendario
+  × MW) — el VAN muestra el precio de la política.
+- **Escenarios como capas con jerarquía**: cada escenario guarda SOLO lo
+  que difiere del default (overlay disperso); la pila resuelve en cascada
+  — lo definido arriba manda, lo no definido cae a las capas de abajo
+  (Forzar CHP → Economic Optimum → BaU) — con reorden ↑↓, cargar capa
+  individual y "aplicar pila". Persistencia por sitio (localStorage).
+- **P1 corridas guardadas**: POST/GET/DELETE /runs (data/runs/<site>/,
+  fuera de git) guardan el BUNDLE completo del cockpit con nombre y notas;
+  la tarjeta "Corridas guardadas" del Cockpit guarda, lista (nombre ·
+  escenario · VAN), recarga sin re-resolver ("viendo 'X'") y elimina — el
+  selector de corridas que alimenta el Summary de v0.8.
+Verificado: 1156 tests (endpoints con round-trip completo) y E2E en la UI:
+guardar "EO base 2026", recargarla y ver los KPIs restaurados.
+
+**v0.7 CERRADA.** Fleco: los escenarios-capa viven en localStorage
+(migrar a backend junto a P2/comparación de corridas en v0.8).
 > Criterio: el flujo BaU / Economic Optimum / "forzar CHP 2028 sin PV"
 > corre sobre el mismo sitio, con herencia en cascada entre escenarios y
 > comparación lado a lado.

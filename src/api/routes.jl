@@ -167,6 +167,91 @@ function handle_solar_profile(req::HTTP.Request)
                                 cf_hourly = cf))
 end
 
+# ── corridas guardadas (P1): la unidad de trabajo del consultor ──────────
+# data/runs/<site>/<id>.json: {id, name, notes, saved_at, payload} donde
+# payload es el BUNDLE completo del cockpit (result, reference, bau, pareto,
+# batch) — restaurarlo reconstruye la vista entera sin resolver de nuevo.
+
+_run_id(name) = begin
+    id = lowercase(replace(strip(name), r"[^A-Za-z0-9]+" => "_"))
+    id = strip(id, '_')
+    isempty(id) ? "corrida" : String(id)
+end
+
+function _runs_site_dir(runs_dir, site)
+    occursin(r"^[A-Za-z0-9_\-]+$", site) ||
+        throw(ApiError(400, "nombre de sitio inválido '$site'"))
+    return joinpath(runs_dir, site)
+end
+
+"POST /runs {site, name, notes?, payload} — guarda una corrida con nombre."
+function handle_save_run(req::HTTP.Request, runs_dir::AbstractString)
+    body = _parse_body(req)
+    for k in (:site, :name, :payload)
+        haskey(body, k) || throw(ApiError(400, "falta el campo '$k'"))
+    end
+    name = strip(String(body.name))
+    isempty(name) && throw(ApiError(400, "el nombre no puede estar vacío"))
+    dir = _runs_site_dir(runs_dir, String(body.site))
+    mkpath(dir)
+    id = _run_id(name)
+    rec = (id = id, name = String(name),
+           notes = String(get(body, :notes, "")),
+           saved_at = Dates.format(Dates.now(), "yyyy-mm-ddTHH:MM:SS"),
+           payload = body.payload)
+    open(io -> JSON3.write(io, rec), joinpath(dir, "$id.json"), "w")
+    return _json_response(200, (saved = id,))
+end
+
+"GET /runs?site= — lista resumida de corridas guardadas del sitio."
+function handle_list_runs(req::HTTP.Request, runs_dir::AbstractString)
+    q = HTTP.queryparams(HTTP.URI(req.target))
+    site = get(q, "site", "")
+    isempty(site) && throw(ApiError(400, "falta ?site="))
+    dir = _runs_site_dir(runs_dir, site)
+    isdir(dir) || return _json_response(200, (runs = [],))
+    runs = []
+    for f in sort!(readdir(dir))
+        endswith(f, ".json") || continue
+        rec = try
+            JSON3.read(read(joinpath(dir, f)))
+        catch
+            continue
+        end
+        meta = try rec.payload.result.meta catch; nothing end
+        kpis = try rec.payload.result.kpis catch; nothing end
+        push!(runs, (id = rec.id, name = rec.name,
+                     notes = get(rec, :notes, ""),
+                     saved_at = get(rec, :saved_at, ""),
+                     scenario = meta === nothing ? "" : get(meta, :scenario, ""),
+                     feasible = meta === nothing ? nothing : get(meta, :feasible, nothing),
+                     base_year = meta === nothing ? 0 : get(meta, :base_year, 0),
+                     npv = kpis === nothing ? nothing : get(kpis, :npv, nothing)))
+    end
+    return _json_response(200, (runs = runs,))
+end
+
+"GET /runs/{id}?site= — corrida completa (payload = bundle del cockpit)."
+function handle_get_run(req::HTTP.Request, runs_dir::AbstractString)
+    id = HTTP.getparams(req)["id"]
+    q = HTTP.queryparams(HTTP.URI(req.target))
+    site = get(q, "site", "")
+    path = joinpath(_runs_site_dir(runs_dir, site), "$id.json")
+    isfile(path) || throw(ApiError(404, "corrida '$id' no encontrada en '$site'"))
+    return HTTP.Response(200, ["Content-Type" => "application/json"], read(path))
+end
+
+"DELETE /runs/{id}?site= — elimina una corrida guardada."
+function handle_delete_run(req::HTTP.Request, runs_dir::AbstractString)
+    id = HTTP.getparams(req)["id"]
+    q = HTTP.queryparams(HTTP.URI(req.target))
+    site = get(q, "site", "")
+    path = joinpath(_runs_site_dir(runs_dir, site), "$id.json")
+    isfile(path) || throw(ApiError(404, "corrida '$id' no encontrada en '$site'"))
+    rm(path)
+    return _json_response(200, (deleted = id,))
+end
+
 "GET /sites — lista de sitios disponibles en data_dir."
 handle_list_sites(::HTTP.Request, data_dir::AbstractString) = _json_response(200,
     (sites = sort!([n for n in readdir(data_dir)

@@ -39,6 +39,27 @@ export async function fetchSolarProfile(lat, lon) {
   return payload;
 }
 
+// ── corridas guardadas (P1) ──
+export const saveRun = (site, name, bundle, notes = "") =>
+  post("/runs", { site, name, notes, payload: bundle });
+export async function listRuns(site) {
+  try {
+    const r = await fetch(`${API_BASE}/runs?site=${encodeURIComponent(site)}`);
+    if (!r.ok) return [];
+    return (await r.json()).runs ?? [];
+  } catch { return []; }
+}
+export async function fetchRun(site, id) {
+  const r = await fetch(
+    `${API_BASE}/runs/${encodeURIComponent(id)}?site=${encodeURIComponent(site)}`);
+  const payload = await r.json();
+  if (!r.ok) throw new Error(payload?.error?.message ?? `HTTP ${r.status}`);
+  return payload;
+}
+export const deleteRun = (site, id) =>
+  post(`/runs/${encodeURIComponent(id)}?site=${encodeURIComponent(site)}`,
+       undefined, { method: "DELETE" });
+
 /** Builder config → config_overrides del contrato (§3). */
 export function toOverrides(cfg) {
   return {

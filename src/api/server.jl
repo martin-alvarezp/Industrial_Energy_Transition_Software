@@ -75,8 +75,18 @@ end
 
 "Router con los endpoints (+ frontend estático si se pasa `static_dir`)."
 function build_router(data_dir::AbstractString;
-                      static_dir::Union{Nothing,AbstractString} = nothing)
+                      static_dir::Union{Nothing,AbstractString} = nothing,
+                      runs_dir::AbstractString =
+                          joinpath(dirname(abspath(data_dir)), "runs"))
     router = HTTP.Router(_json_404, _json_405)
+    HTTP.register!(router, "POST", "/runs",
+                   req -> handle_save_run(req, runs_dir))
+    HTTP.register!(router, "GET", "/runs",
+                   req -> handle_list_runs(req, runs_dir))
+    HTTP.register!(router, "GET", "/runs/{id}",
+                   req -> handle_get_run(req, runs_dir))
+    HTTP.register!(router, "DELETE", "/runs/{id}",
+                   req -> handle_delete_run(req, runs_dir))
     HTTP.register!(router, "GET", "/scenarios", handle_scenarios)
     HTTP.register!(router, "GET", "/solar_profile", handle_solar_profile)
     HTTP.register!(router, "GET", "/sites",
