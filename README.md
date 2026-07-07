@@ -1,5 +1,15 @@
 # IETO — Industrial Energy Transition Optimizer
 
+> **🌐 Pruébala online (gratis, sin instalar nada):**
+> **https://martin-alvarezp.github.io/Industrial_Energy_Transition_Software/**
+> Las optimizaciones se resuelven en tu propio navegador (HiGHS en
+> WebAssembly). También hay versión de escritorio portable para Windows
+> (ver `docs/deploy.md`).
+>
+> Creada por **Martín Álvarez** · codesarrollada con **Fable 5 de Claude**
+> (Anthropic) · dudas, feedback o comentarios: **martin.021299@gmail.com**
+
+
 Optimizador MILP (Julia + JuMP + HiGHS) que representa una planta industrial
 como un sistema multi-vectorial y decide, **a lo largo de un horizonte de N
 años**, el mix tecnológico, el **año de inversión** de cada tecnología y la
