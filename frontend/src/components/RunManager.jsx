@@ -57,7 +57,7 @@ export default function RunManager({ siteName, data, viewingSaved, onLoadRun }) 
         {data && !viewingSaved && (
           <>
             <input type="text" placeholder="nombre de esta corrida…"
-                   value={name} style={{ minWidth: 200 }}
+                   value={name} style={{ width: "auto", flex: "0 1 280px" }}
                    onChange={(e) => setName(e.target.value)} />
             <button className="chart-toggle" disabled={!name.trim()}
                     onClick={doSave}>
