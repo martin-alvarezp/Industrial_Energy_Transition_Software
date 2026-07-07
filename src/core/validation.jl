@@ -281,6 +281,15 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     cfg.capex_budget === nothing ||
         _check_nonneg!(problems, cfg.capex_budget, "scenario_config.yaml: capex_budget")
+    for (name, v) in (("carbon_price_by_year", cfg.carbon_price_by_year),
+                      ("grid_ef_by_year", cfg.grid_ef_by_year))
+        isempty(v) && continue
+        length(v) == cfg.horizon_years || push!(problems,
+            "scenario_config.yaml: $name tiene $(length(v)) valores, " *
+            "se esperaban $(cfg.horizon_years) (uno por año del horizonte)")
+        all(>=(0), v) || push!(problems,
+            "scenario_config.yaml: $name contiene valores negativos")
+    end
     cfg.base_year == 0 || 1900 <= cfg.base_year <= 2200 || push!(problems,
         "scenario_config.yaml: base_year debe ser 0 (relativo) o un año " *
         "calendario 1900-2200 (valor: $(cfg.base_year))")

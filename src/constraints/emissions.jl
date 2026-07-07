@@ -46,7 +46,7 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
     # Scope 2: compras de mercado · factor del mercado (propio o heredado del
     # carrier; 0 en combustibles — su scope 1 ya se contó al quemarlos)
     JuMP.@expression(m, scope2_y[y in years],
-        sum(params.market_ef[mk] * market_flow[mk, s, y] * w[s]
+        sum(params.market_ef[mk][y] * market_flow[mk, s, y] * w[s]
             for mk in sets.buy_markets, s in steps; init = 0.0))
 
     m[:gross_emissions_def] = JuMP.@constraint(m, [y in years],

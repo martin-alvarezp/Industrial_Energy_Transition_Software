@@ -570,7 +570,16 @@ año) · memo con gráficos (hoy es tabular).
 - P2 (memo ejecutivo PDF) · comparación entre corridas guardadas (cierra
   los ⏳ de v0.4).
 
-### v0.9 — "Multi-sitio y plataforma mínima suficiente"
+### v0.9 — "Multi-sitio y plataforma mínima suficiente" ← en curso
+
+✅ **M7 restante** — clima avanzado por año: `carbon_price_by_year` (la
+trayectoria regulatoria entra al objetivo año a año) y `grid_ef_by_year`
+(descarbonización EXÓGENA de la red: los mercados que heredan el factor
+del carrier de red siguen la trayectoria; un contrato con factor PROPIO —
+PPA verde — queda fijo, como corresponde). Validación de largos, overrides
+por API, YAML. Oráculos exactos A7/A8. 1210 tests. Cierra la distorsión
+de electrificación a 15-20 años (§M7). REC/GdO quedan para v1.0.
+Pendiente: CI (S6) espera un remote de GitHub — el repo es local.
 > Criterio: 5+ sitios propios operando; la plataforma crece SOLO cuando el
 > uso real la exige (SSO/multi-tenant se difieren a tracción comercial).
 

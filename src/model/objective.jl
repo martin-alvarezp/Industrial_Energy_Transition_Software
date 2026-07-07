@@ -78,7 +78,9 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(dc_term(mk, se, y) for mk in charged, se in 1:nse))
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
-    JuMP.@expression(m, carbon_cost_y[y in years], cfg.carbon_price * gross_emissions[y])
+    cprice(y) = isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :
+                cfg.carbon_price_by_year[y]   # trayectoria regulatoria (M7)
+    JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y])
     JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
     # ventas :billing pagan su precio de inyección; las :net_metering (M2b)
     # ingresan el crédito neteado O_p · retail medio del período (el banco

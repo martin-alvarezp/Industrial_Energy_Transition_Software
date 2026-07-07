@@ -294,5 +294,7 @@ function load_scenario_config(path::AbstractString)
         Tuple{Symbol,Int,Float64}[
             (Symbol(f["tech"]), Int(f["year"]), Float64(f["mw"]))
             for f in get(d, "forced_builds", [])],
+        Float64[Float64(x) for x in get(d, "carbon_price_by_year", [])],
+        Float64[Float64(x) for x in get(d, "grid_ef_by_year", [])],
     )
 end

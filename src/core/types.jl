@@ -273,19 +273,31 @@ struct ScenarioConfig
     repeat_investments::Bool                 # permite invertir >1 vez por tech
     forced_builds::Vector{Tuple{Symbol,Int,Float64}}  # (tech, año, MW mínimos);
                                              # año calendario si hay base_year
+    # ── clima avanzado (M7): trayectorias exógenas por año ──
+    carbon_price_by_year::Vector{Float64}    # USD/tCO₂e por año; vacío = constante
+    grid_ef_by_year::Vector{Float64}         # tCO₂e/MWh de la RED por año (descarbonización
+                                             # exógena); vacío = factor del carrier. Los
+                                             # mercados con factor PROPIO (PPA) no cambian.
 end
 
 # retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   false, 0, false, false, Tuple{Symbol,Int,Float64}[])
+                   false, 0, false, false, Tuple{Symbol,Int,Float64}[],
+                   Float64[], Float64[])
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv::Bool) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, 0, false, false, Tuple{Symbol,Int,Float64}[])
+                   sv, 0, false, false, Tuple{Symbol,Int,Float64}[],
+                   Float64[], Float64[])
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                sv::Bool, by::Integer) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), false, false, Tuple{Symbol,Int,Float64}[])
+                   sv, Int(by), false, false, Tuple{Symbol,Int,Float64}[],
+                   Float64[], Float64[])
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, Float64[], Float64[])
 
 "Año calendario del año relativo y (y=1 es base_year); y si no hay calendario."
 calendar_year(cfg::ScenarioConfig, y::Integer) =

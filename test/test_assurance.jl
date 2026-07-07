@@ -145,6 +145,56 @@ end
     @test thru ≈ 0.0 atol = 1e-5
 end
 
+@testset "oráculo A7: descarbonización de la red por año (M7) — PPA no cambia" begin
+    # 10 MW de red + 2 MW por PPA con factor propio 0.05; red 0.4 → [0.4,0.2,0.1]
+    site = a_site(
+        carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy)),
+        sources = Dict(:grid_import =>
+            Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, A_TC0)),
+        demands = Dict(:electricity => Demand(:electricity, fill(12.0, 4))),
+        factors = [EmissionFactor(:electricity, :scope2, 0.4)])
+    mkts = Dict(
+        :grid_buy => Market(:grid_buy, "Red", :electricity, :buy, fill(80.0, 4),
+                            Inf, Inf, nothing, :grid_import),
+        :ppa => Market(:ppa, "PPA", :electricity, :buy, fill(60.0, 4),
+                       2.0, Inf, 0.05, :grid_import))
+    site = Site(site.name, site.timesteps, site.carriers, site.sources,
+                site.converters, site.generators, site.storages, site.demands,
+                site.prices, site.emission_factors, mkts)
+    cfg = with_config(a_cfg(3, 0.0); grid_ef_by_year = [0.4, 0.2, 0.1])
+    im = a_solve(site, cfg)
+    # el PPA (60 < 80) llena sus 2 MW; la red cubre 10 MW
+    for y in 1:3
+        expected = 10 * 8760 * cfg.grid_ef_by_year[y] + 2 * 8760 * 0.05
+        @test JuMP.value(im.model[:scope2_y][y]) ≈ expected rtol = 1e-9
+    end
+end
+
+@testset "oráculo A8: precio de carbono por año — costo exacto por trayectoria" begin
+    site = a_site(
+        carriers = Dict(:gas => Carrier(:gas, "Gas", "MWh", :fuel),
+                        :hot => Carrier(:hot, "AC", "MWh", :heat)),
+        converters = Dict(:b => Converter(:b, "Caldera", :gas, :hot, 0.8,
+                                          20.0, 0.0, false, A_TC0)),
+        demands = Dict(:hot => Demand(:hot, fill(8.0, 4))),
+        prices = Dict(:gas => PriceSeries(:gas, fill(30.0, 4))),
+        factors = [EmissionFactor(:gas, :scope1, 0.2)])
+    cfg = with_config(a_cfg(3, 0.0); carbon_price_by_year = [50.0, 100.0, 150.0])
+    im = a_solve(site, cfg)
+    gross = 10 * 8760 * 0.2   # gas 10 MW × factor
+    for y in 1:3
+        @test JuMP.value(im.model[:carbon_cost_y][y]) ≈
+              cfg.carbon_price_by_year[y] * gross rtol = 1e-9
+    end
+    # validación: largo incorrecto → error claro
+    site2, cfgd = load_and_validate(DEMO_DIR)
+    err = try
+        validate_scenario(with_config(cfgd; grid_ef_by_year = [0.3, 0.2]), site2)
+    catch e; e end
+    @test err isa ValidationError
+    @test any(occursin("grid_ef_by_year", p) for p in err.problems)
+end
+
 # ─────────────────── B · INVARIANTES SOBRE EL DEMO ───────────────────
 
 @testset "invariante B1: el balance físico cierra en cada carrier·paso·año" begin

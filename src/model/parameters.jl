@@ -28,7 +28,7 @@ struct ModelParameters
     market_dir::Dict{Symbol,Symbol}                  # :buy | :sell
     market_power_cap::Dict{Symbol,Float64}           # MW por paso (Inf = sin tope)
     market_annual_cap::Dict{Symbol,Float64}          # MWh/año (Inf = sin tope)
-    market_ef::Dict{Symbol,Float64}                  # tCO₂e/MWh comprado (resuelto)
+    market_ef::Dict{Symbol,Vector{Float64}}          # tCO₂e/MWh comprado, por año (M7)
     conn_buy::Dict{Symbol,Vector{Symbol}}            # conexión → mercados de compra
     conn_sell::Dict{Symbol,Vector{Symbol}}           # conexión → mercados de venta
     conv_availability::Dict{Symbol,Vector{Float64}}  # conversor → [step] en [0,1] (M4)
@@ -136,7 +136,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     market_dir = Dict{Symbol,Symbol}()
     market_power_cap = Dict{Symbol,Float64}()
     market_annual_cap = Dict{Symbol,Float64}()
-    market_ef = Dict{Symbol,Float64}()
+    market_ef = Dict{Symbol,Vector{Float64}}()
     market_demand_charge = Dict{Symbol,Float64}()
     conn_buy = Dict{Symbol,Vector{Symbol}}()
     conn_sell = Dict{Symbol,Vector{Symbol}}()
@@ -148,10 +148,23 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         market_dir[id] = mk.direction
         market_power_cap[id] = mk.max_power
         market_annual_cap[id] = mk.max_annual
-        # factor del mercado (scope 2): solo compras de carriers con balance
-        # propio; los combustibles emiten scope 1 al quemarse, no al comprarse
-        market_ef[id] = mk.direction == :buy && !is_fuel(mk.carrier) ?
-            something(mk.emission_factor, ef_lookup(mk.carrier, :scope2)) : 0.0
+        # factor del mercado (scope 2) POR AÑO: solo compras de carriers con
+        # balance; los combustibles emiten scope 1 al quemarse. Un contrato con
+        # factor PROPIO (PPA) es constante; el heredado del carrier de red
+        # sigue la trayectoria exógena grid_ef_by_year si el escenario la trae.
+        market_ef[id] = if mk.direction == :buy && !is_fuel(mk.carrier)
+            if mk.emission_factor !== nothing
+                fill(Float64(mk.emission_factor), length(years))
+            else
+                base = ef_lookup(mk.carrier, :scope2)
+                grid0 = get(site.sources, :grid_import, nothing)
+                on_grid = grid0 !== nothing && mk.carrier == grid0.output_carrier
+                [on_grid && !isempty(cfg.grid_ef_by_year) ?
+                 cfg.grid_ef_by_year[y] : base for y in years]
+            end
+        else
+            zeros(length(years))
+        end
         market_demand_charge[id] = mk.direction == :buy ? mk.demand_charge : 0.0
         if mk.connection != Symbol("")
             side = mk.direction == :buy ? conn_buy : conn_sell

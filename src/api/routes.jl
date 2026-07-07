@@ -94,6 +94,7 @@ _coerce(::Type{Int}, v) = Int(v)
 _coerce(::Type{Float64}, v) = Float64(v)
 _coerce(::Type{Bool}, v) = Bool(v)
 _coerce(::Type{Vector{Symbol}}, v) = Symbol[Symbol(x) for x in v]
+_coerce(::Type{Vector{Float64}}, v) = Float64[Float64(x) for x in v]
 _coerce(::Type{Union{Float64,Nothing}}, v) = v === nothing ? nothing : Float64(v)
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
