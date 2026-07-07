@@ -39,4 +39,9 @@ c4 = with_config(cfg0; horizon_years = 5, base_year = 2026,
                  forced_builds = [(:pv, 2028, 15.0)])
 dump("demo_policies_n5", site0, c4)
 
+# 5 · impuestos y depreciación (M9)
+c5 = with_config(cfg0; horizon_years = 5, tax_rate = 0.27,
+                 depreciation_years = 5)
+dump("demo_tax_n5", site0, c5)
+
 println("fixtures dorados en ", out)

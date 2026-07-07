@@ -23,10 +23,11 @@ function extract_financials(im::IETOModel)
         carbon_cost      = component(:carbon_cost_y),
         offset_cost      = component(:offset_cost_y),
         export_revenue   = component(:export_revenue_y),
+        tax              = component(:tax_y),          # ajuste fiscal M9 (≤0 = ahorro)
     )
     df.total = df.capex .+ df.fixed_opex .+ df.var_opex .+ df.energy_purchases .+
                df.demand_charges .+ df.carbon_cost .+ df.offset_cost .-
-               df.export_revenue
+               df.export_revenue .+ df.tax
     # valor residual: crédito único al fin del horizonte (0 si está apagado),
     # incluido en total/npv del año N para que Σ npv == VAN del objetivo
     salvage = haskey(JuMP.object_dictionary(m), :salvage_credit) ?

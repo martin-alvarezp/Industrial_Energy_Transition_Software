@@ -32,6 +32,9 @@ export function toConfig(cfg) {
     renew_existing: cfg.renew_existing ?? false,
     repeat_investments: cfg.repeat_investments ?? false,
     forced_builds: (cfg.forced_builds ?? []).map((f) => [f.tech, +f.year, +f.mw]),
+    tax_rate: cfg.tax_rate ?? 0,
+    depreciation_years: cfg.depreciation_years ?? 0,
+    currency: cfg.currency ?? "USD",
     carbon_price_by_year: [],
     grid_ef_by_year: [],
   };

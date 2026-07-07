@@ -290,6 +290,12 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         all(>=(0), v) || push!(problems,
             "scenario_config.yaml: $name contiene valores negativos")
     end
+    0 <= cfg.tax_rate < 1 || push!(problems,
+        "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    cfg.depreciation_years >= 0 || push!(problems,
+        "scenario_config.yaml: depreciation_years debe ser ≥ 0 (0 = vida útil)")
+    isempty(strip(cfg.currency)) && push!(problems,
+        "scenario_config.yaml: currency no puede ser vacía")
     cfg.base_year == 0 || 1900 <= cfg.base_year <= 2200 || push!(problems,
         "scenario_config.yaml: base_year debe ser 0 (relativo) o un año " *
         "calendario 1900-2200 (valor: $(cfg.base_year))")

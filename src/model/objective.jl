@@ -94,6 +94,28 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             for (mk, periods) in params.nm_periods
             for pi in eachindex(periods); init = 0.0))
 
+    # Impuestos (M9, cfg.tax_rate > 0): costo after-tax = CAPEX + (1−t)·OPEX
+    # − t·depreciación. Deducibles: OPEX fijo/variable, energía, cargos,
+    # carbono y offsets; el ingreso por export tributa (entra con signo).
+    # Depreciación LINEAL de las inversiones NUEVAS: capex·nc/D durante D
+    # años desde el año de compra (D = depreciation_years, o la vida útil
+    # de la tech si es 0). Las renovaciones deterministas no generan
+    # escudo (conservador). tax_y = ajuste fiscal (≤ 0 = ahorro).
+    t = cfg.tax_rate
+    depy(tech) = cfg.depreciation_years > 0 ? cfg.depreciation_years :
+                 params.costs[tech].lifetime_years
+    JuMP.@expression(m, dep_y[y in years],
+        t == 0 ? JuMP.AffExpr(0.0) :
+        sum(params.costs[tc].capex_per_kw * KW_PER_MW / depy(tc) *
+            new_capacity[tc, yp]
+            for tc in sets.candidates, yp in years
+            if yp <= y < yp + depy(tc); init = 0.0))
+    JuMP.@expression(m, tax_y[y in years],
+        t == 0 ? JuMP.AffExpr(0.0) :
+        -t * (fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
+              demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
+              export_revenue_y[y]) - t * dep_y[y])
+
     # Valor residual (opcional, cfg.salvage_value): crédito lineal al fin del
     # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,
     # descontado al año N. Sin él, invertir tarde en activos longevos queda
@@ -110,7 +132,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(params.discount[y] *
             (capex_y[y] + fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
              demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
-             export_revenue_y[y])
+             export_revenue_y[y] + tax_y[y])
             for y in years) - params.discount[end] * salvage_credit)
 
     return m

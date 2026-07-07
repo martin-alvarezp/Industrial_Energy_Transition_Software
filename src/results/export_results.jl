@@ -26,6 +26,7 @@ _meta(r::Results) = (
     feasible = r.feasible,
     horizon_years = r.horizon_years,
     base_year = r.config.base_year,   # 0 = horizonte relativo (M13)
+    currency = r.config.currency,     # etiqueta de display (M9)
 )
 
 "Valor de config legible para la tabla de supuestos."

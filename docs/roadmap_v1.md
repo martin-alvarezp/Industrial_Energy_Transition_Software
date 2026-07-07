@@ -583,6 +583,18 @@ de electrificación a 15-20 años (§M7). REC/GdO quedan para v1.0.
 motor web + build) y pages.yml (deploy a GitHub Pages); activos al primer
 push del usuario.
 
+✅ **M9 parcial** — finanzas de verdad: `tax_rate` con costo after-tax
+(CAPEX + (1−t)·OPEX − t·depreciación lineal de inversiones nuevas;
+`depreciation_years`, 0 = vida útil; renovaciones sin escudo,
+conservador) — el escudo fiscal cambia el ranking CAPEX vs OPEX como pide
+el roadmap; columna `tax` en el desglose (t=0 ≡ legacy exacto, testeado).
+`currency` como etiqueta (el motor es agnóstico: todos los montos en la
+misma moneda; la UI rotula M<moneda>). Oráculo A9 exacto; espejo completo
+en el motor web (golden demo_tax_n5, Δrel 0.0). WACC after-tax queda como
+responsabilidad del usuario (documentado en el hint del builder).
+Restan de M9 (v1.0): subsidios por tecnología, FX multi-moneda del
+portafolio, financiamiento como flujo.
+
 ✅ **D5** — portafolio multi-sitio: POST /portfolio corre el mismo
 escenario/config sobre N sitios guardados y agrega el grupo (VAN, CAPEX,
 emisiones netas/brutas finales, offsets, factibilidad); pestaña

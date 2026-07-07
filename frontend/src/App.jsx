@@ -9,6 +9,7 @@ import SiteTwin from "./components/twin/SiteTwin.jsx";
 import EmptyResults from "./components/EmptyResults.jsx";
 import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
 import { compute, fetchSite, apiAvailable } from "./lib/api.js";
+import { setCurrency } from "./lib/format.js";
 import { geoJSONToLayout, blankSite } from "./lib/twin.js";
 
 const TABS = [
@@ -127,6 +128,7 @@ export default function App() {
   const bundleToSave = data ? { ...data, site_snapshot: appliedSiteJson } : null;
 
   const hasResults = !!data;
+  useEffect(() => { setCurrency(data?.result?.meta?.currency); }, [data]);
   const { source, result, reference, referenceLabel, bau, bauFeasible, pareto, batch } =
     data ?? {};
 

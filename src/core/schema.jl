@@ -296,5 +296,8 @@ function load_scenario_config(path::AbstractString)
             for f in get(d, "forced_builds", [])],
         Float64[Float64(x) for x in get(d, "carbon_price_by_year", [])],
         Float64[Float64(x) for x in get(d, "grid_ef_by_year", [])],
+        _get_num(d, "tax_rate", 0.0),
+        Int(get(d, "depreciation_years", 0)),
+        String(get(d, "currency", "USD")),
     )
 end

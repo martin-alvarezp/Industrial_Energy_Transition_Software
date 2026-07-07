@@ -78,6 +78,9 @@ export function toOverrides(cfg) {
     forced_builds: (cfg.forced_builds ?? []).map((f) =>
       ({ tech: f.tech, year: +f.year, mw: +f.mw })),
     capex_budget: cfg.capex_budget_musd == null ? null : cfg.capex_budget_musd * 1e6,
+    tax_rate: cfg.tax_rate ?? 0,
+    depreciation_years: cfg.depreciation_years ?? 0,
+    currency: cfg.currency ?? "USD",
   };
 }
 

@@ -40,6 +40,7 @@ export function extractPayload(site, cfg, sol, constant, scenario = "web") {
     status: sol.Status === "Optimal" ? "OPTIMAL" : String(sol.Status).toUpperCase(),
     feasible: sol.Status === "Optimal",
     horizon_years: N, base_year: cfg.base_year ?? 0,
+    currency: cfg.currency ?? "USD",
   };
   if (!meta.feasible)
     return { meta, kpis: {}, investments: [], capacity: [], cost_breakdown: [],
@@ -221,10 +222,26 @@ export function extractPayload(site, cfg, sol, constant, scenario = "web") {
 
     const carbon = cprice(y) * ge;
     const offCost = cfg.offset_price * off;
-    const total = capex + fixed + varop + energy + dcharges + carbon + offCost - exportRev;
+    // ajuste fiscal (M9): −t·deducibles − t·depreciación de inversiones nuevas
+    let tax = 0;
+    const tr = cfg.tax_rate ?? 0;
+    if (tr > 0) {
+      let dep = 0;
+      for (const tc of cands) {
+        const Dp = (cfg.depreciation_years ?? 0) > 0
+          ? cfg.depreciation_years : tc.lifetime_years;
+        for (const yp of years)
+          if (yp <= y && y < yp + Dp)
+            dep += tc.capex_per_kw * 1000 * V(`nc_${sane(tc.tech_id)}_${yp}`) / Dp;
+      }
+      tax = -tr * (fixed + varop + energy + dcharges + carbon + offCost - exportRev)
+            - tr * dep;
+    }
+    const total = capex + fixed + varop + energy + dcharges + carbon + offCost
+                  - exportRev + tax;
     cost_breakdown.push({ year: y, capex, fixed_opex: fixed, var_opex: varop,
       energy_purchases: energy, demand_charges: dcharges, carbon_cost: carbon,
-      offset_cost: offCost, export_revenue: exportRev, total,
+      offset_cost: offCost, export_revenue: exportRev, tax, total,
       salvage_credit: 0, discount_factor: +disc[y - 1].toFixed(4),
       npv: total * disc[y - 1] });
     emissions.push({ year: y, scope1: s1, scope2: s2, gross: ge, net: ne,

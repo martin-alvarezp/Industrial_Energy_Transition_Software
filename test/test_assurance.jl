@@ -195,6 +195,44 @@ end
     @test any(occursin("grid_ef_by_year", p) for p in err.problems)
 end
 
+@testset "oráculo A9: impuestos y escudo por depreciación (M9) exactos" begin
+    # compra pura, tax 25%, wacc 0: costo = 0.75 · energía (sin dep)
+    site = a_site(
+        carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy)),
+        sources = Dict(:grid_import =>
+            Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, A_TC0)),
+        demands = Dict(:electricity => Demand(:electricity, fill(10.0, 4))),
+        prices = Dict(:electricity => PriceSeries(:electricity, fill(80.0, 4))))
+    im = a_solve(site, with_config(a_cfg(2, 0.0); tax_rate = 0.25))
+    @test JuMP.objective_value(im.model) ≈ 0.75 * 10 * 8760 * 80 * 2 rtol = 1e-9
+
+    # con inversión PV (capex 1e6, dep lineal 2 años): escudo = t·5e5 por año
+    pv = Generator(:pv, "PV", :electricity, 0.0, 10.0, true,
+                   TechCosts(100.0, 0.0, 0.0, 30), fill(0.5, 4))
+    site2 = a_site(
+        carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy)),
+        sources = Dict(:grid_import =>
+            Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, A_TC0)),
+        generators = Dict(:pv => pv),
+        demands = Dict(:electricity => Demand(:electricity, fill(10.0, 4))),
+        prices = Dict(:electricity => PriceSeries(:electricity, fill(100.0, 4))))
+    cfg2 = with_config(a_cfg(2, 0.0); tax_rate = 0.25, depreciation_years = 2)
+    im2 = a_solve(site2, cfg2)
+    @test JuMP.value(im2.model[:new_capacity][:pv, 1]) ≈ 10.0 atol = 1e-6
+    # VAN = capex + 0.75·energía − 0.25·(5e5 + 5e5)
+    expected = 1e6 + 0.75 * (5 * 8760 * 100 * 2) - 0.25 * 1e6
+    @test JuMP.objective_value(im2.model) ≈ expected rtol = 1e-9
+    # el desglose cuadra con el VAN y la columna tax es el ajuste
+    r = extract_results(im2; shadow_prices = false)
+    @test sum(r.cost_breakdown.npv) ≈ JuMP.objective_value(im2.model) rtol = 1e-9
+    @test r.cost_breakdown.tax[1] ≈
+          -0.25 * (5 * 8760 * 100) - 0.25 * 5e5 rtol = 1e-9
+    # tax_rate = 0 ⇒ legacy exacto (columna tax en cero)
+    im0 = a_solve(site2, a_cfg(2, 0.0))
+    r0 = extract_results(im0; shadow_prices = false)
+    @test all(iszero, r0.cost_breakdown.tax)
+end
+
 # ─────────────────── B · INVARIANTES SOBRE EL DEMO ───────────────────
 
 @testset "invariante B1: el balance físico cierra en cada carrier·paso·año" begin

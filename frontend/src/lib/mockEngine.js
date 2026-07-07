@@ -41,6 +41,9 @@ export const DEFAULT_CONFIG = {
   renew_existing: false, // BaU renovación (M5)
   repeat_investments: false, // inversiones repetibles (M5)
   forced_builds: [], // [{tech, year (calendario), mw}] (M12)
+  tax_rate: 0, // impuesto corporativo (M9); 0 = sin impuestos
+  depreciation_years: 0, // 0 = vida útil de cada tech
+  currency: "USD", // etiqueta de display
   price_scenario: "base", // base | high_gas | high_carbon
 };
 

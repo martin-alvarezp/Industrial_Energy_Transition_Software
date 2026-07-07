@@ -1,13 +1,17 @@
 // Formateo ejecutivo (es-CL): MUSD con una decimal, toneladas con separador
 // de miles, porcentajes con una decimal.
 
+let CUR = "USD";
+/** Etiqueta de moneda vigente (meta.currency de la corrida mostrada). */
+export const setCurrency = (c) => { CUR = (c || "USD").trim() || "USD"; };
+
 export const musd = (usd, digits = 1) =>
   usd == null || Number.isNaN(usd)
     ? "—"
     : `${(usd / 1e6).toLocaleString("es-CL", {
         minimumFractionDigits: digits,
         maximumFractionDigits: digits,
-      })} MUSD`;
+      })} M${CUR}`;
 
 export const tons = (t) =>
   t == null || Number.isNaN(t)

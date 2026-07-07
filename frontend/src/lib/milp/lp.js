@@ -127,8 +127,16 @@ export function buildLP(site, cfg) {
 
   // ── objetivo ──
   const obj = {};   // var → coef
-  const add = (v, c) => { if (c) obj[v] = (obj[v] ?? 0) + c; };
   let constant = 0;
+  // impuestos (M9): deducibles × (1−t); CAPEX completo; escudo −t·dep de
+  // inversiones nuevas (renovaciones sin escudo — espejo del motor Julia)
+  const t = cfg.tax_rate ?? 0;
+  const at = 1 - t;
+  const depYears = (tech) =>
+    (cfg.depreciation_years ?? 0) > 0 ? cfg.depreciation_years : tech.lifetime_years;
+  const add = (v, c) => { if (c) obj[v] = (obj[v] ?? 0) + c; };
+  const addDed = (v, c) => add(v, c * at);          // término deducible
+  const constDed = (c) => { constant += c * at; };  // constante deducible
   const capNet = (y) => N === 1 ? cfg.emissions_cap_net_start :
     cfg.emissions_cap_net_start +
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (y - 1) / (N - 1);
@@ -137,31 +145,39 @@ export function buildLP(site, cfg) {
 
   for (const y of years) {
     const D = disc[y - 1];
-    constant += D * (fixedCharges + renewalCapex[y - 1]);
-    for (const t of cands) {
-      add(`nc_${sane(t.tech_id)}_${y}`, D * t.capex_per_kw * 1000);
+    constant += D * renewalCapex[y - 1];
+    constDed(D * fixedCharges);
+    for (const tc of cands) {
+      add(`nc_${sane(tc.tech_id)}_${y}`, D * tc.capex_per_kw * 1000);
       if (cfg.salvage_value) {
-        const frac = Math.max(0, (t.lifetime_years - (N - y + 1)) / t.lifetime_years);
-        add(`nc_${sane(t.tech_id)}_${y}`, -disc[N - 1] * t.capex_per_kw * 1000 * frac);
+        const frac = Math.max(0, (tc.lifetime_years - (N - y + 1)) / tc.lifetime_years);
+        add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * tc.capex_per_kw * 1000 * frac);
+      }
+      // escudo fiscal: −t·capex/D en la ventana de depreciación desde y
+      if (t > 0) {
+        const Dp = depYears(tc);
+        for (let yy = y; yy <= Math.min(y + Dp - 1, N); yy++)
+          add(`nc_${sane(tc.tech_id)}_${y}`,
+              -disc[yy - 1] * t * tc.capex_per_kw * 1000 / Dp);
       }
     }
-    for (const t of [...convs, ...gens, ...stors]) {
-      const a = avail(t, y);
-      constant += D * t.fixed_opex * a.k;
-      for (const v of a.ncs) add(v, D * t.fixed_opex);
-      if (t.type !== "storage")
+    for (const tc of [...convs, ...gens, ...stors]) {
+      const a = avail(tc, y);
+      constDed(D * tc.fixed_opex * a.k);
+      for (const v of a.ncs) addDed(v, D * tc.fixed_opex);
+      if (tc.type !== "storage")
         for (const s of steps)
-          add(`d_${sane(t.tech_id)}_${s}_${y}`, D * t.variable_opex * w[s - 1]);
+          addDed(`d_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
       else
         for (const s of steps)
-          add(`dc_${sane(t.tech_id)}_${s}_${y}`, D * t.variable_opex * w[s - 1]);
+          addDed(`dc_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
     }
     for (const mk of mkts) {
       const sign = mk.direction === "buy" ? 1 : -1;   // venta = ingreso
       const nm = mk.direction === "sell" && mk.scheme === "net_metering";
       if (nm) continue;                                // su ingreso va por nm_
       for (const s of steps)
-        add(`mf_${sane(mk.market_id)}_${s}_${y}`,
+        addDed(`mf_${sane(mk.market_id)}_${s}_${y}`,
             sign * D * mk.price[s - 1] * esc(mk.carrier_id, y) * w[s - 1]);
     }
     // compra implícita de combustibles SIN mercado
@@ -170,11 +186,11 @@ export function buildLP(site, cfg) {
         if (catOf[p.carrier] === "fuel" && !fuelWithMkt.has(p.carrier) &&
             site.prices?.[p.carrier])
           for (const s of steps)
-            add(`d_${sane(t.tech_id)}_${s}_${y}`,
+            addDed(`d_${sane(t.tech_id)}_${s}_${y}`,
                 D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                 p.ratio * w[s - 1]);
-    add(`ge_${y}`, D * cprice(y));
-    add(`off_${y}`, D * cfg.offset_price);
+    addDed(`ge_${y}`, D * cprice(y));
+    addDed(`off_${y}`, D * cfg.offset_price);
     // cargos por demanda (M2/M2b)
     for (const mk of buys) {
       const dc = mk.demand_charge ?? 0;
@@ -183,10 +199,10 @@ export function buildLP(site, cfg) {
       if (!(dc > 0 || (cp != null && pen > 0))) continue;
       for (let se = 1; se <= nse; se++) {
         if (cp != null) {
-          constant += D * dc * 1000 * monthsSe * cp;
-          add(`ex_${sane(mk.market_id)}_${se}_${y}`, D * pen * 1000 * monthsSe);
+          constDed(D * dc * 1000 * monthsSe * cp);
+          addDed(`ex_${sane(mk.market_id)}_${se}_${y}`, D * pen * 1000 * monthsSe);
         } else {
-          add(`pk_${sane(mk.market_id)}_${se}_${y}`, D * dc * 1000 * monthsSe);
+          addDed(`pk_${sane(mk.market_id)}_${se}_${y}`, D * dc * 1000 * monthsSe);
         }
       }
     }
@@ -202,7 +218,7 @@ export function buildLP(site, cfg) {
           paired.reduce((a, b) =>
             a + p.reduce((x, s) => x + b.price[s - 1] * esc(b.carrier_id, y) * w[s - 1], 0)
               / wsum, 0) / Math.max(paired.length, 1);
-        add(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`, -disc[y - 1] * retail);
+        addDed(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`, -disc[y - 1] * retail);
       });
     }
   }

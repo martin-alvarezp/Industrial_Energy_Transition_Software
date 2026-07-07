@@ -297,6 +297,32 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
         </div>
 
         <ForcedBuilds draft={draft} set={set} siteJson={siteJson} />
+
+        <div className="control" style={{ marginTop: 10 }}>
+          <label>Impuestos y moneda (M9)</label>
+          <div className="range-row">
+            <input type="number" min={0} max={60} step={1}
+                   value={Math.round((draft.tax_rate ?? 0) * 100)}
+                   aria-label="tasa de impuesto %"
+                   onChange={(e) => set({ tax_rate: (+e.target.value || 0) / 100 })} />
+            <span style={{ fontSize: 12 }}>% imp.</span>
+            <input type="number" min={0} step={1}
+                   value={draft.depreciation_years ?? 0}
+                   aria-label="años de depreciación"
+                   onChange={(e) => set({ depreciation_years: Math.max(0, Math.round(+e.target.value || 0)) })} />
+            <span style={{ fontSize: 12 }}>años dep.</span>
+            <input type="text" maxLength={5} style={{ width: 70 }}
+                   value={draft.currency ?? "USD"}
+                   aria-label="moneda"
+                   onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
+          </div>
+          <p className="hint">
+            costo after-tax = CAPEX + (1−t)·OPEX − t·depreciación lineal de las
+            inversiones (0 años = vida útil de cada equipo). El motor es
+            agnóstico de moneda: ingresa todos los montos en la misma y esta
+            etiqueta rotula los resultados.
+          </p>
+        </div>
       </div>
 
       <ScenarioStack siteName={siteName} draft={draft} setDraft={setDraft} />
