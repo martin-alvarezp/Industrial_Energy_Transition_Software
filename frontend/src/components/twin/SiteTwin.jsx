@@ -5,6 +5,7 @@ import EquipmentDrawer from "./EquipmentDrawer.jsx";
 import CarrierDrawer from "./CarrierDrawer.jsx";
 import MarketDrawer from "./MarketDrawer.jsx";
 import ArcDrawer from "./ArcDrawer.jsx";
+import PreflowView from "./PreflowView.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
@@ -698,6 +699,7 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
       )}
     </div>
 
+    <PreflowView siteJson={siteJson} />
     <SeriesEditor siteJson={siteJson} patchSite={patchSite} />
     </>
   );

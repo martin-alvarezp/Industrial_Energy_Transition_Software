@@ -211,8 +211,15 @@ queda aislado).
   tarjeta "Conexiones" y asignación de demanda por barra. Verificado por la API
   en vivo: el contrato de arcos valida y resuelve (mini factible OPTIMAL; el
   cableado parcial cae en islanding, como debe).
-- **Pendiente (UI):** el Sankey (`flows.js`) leería la topología en vez de
-  inferirla. Gas por arco: requiere que el combustible lleve balance nodal (ya
+- **Flujo PREVIO a optimizar (v0.9, hecho):** panel "Flujo de energía" en el
+  twin, derivado solo del gemelo (sin resolver). Botón *Diagrama* = Sankey
+  estructural del sitio con ancho = capacidad instalable (MW) — qué puede fluir
+  por dónde y a qué escala; botón *Por nodo* = balance por barra con
+  **detección de islas** (vector consumido sin fuente local ni arco entrante).
+  Es el chequeo de que la red dibujada cierra, antes de correr. Builders puros
+  (`buildStructuralFlows`/`buildNodeBalances`) validados fuera de la UI.
+- **Pendiente (UI):** el Sankey POST-solve (`flows.js buildFlows`) leería la
+  topología en vez de inferirla. Gas por arco: requiere que el combustible lleve balance nodal (ya
   ocurre con mercado de compra, M11). Limitación conocida: la demanda es una
   serie por vector, así que vive en una sola barra (no se reparte entre islas).
 

@@ -108,6 +108,16 @@ button { transition: background-color 0.12s var(--ease), border-color 0.12s var(
 .chip.status-ok { background: rgba(23, 180, 140, 0.16); border-color: rgba(23, 180, 140, 0.35); color: #8ce8c9; }
 .chip.status-bad { background: rgba(240, 104, 104, 0.15); border-color: rgba(240, 104, 104, 0.4); color: #ffb9b9; }
 
+/* flujo estructural previo a optimizar (M14) */
+.preflow-nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.preflow-node { border: 1px solid var(--grid); border-radius: 8px; padding: 10px 12px; background: var(--page); }
+.preflow-node.uncovered { border-color: rgba(240, 104, 104, 0.5); }
+.preflow-node-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.preflow-arcs { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; }
+.preflow-carriers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.preflow-carriers li { display: flex; align-items: baseline; gap: 6px; }
+.preflow-cname { font-size: 12px; font-weight: 600; color: var(--ink); min-width: 90px; }
+
 .tabs { display: flex; gap: 2px; margin-top: 12px; }
 .tab {
   appearance: none; border: none; cursor: pointer;
