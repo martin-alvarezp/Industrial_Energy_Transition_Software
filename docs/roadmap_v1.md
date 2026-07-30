@@ -202,11 +202,19 @@ queda aislado).
   por nodo; variable `arc_flow` con capacidad y η (pérdida lineal
   `entrega = η·envío`). Round-trip JSON con huellas legacy estables (sin
   topología, el sitio no gana claves). El demo da el mismo VAN al centavo.
-- **Pendiente (UI):** modo "añadir conexión" en el mapa del twin (clic entre
-  dos activos → arco), drawer para elegir vectores/capacidad/η/dirección; el
-  Sankey (`flows.js`) leería la topología en vez de inferirla. Gas por arco:
-  requiere que el combustible lleve balance nodal (ya ocurre con mercado de
-  compra, M11).
+- **UI (v0.9, hecho):** modo "añadir conexión" en el mapa del twin — se
+  conectan EQUIPOS directamente (cada equipo enchufado a un arco es su propia
+  barra; topología opt-in: sin arcos, una sola barra ≡ MVP). El recorrido se
+  **traza a mano** con vértices (no la recta automática entre dos puntos) y
+  guarda su geometría en el layout; `ArcDrawer` elige sentido (dirigido A→B o
+  bidireccional) y los vectores con capacidad/η. Flecha de sentido en el mapa,
+  tarjeta "Conexiones" y asignación de demanda por barra. Verificado por la API
+  en vivo: el contrato de arcos valida y resuelve (mini factible OPTIMAL; el
+  cableado parcial cae en islanding, como debe).
+- **Pendiente (UI):** el Sankey (`flows.js`) leería la topología en vez de
+  inferirla. Gas por arco: requiere que el combustible lleve balance nodal (ya
+  ocurre con mercado de compra, M11). Limitación conocida: la demanda es una
+  serie por vector, así que vive en una sola barra (no se reparte entre islas).
 
 ---
 

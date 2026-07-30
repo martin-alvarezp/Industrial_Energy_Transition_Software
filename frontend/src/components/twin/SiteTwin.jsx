@@ -4,6 +4,7 @@ import AddressSearch from "./AddressSearch.jsx";
 import EquipmentDrawer from "./EquipmentDrawer.jsx";
 import CarrierDrawer from "./CarrierDrawer.jsx";
 import MarketDrawer from "./MarketDrawer.jsx";
+import ArcDrawer from "./ArcDrawer.jsx";
 import SeriesEditor from "./SeriesEditor.jsx";
 import {
   TECH_TYPE_META, techColor, techGlyph, blankEquipment, upsertTech,
@@ -11,6 +12,7 @@ import {
   CARRIER_CATEGORY_META, CARRIER_PRESETS, carrierColor, blankCarrier,
   upsertCarrier, removeCarrier, MARKET_DIR_META, blankMarket, upsertMarket,
   removeMarket, carrierLabel, TECH_PRESETS, blankFromPreset,
+  blankArc, upsertArc, removeArc, hasTopology, arcEndpointLabel, setDemandNode,
 } from "../../lib/twin.js";
 import { validateTwin, listSites, saveSite, deleteSite } from "../../lib/api.js";
 import Icon, { techIconKey } from "../Icon.jsx";
@@ -26,11 +28,13 @@ const DEFAULT_CENTER = [-33.45, -70.66];   // sin layout: vista país, buscar di
 export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
                                    onLoadSite, onNewSite, apiUp, config,
                                    onRun, running, twinIgnored }) {
-  const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>"
+  const [mode, setMode] = useState(null);            // null | "draw" | "place:<id>" | "connect"
   const [draftBoundary, setDraftBoundary] = useState([]);
+  const [draftArc, setDraftArc] = useState(null);    // {from, waypoints} en modo connect
   const [drawer, setDrawer] = useState(null);        // {tech, isNew}
   const [carrierDrawer, setCarrierDrawer] = useState(null); // {draft, isNew}
   const [marketDrawer, setMarketDrawer] = useState(null);   // {draft, isNew}
+  const [arcDrawer, setArcDrawer] = useState(null);         // {draft, isNew, geometry}
   const [selectedId, setSelectedId] = useState(null);
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
@@ -43,7 +47,9 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
   useEffect(() => { listSites().then(setSiteList); }, []);
 
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && (setMode(null), setDraftBoundary([]));
+    const onKey = (e) =>
+      e.key === "Escape" &&
+      (setMode(null), setDraftBoundary([]), setDraftArc(null));
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -98,6 +104,9 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
   const onMapClick = (pos, m) => {
     if (m === "draw") {
       setDraftBoundary((b) => [...b, pos]);
+    } else if (m === "connect") {
+      // vértice del recorrido a mano (solo tras elegir el equipo de origen)
+      setDraftArc((d) => (d?.from ? { ...d, waypoints: [...d.waypoints, pos] } : d));
     } else if (m?.startsWith("place:")) {
       const techId = m.slice(6);
       setTwin((t) => ({
@@ -108,6 +117,48 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
       setMode(null);
       setSelectedId(techId);
     }
+  };
+
+  // ── conexiones (arcos, M14): dibujar recorrido entre equipos ──
+  const startConnect = () => { setMode("connect"); setDraftArc({ from: null, waypoints: [] }); };
+  const pickEndpoint = (techId) => {
+    if (!draftArc) return;
+    if (!draftArc.from) { setDraftArc({ from: techId, waypoints: [] }); return; }
+    if (techId === draftArc.from) return;   // no se conecta consigo mismo
+    const fromPos = layout.equipment[draftArc.from];
+    const toPos = layout.equipment[techId];
+    const geometry = fromPos && toPos
+      ? [fromPos, ...draftArc.waypoints, toPos] : null;
+    setArcDrawer({ draft: blankArc(draftArc.from, techId, siteJson),
+                   isNew: true, geometry });
+    setMode(null);
+    setDraftArc(null);
+  };
+  const saveArc = (arc) => {
+    const geo = arcDrawer?.geometry;
+    patch({
+      siteJson: upsertArc(siteJson, arc),
+      ...(geo ? { layout: { ...layout,
+                            arcs: { ...(layout.arcs ?? {}), [arc.arc_id]: geo } } } : {}),
+    });
+    setArcDrawer(null);
+  };
+  const deleteArc = (id) => {
+    const { [id]: _drop, ...arcsGeo } = layout.arcs ?? {};
+    patch({ siteJson: removeArc(siteJson, id),
+            layout: { ...layout, arcs: arcsGeo } });
+    setArcDrawer(null);
+  };
+  const openArc = (id) => {
+    const arc = (siteJson.arcs ?? []).find((a) => a.arc_id === id);
+    if (arc) setArcDrawer({ draft: { ...arc }, isNew: false,
+                            geometry: layout.arcs?.[id] });
+  };
+  // opciones de nodo para la demanda: barra común + cada equipo enchufado a un arco
+  const nodeOptions = () => {
+    const eps = [...new Set((siteJson.arcs ?? []).flatMap((a) => [a.from, a.to]))];
+    return [{ id: "", label: "barra común (main)" },
+            ...eps.map((id) => ({ id, label: arcEndpointLabel(siteJson, id) }))];
   };
 
   const finishBoundary = () => {
@@ -215,6 +266,14 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
             · Esc para cancelar
           </div>
         )}
+        {mode === "connect" && (
+          <div className="mode-banner">
+            {!draftArc?.from
+              ? "Conexión: haz click en el equipo de ORIGEN"
+              : `Desde ${arcEndpointLabel(siteJson, draftArc.from)}: click en el mapa para trazar vértices (${draftArc.waypoints.length}) · click en el equipo de DESTINO para cerrar`}
+            {" · Esc para cancelar"}
+          </div>
+        )}
         <TwinMap
           center={layout.center ?? DEFAULT_CENTER}
           zoom={layout.center ? 17 : 5}
@@ -222,13 +281,18 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
           drawing={mode === "draw"} draftBoundary={draftBoundary}
           equipmentPositions={layout.equipment}
           technologies={siteJson.technologies}
+          carriers={siteJson.carriers}
+          arcs={siteJson.arcs ?? []} arcGeometry={layout.arcs ?? {}}
+          draftArc={draftArc}
           selectedId={selectedId} mode={mode}
           onMapClick={onMapClick}
-          onSelect={(id) => {
+          onSelect={(id, kind) => {
+            if (kind === "arc") { openArc(id); return; }
             setSelectedId(id);
             const t = siteJson.technologies.find((x) => x.tech_id === id);
             t && setDrawer({ tech: t, isNew: false });
           }}
+          onPickEndpoint={pickEndpoint}
           onMove={(id, pos) =>
             patchLayout({ equipment: { ...layout.equipment, [id]: pos } })}
           mapRef={mapRef}
@@ -481,6 +545,68 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
         </div>
 
         <div className="card">
+          <div className="card-head">
+            <h3 className="card-title">
+              Conexiones ({(siteJson.arcs ?? []).length})
+            </h3>
+          </div>
+          <p className="card-sub">
+            Traza arcos entre equipos ubicados en el mapa para definir qué está
+            conectado con qué. Sin arcos, todo comparte una sola barra (el
+            comportamiento actual). Al crear el primer arco cada equipo
+            conectado pasa a ser su propia barra: hay que cablear la red y la
+            demanda (las partes sin conectar quedan aisladas — así se modela lo
+            off-grid).
+          </p>
+          <div className="equip-list">
+            {(siteJson.arcs ?? []).map((a) => (
+              <div key={a.arc_id} className="equip-row">
+                <span className="equip-dot"
+                      style={{ "--c": carrierColor(siteJson.carriers.find(
+                        (c) => c.carrier_id === a.ports?.[0]?.carrier)) }}>
+                  {a.directed ? "→" : "↔"}
+                </span>
+                <button className="equip-name" onClick={() => openArc(a.arc_id)}>
+                  {a.name || a.arc_id}
+                  <span className="equip-sub">
+                    {arcEndpointLabel(siteJson, a.from)}
+                    {a.directed ? " → " : " ↔ "}
+                    {arcEndpointLabel(siteJson, a.to)}
+                    {" · "}{a.ports.map((p) => p.carrier).join(", ")}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="equip-new">
+            <button className="chart-toggle" onClick={startConnect}
+                    disabled={placedCount < 2 || mode === "connect"}>
+              + Conexión (arco entre equipos)
+            </button>
+            {placedCount < 2 && (
+              <p className="hint">ubica al menos 2 equipos en el mapa para conectarlos</p>
+            )}
+          </div>
+          {hasTopology(siteJson) && Object.keys(siteJson.demands ?? {}).length > 0 && (
+            <div className="control" style={{ marginTop: 10 }}>
+              <label>Dónde se consume cada demanda (barra)</label>
+              {Object.keys(siteJson.demands ?? {}).map((carrier) => (
+                <div className="range-row" key={carrier} style={{ marginBottom: 6 }}>
+                  <span className="equip-sub" style={{ minWidth: 90 }}>{carrier}</span>
+                  <select value={siteJson.demand_nodes?.[carrier] ?? ""}
+                          onChange={(e) =>
+                            patchSite((sj) => setDemandNode(sj, carrier, e.target.value))}>
+                    {nodeOptions().map((o) => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card">
           <div style={{ display: "flex", gap: 8 }}>
             <button className="chart-toggle" onClick={doValidate}
                     disabled={validating}>
@@ -561,6 +687,13 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
           siteJson={siteJson}
           onSave={saveMarket} onDelete={deleteMarket}
           onClose={() => setMarketDrawer(null)}
+        />
+      )}
+      {arcDrawer && (
+        <ArcDrawer
+          draft={arcDrawer.draft} isNew={arcDrawer.isNew} siteJson={siteJson}
+          onSave={saveArc} onDelete={deleteArc}
+          onClose={() => { setArcDrawer(null); setDraftArc(null); }}
         />
       )}
     </div>

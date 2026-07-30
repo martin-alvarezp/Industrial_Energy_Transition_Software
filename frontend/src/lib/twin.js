@@ -462,10 +462,14 @@ export function upsertTech(siteJson, tech) {
 }
 
 export function removeTech(siteJson, techId) {
-  const out = {
+  // al borrar un equipo caen los arcos que lo tocan (M14) y se recalculan nodos
+  const arcs = (siteJson.arcs ?? []).filter(
+    (a) => a.from !== techId && a.to !== techId);
+  const out = applyTopology({
     ...siteJson,
     technologies: siteJson.technologies.filter((t) => t.tech_id !== techId),
-  };
+    arcs,
+  });
   if (siteJson.generation_profiles?.[techId]) {
     const { [techId]: _, ...rest } = siteJson.generation_profiles;
     out.generation_profiles = rest;
@@ -632,6 +636,101 @@ export function marketProblems(draft, siteJson, isNew) {
   return p;
 }
 
+// ── Topología de red: nodos y arcos (roadmap M14) ──────────────────────────
+// Los arcos conectan EQUIPOS directamente: cada equipo enchufado a un arco es
+// su propia barra (node = tech_id). El flujo puede ser dirigido (from→to) o
+// bidireccional, con uno o más vectores, cada uno con su capacidad (MW) y su
+// eficiencia de transporte (η, entrega = η·envío). La topología es OPT-IN: sin
+// arcos el sitio es una sola barra (placa de cobre ≡ MVP). La geometría del
+// recorrido (vértices dibujados a mano) vive en el layout, no en el modelo.
+
+export const ARC_CARRIER_CATS = ["energy", "heat", "cooling", "fuel"];
+
+const techById = (siteJson, id) =>
+  siteJson.technologies.find((t) => t.tech_id === id);
+
+/** Vectores que un arco puede transportar (con balance nodal o combustible). */
+export const arcCarrierOptions = (siteJson) =>
+  siteJson.carriers.filter((c) => ARC_CARRIER_CATS.includes(c.category));
+
+export const arcEndpointLabel = (siteJson, id) =>
+  techById(siteJson, id)?.name ?? id;
+
+/** Arco nuevo entre dos equipos, listo para el drawer. */
+export function blankArc(from, to, siteJson) {
+  const c = arcCarrierOptions(siteJson)[0]?.carrier_id ?? "electricity";
+  return {
+    arc_id: "", name: "", from, to, directed: true,
+    ports: [{ carrier: c, capacity: null, efficiency: 1 }],
+  };
+}
+
+/**
+ * Deriva el `node` de cada equipo a partir de los arcos: un equipo enchufado a
+ * algún arco es su propia barra (node = tech_id); el resto queda en la barra
+ * común (:main, sin clave). Sin arcos, el sitio recupera su forma canónica del
+ * MVP (sin claves de topología) — la huella no cambia.
+ */
+export function applyTopology(siteJson) {
+  const arcs = siteJson.arcs ?? [];
+  const endpoints = new Set(arcs.flatMap((a) => [a.from, a.to]));
+  const technologies = siteJson.technologies.map((t) => {
+    if (endpoints.has(t.tech_id))
+      return t.node === t.tech_id ? t : { ...t, node: t.tech_id };
+    if (t.node == null) return t;
+    const { node: _n, ...rest } = t;
+    return rest;
+  });
+  const out = { ...siteJson, technologies };
+  if (arcs.length === 0) { delete out.arcs; delete out.demand_nodes; }
+  else out.arcs = arcs;
+  return out;
+}
+
+export function upsertArc(siteJson, arc) {
+  const arcs = (siteJson.arcs ?? []).filter((a) => a.arc_id !== arc.arc_id);
+  arcs.push(arc);
+  arcs.sort((a, b) => a.arc_id.localeCompare(b.arc_id));
+  return applyTopology({ ...siteJson, arcs });
+}
+
+export const removeArc = (siteJson, id) =>
+  applyTopology({ ...siteJson, arcs: (siteJson.arcs ?? []).filter((a) => a.arc_id !== id) });
+
+/** Asigna (o limpia, con node vacío) el nodo donde se consume una demanda. */
+export function setDemandNode(siteJson, carrier, node) {
+  const dn = { ...(siteJson.demand_nodes ?? {}) };
+  if (node) dn[carrier] = node; else delete dn[carrier];
+  return { ...siteJson, demand_nodes: Object.keys(dn).length ? dn : undefined };
+}
+
+/** ¿El sitio tiene topología activa (al menos un arco)? */
+export const hasTopology = (siteJson) => (siteJson.arcs ?? []).length > 0;
+
+/** Validación ligera de un arco (espejo de validate_site, M14). */
+export function arcProblems(draft, siteJson, isNew) {
+  const p = [];
+  if (draft.from === draft.to)
+    p.push("un arco no puede conectar un equipo consigo mismo");
+  if (!techById(siteJson, draft.from)) p.push("el extremo de origen no existe");
+  if (!techById(siteJson, draft.to)) p.push("el extremo de destino no existe");
+  if ((draft.ports ?? []).length === 0)
+    p.push("un arco necesita al menos un vector");
+  for (const port of draft.ports ?? []) {
+    if (!port.carrier) p.push("cada vector del arco necesita un carrier");
+    if (port.capacity != null && port.capacity !== "" && !(+port.capacity >= 0))
+      p.push(`la capacidad de '${port.carrier}' debe ser ≥ 0`);
+    if (!(port.efficiency > 0 && port.efficiency <= 1))
+      p.push(`la eficiencia de '${port.carrier}' debe estar en (0,1]`);
+  }
+  if (isNew) {
+    const id = draft.arc_id || slugId(`${draft.from}_${draft.to}`, []);
+    if ((siteJson.arcs ?? []).some((a) => a.arc_id === id))
+      p.push(`ya existe una conexión '${id}' — cambia el nombre`);
+  }
+  return p;
+}
+
 // ── Pasos de punta por estación (roadmap M6, acoplado a M2) ────────────────
 // El año-plantilla de días promedio SUBESTIMA puntas (§8.3): sin esto, los
 // cargos por demanda dan falsa precisión. Cada estación gana un paso extra
@@ -741,6 +840,14 @@ export function layoutToGeoJSON(l) {
     features.push({ type: "Feature", properties: { role: "equipment", tech_id },
                     geometry: { type: "Point", coordinates: [ln, la] } });
   }
+  // recorrido a mano de cada arco (M14): LineString de vértices [lng,lat]. Es
+  // presentación pura — el modelo solo ve from/to en site_json.arcs.
+  for (const [arc_id, pts] of Object.entries(l.arcs ?? {})) {
+    if (!pts || pts.length < 2) continue;
+    features.push({ type: "Feature", properties: { role: "arc", arc_id },
+                    geometry: { type: "LineString",
+                                coordinates: pts.map(([la, ln]) => [ln, la]) } });
+  }
   return {
     type: "FeatureCollection",
     properties: { address: l.address ?? null,
@@ -753,7 +860,7 @@ export function geoJSONToLayout(g) {
   const out = { address: g?.properties?.address ?? null,
                 center: g?.properties?.center
                   ? [g.properties.center[1], g.properties.center[0]] : null,
-                boundary: null, equipment: {} };
+                boundary: null, equipment: {}, arcs: {} };
   for (const f of g?.features ?? []) {
     if (f.properties?.role === "boundary" && f.geometry?.type === "Polygon") {
       const ring = f.geometry.coordinates[0] ?? [];
@@ -762,6 +869,9 @@ export function geoJSONToLayout(g) {
     } else if (f.properties?.role === "equipment" && f.geometry?.type === "Point") {
       const [ln, la] = f.geometry.coordinates;
       out.equipment[f.properties.tech_id] = [la, ln];
+    } else if (f.properties?.role === "arc" && f.geometry?.type === "LineString") {
+      out.arcs[f.properties.arc_id] =
+        (f.geometry.coordinates ?? []).map(([ln, la]) => [la, ln]);
     }
   }
   return out;
@@ -786,5 +896,7 @@ export function serializedPreview(siteJson) {
     emission_factors: siteJson.emission_factors,
     markets: (siteJson.markets ?? []).map((mk) =>
       ({ ...mk, price: short(mk.price) })),
+    ...(hasTopology(siteJson) ? { arcs: siteJson.arcs,
+                                  demand_nodes: siteJson.demand_nodes } : {}),
   };
 }
