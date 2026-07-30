@@ -22,5 +22,7 @@ jobs:
         working-directory: frontend
       - run: npm run verify:wasm   # motor JS ≡ motor Julia (fixtures dorados)
         working-directory: frontend
+      - run: npm run verify:flows  # Sankey por barra ≡ convención del motor
+        working-directory: frontend
       - run: npm run build
         working-directory: frontend

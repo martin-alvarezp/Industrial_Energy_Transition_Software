@@ -33,6 +33,13 @@ function groupKey(t) {
  * mode: "component" (cada equipo un nodo) | "technology" (agrupado por firma).
  * Nodos: mercados/compras → carriers → equipos → carriers → demandas/ventas,
  * con Pérdidas explícitas (conversión y round-trip de storage).
+ *
+ * Con topología (M14) y flujos de arco en el dispatch, cada vector se separa
+ * POR BARRA (nodo) y los arcos son puentes entre barras con sus pérdidas de
+ * transporte — resultados y gemelo hablan el mismo idioma. Sin arcos (o sin
+ * flujos de arco, p.ej. el motor web), colapsa a la vista agregada de siempre;
+ * también cae al agregado si algún arco bidireccional se invirtió durante el
+ * año (ver `reversed`), porque ahí el detalle por barra no sería fiel.
  */
 export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
   const w = siteJson.timesteps.map((t) => t.weight_hours);
@@ -46,8 +53,33 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
 
   const carriers = Object.fromEntries(
     siteJson.carriers.map((c) => [c.carrier_id, c]));
+  const techById = Object.fromEntries(
+    siteJson.technologies.map((t) => [t.tech_id, t]));
+  const arcs = siteJson.arcs ?? [];
+  const arcRows = rows.some(
+    (r) => typeof r.flow === "string" && r.flow.startsWith("arc__"));
+  // Un arco bidireccional que se INVIRTIÓ durante el año no tiene
+  // representación anual fiel: el neto cancela los sentidos opuestos (y los
+  // dos sentidos a la vez serían un ciclo, que el Sankey no admite). El
+  // detalle por barra mentiría —y el residual de demanda se comería el error
+  // en silencio—, así que en ese caso se cae al agregado, exacto en total.
+  // energía transportada por el enlace: el gross de los bidireccionales, o
+  // |neto| cuando el sentido es único (ahí gross ≡ |neto|)
+  const arcGross = (a, p) => Math.max(
+    E(a.arc_id, `arc__${p.carrier}__gross`),
+    Math.abs(E(a.arc_id, `arc__${p.carrier}`)));
+  const reversed = arcs.some((a) => (a.ports ?? []).some(
+    (p) => arcGross(a, p) > Math.abs(E(a.arc_id, `arc__${p.carrier}`)) + MIN_MWH));
+  const topo = arcs.length > 0 && arcRows && !reversed;
+  const nodeOf = (id) => (topo ? (techById[id]?.node ?? "main") : "main");
+  const demandNodeOf = (c) => (topo ? (siteJson.demand_nodes?.[c] ?? "main") : "main");
+  const busName = Object.fromEntries(
+    (siteJson.nodes ?? []).map((n) => [n.node_id, n.name || n.node_id]));
+  const suffix = (n) => (topo && n !== "main" ? ` · ${busName[n] ?? n}` : "");
+
   const nodes = [];   // {name, color}
   const index = {};
+  const carrierIdx = new Set();   // índices que son nodos de vector (para el residual)
   const nodeId = (key, name, color) => {
     if (index[key] == null) {
       index[key] = nodes.length;
@@ -55,19 +87,17 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
     }
     return index[key];
   };
-  const carrierNode = (cid) =>
-    nodeId(`c:${cid}`, carrierLabel(carriers[cid]) || cid,
-           carrierColor(carriers[cid]));
+  const carrierNode = (n, cid) => {
+    const i = nodeId(`c:${n}:${cid}`,
+                     (carrierLabel(carriers[cid]) || cid) + suffix(n),
+                     carrierColor(carriers[cid]));
+    carrierIdx.add(i);
+    return i;
+  };
   const linkAcc = {};
-  const inflow = {}, outflow = {};   // balance por carrier (para demandas)
-  const link = (s, t, v, cid = null) => {
+  const link = (s, t, v) => {
     if (!(v > MIN_MWH)) return;
-    const k = `${s}→${t}`;
-    linkAcc[k] = (linkAcc[k] ?? 0) + v;
-    if (cid != null) {
-      if (t === carrierNode(cid)) inflow[cid] = (inflow[cid] ?? 0) + v;
-      if (s === carrierNode(cid)) outflow[cid] = (outflow[cid] ?? 0) + v;
-    }
+    linkAcc[`${s}→${t}`] = (linkAcc[`${s}→${t}`] ?? 0) + v;
   };
 
   const techNode = (t) => {
@@ -78,68 +108,103 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
     return nodeId(`t:${t.tech_id}`, t.name, techColor(t));
   };
 
-  const grid = siteJson.technologies.find((t) => t.tech_id === "grid_import");
+  const grid = techById["grid_import"];
   const gridCarrier = grid?.output_carrier ?? "electricity";
+  const gridNode = nodeOf("grid_import");
 
   for (const t of siteJson.technologies) {
+    const n = nodeOf(t.tech_id);
     if (t.type === "converter") {
       const e = E(t.tech_id, "output");
       if (!(e > MIN_MWH)) continue;
-      const n = techNode(t);
+      const tn = techNode(t);
       const p = converterPorts(t);
       let ein = 0, eout = 0;
       for (const port of p.inputs) {
         const v = e * port.ratio;
         ein += v;
-        link(carrierNode(port.carrier), n, v, port.carrier);
+        link(carrierNode(n, port.carrier), tn, v);
         // combustibles: la compra entra al carrier desde su mercado
         if (carriers[port.carrier]?.category === "fuel")
-          link(nodeId(`m:${port.carrier}`,
+          link(nodeId(`m:${n}:${port.carrier}`,
                       `Compra de ${carrierLabel(carriers[port.carrier])}`,
                       "#7a6120"),
-               carrierNode(port.carrier), v, port.carrier);
+               carrierNode(n, port.carrier), v);
       }
       for (const port of p.outputs) {
         const v = e * port.ratio;
         eout += v;
-        link(n, carrierNode(port.carrier), v, port.carrier);
+        link(tn, carrierNode(n, port.carrier), v);
       }
-      if (ein - eout > MIN_MWH) link(n, nodeId("loss", LOSS, "#8a8f4a"), ein - eout);
+      if (ein - eout > MIN_MWH) link(tn, nodeId("loss", LOSS, "#8a8f4a"), ein - eout);
     } else if (t.type === "generator") {
       const e = E(t.tech_id, "output");
-      if (e > MIN_MWH) link(techNode(t), carrierNode(t.output_carrier), e,
-                            t.output_carrier);
+      if (e > MIN_MWH) link(techNode(t), carrierNode(n, t.output_carrier), e);
     } else if (t.type === "storage") {
       // en energía ANUAL el storage es neutro salvo sus pérdidas de
       // round-trip (el SOC vuelve al inicio): mostrar carga y descarga
       // duplicaría la energía ciclada y crearía un ciclo en el grafo.
-      // El throughput/ciclos vive en Ingeniería de planta.
       const ch = E(t.tech_id, "charge"), dis = E(t.tech_id, "discharge");
       const cid = t.output_carrier ?? t.input_carrier;
       const loss = ch - dis;
       if (loss > MIN_MWH) {
-        const n = techNode(t);
-        link(carrierNode(cid), n, loss, cid);
-        link(n, nodeId("loss", LOSS, "#8a8f4a"), loss);
+        const tn = techNode(t);
+        link(carrierNode(n, cid), tn, loss);
+        link(tn, nodeId("loss", LOSS, "#8a8f4a"), loss);
       }
     }
   }
 
+  // red: import/export en la barra de la conexión
   const imp = E("grid", "import"), exp = E("grid", "export");
   if (imp > MIN_MWH)
-    link(nodeId("m:grid_buy", "Compra de red", "#2b62c4"),
-         carrierNode(gridCarrier), imp, gridCarrier);
+    link(nodeId(`m:${gridNode}:grid_buy`, "Compra de red", "#2b62c4"),
+         carrierNode(gridNode, gridCarrier), imp);
   if (exp > MIN_MWH)
-    link(carrierNode(gridCarrier),
-         nodeId("m:grid_sell", "Venta a red", "#3c7a44"), exp, gridCarrier);
+    link(carrierNode(gridNode, gridCarrier),
+         nodeId(`m:${gridNode}:grid_sell`, "Venta a red", "#3c7a44"), exp);
 
-  // demandas = residual del balance de cada carrier (cierra por construcción)
+  // arcos (M14): puentes entre barras con pérdidas de transporte explícitas
+  for (const a of topo ? arcs : []) {
+    for (const port of a.ports ?? []) {
+      const net = E(a.arc_id, `arc__${port.carrier}`);
+      const mag = Math.abs(net);
+      if (!(mag > MIN_MWH)) continue;
+      const [from, to] = net >= 0 ? [a.from, a.to] : [a.to, a.from];
+      const delivered = mag * (port.efficiency ?? 1);
+      const src = carrierNode(from, port.carrier);
+      link(src, carrierNode(to, port.carrier), delivered);
+      if (mag - delivered > MIN_MWH)
+        link(src, nodeId("loss", LOSS, "#8a8f4a"), mag - delivered);
+    }
+  }
+  // agregado con arcos: no hay barras entre las que tender un puente, pero la
+  // pérdida de transporte es física y tiene que SALIR del vector — si no, el
+  // residual se la comería y la demanda saldría inflada
+  for (const a of !topo && arcRows ? arcs : []) {
+    for (const port of a.ports ?? []) {
+      const loss = arcGross(a, port) * (1 - (port.efficiency ?? 1));
+      if (loss > MIN_MWH)
+        link(carrierNode("main", port.carrier),
+             nodeId("loss", LOSS, "#8a8f4a"), loss);
+    }
+  }
+
+  // demandas = residual del balance de cada (barra, vector) — cierra por
+  // construcción; el residual se toma en la barra donde vive la demanda
+  const inflow = {}, outflow = {};
+  for (const [k, v] of Object.entries(linkAcc)) {
+    const [s, t] = k.split("→").map(Number);
+    if (carrierIdx.has(t)) inflow[t] = (inflow[t] ?? 0) + v;
+    if (carrierIdx.has(s)) outflow[s] = (outflow[s] ?? 0) + v;
+  }
   for (const cid of Object.keys(siteJson.demands ?? {})) {
-    const v = (inflow[cid] ?? 0) - (outflow[cid] ?? 0);
+    const key = `c:${demandNodeOf(cid)}:${cid}`;
+    const idx = index[key];
+    if (idx == null) continue;
+    const v = (inflow[idx] ?? 0) - (outflow[idx] ?? 0);
     if (v > MIN_MWH)
-      link(carrierNode(cid),
-           nodeId(`d:${cid}`, `Demanda ${carrierLabel(carriers[cid])}`, "#9aa39f"),
-           v);
+      link(idx, nodeId(`d:${cid}`, `Demanda ${carrierLabel(carriers[cid])}`, "#9aa39f"), v);
   }
 
   const links = Object.entries(linkAcc).map(([k, value]) => {

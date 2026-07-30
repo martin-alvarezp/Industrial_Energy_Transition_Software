@@ -218,8 +218,24 @@ queda aislado).
   **detección de islas** (vector consumido sin fuente local ni arco entrante).
   Es el chequeo de que la red dibujada cierra, antes de correr. Builders puros
   (`buildStructuralFlows`/`buildNodeBalances`) validados fuera de la UI.
-- **Pendiente (UI):** el Sankey POST-solve (`flows.js buildFlows`) leería la
-  topología en vez de inferirla. Gas por arco: requiere que el combustible lleve balance nodal (ya
+- **Sankey POST-solve por barra (v0.9, hecho):** el motor emite el flujo NETO
+  de cada arco por vector en el dispatch (`extract_dispatch`: tech=arc_id,
+  flow=`arc__<carrier>`), y `buildFlows` separa cada vector POR BARRA y dibuja
+  los arcos como puentes con sus pérdidas de transporte explícitas — resultados
+  y gemelo hablan el mismo idioma. Verificado contra el motor: con η=0.5 el
+  dispatch publica los 20 MW ENVIADOS (la convención del balance nodal mide el
+  arco en el emisor) y el Sankey reparte 87 600 MWh entregados + 87 600 de
+  pérdida, con la demanda de la barra destino igual a la real.
+  **Arco bidireccional que se invierte durante el año:** el neto anual
+  cancelaría los sentidos opuestos (y dibujar los dos sería un ciclo, que el
+  Sankey no admite), así que el arco publica además `arc__<carrier>__gross` y
+  `buildFlows` cae al agregado en ese caso — cargando igual las pérdidas de
+  transporte, porque si no el residual de demanda se las comería y la demanda
+  saldría inflada (era el modo de falla silencioso: el diagrama cierra por
+  construcción y por eso un reparto mal hecho no se ve). Mismo fallback sin
+  arcos o sin flujos de arco (p.ej. el motor web). Cubierto por
+  `npm run verify:flows` (2 casos) + dispatch de arcos en `test_topology.jl`.
+  Gas por arco: requiere que el combustible lleve balance nodal (ya
   ocurre con mercado de compra, M11). Limitación conocida: la demanda es una
   serie por vector, así que vive en una sola barra (no se reparte entre islas).
 

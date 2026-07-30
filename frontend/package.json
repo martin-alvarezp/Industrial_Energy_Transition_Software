@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "verify:twin": "node scripts/twin_e2e.mjs",
     "verify:e2e": "node scripts/verify_e2e.mjs",
+    "verify:flows": "node scripts/verify_flows.mjs",
     "verify:wasm": "node scripts/verify_wasm.mjs"
   },
   "dependencies": {
