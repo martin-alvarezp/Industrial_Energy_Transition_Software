@@ -130,6 +130,12 @@ function site_json(site::Site)
     end
     sort!(techs; by = t -> t.tech_id)
 
+    # nodo del activo (M14) sólo si no es :main — huellas legacy estables
+    techs = [begin
+            n = get(site.node_of, Symbol(t.tech_id), DEFAULT_NODE)
+            n == DEFAULT_NODE ? t : merge(t, (node = String(n),))
+        end for t in techs]
+
     # level/color solo si están definidos: mantiene la forma canónica (y la
     # huella site_version) de los sitios que no usan estos campos de display
     carriers = [begin
@@ -164,23 +170,50 @@ function site_json(site::Site)
                  if !isempty(c.availability)))),
         emission_factors = factors,
     )
-    isempty(site.markets) && return base   # clave ausente = huella legacy
+    result = base
 
-    mkts = [(market_id = String(mk.id), name = mk.name,
-             carrier_id = String(mk.carrier), direction = String(mk.direction),
-             price = mk.price,
-             max_power = isfinite(mk.max_power) ? mk.max_power : nothing,
-             max_annual = isfinite(mk.max_annual) ? mk.max_annual : nothing,
-             emission_factor = mk.emission_factor,
-             connection = mk.connection == Symbol("") ? nothing : String(mk.connection),
-             demand_charge = mk.demand_charge == 0.0 ? nothing : mk.demand_charge,
-             contracted_power = isfinite(mk.contracted_power) ? mk.contracted_power : nothing,
-             excess_penalty = mk.excess_penalty == 0.0 ? nothing : mk.excess_penalty,
-             scheme = mk.scheme == :billing ? nothing : String(mk.scheme),
-             netting = mk.netting == :year ? nothing : String(mk.netting))
-            for mk in values(site.markets)]
-    sort!(mkts; by = x -> x.market_id)
-    return merge(base, (markets = mkts,))
+    # mercados (M11): clave ausente = huella legacy
+    if !isempty(site.markets)
+        mkts = [(market_id = String(mk.id), name = mk.name,
+                 carrier_id = String(mk.carrier), direction = String(mk.direction),
+                 price = mk.price,
+                 max_power = isfinite(mk.max_power) ? mk.max_power : nothing,
+                 max_annual = isfinite(mk.max_annual) ? mk.max_annual : nothing,
+                 emission_factor = mk.emission_factor,
+                 connection = mk.connection == Symbol("") ? nothing : String(mk.connection),
+                 demand_charge = mk.demand_charge == 0.0 ? nothing : mk.demand_charge,
+                 contracted_power = isfinite(mk.contracted_power) ? mk.contracted_power : nothing,
+                 excess_penalty = mk.excess_penalty == 0.0 ? nothing : mk.excess_penalty,
+                 scheme = mk.scheme == :billing ? nothing : String(mk.scheme),
+                 netting = mk.netting == :year ? nothing : String(mk.netting))
+                for mk in values(site.markets)]
+        sort!(mkts; by = x -> x.market_id)
+        result = merge(result, (markets = mkts,))
+    end
+
+    # topología (M14): nodos/arcos/demanda-por-nodo sólo si están declarados —
+    # un sitio sin topología conserva su forma canónica y su huella legacy
+    if !isempty(site.nodes)
+        nds = [(node_id = String(n.id), name = n.name) for n in values(site.nodes)]
+        sort!(nds; by = x -> x.node_id)
+        result = merge(result, (nodes = nds,))
+    end
+    if !isempty(site.arcs)
+        arcs = [(arc_id = String(a.id), name = a.name,
+                 from = String(a.from), to = String(a.to), directed = a.directed,
+                 ports = [(carrier = String(p.carrier),
+                           capacity = isfinite(p.capacity) ? p.capacity : nothing,
+                           efficiency = p.efficiency) for p in a.ports])
+                for a in values(site.arcs)]
+        sort!(arcs; by = x -> x.arc_id)
+        result = merge(result, (arcs = arcs,))
+    end
+    if !isempty(site.demand_node)
+        dn = (; (k => String(site.demand_node[k])
+                 for k in sort!(collect(keys(site.demand_node))))...)
+        result = merge(result, (demand_nodes = dn,))
+    end
+    return result
 end
 
 """
@@ -238,9 +271,14 @@ function site_from_json(obj; default_name::AbstractString = "twin")
     converters = Dict{Symbol,Converter}()
     generators = Dict{Symbol,Generator}()
     storages   = Dict{Symbol,Storage}()
+    node_of    = Dict{Symbol,Symbol}()          # M14: tech_id → nodo (si != :main)
     for t in _twin_req(obj, :technologies, "el sitio")
         id = Symbol(_twin_req(t, :tech_id, "technologies"))
         ctx = "technologies[$id]"
+        let nd = _twin_get(t, :node)
+            nd === nothing || nd == "" || nd == String(DEFAULT_NODE) ||
+                (node_of[id] = Symbol(nd))
+        end
         tname = String(something(_twin_get(t, :name), String(id)))
         kind = Symbol(_twin_req(t, :type, ctx))
         inc_raw = _twin_get(t, :input_carrier)
@@ -357,8 +395,51 @@ function site_from_json(obj; default_name::AbstractString = "twin")
         end
     end
 
+    # ── topología de red (M14): nodos, arcos y demanda por nodo ──
+    nodes = Dict{Symbol,Node}()
+    nodes_raw = _twin_get(obj, :nodes)
+    if nodes_raw !== nothing
+        for n in nodes_raw
+            nid = Symbol(_twin_req(n, :node_id, "nodes"))
+            nodes[nid] = Node(nid, String(something(_twin_get(n, :name), String(nid))))
+        end
+    end
+
+    arcs = Dict{Symbol,Arc}()
+    arcs_raw = _twin_get(obj, :arcs)
+    if arcs_raw !== nothing
+        for a in arcs_raw
+            aid = Symbol(_twin_req(a, :arc_id, "arcs"))
+            actx = "arcs[$aid]"
+            ports = ArcPort[]
+            for p in _twin_req(a, :ports, actx)
+                cap_raw = _twin_get(p, :capacity)
+                eff_raw = _twin_get(p, :efficiency)
+                push!(ports, ArcPort(
+                    Symbol(_twin_req(p, :carrier, "$actx.ports")),
+                    cap_raw === nothing ? Inf : _twin_num(cap_raw, :capacity, actx),
+                    eff_raw === nothing ? 1.0 : _twin_num(eff_raw, :efficiency, actx)))
+            end
+            dir_raw = _twin_get(a, :directed)
+            arcs[aid] = Arc(aid,
+                String(something(_twin_get(a, :name), String(aid))),
+                Symbol(_twin_req(a, :from, actx)), Symbol(_twin_req(a, :to, actx)),
+                dir_raw === nothing ? false : _bool(dir_raw, "$actx.directed"),
+                ports)
+        end
+    end
+
+    demand_node = Dict{Symbol,Symbol}()
+    dn_raw = _twin_get(obj, :demand_nodes)
+    if dn_raw !== nothing
+        for (k, v) in pairs(dn_raw)
+            demand_node[Symbol(k)] = Symbol(v)
+        end
+    end
+
     return Site(name, steps, carriers, sources, converters, generators,
-                storages, demands, prices, factors, markets)
+                storages, demands, prices, factors, markets,
+                nodes, arcs, node_of, demand_node)
 end
 
 """

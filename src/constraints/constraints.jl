@@ -16,6 +16,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_generator_constraints!(m, sets, params)
     add_storage_constraints!(m, sets, params, site)
     add_grid_constraints!(m, sets, params)
+    add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)
     return m
 end

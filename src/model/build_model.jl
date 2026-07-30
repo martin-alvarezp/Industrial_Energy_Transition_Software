@@ -44,5 +44,6 @@ function expected_variable_count(sets::ModelSets)
            length(sets.candidates) * Y * 2 +       # new_capacity + build
            length(sets.storages) * S * Y * 3 +     # soc, charge, discharge
            length(sets.markets) * S * Y +          # market_flow
+           length(sets.arc_flows) * S * Y +        # arc_flow (M14; 0 sin arcos)
            Y * 3                                   # offset_buy, gross, net
 end

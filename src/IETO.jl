@@ -38,6 +38,7 @@ include("constraints/capacity.jl")
 include("constraints/generators.jl")
 include("constraints/storage.jl")
 include("constraints/grid.jl")
+include("constraints/arcs.jl")
 include("constraints/emissions.jl")
 include("constraints/constraints.jl")
 
@@ -65,7 +66,9 @@ export Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
        PriceSeries, EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts,
        primary_input, primary_output, reference_efficiency, is_multiport,
        CARRIER_CATEGORIES, BALANCED_CATEGORIES, is_balanced,
-       Market, effective_markets
+       Market, effective_markets,
+       Node, Arc, ArcPort, DEFAULT_NODE, tech_node, demand_node_of,
+       site_nodes, arc_links
 # core API
 export load_site, load_scenario_config, load_and_validate,
        validate_site, validate_scenario, SchemaError, ValidationError,
@@ -77,7 +80,7 @@ export build_model, build_sets, build_parameters, add_variables!, set_objective!
 # constraints
 export add_constraints!, add_carrier_balance!,
        add_capacity_constraints!, add_generator_constraints!,
-       add_storage_constraints!, add_grid_constraints!,
+       add_storage_constraints!, add_grid_constraints!, add_arc_constraints!,
        add_emissions_constraints!, net_cap_shadow_prices
 # solve + results
 export SolverConfig, configure_solver!, solve!, run_scenario, apply_scenario,

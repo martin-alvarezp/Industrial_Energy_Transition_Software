@@ -238,6 +238,48 @@ function validate_site(site::Site)
                        "technologies.csv[$(s.id)].fixed_charge")
     end
 
+    # --- topología de red (M14): arcos coherentes con nodos y carriers ---
+    for a in values(site.arcs)
+        ctx = "arcs[$(a.id)]"
+        a.from == a.to && push!(problems,
+            "$ctx: 'from' y 'to' no pueden ser el mismo nodo ('$(a.from)')")
+        isempty(a.ports) && push!(problems,
+            "$ctx: un arco necesita al menos un vector (puerto)")
+        for p in a.ports
+            _check_carrier!(problems, site.carriers, p.carrier,
+                            "$ctx puerto '$(p.carrier)'")
+            if haskey(site.carriers, p.carrier) &&
+               site.carriers[p.carrier].category in (:emissions, :offset)
+                push!(problems,
+                    "$ctx: el vector '$(p.carrier)' (categoría " *
+                    "'$(site.carriers[p.carrier].category)') no fluye por un arco " *
+                    "— sólo vectores con balance nodal o combustibles")
+            end
+            isfinite(p.capacity) &&
+                _check_nonneg!(problems, p.capacity, "$ctx puerto '$(p.carrier)'.capacity")
+            0 < p.efficiency <= 1 || push!(problems,
+                "$ctx puerto '$(p.carrier)'.efficiency: debe estar en (0,1] " *
+                "(valor: $(p.efficiency))")
+        end
+    end
+    # cada tech/carrier ubicado en un nodo debe referirse a un nodo real
+    # (declarado en `nodes`, extremo de un arco, o el implícito :main)
+    known_nodes = Set{Symbol}((DEFAULT_NODE,))
+    union!(known_nodes, keys(site.nodes))
+    for a in values(site.arcs)
+        push!(known_nodes, a.from); push!(known_nodes, a.to)
+    end
+    for (t, n) in site.node_of
+        n in known_nodes || push!(problems,
+            "node_of['$t']: el nodo '$n' no existe (declara el nodo o conéctalo con un arco)")
+        find_tech(site, t) === nothing && push!(problems,
+            "node_of['$t']: no existe una tecnología con ese id")
+    end
+    for (c, n) in site.demand_node
+        n in known_nodes || push!(problems,
+            "demand_node['$c']: el nodo '$n' no existe")
+    end
+
     # --- demandas cubiertas: cada carrier con demanda debe tener al menos un
     # productor (una tecnología o un mercado de compra) ---
     producers = Set{Symbol}()

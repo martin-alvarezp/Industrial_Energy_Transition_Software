@@ -336,7 +336,57 @@ function emissions_cap_net(cfg::ScenarioConfig, y::Integer)
            (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * frac
 end
 
-"Contenedor del sitio: año-plantilla completo + inventario tecnológico."
+"""
+Nodo físico del sitio (bus local, roadmap M14). Agrupa los activos que
+comparten un balance de vector en un mismo punto. El sitio siempre tiene el
+nodo implícito `:main`; declarar nodos extra habilita la topología multi-nodo.
+`name` es sólo etiqueta para las vistas.
+"""
+struct Node
+    id::Symbol
+    name::String
+end
+Node(id::Symbol) = Node(id, String(id))
+
+"""
+Puerto de un arco (roadmap M14): un vector que transita por el arco, con su
+capacidad de transporte (MW, `Inf` = sin tope) y su eficiencia (`η` en (0,1],
+1 = sin pérdidas). El caudal entregado en el nodo destino es `η · caudal`.
+"""
+struct ArcPort
+    carrier::Symbol
+    capacity::Float64
+    efficiency::Float64
+end
+ArcPort(c::Symbol) = ArcPort(c, Inf, 1.0)
+ArcPort(c::Symbol, cap::Real) = ArcPort(c, Float64(cap), 1.0)
+
+"""
+Arco de transporte entre dos nodos (roadmap M14): el ACTIVO que conecta puntos
+del sitio y por el que fluyen uno o más vectores (`ports`), cada uno con su
+capacidad y eficiencia. `directed=true` sólo permite `from → to`; `false`
+(default) es bidireccional. Un vector sin arco entre dos nodos queda AISLADO
+entre ellos (islas off-grid).
+"""
+struct Arc
+    id::Symbol
+    name::String
+    from::Symbol
+    to::Symbol
+    directed::Bool
+    ports::Vector{ArcPort}
+end
+Arc(id::Symbol, name::AbstractString, from::Symbol, to::Symbol, ports::Vector{ArcPort}) =
+    Arc(id, String(name), from, to, false, ports)
+
+"Nodo implícito por defecto: sin topología declarada, todo vive aquí (≡ MVP)."
+const DEFAULT_NODE = :main
+
+"""
+Contenedor del sitio: año-plantilla completo + inventario tecnológico.
+La topología (roadmap M14) es opcional: `nodes`/`arcs` vacíos y `node_of`/
+`demand_node` sin entradas ⇒ un único nodo `:main` (placa de cobre, el MVP).
+"""
 struct Site
     name::String
     timesteps::Vector{TimeStep}              # ordenados por step_id (1..96)
@@ -349,7 +399,20 @@ struct Site
     prices::Dict{Symbol,PriceSeries}         # por carrier (puede incluir :grid_export)
     emission_factors::Vector{EmissionFactor}
     markets::Dict{Symbol,Market}             # contratos de compra/venta (M11)
+    # ── topología de red (M14) ──
+    nodes::Dict{Symbol,Node}                 # nodos declarados (además del :main)
+    arcs::Dict{Symbol,Arc}                   # arcos de transporte entre nodos
+    node_of::Dict{Symbol,Symbol}             # tech_id → nodo (ausente ⇒ :main)
+    demand_node::Dict{Symbol,Symbol}         # carrier con demanda → nodo (ausente ⇒ :main)
 end
+
+# retro-compatibilidad (11 campos): sitio con mercados pero sin topología
+Site(name, ts, carriers, sources, converters, generators, storages,
+     demands, prices, emission_factors, markets::Dict{Symbol,Market}) =
+    Site(name, ts, carriers, sources, converters, generators, storages,
+         demands, prices, emission_factors, markets,
+         Dict{Symbol,Node}(), Dict{Symbol,Arc}(),
+         Dict{Symbol,Symbol}(), Dict{Symbol,Symbol}())
 
 # retro-compatibilidad (10 campos): sitio sin mercados explícitos
 Site(name, ts, carriers, sources, converters, generators, storages,
@@ -358,6 +421,47 @@ Site(name, ts, carriers, sources, converters, generators, storages,
          demands, prices, emission_factors, Dict{Symbol,Market}())
 
 n_steps(site::Site) = length(site.timesteps)
+
+"Nodo donde vive una tecnología (default `:main` si no está mapeada)."
+tech_node(site::Site, id::Symbol) = get(site.node_of, id, DEFAULT_NODE)
+
+"Nodo donde se consume la demanda de un carrier (default `:main`)."
+demand_node_of(site::Site, c::Symbol) = get(site.demand_node, c, DEFAULT_NODE)
+
+"Conjunto ordenado de nodos del sitio: `:main` + declarados + referenciados."
+function site_nodes(site::Site)
+    ns = Set{Symbol}((DEFAULT_NODE,))
+    union!(ns, keys(site.nodes))
+    union!(ns, values(site.node_of))
+    union!(ns, values(site.demand_node))
+    for a in values(site.arcs)
+        push!(ns, a.from); push!(ns, a.to)
+    end
+    return sort!(collect(ns))
+end
+
+"""
+    arc_links(site) -> Vector{Tuple}
+
+Expande los arcos en ENLACES dirigidos por vector (roadmap M14): un arco
+dirigido da un enlace por puerto; uno bidireccional da dos (ida y vuelta).
+Cada tupla es `(key, carrier, from, to, capacity, efficiency)` y `key` es el
+índice del flujo en el modelo. Determinista (arcos y claves ordenados).
+"""
+function arc_links(site::Site)
+    T = Tuple{Symbol,Symbol,Symbol,Symbol,Float64,Float64}
+    links = T[]
+    for aid in sort!(collect(keys(site.arcs)))
+        a = site.arcs[aid]
+        dirs = a.directed ? ((:f, a.from, a.to),) :
+                            ((:f, a.from, a.to), (:r, a.to, a.from))
+        for p in a.ports, (suf, f, t) in dirs
+            push!(links, (Symbol(aid, "__", p.carrier, "__", suf),
+                          p.carrier, f, t, p.capacity, p.efficiency))
+        end
+    end
+    return links
+end
 
 """
 Mercados efectivos del sitio: los explícitos si hay, o los sintetizados desde

@@ -16,6 +16,8 @@ struct ModelSets
     markets::Vector{Symbol}          # contratos de compra/venta (M11; incluye
     buy_markets::Vector{Symbol}      # los sintetizados del esquema legacy)
     sell_markets::Vector{Symbol}
+    nodes::Vector{Symbol}            # nodos del sitio (M14; :main si no hay topología)
+    arc_flows::Vector{Symbol}        # claves de arc_flow (un enlace dirigido por vector)
 end
 
 """
@@ -58,5 +60,7 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         mkt_ids,
         [id for id in mkt_ids if mkts[id].direction == :buy],
         [id for id in mkt_ids if mkts[id].direction == :sell],
+        site_nodes(site),
+        [l[1] for l in arc_links(site)],
     )
 end

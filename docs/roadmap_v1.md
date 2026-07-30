@@ -186,6 +186,28 @@ todo parámetro/equipo/mercado puede fijarse **por escenario**:
 inversión (M12) y el XLSX hablan en años reales. Trivial en el motor
 (offset), transversal en UI/series/resultados.
 
+### M14 · Topología de red (nodos + arcos)
+Hoy el motor es **placa de cobre**: un solo balance por vector para todo el
+sitio (`carrier_balance`), así que no sabe qué activo está conectado a cuál ni
+distingue una isla off-grid de la red — todo lo del mismo vector comparte un
+bus infinito y sin pérdidas. M14 lo lleva a una **red multi-nodo**: el balance
+pasa a ser por `(nodo, carrier)` y aparecen **arcos** de transporte entre nodos
+con **capacidad y eficiencia por vector** (un mismo arco puede llevar gas y
+electricidad, cada uno con su tope y su η). Encuadre retro-compatible por
+construcción: *el modelo siempre es una red; con un único nodo `:main` degenera
+en el MVP*. Las islas off-grid emergen solas (un nodo sin arco de ese vector
+queda aislado).
+- **Motor (v0.9, hecho):** `Node`/`Arc`/`ArcPort` en el sitio; `node` por
+  activo (default `:main`); mercados fluyen en el nodo de su conexión; demanda
+  por nodo; variable `arc_flow` con capacidad y η (pérdida lineal
+  `entrega = η·envío`). Round-trip JSON con huellas legacy estables (sin
+  topología, el sitio no gana claves). El demo da el mismo VAN al centavo.
+- **Pendiente (UI):** modo "añadir conexión" en el mapa del twin (clic entre
+  dos activos → arco), drawer para elegir vectores/capacidad/η/dirección; el
+  Sankey (`flows.js`) leería la topología en vez de inferirla. Gas por arco:
+  requiere que el combustible lleve balance nodal (ya ocurre con mercado de
+  compra, M11).
+
 ---
 
 ## 3 · Brechas de DATOS e integraciones (prioridad 2)

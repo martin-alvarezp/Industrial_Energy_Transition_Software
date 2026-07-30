@@ -51,6 +51,15 @@ struct ModelParameters
     nm_periods::Dict{Symbol,Vector{Vector{Int}}}     # mercado nm → pasos por período
     nm_retail::Dict{Symbol,Matrix{Float64}}          # mercado nm → retail medio [p, y]
     nm_buys::Dict{Symbol,Vector{Symbol}}             # mercado nm → compras pareadas
+    # ── topología de red (M14) ──
+    node_of::Dict{Symbol,Symbol}                     # tech_id → nodo (ausente ⇒ :main)
+    demand_node::Dict{Symbol,Symbol}                 # carrier con demanda → nodo
+    market_node::Dict{Symbol,Symbol}                 # mercado → nodo (el de su conexión)
+    arc_carrier::Dict{Symbol,Symbol}                 # arc_flow key → vector transportado
+    arc_from::Dict{Symbol,Symbol}                    # key → nodo origen
+    arc_to::Dict{Symbol,Symbol}                      # key → nodo destino
+    arc_cap::Dict{Symbol,Float64}                    # key → MW (Inf = sin tope)
+    arc_eff::Dict{Symbol,Float64}                    # key → η de transporte en (0,1]
 end
 
 function _scaled_matrix(base::Vector{Float64}, rate::Float64, years::UnitRange{Int})
@@ -273,6 +282,26 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         nm_buys[id] = buys
     end
 
+    # ── topología de red (M14): nodos de activos, mercados y enlaces de arcos ──
+    node_of = Dict{Symbol,Symbol}(t => n for (t, n) in site.node_of)
+    demand_node = Dict{Symbol,Symbol}(c => n for (c, n) in site.demand_node)
+    # el mercado importa/exporta en el nodo de su conexión física (o :main si
+    # es un mercado directo sin conexión)
+    market_node = Dict{Symbol,Symbol}()
+    for (id, mk) in mkts
+        market_node[id] = mk.connection == Symbol("") ?
+                          DEFAULT_NODE : get(node_of, mk.connection, DEFAULT_NODE)
+    end
+    arc_carrier = Dict{Symbol,Symbol}()
+    arc_from = Dict{Symbol,Symbol}()
+    arc_to = Dict{Symbol,Symbol}()
+    arc_cap = Dict{Symbol,Float64}()
+    arc_eff = Dict{Symbol,Float64}()
+    for (k, c, f, t, cap, eff) in arc_links(site)
+        arc_carrier[k] = c; arc_from[k] = f; arc_to[k] = t
+        arc_cap[k] = cap;   arc_eff[k] = eff
+    end
+
     return ModelParameters(weight, price, demand, discount, costs,
                            existing, max_new, efficiency, cf_profile, ef,
                            conv_inputs, conv_outputs, fuel_inputs,
@@ -285,5 +314,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            market_contracted, market_excess_penalty,
                            remaining_life, cfg.renew_existing,
                            cfg.repeat_investments, renewal_capex, forced,
-                           nm_periods, nm_retail, nm_buys)
+                           nm_periods, nm_retail, nm_buys,
+                           node_of, demand_node, market_node,
+                           arc_carrier, arc_from, arc_to, arc_cap, arc_eff)
 end

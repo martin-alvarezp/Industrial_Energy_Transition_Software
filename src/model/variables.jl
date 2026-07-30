@@ -26,6 +26,11 @@ function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
     # Mercados (M11): flujo comprado/vendido por mercado, paso y año.
     JuMP.@variable(m, market_flow[sets.markets, steps, years] >= 0)
 
+    # Topología (M14): flujo de transporte por enlace de arco (dirigido por
+    # vector), paso y año. Sin arcos declarados el índice es vacío ⇒ sin
+    # variables (el sitio es un único nodo, idéntico al MVP).
+    JuMP.@variable(m, arc_flow[sets.arc_flows, steps, years] >= 0)
+
     # Red legacy como EXPRESIONES: import/export del carrier de red = suma de
     # los flujos de sus mercados con conexión. Mantiene el contrato de
     # resultados (extract_dispatch/emissions leen m[:grid_import_p] como antes).

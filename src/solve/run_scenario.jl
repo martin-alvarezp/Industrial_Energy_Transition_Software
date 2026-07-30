@@ -45,7 +45,8 @@ function _scale_prices(site::Site, carrier::Symbol, factor::Float64)
         for (id, mk) in site.markets)
     return Site(site.name, site.timesteps, site.carriers, site.sources,
                 site.converters, site.generators, site.storages, site.demands,
-                prices, site.emission_factors, markets)
+                prices, site.emission_factors, markets,
+                site.nodes, site.arcs, site.node_of, site.demand_node)
 end
 
 """
