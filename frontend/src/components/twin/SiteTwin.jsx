@@ -40,12 +40,19 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
   const [validation, setValidation] = useState(null); // {ok, site_version?, problems}
   const [validating, setValidating] = useState(false);
   const [siteList, setSiteList] = useState(["demo"]);
-  const [pickName, setPickName] = useState("demo");   // selección del chooser
+  const [pickName, setPickName] = useState(null);   // selección del chooser
   const [saveName, setSaveName] = useState("");
   const [saveMsg, setSaveMsg] = useState(null);       // {ok, text}
   const mapRef = useRef(null);
 
-  useEffect(() => { listSites().then(setSiteList); }, []);
+  // el chooser se posa en el primer sitio disponible (sin API, el ejemplo con
+  // red) en vez de quedar fijado en un nombre elegido antes de conocer la lista
+  useEffect(() => {
+    listSites().then((l) => {
+      setSiteList(l);
+      setPickName((p) => (p && l.includes(p) ? p : l[0] ?? "demo"));
+    });
+  }, []);
 
   useEffect(() => {
     const onKey = (e) =>
@@ -63,14 +70,15 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
         <h3 className="card-title">Empieza por tu sitio</h3>
         <p className="card-sub">
           IETO optimiza a partir de tu planta industrial. Carga un sitio
-          guardado, parte del ejemplo <em>demo</em>, o crea uno nuevo desde cero
-          — no hay resultados hasta que definas el sitio y ejecutes.
+          guardado, parte del ejemplo <em>planta_red</em> —una planta con su red
+          interna de barras y alimentadores— o crea uno nuevo desde cero. No hay
+          resultados hasta que definas el sitio y ejecutes.
         </p>
         <div className="control">
           <label>Cargar un sitio existente</label>
           <div className="range-row">
             <select
-              className="site-select" value={pickName}
+              className="site-select" value={pickName ?? ""}
               onChange={(e) => setPickName(e.target.value)}
               aria-label="sitio a cargar"
             >
@@ -89,9 +97,10 @@ export default function SiteTwin({ twin, setTwin, twinLoading, siteName,
           </button>
         </div>
         {apiUp === false && (
-          <p className="hint warn" style={{ marginTop: 10 }}>
-            Sin API: puedes mapear y editar, pero guardar y ejecutar requieren el
-            backend en 127.0.0.1:8080.
+          <p className="hint" style={{ marginTop: 10 }}>
+            Sin API: mapear, editar y <strong>optimizar</strong> funcionan aquí
+            mismo — el MILP lo resuelve HiGHS en tu navegador. Lo que requiere el
+            backend en 127.0.0.1:8080 es guardar el sitio en disco.
           </p>
         )}
       </div>

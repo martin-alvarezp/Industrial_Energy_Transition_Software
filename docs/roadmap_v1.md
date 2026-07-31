@@ -238,6 +238,25 @@ queda aislado).
   Gas por arco: requiere que el combustible lleve balance nodal (ya
   ocurre con mercado de compra, M11). Limitación conocida: la demanda es una
   serie por vector, así que vive en una sola barra (no se reparte entre islas).
+- **Espejo web (v0.9, hecho):** el motor del navegador aprende la topología, o
+  la versión publicada quedaba una release atrás del motor Julia. `lp.js` gana
+  `siteNodes`/`arcLinks` (espejo de `types.jl`), balance por `(nodo, carrier)` y
+  tope por enlace; `extract.js` emite el dispatch de arcos (neto + gross). Dos
+  fixtures dorados nuevos, `planta_red_n5/n10`, generados desde el sitio de
+  ejemplo que la app lleva embebido (`frontend/src/demo/planta_red.json`), así
+  la planta que se ve publicada es la misma que ancla Julia — `verify:wasm`
+  cuadra los 7 con Δ ~1e-16. Detalles que costaron: (a) una fila de balance sin
+  ningún término es una isla mal cableada, o sea **infactible**, y el formato LP
+  no admite filas vacías — se ancla a `zero_` fija en 0 para que el navegador
+  también la declare infactible en vez de borrarla del problema; (b) dos arcos
+  opuestos entre las mismas barras (lo natural con un storage en su propia
+  barra) hacen del grafo un ciclo y d3-sankey recursa hasta agotar la pila, así
+  que `buildFlows` detecta el ciclo *antes* y cae al agregado. Sin API la app
+  ofrece la planta con red como sitio real (no el mock) y el aviso dice la
+  verdad: optimizar funciona, lo que pide backend es guardar en disco. Cubierto
+  por `npm run verify:flows` (4 casos, uno con el dispatch real del motor web e
+  invariante de cierre por barra) y `npm run verify:topology` (E2E de navegador
+  sin backend: mapa → optimizar → VAN contra el dorado → Sankey).
 
 ---
 

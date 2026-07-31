@@ -69,15 +69,28 @@ años calendario → Summary con medidas y Sankey trazado → guardar corrida �
 recargarla sin re-resolver → memo ejecutivo. Falla al primer paso roto y
 verifica que no hubo errores de consola en todo el flujo.
 
+`npm run verify:topology` recorre el otro modo de uso: la app publicada, **sin
+backend**, resolviendo en el navegador. Carga la planta de ejemplo con red,
+comprueba que el mapa dibuja sus equipos y el recorrido de cada arco, optimiza
+con HiGHS wasm y contrasta el VAN de la pantalla contra el fixture dorado de
+Julia.
+
 ## Cómo reproducir
 
 ```bash
 # suite Julia completa (motor + contrato + API), ~4 min
 julia --project=. -e "using Pkg; Pkg.test()"
 
+# equivalencia del motor web con el motor Julia (sin navegador)
+cd frontend && npm run verify:wasm && npm run verify:flows
+
 # camino dorado en navegador (server en 127.0.0.1:8080)
 julia --project=. launcher/server.jl        # terminal 1
 cd frontend && npm run verify:e2e           # terminal 2
+
+# la app publicada, sin backend (build servida por vite preview)
+cd frontend && npm run build && npm run preview   # terminal 1
+cd frontend && npm run verify:topology            # terminal 2
 ```
 
 ## Trazabilidad

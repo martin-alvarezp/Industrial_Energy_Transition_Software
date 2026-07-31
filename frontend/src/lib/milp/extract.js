@@ -80,6 +80,15 @@ export function extractPayload(site, cfg, sol, constant, scenario = "web") {
   const fuelWithMkt = new Set(buys.map((m) => m.carrier_id)
     .filter((c) => catOf[c] === "fuel"));
 
+  // claves de arc_flow por (arco, vector); vacío sin topología
+  const arcSpecs = [];
+  for (const a of [...(site.arcs ?? [])].sort((x, y) =>
+       String(x.arc_id) < String(y.arc_id) ? -1 : 1))
+    for (const p of a.ports)
+      arcSpecs.push({ arc_id: a.arc_id, carrier: p.carrier,
+                      fkey: `${a.arc_id}__${p.carrier}__f`,
+                      rkey: a.directed ? null : `${a.arc_id}__${p.carrier}__r` });
+
   // ── dispatch tidy (tech, flow, year, step, value) ──
   const dispatch = [];
   for (const y of years) for (const s of steps) {
@@ -98,6 +107,19 @@ export function extractPayload(site, cfg, sol, constant, scenario = "web") {
       .reduce((a, m) => a + V(`mf_${sane(m.market_id)}_${s}_${y}`), 0);
     dispatch.push({ tech: "grid", flow: "import", year: y, step: s, value: gi });
     dispatch.push({ tech: "grid", flow: "export", year: y, step: s, value: ge });
+    // arcos (M14): flujo NETO por (arco, vector) = enviado ida − vuelta. Los
+    // bidireccionales emiten además el GROSS, sin el cual un arco que se
+    // invierte durante el año se cancelaría al agregar (ver extract_dispatch.jl
+    // y buildFlows). Sin topología no se emite ninguna fila.
+    for (const spec of arcSpecs) {
+      const fv = V(`af_${sane(spec.fkey)}_${s}_${y}`);
+      const rv = spec.rkey ? V(`af_${sane(spec.rkey)}_${s}_${y}`) : 0;
+      dispatch.push({ tech: spec.arc_id, flow: `arc__${spec.carrier}`,
+                      year: y, step: s, value: fv - rv });
+      if (spec.rkey)
+        dispatch.push({ tech: spec.arc_id, flow: `arc__${spec.carrier}__gross`,
+                        year: y, step: s, value: fv + rv });
+    }
   }
 
   // ── capacidad disponible y nueva (M5: retiro + ventanas de vida) ──

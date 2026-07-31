@@ -12,7 +12,11 @@
 //      cancelaría los sentidos, así que cae al agregado con las pérdidas de
 //      transporte igualmente cargadas (exacto en total).
 // Uso: npm run verify:flows
+import { readFileSync } from "node:fs";
+import highsLoader from "highs";
 import { buildFlows } from "../src/lib/flows.js";
+import { buildLP } from "../src/lib/milp/lp.js";
+import { extractPayload } from "../src/lib/milp/extract.js";
 
 const H = 4380;   // dos pasos de medio año
 const eq = (a, b, tol = 1) => a != null && Math.abs(a - b) <= tol;
@@ -99,6 +103,84 @@ console.log("\narco bidireccional que se invierte (fallback al agregado)");
   check("pérdidas de transporte cargadas", totalTo(g, "Pérdidas"), 10 * 2 * H);
   // y con la pérdida fuera del vector, el residual da la demanda REAL
   check("demanda agregada", totalTo(g, "Demanda"), 10 * 2 * H);
+}
+
+// ── caso 3: dos arcos OPUESTOS entre las mismas barras (ciclo) ─────────────
+// Es lo que sale de poner un almacenamiento en su propia barra: un arco de
+// carga y otro de descarga. El grafo deja de ser acíclico y d3-sankey recursa
+// hasta agotar la pila, así que buildFlows tiene que caer al agregado.
+console.log("\ndos arcos opuestos entre las mismas barras (ciclo)");
+{
+  const g = buildFlows(
+    { timesteps: [{ weight_hours: H }, { weight_hours: H }],
+      carriers: CARRIERS,
+      technologies: [GRID_A, { tech_id: "bat_b", name: "Batería B", type: "storage",
+                               input_carrier: "electricity",
+                               output_carrier: "electricity", node: "B" }],
+      demands: { electricity: [10, 10] }, demand_nodes: { electricity: "A" },
+      nodes: NODES,
+      arcs: [{ arc_id: "ab", name: "carga", from: "A", to: "B", directed: true,
+               ports: [{ carrier: "electricity", capacity: null, efficiency: 1 }] },
+             { arc_id: "ba", name: "descarga", from: "B", to: "A", directed: true,
+               ports: [{ carrier: "electricity", capacity: null, efficiency: 1 }] }] },
+    [{ tech: "ab", flow: "arc__electricity", year: 1, step: 1, value: 10 },
+     { tech: "ab", flow: "arc__electricity", year: 1, step: 2, value: 0 },
+     { tech: "ba", flow: "arc__electricity", year: 1, step: 1, value: 0 },
+     { tech: "ba", flow: "arc__electricity", year: 1, step: 2, value: 10 },
+     { tech: "bat_b", flow: "charge", year: 1, step: 1, value: 10 },
+     { tech: "bat_b", flow: "discharge", year: 1, step: 2, value: 10 },
+     { tech: "grid", flow: "import", year: 1, step: 1, value: 20 },
+     { tech: "grid", flow: "import", year: 1, step: 2, value: 0 }],
+    1);
+  const perBus = g.nodes.some((n) => n.name.includes("· Barra"));
+  if (perBus) { fails++; console.log("  ✗ se separó por barra un grafo con ciclo"); }
+  else console.log("  ✓ no se separó por barra (el Sankey no admite ciclos)");
+  const finito = g.links.every((l) => Number.isFinite(l.value));
+  if (finito) console.log("  ✓ el diagrama se construye sin recursión infinita");
+  else { fails++; console.log("  ✗ el diagrama trae valores no finitos"); }
+}
+
+// ── caso 4: la planta de demostración REAL, resuelta por el motor web ──────
+// Los dos casos anteriores son sintéticos. Este cierra el circuito completo:
+// el sitio que sirve la versión publicada (frontend/src/demo/planta_red.json),
+// resuelto por el mismo HiGHS que corre en el navegador, tiene que producir un
+// Sankey por barra con los puentes y las pérdidas de sus colectores.
+console.log("\nplanta de demostración con red (motor web, dispatch real)");
+{
+  const g = JSON.parse(readFileSync(
+    new URL("../golden/planta_red_n10.json", import.meta.url)));
+  const highs = await highsLoader();
+  const { lp, constant } = buildLP(g.site, g.config);
+  const sol = highs.solve(lp);
+  const pay = extractPayload(g.site, g.config, sol, constant, g.name);
+  const npvOk = Math.abs(pay.kpis.npv - g.expected_npv) /
+                Math.abs(g.expected_npv) < 1e-6;
+  if (!npvOk) { fails++; console.log("  ✗ el VAN no reproduce al motor Julia"); }
+  else console.log(`  ✓ VAN ${(pay.kpis.npv / 1e6).toFixed(2)} MUSD == Julia`);
+
+  const fl = buildFlows(g.site, pay.dispatch, 1);
+  const buses = fl.nodes.filter((n) => n.name.includes("· ")).length;
+  if (buses >= 2) console.log(`  ✓ el Sankey separa ${buses} barras`);
+  else { fails++; console.log("  ✗ el Sankey NO separó por barra"); }
+
+  // el colector de la bomba de calor pierde 4 % de todo lo que transporta
+  const perdidas = totalTo(fl, "Pérdidas");
+  if (perdidas > 0) console.log(`  ✓ pérdidas de transporte y de storage: ${
+    Math.round(perdidas).toLocaleString("es")} MWh`);
+  else { fails++; console.log("  ✗ no hay pérdidas en el diagrama"); }
+
+  // invariante duro: cada BARRA cierra (lo que entra sale). Solo las barras —
+  // un equipo no tiene por qué cerrar en energía: la bomba de calor entrega
+  // COP veces lo que consume porque el resto lo toma del ambiente.
+  for (const [i, n] of fl.nodes.entries()) {
+    if (!n.name.includes("· ")) continue;
+    const inn = fl.links.filter((l) => l.target === i).reduce((a, l) => a + l.value, 0);
+    const out = fl.links.filter((l) => l.source === i).reduce((a, l) => a + l.value, 0);
+    if (inn > 1 && out > 1 && Math.abs(inn - out) > Math.max(1, inn * 1e-6)) {
+      fails++;
+      console.log(`  ✗ la barra "${n.name}" no cierra: entra ${Math.round(inn)}, sale ${Math.round(out)}`);
+    }
+  }
 }
 
 console.log(fails === 0

@@ -6,6 +6,13 @@ import {
   runPareto as mockPareto, runBatch as mockBatch, mockSiteJson,
 } from "./mockEngine.js";
 import { tornadoLevers, buildTornado } from "./sensitivity.js";
+import plantaRed from "../demo/planta_red.json";
+
+// Sitios que la app lleva embebidos para funcionar SIN backend (GitHub Pages).
+// `planta_red` es la planta de ejemplo con topología de red (M14): barras por
+// equipo, alimentadores y colectores con tope y pérdida. Su resultado está
+// anclado a Julia por los fixtures dorados planta_red_n5/n10 (verify:wasm).
+const BUNDLED_SITES = { planta_red: plantaRed };
 
 // API same-origin por default: el escritorio/portable sirven UI+API juntos;
 // publicada como estático (GitHub Pages) no hay API ⇒ motor web (HiGHS wasm).
@@ -245,14 +252,15 @@ export const runPortfolio = (sites, scenario, cfg) =>
   post("/portfolio", { sites, scenario, config_overrides: toOverrides(cfg) },
        { timeoutMs: 600_000 });
 
-/** GET /sites: sitios guardados disponibles. Sin API → solo demo. */
+/** GET /sites: sitios guardados disponibles. Sin API van los sitios embebidos:
+ * la planta con red (topología M14) y el demo de placa de cobre. */
 export async function listSites() {
-  if (!(await apiAvailable())) return ["demo"];
+  if (!(await apiAvailable())) return [...Object.keys(BUNDLED_SITES), "demo"];
   try {
     const resp = await fetch(API_BASE + "/sites");
     if (resp.ok) return (await resp.json()).sites;
   } catch { /* fallthrough */ }
-  return ["demo"];
+  return [...Object.keys(BUNDLED_SITES), "demo"];
 }
 
 /** PUT /sites/{name}: persiste el twin (CSVs + layout.geojson). */
@@ -300,6 +308,10 @@ export async function fetchSite(name = "demo") {
       console.warn("GET /sites falló, usando mock:", err);
     }
   }
+  // sitio embebido: viaja completo (incluido el layout del mapa) y el motor
+  // del navegador lo resuelve de verdad — no es un mock de resultados
+  if (BUNDLED_SITES[name])
+    return { source: "bundled", site: structuredClone(BUNDLED_SITES[name]) };
   return { source: "mock", site: mockSiteJson() };
 }
 

@@ -70,7 +70,33 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
     Math.abs(E(a.arc_id, `arc__${p.carrier}`)));
   const reversed = arcs.some((a) => (a.ports ?? []).some(
     (p) => arcGross(a, p) > Math.abs(E(a.arc_id, `arc__${p.carrier}`)) + MIN_MWH));
-  const topo = arcs.length > 0 && arcRows && !reversed;
+  // El otro camino a un ciclo no lo da un arco solo, sino DOS arcos opuestos
+  // entre las mismas barras (el caso natural: la carga y la descarga de un
+  // almacenamiento que vive en su propia barra). d3-sankey recursa sobre el
+  // grafo hasta agotar la pila, así que el ciclo hay que detectarlo ANTES:
+  // se cae al agregado, que es exacto en total y siempre acíclico.
+  const cyclic = (() => {
+    const g = {};                      // "vector|barra" → barras destino
+    for (const a of arcs) {
+      for (const p of a.ports ?? []) {
+        if (arcGross(a, p) <= MIN_MWH) continue;   // enlace sin uso: no es arista
+        const net = E(a.arc_id, `arc__${p.carrier}`);
+        const [from, to] = net >= 0 ? [a.from, a.to] : [a.to, a.from];
+        (g[`${p.carrier}|${from}`] ??= []).push(`${p.carrier}|${to}`);
+      }
+    }
+    const state = {};                  // 1 = en la pila · 2 = cerrado
+    const walk = (n) => {
+      if (state[n] === 1) return true;
+      if (state[n] === 2) return false;
+      state[n] = 1;
+      for (const m of g[n] ?? []) if (walk(m)) return true;
+      state[n] = 2;
+      return false;
+    };
+    return Object.keys(g).some(walk);
+  })();
+  const topo = arcs.length > 0 && arcRows && !reversed && !cyclic;
   const nodeOf = (id) => (topo ? (techById[id]?.node ?? "main") : "main");
   const demandNodeOf = (c) => (topo ? (siteJson.demand_nodes?.[c] ?? "main") : "main");
   const busName = Object.fromEntries(

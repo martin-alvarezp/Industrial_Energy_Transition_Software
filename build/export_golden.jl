@@ -44,4 +44,15 @@ c5 = with_config(cfg0; horizon_years = 5, tax_rate = 0.27,
                  depreciation_years = 5)
 dump("demo_tax_n5", site0, c5)
 
+# 6 · topología de red (M14): el sitio de demostración con barras y arcos, que
+# es el que sirve la versión web. Su definición canónica vive junto al frontend
+# (frontend/src/demo/planta_red.json) porque la app la trae embebida; aquí se
+# lee para que el motor Julia fije el resultado esperado del motor del
+# navegador — sin esto, la topología del espejo web no tendría ancla.
+planta = JSON3.read(read(joinpath(root, "frontend", "src", "demo",
+                                  "planta_red.json"), String))
+site_red = IETO.site_from_json(planta; default_name = "planta_red")
+dump("planta_red_n5", site_red, with_config(cfg0; horizon_years = 5))
+dump("planta_red_n10", site_red, with_config(cfg0; horizon_years = 10))
+
 println("fixtures dorados en ", out)

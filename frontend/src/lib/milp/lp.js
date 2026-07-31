@@ -9,9 +9,42 @@
 //   soc/ch/dc_<st>_<s>_<y> storage · mf_<mk>_<s>_<y> mercado
 //   pk_<mk>_<se>_<y> peak · ex_<mk>_<se>_<y> exceso · nm_<mk>_<p>_<y> neteo
 //   off_<y> offsets · ge_<y>/ne_<y> emisiones gross/net
+//   af_<enlace>_<s>_<y> flujo de arco (M14, un enlace dirigido por vector)
 
 const BALANCED = ["energy", "heat", "cooling"];
+const DEFAULT_NODE = "main";
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
+
+/** Nodos del sitio: :main ∪ declarados ∪ los que usan activos, demandas y
+ * arcos, ordenados (espejo de site_nodes en types.jl). Sin topología ⇒
+ * ["main"] y el balance nodal degenera en el del MVP. */
+export function siteNodes(site) {
+  const ns = new Set([DEFAULT_NODE]);
+  for (const n of site.nodes ?? []) ns.add(n.node_id);
+  for (const t of site.technologies ?? []) if (t.node) ns.add(t.node);
+  for (const n of Object.values(site.demand_nodes ?? {})) ns.add(n);
+  for (const a of site.arcs ?? []) { ns.add(a.from); ns.add(a.to); }
+  return [...ns].sort();
+}
+
+/** Expande los arcos en ENLACES dirigidos por vector (espejo de arc_links en
+ * types.jl): un arco dirigido da un enlace por puerto; uno bidireccional da
+ * dos (ida `__f` y vuelta `__r`). */
+export function arcLinks(site) {
+  const links = [];
+  for (const a of [...(site.arcs ?? [])].sort((x, y) =>
+       String(x.arc_id) < String(y.arc_id) ? -1 : 1)) {
+    const dirs = a.directed ? [["f", a.from, a.to]]
+                            : [["f", a.from, a.to], ["r", a.to, a.from]];
+    for (const p of a.ports)
+      for (const [suf, from, to] of dirs)
+        links.push({ key: `${a.arc_id}__${p.carrier}__${suf}`,
+                     carrier: p.carrier, from, to,
+                     capacity: p.capacity ?? Infinity,
+                     efficiency: p.efficiency ?? 1 });
+  }
+  return links;
+}
 
 /** Mercados efectivos: los explícitos, o los sintetizados del esquema legacy
  * (espejo de effective_markets en types.jl). */
@@ -67,6 +100,16 @@ export function buildLP(site, cfg) {
   const buys = mkts.filter((m) => m.direction === "buy");
   const grid = site.technologies.find((t) => t.tech_id === "grid_import");
   const gridCarrier = grid?.output_carrier ?? "electricity";
+
+  // ── topología de red (M14) ──  sin nodos ni arcos: un único nodo "main" y
+  // todo lo de abajo degenera exactamente en el balance de placa de cobre.
+  const nodes = siteNodes(site);
+  const links = arcLinks(site);
+  const nodeOf = (id) =>
+    site.technologies.find((t) => t.tech_id === id)?.node ?? DEFAULT_NODE;
+  // el mercado entra/sale en el nodo de su conexión física (parameters.jl)
+  const marketNode = (mk) => (mk.connection ? nodeOf(mk.connection) : DEFAULT_NODE);
+  const demandNode = (c) => site.demand_nodes?.[c] ?? DEFAULT_NODE;
 
   // estaciones en orden de primera aparición (espejo de parameters.jl)
   const seasonOrder = [];
@@ -225,41 +268,65 @@ export function buildLP(site, cfg) {
 
   // ── restricciones ──
   const rows = [];
+  let usesZero = false;
   const row = (name, terms, op, rhs) => {
     const body = Object.entries(terms).filter(([, c]) => c !== 0)
       .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
-    if (body) rows.push(` ${name}: ${body} ${op} ${rhs}`);
+    if (body) { rows.push(` ${name}: ${body} ${op} ${rhs}`); return; }
+    // Sin términos la fila es `0 <op> rhs`. El formato LP no admite una fila
+    // vacía, pero Julia SÍ registra la restricción: una demanda sin ninguna
+    // fuente que la sirva (una isla mal cableada, M14) es INFACTIBLE y así
+    // debe verse también en el navegador. Se ancla a una variable fija en 0.
+    const violated = op === "=" ? rhs !== 0 : op === "<=" ? rhs < 0 : rhs > 0;
+    if (violated) { usesZero = true; rows.push(` ${name}: + 1 zero_ ${op} ${rhs}`); }
   };
   const T = () => ({});
   const inc = (t, v, c) => { t[v] = (t[v] ?? 0) + c; };
 
   for (const y of years) {
-    // balance por carrier con balance
-    for (const c of balanced) {
-      for (const s of steps) {
-        const t = T();
-        for (const cv of convs) {
-          const p = portsOf(cv);
-          for (const o of p.outs) if (o.carrier === c)
-            inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, o.ratio);
-          for (const i of p.ins) if (i.carrier === c)
-            inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, -i.ratio);
-        }
-        for (const g of gens) if (g.output_carrier === c)
-          inc(t, `d_${sane(g.tech_id)}_${s}_${y}`, 1);
-        for (const st of stors) {
-          const cid = st.output_carrier ?? st.input_carrier;
-          if (cid === c) {
-            inc(t, `dc_${sane(st.tech_id)}_${s}_${y}`, 1);
-            inc(t, `ch_${sane(st.tech_id)}_${s}_${y}`, -1);
+    // balance por (NODO, carrier) con balance — M14. Cada activo suma en su
+    // nodo; los arcos aportan el flujo entrante (×η) y el saliente.
+    for (const n of nodes) {
+      for (const c of balanced) {
+        for (const s of steps) {
+          const t = T();
+          for (const cv of convs) {
+            if (nodeOf(cv.tech_id) !== n) continue;
+            const p = portsOf(cv);
+            for (const o of p.outs) if (o.carrier === c)
+              inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, o.ratio);
+            for (const i of p.ins) if (i.carrier === c)
+              inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, -i.ratio);
           }
+          for (const g of gens) if (g.output_carrier === c && nodeOf(g.tech_id) === n)
+            inc(t, `d_${sane(g.tech_id)}_${s}_${y}`, 1);
+          for (const st of stors) {
+            const cid = st.output_carrier ?? st.input_carrier;
+            if (cid === c && nodeOf(st.tech_id) === n) {
+              inc(t, `dc_${sane(st.tech_id)}_${s}_${y}`, 1);
+              inc(t, `ch_${sane(st.tech_id)}_${s}_${y}`, -1);
+            }
+          }
+          for (const mk of mkts) if (mk.carrier_id === c && marketNode(mk) === n)
+            inc(t, `mf_${sane(mk.market_id)}_${s}_${y}`,
+                mk.direction === "buy" ? 1 : -1);
+          for (const l of links) {
+            if (l.carrier !== c) continue;
+            if (l.to === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, l.efficiency);
+            if (l.from === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, -1);
+          }
+          const dem = demandNode(c) === n
+            ? (site.demands?.[c]?.[s - 1] ?? 0) * growth(y) : 0;
+          row(`bal_${sane(n)}_${sane(c)}_${s}_${y}`, t, "=", dem);
         }
-        for (const mk of mkts) if (mk.carrier_id === c)
-          inc(t, `mf_${sane(mk.market_id)}_${s}_${y}`,
-              mk.direction === "buy" ? 1 : -1);
-        const dem = (site.demands?.[c]?.[s - 1] ?? 0) * growth(y);
-        row(`bal_${sane(c)}_${s}_${y}`, t, "=", dem);
       }
+    }
+    // capacidad de los enlaces de arco (arcs.jl): sin tope, sin restricción
+    for (const l of links) {
+      if (!isFinite(l.capacity)) continue;
+      for (const s of steps)
+        row(`arccap_${sane(l.key)}_${s}_${y}`,
+            { [`af_${sane(l.key)}_${s}_${y}`]: 1 }, "<=", l.capacity);
     }
     // capacidad de conversores (disponibilidad M4 + ciclo de vida M5)
     for (const cv of convs) {
@@ -414,6 +481,8 @@ export function buildLP(site, cfg) {
   const objBody = Object.entries(obj).filter(([, c]) => c !== 0)
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
   const lp = `Minimize\n obj: ${objBody}\nSubject To\n${rows.join("\n")}\n` +
+    (usesZero ? "Bounds\n zero_ = 0\n" : "") +
     (binaries.length ? `Binary\n ${binaries.join(" ")}\n` : "") + "End\n";
-  return { lp, constant, meta: { S, N, binaries: binaries.length, rows: rows.length } };
+  return { lp, constant, meta: { S, N, binaries: binaries.length, rows: rows.length,
+                                 nodes: nodes.length, arc_links: links.length } };
 }
