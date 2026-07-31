@@ -469,3 +469,110 @@ select { cursor: pointer; }
 .empty-results .btn-run { margin-top: 6px; }
 .no-site { max-width: 560px; }
 .no-site .control label { color: var(--ink-2); }
+
+/* ── documentación del modelo de optimización (botón del header) ── */
+.doc-btn {
+  appearance: none; cursor: pointer; margin-left: auto; align-self: center;
+  background: rgba(255, 255, 255, 0.07); color: rgba(238, 245, 242, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px;
+  font: inherit; font-size: 12px; font-weight: 570; letter-spacing: 0.01em;
+  padding: 7px 13px; margin-bottom: 6px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.doc-btn:hover { background: rgba(23, 180, 140, 0.18); border-color: rgba(23, 180, 140, 0.45); color: #fff; }
+.doc-btn .glyph { font-style: italic; font-weight: 700; color: var(--brand-accent); }
+
+.mdoc-backdrop {
+  position: fixed; inset: 0; z-index: 1200; background: rgba(6, 35, 31, 0.52);
+  backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.mdoc {
+  width: min(1060px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-pop);
+  overflow: hidden; outline: none;
+  animation: mdoc-in 0.18s var(--ease);
+}
+@keyframes mdoc-in { from { transform: translateY(10px); opacity: 0.5; } to { transform: none; opacity: 1; } }
+.mdoc-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 24px 14px; background: var(--brand-950); color: #eef5f2;
+}
+.mdoc-head h2 { margin: 0; font-size: 16px; font-weight: 680; letter-spacing: -0.01em; }
+.mdoc-head p { margin: 4px 0 0; font-size: 12px; color: rgba(238, 245, 242, 0.6); max-width: 70ch; }
+.mdoc-head em { color: rgba(238, 245, 242, 0.85); font-style: normal; font-weight: 600; }
+.mdoc-close {
+  appearance: none; cursor: pointer; background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14); color: #eef5f2;
+  border-radius: 7px; font: inherit; font-size: 13px; line-height: 1;
+  padding: 7px 10px; flex: none;
+}
+.mdoc-close:hover { background: rgba(255, 255, 255, 0.16); }
+.mdoc-nav {
+  display: flex; gap: 2px 0; flex-wrap: wrap; padding: 8px 16px;
+  background: var(--surface-2); border-bottom: 1px solid var(--grid); flex: none;
+}
+.mdoc-nav a {
+  font-size: 11.5px; font-weight: 560; color: var(--ink-2); text-decoration: none;
+  padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+}
+.mdoc-nav a:hover { background: var(--brand-wash); color: var(--brand-700); }
+.mdoc-body { overflow-y: auto; padding: 4px 26px 30px; }
+.mdoc-sec { scroll-margin-top: 8px; padding-top: 22px; }
+.mdoc-h {
+  margin: 0 0 10px; font-size: 14.5px; font-weight: 660; letter-spacing: -0.005em;
+  color: var(--ink); padding-bottom: 8px; border-bottom: 2px solid var(--brand-wash);
+}
+.mdoc-h4 {
+  margin: 22px 0 8px; font-size: 12.5px; font-weight: 650; color: var(--brand-700);
+  letter-spacing: 0.005em;
+}
+.mdoc-body p { font-size: 13px; line-height: 1.62; color: var(--ink-2); margin: 0 0 11px; max-width: 88ch; }
+.mdoc-body p strong, .mdoc-body li strong { color: var(--ink); font-weight: 620; }
+.mdoc-body a { color: var(--brand-700); font-weight: 560; }
+.mdoc-small { font-size: 12px !important; color: var(--muted) !important; }
+.mdoc-list { margin: 0 0 12px; padding-left: 18px; max-width: 88ch; }
+.mdoc-list li { font-size: 13px; line-height: 1.6; color: var(--ink-2); margin-bottom: 9px; }
+.mdoc-math {
+  background: var(--brand-950); color: #d6ece5; border-radius: var(--radius-sm);
+  padding: 14px 16px; margin: 4px 0 14px; overflow-x: auto;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.8px; line-height: 1.75; white-space: pre; tab-size: 2;
+}
+.mdoc-code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--grid);
+  border-radius: 4px; padding: 1px 5px; color: var(--brand-700);
+}
+.mdoc-note {
+  background: var(--brand-wash); border-left: 3px solid var(--brand);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 11px 14px; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.6;
+  color: var(--brand-700); max-width: 88ch;
+}
+.mdoc-note strong { color: var(--brand-950); }
+.mdoc-tablewrap { overflow-x: auto; margin: 4px 0 14px; }
+.mdoc-table { border-collapse: collapse; width: 100%; font-size: 12.3px; }
+.mdoc-table th {
+  text-align: left; font-size: 10.5px; font-weight: 680; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); padding: 6px 12px 6px 0;
+  border-bottom: 1px solid var(--baseline); white-space: nowrap;
+}
+.mdoc-table td {
+  padding: 8px 12px 8px 0; border-bottom: 1px solid var(--hairline);
+  color: var(--ink-2); line-height: 1.55; vertical-align: top;
+}
+.mdoc-table td.sym, .mdoc-table .sym {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: var(--ink); font-weight: 600; white-space: nowrap;
+}
+.mdoc-table tbody tr:last-child td { border-bottom: none; }
+.mdoc-foot {
+  margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--grid);
+  font-size: 11.5px; color: var(--muted); line-height: 1.6;
+}
+@media (max-width: 700px) {
+  .mdoc-backdrop { padding: 0; }
+  .mdoc { border-radius: 0; max-height: 100%; height: 100%; }
+  .mdoc-body { padding: 4px 16px 24px; }
+}

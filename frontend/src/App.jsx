@@ -7,6 +7,7 @@ import PortfolioView from "./components/PortfolioView.jsx";
 import Explorer from "./components/Explorer.jsx";
 import SiteTwin from "./components/twin/SiteTwin.jsx";
 import EmptyResults from "./components/EmptyResults.jsx";
+import ModelDoc from "./components/ModelDoc.jsx";
 import { DEFAULT_CONFIG } from "./lib/mockEngine.js";
 import { compute, fetchSite, apiAvailable } from "./lib/api.js";
 import { setCurrency } from "./lib/format.js";
@@ -48,6 +49,7 @@ export default function App() {
   // métricas por equipo y del tornado
   const [appliedSiteJson, setAppliedSiteJson] = useState(null);
   const [viewingSaved, setViewingSaved] = useState(null); // nombre de la corrida cargada
+  const [showModel, setShowModel] = useState(false);      // doc del modelo MILP
 
   // sondeo único de la API: alimenta el header y habilita guardar/ejecutar.
   // NO autocarga un sitio ni autocorre — ese era el origen de los resultados
@@ -186,8 +188,14 @@ export default function App() {
               {t.label}
             </button>
           ))}
+          <button className="doc-btn" onClick={() => setShowModel(true)}
+                  title="Formulación completa del MILP: variables, objetivo, restricciones y solver">
+            <span className="glyph">ƒ</span> El modelo matemático
+          </button>
         </nav>
       </header>
+
+      {showModel && <ModelDoc onClose={() => setShowModel(false)} />}
 
       <main className="app-main">
         {tab === "site" && (
