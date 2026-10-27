@@ -1,0 +1,141 @@
+{
+    "escenarios": [
+        {
+            "van_usd": null,
+            "factible": false,
+            "capex_usd": null,
+            "anio_inversion": {
+            },
+            "emis_bruta_final": null,
+            "res_share_final": null,
+            "emis_neta_final": null,
+            "segundos": 9.98,
+            "escenario": "bau",
+            "mw_nuevos": {
+            },
+            "estado": "INFEASIBLE"
+        },
+        {
+            "van_usd": 7.577489541e7,
+            "factible": true,
+            "capex_usd": 3.188526567e7,
+            "anio_inversion": {
+                "pv": 1,
+                "battery": 1,
+                "heat_pump": 1
+            },
+            "emis_bruta_final": 23309.197,
+            "res_share_final": 0.238625,
+            "emis_neta_final": 23309.197,
+            "segundos": 2.67,
+            "escenario": "least_cost",
+            "mw_nuevos": {
+                "heat_pump@1": 10.404999,
+                "pv@1": 30,
+                "battery@1": 8.977903
+            },
+            "estado": "OPTIMAL"
+        },
+        {
+            "van_usd": 7.59079289e7,
+            "factible": true,
+            "capex_usd": 3.200730447e7,
+            "anio_inversion": {
+                "pv": 1,
+                "battery": 1,
+                "heat_pump": 1
+            },
+            "emis_bruta_final": 23136.936,
+            "res_share_final": 0.238625,
+            "emis_neta_final": 20000,
+            "segundos": 0.67,
+            "escenario": "emissions_cap",
+            "mw_nuevos": {
+                "heat_pump@1": 10.720281,
+                "pv@1": 30,
+                "battery@1": 8.786102
+            },
+            "estado": "OPTIMAL"
+        },
+        {
+            "van_usd": null,
+            "factible": false,
+            "capex_usd": null,
+            "anio_inversion": {
+            },
+            "emis_bruta_final": null,
+            "res_share_final": null,
+            "emis_neta_final": null,
+            "segundos": 0.43,
+            "escenario": "no_offsets",
+            "mw_nuevos": {
+            },
+            "estado": "INFEASIBLE"
+        },
+        {
+            "van_usd": 7.67875135e7,
+            "factible": true,
+            "capex_usd": 3.337093962e7,
+            "anio_inversion": {
+                "pv": 1,
+                "battery": 1,
+                "heat_pump": 1
+            },
+            "emis_bruta_final": 22214.029,
+            "res_share_final": 0.238625,
+            "emis_neta_final": 20000,
+            "segundos": 1,
+            "escenario": "high_gas",
+            "mw_nuevos": {
+                "heat_pump@1": 12.993007,
+                "pv@1": 30,
+                "battery@1": 8.786102
+            },
+            "estado": "OPTIMAL"
+        },
+        {
+            "van_usd": 8.976422254e7,
+            "factible": true,
+            "capex_usd": 3.325340554e7,
+            "anio_inversion": {
+                "pv": 1,
+                "battery": 1,
+                "heat_pump": 1
+            },
+            "emis_bruta_final": 22373.205,
+            "res_share_final": 0.238625,
+            "emis_neta_final": 20000,
+            "segundos": 0.68,
+            "escenario": "high_carbon",
+            "mw_nuevos": {
+                "heat_pump@1": 12.610884,
+                "pv@1": 30,
+                "battery@1": 9.105357
+            },
+            "estado": "OPTIMAL"
+        },
+        {
+            "van_usd": 7.59079289e7,
+            "factible": true,
+            "capex_usd": 3.200730447e7,
+            "anio_inversion": {
+                "pv": 1,
+                "battery": 1,
+                "heat_pump": 1
+            },
+            "emis_bruta_final": 23136.936,
+            "res_share_final": 0.238625,
+            "emis_neta_final": 20000,
+            "segundos": 0.7,
+            "escenario": "no_new_fossil",
+            "mw_nuevos": {
+                "heat_pump@1": 10.720281,
+                "pv@1": 30,
+                "battery@1": 8.786102
+            },
+            "estado": "OPTIMAL"
+        }
+    ],
+    "horizonte": 10,
+    "sitio": "data/sample_sites/demo"
+}
