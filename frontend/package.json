@@ -7,18 +7,20 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify:twin": "node scripts/twin_e2e.mjs",
     "verify:e2e": "node scripts/verify_e2e.mjs",
     "verify:flows": "node scripts/verify_flows.mjs",
     "verify:topology": "node scripts/verify_topology_web.mjs",
-    "verify:wasm": "node scripts/verify_wasm.mjs"
+    "verify:wasm": "node scripts/verify_wasm.mjs",
+    "verify:ui": "node scripts/verify_ui.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource-variable/inter": "^5.2.8",
     "highs": "^1.14.2",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-icons": "^5.7.0",
     "react-leaflet": "^4.2.1",
     "recharts": "^2.15.0"
   },

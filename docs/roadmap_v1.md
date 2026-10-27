@@ -707,6 +707,20 @@ C1-C4 · SLA de solve (S8 si hace falta).
 
 ---
 
+### Interfaz v1 (21-oct-2026)
+
+✅ Interfaz rehecha con la organización de un estudio de transición energética:
+barra lateral (Sistemas · Gemelo digital · Decisiones · Portafolio), mapa de
+infraestructura con ubicaciones y vista Flow, Resumen con KPIs, medidas,
+inversión/OPEX/costo anual por ítem (cuadrados contra el motor), cascada de
+emisiones evitadas y Sankey; páginas de Componentes, Parámetros, Mercados,
+Tareas, Potenciales, Escenarios, Series, Flujos de trabajo, Documentos,
+Registro de cambios, Optimizaciones, KPIs, Capacidades, Costos, Operación,
+Ubicaciones, Componentes y Tableros; bibliotecas globales; español e inglés.
+Backend: `topology.json` (la topología ya no se pierde al guardar),
+`currency` aceptado en overrides, `GET /sites/{name}/config`. 1308 tests;
+verify:e2e 15/15, verify:ui 58 vistas, verify:topology 7/7.
+
 ## 8 · Riesgos técnicos a vigilar
 
 1. **Tamaño del MILP**: 8760 pasos × rampas × portafolio explota; mitigación:

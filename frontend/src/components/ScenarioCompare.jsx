@@ -4,14 +4,15 @@ import {
 } from "recharts";
 import ChartCard, { VizTooltip } from "./ChartCard.jsx";
 import { musd, tons, num } from "../lib/format.js";
+import { useL } from "../ui/i18n.jsx";
 
 const SCENARIO_LABELS = {
-  bau: "BAU",
-  least_cost: "Costo mínimo",
-  emissions_cap: "Meta de emisiones",
-  no_offsets: "Sin offsets",
-  high_gas: "Gas alto",
-  high_carbon: "Carbono alto",
+  bau: ["Situación actual", "Status quo"],
+  least_cost: ["Óptimo económico", "Economic optimum"],
+  emissions_cap: ["Meta de emisiones", "Emissions target"],
+  no_offsets: ["Sin compensaciones", "No offsets"],
+  high_gas: ["Gas alto", "High gas"],
+  high_carbon: ["Carbono alto", "High carbon"],
 };
 
 /**
@@ -20,40 +21,41 @@ const SCENARIO_LABELS = {
  * todas las barras en el slot 1.
  */
 export default function ScenarioCompare({ batch }) {
+  const L = useL();
   const rows = batch.map((b) => ({
     ...b,
-    label: SCENARIO_LABELS[b.scenario] ?? b.scenario,
+    label: SCENARIO_LABELS[b.scenario] ? L(...SCENARIO_LABELS[b.scenario]) : b.scenario,
     npvM: b.npv == null ? null : b.npv / 1e6,
     netK: b.final_net_emissions == null ? null : b.final_net_emissions / 1000,
   }));
 
   const table = {
     columns: [
-      { key: "label", label: "Escenario" },
-      { key: "feasible", label: "Factible", fmt: (v) => (v ? "sí" : "no") },
-      { key: "npv", label: "VAN", fmt: (v) => musd(v) },
+      { key: "label", label: L("Escenario", "Scenario") },
+      { key: "feasible", label: L("Factible", "Feasible"), fmt: (v) => (v ? L("sí", "yes") : "no") },
+      { key: "npv", label: L("VAN", "NPV"), fmt: (v) => musd(v) },
       { key: "total_capex", label: "CAPEX", fmt: (v) => musd(v) },
-      { key: "final_net_emissions", label: "Netas finales", fmt: (v) => (v == null ? "—" : tons(v)) },
-      { key: "total_offsets", label: "Offsets acum.", fmt: (v) => (v == null ? "—" : tons(v)) },
+      { key: "final_net_emissions", label: L("Netas finales", "Final net"), fmt: (v) => (v == null ? "—" : tons(v)) },
+      { key: "total_offsets", label: L("Compensaciones acum.", "Cumulative offsets"), fmt: (v) => (v == null ? "—" : tons(v)) },
     ],
     rows,
   };
 
   return (
     <ChartCard
-      title="Comparación de escenarios"
-      sub="mismas condiciones del builder, recorridas por el motor de escenarios (§11)"
+      title={L("Comparación de escenarios", "Scenario comparison")}
+      sub={L("mismos parámetros, recorridos por el motor de escenarios", "same parameters, run through the scenario engine")}
       table={table}
-      footnote="“Sin offsets” puede salir infactible: en el demo los offsets son estructurales para la meta final."
+      footnote={L("Un escenario infactible no tiene barra: no existe plan que cumpla sus restricciones.", "An infeasible scenario has no bar: no plan satisfies its constraints.")}
     >
       <div className="grid cols-2">
         <MiniBars
-          title="VAN del horizonte (MUSD)"
+          title={L("VAN del horizonte (MUSD)", "Horizon NPV (MUSD)")}
           rows={rows} dataKey="npvM"
           fmt={(v) => (v == null ? "—" : num(v, 1))}
         />
         <MiniBars
-          title="Emisiones netas finales (kt)"
+          title={L("Emisiones netas finales (kt)", "Final net emissions (kt)")}
           rows={rows} dataKey="netK"
           fmt={(v) => (v == null ? "—" : num(v, 1))}
         />

@@ -35,7 +35,7 @@ julia --project -e "using Pkg; Pkg.instantiate()"   # backend
 cd frontend && npm install && cd ..                  # frontend
 ```
 
-Verificación (suite completa: 570 tests, incluye un end-to-end con la API
+Verificación (suite completa: 1.308 tests, incluye un end-to-end con la API
 levantada):
 
 ```bash
@@ -100,16 +100,32 @@ con espacios.
 ## Correr el frontend
 
 ```bash
-cd frontend
-npm run dev            # http://localhost:5173
+julia --project=. -e 'using IETO; s = start_server(port=8080); wait(s.serve_task)'   # terminal 1
+cd frontend && npm run dev                                                            # terminal 2 → http://localhost:5173
 ```
 
-El cockpit detecta la API en `http://127.0.0.1:8080` (configurable con
-`VITE_IETO_API`); si no responde, cae a **datos mock** que cumplen el mismo
-contrato — el chip del header indica la fuente (`API real · HiGHS` vs
-`datos mock`). Con la API viva, el flujo completo es:
-**builder → Ejecutar escenario → cockpit (KPIs + lectura ejecutiva) →
-gráficos (trayectoria, costos, dispatch, Pareto, roadmap) → Descargar Excel**.
+En desarrollo, Vite reenvía las rutas de la API a `127.0.0.1:8080` (proxy en
+`vite.config.js`), así la interfaz habla con el motor igual que en el
+escritorio. Sin API, la app sigue funcionando: los sistemas de ejemplo vienen
+embebidos y el MILP lo resuelve HiGHS en el navegador.
+
+**La interfaz** (español e inglés, selector en el perfil) se organiza en una
+barra lateral:
+
+- **Sistemas** — la grilla de sitios, cada uno con su gemelo digital.
+- **Gemelo digital** — *Infraestructura* (mapa estándar/satelital con límite,
+  ubicaciones, componentes y conexiones, más la vista *Flow* como diagrama),
+  *Componentes*, *Parámetros*, *Mercados*, *Tareas*, *Potenciales*,
+  *Escenarios*, *Series de tiempo*, *Flujos de trabajo* (Pareto, tornado),
+  *Documentos* y *Registro de cambios*.
+- **Decisiones** — *Optimizaciones* (corridas guardadas) y los resultados:
+  *Resumen* (KPIs, medidas, inversión, OPEX, costo anual, emisiones evitadas y
+  Sankey), *KPIs / Situación actual*, *Capacidades*, *Costos*, *Operación*,
+  *Ubicaciones*, *Componentes* y *Tableros*.
+- **Gestor de portafolio** — un escenario sobre varios sistemas.
+
+Las ediciones del gemelo se guardan solas en disco (el sistema `demo` es la
+referencia y es de sólo lectura: se guarda una copia).
 
 ## Estructura
 

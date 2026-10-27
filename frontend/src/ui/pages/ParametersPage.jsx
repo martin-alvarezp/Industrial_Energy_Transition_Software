@@ -1,0 +1,205 @@
+import { useEffect, useState } from "react";
+import { MdAdd, MdDelete, MdRestartAlt, MdRocketLaunch } from "react-icons/md";
+import { useI18n } from "../i18n.jsx";
+import { useStudio } from "../studio.jsx";
+import { PageHead } from "../kit.jsx";
+import { useStored } from "../storage.js";
+import { NAV_ICONS } from "../icons.jsx";
+import { hrefFor, navigate } from "../router.js";
+import RunModal from "../components/RunModal.jsx";
+import { fetchSiteConfig, EXTRA_OVERRIDES } from "../../lib/api.js";
+import { DEFAULT_CONFIG } from "../../lib/mockEngine.js";
+
+
+const pctIn = (v) => (v == null || Number.isNaN(v) ? "" : +(v * 100).toFixed(4));
+const pctOut = (s) => (s === "" ? null : +s / 100);
+
+function Field({ label, unit, children, overridden, siteValue, t }) {
+  return (
+    <div className="par-field">
+      <label>{label}{overridden && <span className="ui-tag purple" style={{ marginLeft: 8 }}>{t("par.overridden")}</span>}</label>
+      <div className="par-input">{children}{unit && <span className="unit">{unit}</span>}</div>
+      {overridden && siteValue != null && <p className="ui-hint">{t("par.siteValue", { v: siteValue })}</p>}
+    </div>
+  );
+}
+
+function Toggle({ on, onChange, label }) {
+  return (
+    <label className="par-toggle">
+      <input type="checkbox" checked={!!on} onChange={(e) => onChange(e.target.checked)} />
+      <span className="track"><span className="knob" /></span>{label}
+    </label>
+  );
+}
+
+const ENGINE_DEFAULTS = {
+  wacc: 0.08, carbon_price: 50, demand_growth: 0.01, emissions_cap_gross: 48000,
+  max_offset_share: 0.15, offset_price: 80, offset_availability: 5000,
+  price_escalation: { electricity: 0.02, natural_gas: 0.03 },
+};
+
+export default function ParametersPage({ route }) {
+  const { t } = useI18n();
+  const studio = useStudio();
+  const lib = route?.scope === "library";
+  const [defaults, setDefaults] = useStored("ieto.cfg._default", DEFAULT_CONFIG);
+  const siteName = lib ? null : studio.siteName;
+  const twin = lib ? { siteJson: { prices: {}, carriers: [], technologies: [] } } : studio.twin;
+  const draft = lib ? { ...DEFAULT_CONFIG, ...defaults } : studio.draft;
+  const setDraft = lib ? (fn) => setDefaults((d) => (typeof fn === "function" ? fn({ ...DEFAULT_CONFIG, ...d }) : fn)) : studio.setDraft;
+  const [base, setBase] = useState(null);
+  const [runOpen, setRunOpen] = useState(false);
+  useEffect(() => {
+    if (lib) { setBase(ENGINE_DEFAULTS); return; }
+    fetchSiteConfig(siteName).then((c) => setBase(c ?? {
+      wacc: 0.08, carbon_price: 50, demand_growth: 0.01, emissions_cap_gross: 48000,
+      max_offset_share: 0.15, offset_price: 80, offset_availability: 5000,
+      price_escalation: { electricity: 0.02, natural_gas: 0.03 },
+    }));
+  }, [siteName, lib]);
+  const set = (p) => setDraft((d) => ({ ...d, ...p }));
+  const v = (k) => draft[k] ?? base?.[k];
+  const over = (k) => draft[k] != null && base?.[k] != null && JSON.stringify(draft[k]) !== JSON.stringify(base[k]);
+  const cur = draft.currency ?? "USD";
+  const priced = Object.keys({ ...(base?.price_escalation ?? {}), ...(twin.siteJson.prices ?? {}) })
+    .filter((c) => c !== "grid_export");
+  const carrierName = (c) => twin.siteJson.carriers.find((x) => x.carrier_id === c)?.name ??
+    ({ electricity: t("lib.electricity"), natural_gas: t("lib.gas") }[c] ?? c);
+  const candidates = twin.siteJson.technologies.filter((x) => x.investable && x.max_new_capacity > 0);
+  const resetAll = () => setDraft((d) => {
+    const n = { ...d };
+    for (const k of EXTRA_OVERRIDES) delete n[k];
+    return { ...DEFAULT_CONFIG, ...n };
+  });
+  const num = (k, { pct = false, step = "any" } = {}) => (
+    <input className="ui-input" type="number" step={step}
+           value={pct ? pctIn(v(k)) : v(k) ?? ""}
+           onChange={(e) => set({ [k]: pct ? pctOut(e.target.value) : e.target.value === "" ? null : +e.target.value })} />
+  );
+
+  return (
+    <div className="ui-page">
+      <PageHead icon={NAV_ICONS.parameters} title={lib ? t("lib.paramsTitle") : t("nav.parameters")}
+                help={lib ? t("lib.paramsHelp") : t("par.help")}>
+        <button className="ui-btn ghost" onClick={resetAll}><MdRestartAlt /> {t("par.reset")}</button>
+        {!lib && <button className="ui-btn primary" onClick={() => setRunOpen(true)}><MdRocketLaunch /> {t("par.optimize")}</button>}
+      </PageHead>
+
+      <div className="par-grid">
+        <section className="ui-card ui-card-pad">
+          <h3 className="ui-card-title">{t("par.horizon")}</h3>
+          <div className="par-row">
+            <Field t={t} label={t("par.baseYear")}>
+              <input className="ui-input" type="number" value={draft.base_year} onChange={(e) => set({ base_year: +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.years")} unit={`${draft.base_year} → ${draft.base_year + draft.horizon_years - 1}`}>
+              <input className="ui-input" type="number" min={1} max={30} value={draft.horizon_years}
+                     onChange={(e) => set({ horizon_years: Math.max(1, +e.target.value) })} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="ui-card ui-card-pad">
+          <h3 className="ui-card-title">{t("par.finance")}</h3>
+          <div className="par-row">
+            <Field t={t} label={t("par.wacc")} unit="%" overridden={over("wacc")} siteValue={`${pctIn(base?.wacc)} %`}>{num("wacc", { pct: true })}</Field>
+            <Field t={t} label={t("par.currency")}>
+              <input className="ui-input" value={cur} onChange={(e) => set({ currency: e.target.value.toUpperCase().slice(0, 5) })} />
+            </Field>
+            <Field t={t} label={t("par.tax")} unit="%">
+              <input className="ui-input" type="number" value={pctIn(draft.tax_rate)} onChange={(e) => set({ tax_rate: pctOut(e.target.value) ?? 0 })} />
+            </Field>
+            <Field t={t} label={t("par.dep")}>
+              <input className="ui-input" type="number" min={0} value={draft.depreciation_years} onChange={(e) => set({ depreciation_years: +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.budget")} unit={`M${cur}`}>
+              <input className="ui-input" type="number" min={0} placeholder={t("par.noBudget")}
+                     value={draft.capex_budget_musd ?? ""}
+                     onChange={(e) => set({ capex_budget_musd: e.target.value === "" ? null : +e.target.value })} />
+            </Field>
+          </div>
+          <Toggle on={draft.salvage_value} onChange={(x) => set({ salvage_value: x })} label={t("par.salvage")} />
+        </section>
+
+        <section className="ui-card ui-card-pad">
+          <h3 className="ui-card-title">{t("par.prices")}</h3>
+          <div className="par-row">
+            {priced.map((c) => {
+              const esc = v("price_escalation") ?? {};
+              const baseEsc = base?.price_escalation?.[c] ?? 0;
+              return (
+                <Field key={c} t={t} label={t("par.escalation", { c: carrierName(c) })} unit="%/año"
+                       overridden={draft.price_escalation?.[c] != null && draft.price_escalation[c] !== baseEsc}
+                       siteValue={`${pctIn(baseEsc)} %`}>
+                  <input className="ui-input" type="number" step="any" value={pctIn(esc[c] ?? 0)}
+                         onChange={(e) => set({ price_escalation: { ...(base?.price_escalation ?? {}), ...(draft.price_escalation ?? {}), [c]: pctOut(e.target.value) ?? 0 } })} />
+                </Field>
+              );
+            })}
+            <Field t={t} label={t("par.growth")} unit="%/año" overridden={over("demand_growth")} siteValue={`${pctIn(base?.demand_growth)} %`}>
+              {num("demand_growth", { pct: true })}
+            </Field>
+          </div>
+        </section>
+
+        <section className="ui-card ui-card-pad">
+          <h3 className="ui-card-title">{t("par.climate")}</h3>
+          <div className="par-row">
+            <Field t={t} label={t("par.capStart")} unit="tCO₂e">
+              <input className="ui-input" type="number" value={draft.emissions_cap_net_start} onChange={(e) => set({ emissions_cap_net_start: +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.capEnd")} unit="tCO₂e">
+              <input className="ui-input" type="number" value={draft.emissions_cap_net_end} onChange={(e) => set({ emissions_cap_net_end: +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.capGross")} unit="tCO₂e" overridden={over("emissions_cap_gross")} siteValue={base?.emissions_cap_gross}>{num("emissions_cap_gross")}</Field>
+            <Field t={t} label={t("par.carbon")} unit={`${cur}/tCO₂e`} overridden={over("carbon_price")} siteValue={base?.carbon_price}>{num("carbon_price")}</Field>
+          </div>
+          <Toggle on={draft.allow_offsets} onChange={(x) => set({ allow_offsets: x })} label={t("par.offsets")} />
+          {draft.allow_offsets && (
+            <div className="par-row" style={{ marginTop: 10 }}>
+              <Field t={t} label={t("par.offShare")} unit="%" overridden={over("max_offset_share")} siteValue={`${pctIn(base?.max_offset_share)} %`}>{num("max_offset_share", { pct: true })}</Field>
+              <Field t={t} label={t("par.offPrice")} unit={`${cur}/tCO₂e`} overridden={over("offset_price")} siteValue={base?.offset_price}>{num("offset_price")}</Field>
+              <Field t={t} label={t("par.offAvail")} unit="tCO₂e" overridden={over("offset_availability")} siteValue={base?.offset_availability}>{num("offset_availability")}</Field>
+            </div>
+          )}
+        </section>
+
+        <section className="ui-card ui-card-pad par-wide">
+          <h3 className="ui-card-title">{t("par.invest")}</h3>
+          <Toggle on={draft.allow_new_fossil} onChange={(x) => set({ allow_new_fossil: x })} label={t("par.newFossil")} />
+          <Toggle on={draft.renew_existing} onChange={(x) => set({ renew_existing: x })} label={t("par.renew")} />
+          <Toggle on={draft.repeat_investments} onChange={(x) => set({ repeat_investments: x })} label={t("par.repeat")} />
+          {!lib && <>
+          <h4 className="par-sub">{t("par.forced")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.forcedHint")}</p>
+          {candidates.length === 0 ? <p className="ui-hint">{t("par.noCandidates")}</p> : (
+            <>
+              {(draft.forced_builds ?? []).map((f, i) => (
+                <div key={i} className="par-forced">
+                  <select className="ui-select" value={f.tech}
+                          onChange={(e) => set({ forced_builds: draft.forced_builds.map((x, j) => (j === i ? { ...x, tech: e.target.value } : x)) })}>
+                    {candidates.map((c) => <option key={c.tech_id} value={c.tech_id}>{c.name}</option>)}
+                  </select>
+                  <input className="ui-input" type="number" value={f.year} style={{ width: 120 }}
+                         onChange={(e) => set({ forced_builds: draft.forced_builds.map((x, j) => (j === i ? { ...x, year: +e.target.value } : x)) })} />
+                  <input className="ui-input" type="number" value={f.mw} style={{ width: 120 }}
+                         onChange={(e) => set({ forced_builds: draft.forced_builds.map((x, j) => (j === i ? { ...x, mw: +e.target.value } : x)) })} />
+                  <span className="unit">MW</span>
+                  <button className="ui-dots" onClick={() => set({ forced_builds: draft.forced_builds.filter((_, j) => j !== i) })}><MdDelete /></button>
+                </div>
+              ))}
+              <button className="ui-btn outline sm" onClick={() => set({ forced_builds: [...(draft.forced_builds ?? []),
+                { tech: candidates[0].tech_id, year: draft.base_year + 1, mw: Math.min(1, candidates[0].max_new_capacity) }] })}>
+                <MdAdd /> {t("par.addForced")}
+              </button>
+            </>
+          )}
+          </>}
+        </section>
+      </div>
+      {runOpen && <RunModal onClose={() => setRunOpen(false)}
+                            onDone={() => navigate(hrefFor({ site: siteName, page: "summary" }))} />}
+    </div>
+  );
+}

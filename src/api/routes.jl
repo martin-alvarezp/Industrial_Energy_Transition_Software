@@ -96,6 +96,10 @@ _coerce(::Type{Bool}, v) = Bool(v)
 _coerce(::Type{Vector{Symbol}}, v) = Symbol[Symbol(x) for x in v]
 _coerce(::Type{Vector{Float64}}, v) = Float64[Float64(x) for x in v]
 _coerce(::Type{Union{Float64,Nothing}}, v) = v === nothing ? nothing : Float64(v)
+# `currency` (M9) es el único campo de texto; sin este método el override
+# caía en MethodError → 400 y la UI degradaba en silencio al motor web
+_coerce(::Type{String}, v) = v isa AbstractString ? String(v) :
+    throw(ArgumentError("se esperaba texto"))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{Tuple{Symbol,Int,Float64}}}, v) =
@@ -393,6 +397,17 @@ function handle_get_site(req::HTTP.Request, data_dir::AbstractString)
     return _json_response(200,
         merge(site_json(site), (site_version = site_version(site),
                                 layout = layout)))
+end
+
+"""
+GET /sites/{name}/config — el scenario_config.yaml del sitio como JSON (el
+mismo formato que `assumptions.scenario_config` de los resultados). Sólo
+lectura: los cambios del usuario viajan como `config_overrides` al correr.
+"""
+function handle_get_site_config(req::HTTP.Request, data_dir::AbstractString)
+    name = get(HTTP.getparams(req), "name", "")
+    _, cfg = load_and_validate(_site_dir(name, data_dir))
+    return _json_response(200, (scenario_config = _config_json(cfg),))
 end
 
 """

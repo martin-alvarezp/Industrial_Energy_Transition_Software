@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import KpiTile from "./KpiTile.jsx";
 import { listSites, runPortfolio, toOverrides } from "../lib/api.js";
 import { musd, num, calYear } from "../lib/format.js";
+import { useL } from "../ui/i18n.jsx";
 
 const SCENARIOS = [
-  ["emissions_cap", "Caso base (con meta)"],
-  ["least_cost", "Sin meta (mínimo costo)"],
-  ["bau", "BaU (solo existentes)"],
-  ["high_gas", "Gas alto ×1.5"],
-  ["high_carbon", "Carbono alto ×3"],
+  ["emissions_cap", "Caso base (con meta)", "Base case (with target)"],
+  ["least_cost", "Sin meta (mínimo costo)", "No target (least cost)"],
+  ["bau", "Situación actual (sólo existentes)", "Status quo (existing only)"],
+  ["high_gas", "Gas alto ×1,5", "High gas ×1.5"],
+  ["high_carbon", "Carbono alto ×3", "High carbon ×3"],
 ];
 
 /**
@@ -17,6 +18,7 @@ const SCENARIOS = [
  * empresa". Requiere la API real (los sitios viven en disco).
  */
 export default function PortfolioView({ apiUp, draft }) {
+  const L = useL();
   const [sites, setSites] = useState([]);
   const [sel, setSel] = useState([]);
   const [scenario, setScenario] = useState("emissions_cap");
@@ -28,12 +30,9 @@ export default function PortfolioView({ apiUp, draft }) {
   if (!apiUp)
     return (
       <div className="empty-results">
-        <div className="empty-glyph">🏭</div>
-        <h3>El portafolio requiere la API real</h3>
+        <h3>{L("El portafolio requiere la API", "The portfolio requires the API")}</h3>
         <p>
-          Los sitios del portafolio viven guardados en disco y se corren en el
-          motor local. En la versión web (navegador) trabaja sitio a sitio; para
-          el portafolio corporativo usa la versión de escritorio.
+          {L("Los sistemas del portafolio viven guardados en disco y se corren en el motor local. En la versión web (navegador) se trabaja sistema por sistema.", "Portfolio systems are saved on disk and run on the local engine. In the web version (browser) you work system by system.")}
         </p>
       </div>
     );
@@ -59,7 +58,7 @@ export default function PortfolioView({ apiUp, draft }) {
       <div className="filter-row" style={{ alignItems: "center" }}>
         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em",
                        textTransform: "uppercase", color: "var(--muted)" }}>
-          Sitios del grupo
+          {L("Sistemas del grupo", "Group systems")}
         </span>
         {sites.map((s) => (
           <label key={s} style={{ fontSize: 12.5, display: "flex", gap: 5,
@@ -70,13 +69,13 @@ export default function PortfolioView({ apiUp, draft }) {
         ))}
         <select className="site-select" value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
-                aria-label="escenario del portafolio">
-          {SCENARIOS.map(([id, lb]) => <option key={id} value={id}>{lb}</option>)}
+                aria-label={L("escenario del portafolio", "portfolio scenario")}>
+          {SCENARIOS.map(([id, es, en]) => <option key={id} value={id}>{L(es, en)}</option>)}
         </select>
         <button className="btn-run" style={{ width: "auto", padding: "8px 18px" }}
                 disabled={sel.length === 0 || state === "running"} onClick={run}>
           {state === "running"
-            ? `Optimizando ${sel.length} sitio(s)…` : "Correr portafolio"}
+            ? L(`Optimizando ${sel.length} sistema(s)…`, `Optimizing ${sel.length} system(s)…`) : L("Correr portafolio", "Run portfolio")}
         </button>
       </div>
       {state?.error && (
@@ -88,27 +87,28 @@ export default function PortfolioView({ apiUp, draft }) {
       {agg && (
         <>
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
-            <KpiTile label="VAN del grupo" value={musd(agg.npv)}
-                     note={`${agg.feasible_sites}/${agg.total_sites} sitios factibles · ${out.scenario}`} />
-            <KpiTile label="Inversión del grupo" value={musd(agg.total_capex)} />
-            <KpiTile label="Emisiones netas finales"
+            <KpiTile label={L("VAN del grupo", "Group NPV")} value={musd(agg.npv)}
+                     note={L(`${agg.feasible_sites}/${agg.total_sites} sistemas factibles · ${out.scenario}`, `${agg.feasible_sites}/${agg.total_sites} feasible systems · ${out.scenario}`)} />
+            <KpiTile label={L("Inversión del grupo", "Group investment")} value={musd(agg.total_capex)} />
+            <KpiTile label={L("Emisiones netas finales", "Final net emissions")}
                      value={`${num(agg.final_net_emissions, 0)} t`}
-                     note={`brutas ${num(agg.final_gross_emissions, 0)} t`} />
-            <KpiTile label="Offsets del horizonte"
+                     note={L(`brutas ${num(agg.final_gross_emissions, 0)} t`, `gross ${num(agg.final_gross_emissions, 0)} t`)} />
+            <KpiTile label={L("Compensaciones del horizonte", "Horizon offsets")}
                      value={`${num(agg.total_offsets, 0)} t`} />
           </div>
           <div style={{ height: 14 }} />
           <div className="card">
             <div className="card-head">
-              <h3 className="card-title">Sitios del portafolio</h3>
+              <h3 className="card-title">{L("Sistemas del portafolio", "Portfolio systems")}</h3>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table className="data-table" style={{ width: "100%" }}>
                 <thead>
                   <tr>
-                    {["Sitio", "Estado", "VAN", "Inversión", "Emisiones netas finales",
-                      "Medidas", "% del VAN grupo"].map((h) => (
-                      <th key={h} style={{ textAlign: h === "Sitio" ? "left" : "right" }}>{h}</th>
+                    {[L("Sistema", "System"), L("Estado", "Status"), L("VAN", "NPV"), L("Inversión", "Investment"),
+                      L("Emisiones netas finales", "Final net emissions"), L("Medidas", "Measures"),
+                      L("% del VAN grupo", "% of group NPV")].map((h, i) => (
+                      <th key={h} style={{ textAlign: i === 0 ? "left" : "right" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -118,7 +118,7 @@ export default function PortfolioView({ apiUp, draft }) {
                       <td>{s.site}</td>
                       <td style={{ textAlign: "right",
                                    color: s.feasible ? "var(--ok-text)" : "var(--crit)" }}>
-                        {s.feasible ? "óptimo" : `infactible (${s.status})`}
+                        {s.feasible ? L("óptimo", "optimal") : L(`infactible (${s.status})`, `infeasible (${s.status})`)}
                       </td>
                       <td style={{ textAlign: "right" }}>{s.npv != null ? musd(s.npv) : "—"}</td>
                       <td style={{ textAlign: "right" }}>{s.total_capex != null ? musd(s.total_capex) : "—"}</td>
@@ -139,8 +139,7 @@ export default function PortfolioView({ apiUp, draft }) {
               </table>
             </div>
             <p className="footnote">
-              mismo escenario y mismos supuestos del builder aplicados a todos
-              los sitios — el agregado es la suma de las corridas individuales
+              {L("mismo escenario y mismos parámetros aplicados a todos los sistemas — el agregado es la suma de las corridas individuales", "same scenario and parameters applied to every system — the aggregate is the sum of the individual runs")}
             </p>
           </div>
         </>

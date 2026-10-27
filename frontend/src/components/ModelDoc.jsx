@@ -1,23 +1,26 @@
 // Documentación del MODELO DE OPTIMIZACIÓN, escrita para alguien que sabe de
 // programación matemática: qué problema es, cómo se arma, qué se minimiza,
-// qué restricciones lo definen, cómo se resuelve y qué NO modela.
+// qué restricciones lo definen, cómo se resuelve y qué NO modela. En español y
+// en inglés: los dos cuerpos dicen lo mismo.
 //
 // Regla de mantenimiento: esto describe el modelo REAL (src/model/objective.jl,
 // src/constraints/*.jl y su espejo lib/milp/lp.js). Si cambia una restricción,
-// cambia también acá — una documentación que miente es peor que ninguna.
+// cambia también acá —en los dos idiomas—: una documentación que miente es peor
+// que ninguna.
 import { useEffect, useRef } from "react";
+import { useI18n } from "../ui/i18n.jsx";
 
 const SECCIONES = [
-  ["que-es", "Qué problema es"],
-  ["generacion", "Cómo se genera"],
-  ["conjuntos", "Conjuntos"],
-  ["variables", "Variables"],
-  ["objetivo", "Función objetivo"],
-  ["restricciones", "Restricciones"],
-  ["naturaleza", "Naturaleza del problema"],
-  ["solver", "Cómo se resuelve"],
-  ["equivalencia", "Verificación"],
-  ["limitaciones", "Supuestos y límites"],
+  ["que-es", "Qué problema es", "What problem it is"],
+  ["generacion", "Cómo se genera", "How it is generated"],
+  ["conjuntos", "Conjuntos", "Sets"],
+  ["variables", "Variables", "Variables"],
+  ["objetivo", "Función objetivo", "Objective function"],
+  ["restricciones", "Restricciones", "Constraints"],
+  ["naturaleza", "Naturaleza del problema", "Nature of the problem"],
+  ["solver", "Cómo se resuelve", "How it is solved"],
+  ["equivalencia", "Verificación", "Verification"],
+  ["limitaciones", "Supuestos y límites", "Assumptions and limits"],
 ];
 
 const M = ({ children }) => <div className="mdoc-math">{children}</div>;
@@ -28,52 +31,9 @@ const S = ({ id, title, children }) => (
   </section>
 );
 
-export default function ModelDoc({ onClose }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    ref.current?.focus();
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
-  const jump = (id) => (e) => {
-    e.preventDefault();
-    ref.current?.querySelector(`#${id}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
+function BodyES({ jump }) {
   return (
-    <div className="mdoc-backdrop" onMouseDown={(e) => {
-      if (e.target === e.currentTarget) onClose();
-    }}>
-      <div className="mdoc" role="dialog" aria-modal="true"
-           aria-label="Documentación del modelo de optimización"
-           tabIndex={-1} ref={ref}>
-        <header className="mdoc-head">
-          <div>
-            <h2>El modelo de optimización</h2>
-            <p>
-              Qué se está resolviendo cuando pulsas <em>Ejecutar</em> — formulación
-              completa, no un resumen divulgativo.
-            </p>
-          </div>
-          <button className="mdoc-close" onClick={onClose} aria-label="cerrar">✕</button>
-        </header>
-
-        <nav className="mdoc-nav">
-          {SECCIONES.map(([id, label]) => (
-            <a key={id} href={`#${id}`} onClick={jump(id)}>{label}</a>
-          ))}
-        </nav>
-
-        <div className="mdoc-body">
+    <>
 
           <S id="que-es" title="1 · Qué problema es">
             <p>
@@ -356,6 +316,18 @@ nc[t,y*] ≥ q                     compras forzadas por el usuario`}</M>
               ajustada posible. Permitir inversiones repetidas relaja la segunda
               restricción y admite ampliaciones por etapas.
             </p>
+
+            <h4 className="mdoc-h4">6.8 · Presupuesto CAPEX</h4>
+            <M>{`Σ  CAPEX_y  ≤  capex_budget          (sólo si el escenario fija un presupuesto)
+y∈Y`}</M>
+            <p className="mdoc-small">
+              Usa la misma expresión CAPEX_y del objetivo —inversiones nuevas, compras
+              forzadas y repetidas, y renovaciones del parque existente—, sin descontar
+              y antes del escudo fiscal y del valor residual. Así, el CAPEX total que
+              reportan los resultados nunca supera el presupuesto. Si el presupuesto
+              vuelve infactible el escenario, el diagnóstico lo dice y entrega el mínimo
+              CAPEX exacto con el que sí sería factible.
+            </p>
           </S>
 
           <S id="naturaleza" title="7 · Naturaleza del problema">
@@ -379,9 +351,10 @@ nc[t,y*] ≥ q                     compras forzadas por el usuario`}</M>
                 se fija en 1e−6 y los tests comparan contra óptimos exactos.
               </li>
               <li>
-                <strong>Acoplamiento inter-anual.</strong> Viene de tres sitios: la
-                ventana de vida útil en A[t,y], la trayectoria del tope de emisiones y la
-                depreciación fiscal. Sin ellos el problema se separaría por año.
+                <strong>Acoplamiento inter-anual.</strong> Viene de cuatro sitios: la
+                ventana de vida útil en A[t,y], la trayectoria del tope de emisiones, la
+                depreciación fiscal y el presupuesto CAPEX acumulado. Sin ellos el
+                problema se separaría por año.
               </li>
               <li>
                 <strong>Previsión perfecta y determinismo.</strong> El modelo conoce todo
@@ -427,11 +400,11 @@ nc[t,y*] ≥ q                     compras forzadas por el usuario`}</M>
               motor Julia resuelve un catálogo de instancias y sella el óptimo; el motor
               del navegador debe reproducir cada uno.
             </p>
-            <M>{`verify:wasm   7/7 instancias   ·   Δ relativo ~1e−16`}</M>
+            <M>{`verify:wasm   8/8 instancias   ·   Δ relativo ~1e−16`}</M>
             <p className="mdoc-small">
               Es decir: coinciden hasta el último bit representable en doble precisión, no
               «aproximadamente». A eso se suman los oráculos analíticos de la suite Julia
-              (1.275 tests), invariantes de balance físico y determinismo, y la validación
+              (1.308 tests), invariantes de balance físico y determinismo, y la validación
               de que el diagrama de flujos publicado respeta la convención del balance
               nodal. Cada corrida queda sellada con dos huellas —del sitio y del
               escenario— que hacen reproducible el resultado.
@@ -469,6 +442,470 @@ nc[t,y*] ≥ q                     compras forzadas por el usuario`}</M>
             {" "}<a href="https://github.com/martin-alvarezp/Industrial_Energy_Transition_Software"
                    target="_blank" rel="noreferrer">Repositorio en GitHub</a>.
           </footer>
+    </>
+  );
+}
+
+function BodyEN({ jump }) {
+  return (
+    <>
+          <S id="que-es" title="1 · What problem it is">
+            <p>
+              A <strong>deterministic MILP with coupled investment and dispatch</strong>
+              {" "}(<em>capacity expansion + unit dispatch</em>) over a multi-year
+              horizon with perfect foresight. It decides <strong>what to buy, how much,
+              in which year</strong> and, at the same time, <strong>how to operate</strong>
+              {" "}the whole fleet in each representative time step, minimizing the
+              <strong> net present value of total system cost</strong> subject to
+              physical balances per node and energy carrier, capacity limits, market
+              contracts and emission caps.
+            </p>
+            <p>
+              The structure is the classic two-stage one <em>in the model, not in the
+              algorithm</em>: investment variables (integer and continuous) and
+              operation variables (continuous) live in <strong>a single monolithic
+              problem</strong>, solved at once. There is no Benders decomposition nor
+              rolling horizon: the size allows it, and the optimum is exact and
+              reproducible.
+            </p>
+            <div className="mdoc-note">
+              The sign matters: the objective is a <strong>cost</strong> to be
+              minimized. The KPI the interface calls «NPV» is the NPV of total system
+              cost — <strong>lower is better</strong>. Comparing against the reference
+              scenario is what turns that into savings.
+            </div>
+          </S>
+
+          <S id="generacion" title="2 · How the model is generated">
+            <p>
+              The instance is built by composition, without the user writing any
+              algebra. The site's <em>digital twin</em> (components, carriers, hourly
+              series, markets, nodes and arcs) plus the scenario configuration
+              (horizon, WACC, caps, prices, taxes, budget) become:
+            </p>
+            <M>{`site (digital twin) + scenario
+    →  sets  →  parameters  →  variables  →  constraints
+    →  objective   →  MILP instance`}</M>
+            <p>
+              Scenarios are not different models: they are <strong>transformations of
+              the configuration</strong> applied before building (for example
+              <em> least_cost</em> relaxes the emission caps to +∞; <em>bau</em>
+              {" "}restricts the technology set to the existing ones;
+              {" "}<em>high_gas</em> multiplies the gas price by 1.5). Same structure,
+              different data.
+            </p>
+            <p>
+              There are <strong>two independent implementations of the same model</strong>:
+              the reference one in Julia with JuMP (<span className="mdoc-code">src/model</span>,
+              {" "}<span className="mdoc-code">src/constraints</span>), and a mirror in
+              JavaScript (<span className="mdoc-code">lib/milp/lp.js</span>) that writes
+              the <strong>LP file in CPLEX format</strong> directly and solves it in your
+              browser when there is no backend.
+              The <a href="#equivalencia" onClick={jump("equivalencia")}>Verification</a>
+              {" "}section explains how they are kept from drifting apart.
+            </p>
+            <h4 className="mdoc-h4">Actual size of an instance</h4>
+            <p>
+              Exact dimensions of two instances you can run in this same app (96
+              representative steps adding up to 8760 h):
+            </p>
+            <div className="mdoc-tablewrap">
+              <table className="mdoc-table">
+                <thead>
+                  <tr><th>Instance</th><th>Years</th><th>Nodes</th><th>Rows</th>
+                      <th>Variables</th><th>Binaries</th><th>Non-zeros</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>plant with internal grid</td><td>10</td><td>6</td>
+                      <td>17,373</td><td>10,650</td><td>30</td><td>47,770</td></tr>
+                  <tr><td>copper-plate demo</td><td>5</td><td>1</td>
+                      <td>5,814</td><td>4,375</td><td>20</td><td>22,875</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mdoc-small">
+              The matrix is very sparse (≈0.03% density) and strongly block-structured
+              by year: almost all the difficulty lies in the inter-year coupling
+              introduced by asset lifetimes, the emission cap trajectory and the
+              investment budget.
+            </p>
+          </S>
+
+          <S id="conjuntos" title="3 · Indices and sets">
+            <div className="mdoc-tablewrap">
+              <table className="mdoc-table">
+                <tbody>
+                  <tr><td className="sym">s ∈ T</td><td>Representative time steps of the template year. Each has a weight w<sub>s</sub> (hours/year) with Σ<sub>s</sub> w<sub>s</sub> = 8760, a season and an hour. By default 96 steps = 4 seasons × 24 h.</td></tr>
+                  <tr><td className="sym">y ∈ Y</td><td>Horizon years, 1…N. Optionally mapped to calendar years.</td></tr>
+                  <tr><td className="sym">se ∈ SE</td><td>Seasons — they partition T. They define the storage cycle and the billing period of peak power.</td></tr>
+                  <tr><td className="sym">n ∈ N<sub>d</sub></td><td>Nodes (buses) of the site's internal network. Without a declared topology there is a single node and the model degenerates exactly into a copper plate.</td></tr>
+                  <tr><td className="sym">c ∈ C</td><td>Energy carriers. Only the <em>balanced</em> ones —energy, heat and cooling categories, plus fuels with a purchase market— get a balance equation.</td></tr>
+                  <tr><td className="sym">V, G, B</td><td>Converters (consume one carrier and produce another), generators (resource profile) and storages.</td></tr>
+                  <tr><td className="sym">K ⊆ V∪G∪B</td><td><em>Candidate</em> technologies: those marked as investable. Only these have investment variables.</td></tr>
+                  <tr><td className="sym">M⁺, M⁻</td><td>Purchase and sale markets, each with its price series, physical connection and caps.</td></tr>
+                  <tr><td className="sym">L</td><td>Arc links: each arc is expanded into one directed link <em>per carrier</em>; bidirectional arcs give two (forward and back), because flow is non-negative.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </S>
+
+          <S id="variables" title="4 · Decision variables">
+            <p>
+              All continuous and <strong>non-negative</strong> except the build
+              decision, the model's only binary.
+            </p>
+            <div className="mdoc-tablewrap">
+              <table className="mdoc-table">
+                <thead><tr><th>Symbol</th><th>Meaning</th><th>Indices</th><th>Domain</th></tr></thead>
+                <tbody>
+                  <tr><td className="sym">d<sub>t,s,y</sub></td><td>Dispatch (mean power of the step)</td><td>t ∈ V∪G</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">nc<sub>t,y</sub></td><td>New capacity installed in year y</td><td>t ∈ K</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">b<sub>t,y</sub></td><td>Build decision</td><td>t ∈ K</td><td><strong>{"{0,1}"}</strong></td></tr>
+                  <tr><td className="sym">soc<sub>t,s,y</sub></td><td>State of charge</td><td>t ∈ B</td><td>≥ 0 · MWh</td></tr>
+                  <tr><td className="sym">ch, dc</td><td>Charge and discharge</td><td>t ∈ B</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">mf<sub>m,s,y</sub></td><td>Flow bought or sold in market m</td><td>m ∈ M⁺∪M⁻</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">af<sub>l,s,y</sub></td><td>Flow through arc link l (measured at the sender)</td><td>l ∈ L</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">pk<sub>m,se,y</sub></td><td>Billable peak power of the season</td><td>m ∈ M⁺</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">ex<sub>m,se,y</sub></td><td>Excess over contracted power</td><td>m ∈ M⁺</td><td>≥ 0 · MW</td></tr>
+                  <tr><td className="sym">nm<sub>m,p,y</sub></td><td>Energy credited by netting in period p</td><td>m ∈ M⁻</td><td>≥ 0 · MWh</td></tr>
+                  <tr><td className="sym">ge<sub>y</sub>, ne<sub>y</sub></td><td>Gross and net emissions of the year</td><td>—</td><td>≥ 0 · tCO₂e</td></tr>
+                  <tr><td className="sym">off<sub>y</sub></td><td>Purchased offsets</td><td>—</td><td>≥ 0 · tCO₂e</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mdoc-small">
+              Non-negativity of <span className="sym">af</span> is why a bidirectional
+              arc is modeled with two links: it keeps the matrix linear and leaves the
+              flow direction as a result, not as data.
+            </p>
+            <h4 className="mdoc-h4">Available capacity (derived expression)</h4>
+            <p>
+              Not an independent variable but an affine expression that couples the
+              years — it is what introduces the life cycle:
+            </p>
+            <M>{`A[t,y] = existing_t · 1{t alive in y}  +  Σ  nc[t,y']
+                                                y'≤y, y−y'<L_t`}</M>
+            <p className="mdoc-small">
+              An asset bought in y′ provides capacity during its lifetime L<sub>t</sub>
+              {" "}and disappears afterwards. The existing fleet retires when its
+              remaining life runs out, or is renewed deterministically if the scenario
+              says so.
+            </p>
+          </S>
+
+          <S id="objetivo" title="5 · Objective function">
+            <p>
+              Minimize the NPV of total cost, with annual discounting δ<sub>y</sub> =
+              (1+wacc)<sup>−y</sup>. No capital recovery factor: each CAPEX is discounted
+              <strong> in full in its investment year</strong>, with the same factor as
+              all other flows.
+            </p>
+            <M>{`min   Σ  δ_y · [ CAPEX_y + FOM_y + VOM_y + Purchases_y + PeakCharges_y
+     y∈Y            + Carbon_y + Offsets_y − Sales_y + Tax_y ]
+
+      −  δ_N · SalvageValue`}</M>
+            <div className="mdoc-tablewrap">
+              <table className="mdoc-table">
+                <tbody>
+                  <tr><td className="sym">CAPEX<sub>y</sub></td><td>Σ<sub>t∈K</sub> capex<sub>t</sub>·nc<sub>t,y</sub> + deterministic renewals of the existing fleet.</td></tr>
+                  <tr><td className="sym">FOM<sub>y</sub></td><td>Σ<sub>t</sub> fom<sub>t</sub>·A[t,y] + fixed connection charges (USD/year).</td></tr>
+                  <tr><td className="sym">VOM<sub>y</sub></td><td>Σ<sub>t,s</sub> vom<sub>t</sub>·d<sub>t,s,y</sub>·w<sub>s</sub>. For a storage, «dispatch» is its discharge.</td></tr>
+                  <tr><td className="sym">Purchases<sub>y</sub></td><td>Σ<sub>m∈M⁺,s</sub> price<sub>m,s,y</sub>·mf<sub>m,s,y</sub>·w<sub>s</sub> + implicit purchase of fuels without a market, valued per input port (covers cogeneration).</td></tr>
+                  <tr><td className="sym">PeakCharges<sub>y</sub></td><td>Per season: USD/kW·month charge on pk, or —with contracted power— the fixed charge for the contracted kW plus the penalty on ex.</td></tr>
+                  <tr><td className="sym">Carbon<sub>y</sub></td><td>carbon_price(y) · ge<sub>y</sub>, with a per-year trajectory if the scenario defines one.</td></tr>
+                  <tr><td className="sym">Sales<sub>y</sub></td><td>Injection revenue at the sale price; with netting, the credit at the period's average retail price.</td></tr>
+                  <tr><td className="sym">Tax<sub>y</sub></td><td>After-tax cost: −t·(deductibles) − t·straight-line depreciation of new investments. CAPEX enters in full and the shield arrives through depreciation.</td></tr>
+                  <tr><td className="sym">SalvageValue</td><td>Optional credit for unused lifetime at the end of the horizon, capex<sub>t</sub>·nc<sub>t,y</sub>·max(0, (L<sub>t</sub>−(N−y+1))/L<sub>t</sub>), discounted to year N. Without it, investing late in long-lived assets is penalized by truncation.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mdoc-small">
+              All coefficients are constants known when building: the function is
+              <strong> linear</strong>. The usual economic non-linearities (economies of
+              scale, learning curves) are not modeled.
+            </p>
+          </S>
+
+          <S id="restricciones" title="6 · Constraints">
+
+            <h4 className="mdoc-h4">6.1 · Balance per node and carrier — the heart of the model</h4>
+            <p>One equality per (node, balanced carrier, step, year):</p>
+            <M>{`Σ  (Σ ρ_out − Σ ρ_in)·d[v,s,y]        converters at node n
+v∈V_n
+
+ + Σ  d[g,s,y]                          generators at node n
+  g∈G_n
+
+ + Σ  (dc[b,s,y] − ch[b,s,y])           storages at node n
+  b∈B_n
+
+ + Σ  σ_m · mf[m,s,y]                   markets connected at n (σ=+1 buy, −1 sell)
+  m
+
+ + Σ  η_l · af[l,s,y]  −  Σ  af[l,s,y]  incoming and outgoing arcs
+  l→n                     l←n
+
+ =  D[c,s] · (1+g)^(y−1) · 1{demand of c lives at n}`}</M>
+            <p className="mdoc-small">
+              Transport loss is linear: the link delivers η<sub>l</sub> times what is
+              sent, and the arc is measured at the sender. A node that consumes a carrier
+              with no local source and no incoming arc makes the problem
+              <strong> infeasible</strong> — badly wired islands show up on their own,
+              with no separate detection needed.
+            </p>
+
+            <h4 className="mdoc-h4">6.2 · Capacity and availability</h4>
+            <M>{`d[v,s,y]  ≤  α[v,s] · A[v,y]        converters (α = availability, default 1)
+d[g,s,y]  ≤  cf[g,s] · A[g,y]       generators (cf = resource capacity factor)
+af[l,s,y] ≤  κ_l                    link with a declared cap`}</M>
+            <p className="mdoc-small">
+              A renewable generator's profile enters as a step-dependent upper bound:
+              the model may curtail (there is no obligation to dispatch all the
+              available resource).
+            </p>
+
+            <h4 className="mdoc-h4">6.3 · Storage</h4>
+            <M>{`soc[s] − soc[prev(s)] − η·ch[s] + dc[s]/η  =  0     ∀ s in the season
+soc ≤ h · A[t,y]      ch ≤ A[t,y]      dc ≤ A[t,y]`}</M>
+            <p className="mdoc-small">
+              The balance is <strong>cyclic within each season</strong>: steps are
+              ordered by hour and the predecessor of the first is the last, so the season
+              closes on itself. A deliberate choice with consequences: it models
+              intra-day arbitrage, <strong>not</strong> seasonal storage. Usable energy is
+              h hours of nominal capacity; round-trip efficiency is η².
+            </p>
+
+            <h4 className="mdoc-h4">6.4 · Connections and markets</h4>
+            <M>{`Σ  mf[m,s,y] ≤ P_imp(src)       purchases entering through the same connection
+m↑src
+Σ  mf[m,s,y] ≤ P_exp(src)       sales leaving through it
+m↓src
+
+mf[m,s,y] ≤ maxP_m              contract power cap
+Σ w_s · mf[m,s,y] ≤ maxA_m      annual volume cap
+ s`}</M>
+            <p className="mdoc-small">
+              The physical connection is different from the contract: several markets
+              can share one connection and compete for its capacity.
+            </p>
+
+            <h4 className="mdoc-h4">6.5 · Demand charges and netting</h4>
+            <M>{`pk[m,se,y] ≥ mf[m,s,y]              ∀ s ∈ se     (season peak)
+ex[m,se,y] ≥ pk[m,se,y] − contracted
+
+nm[m,p,y] ≤ Σ w_s·mf[m,s,y]         energy injected in the period
+             s∈p
+nm[m,p,y] ≤ Σ w_s·mf[paired purchases]   energy consumed in the period`}</M>
+            <p className="mdoc-small">
+              The peak is modeled as a lower bound and the objective pushes it down: at
+              the optimum pk is exactly the maximum, with no binaries. The netting credit
+              is the minimum of injected and consumed energy, obtained the same way (two
+              upper bounds and a favorable objective coefficient). The credit bank
+              expires when the period closes.
+            </p>
+
+            <h4 className="mdoc-h4">6.6 · Emissions</h4>
+            <M>{`ge[y] = Σ f_scope1(c)·ρ_in·d[v,s,y]·w_s  +  Σ f_scope2(m,y)·mf[m,s,y]·w_s
+        v,s                                     m∈M⁺,s
+
+ne[y] = ge[y] − off[y]
+
+off[y] ≤ share · ge[y]        off[y] ≤ availability      (0 if not allowed)
+ne[y] ≤ cap_net(y)            ge[y] ≤ cap_gross`}</M>
+            <p className="mdoc-small">
+              cap_net(y) interpolates linearly between the initial and final targets of
+              the horizon: it is the decarbonization trajectory, the constraint that
+              couples the years and makes the problem interesting. The grid emission
+              factor can follow its own yearly trajectory; a PPA with its own factor
+              stays fixed.
+            </p>
+
+            <h4 className="mdoc-h4">6.7 · Investment logic (the integer part)</h4>
+            <M>{`nc[t,y] ≤ maxNew_t · b[t,y]       purchase activation
+Σ b[t,y] ≤ 1                     at most one purchase per technology (optional)
+ y
+nc[t,y*] ≥ q                     user-forced purchases`}</M>
+            <p className="mdoc-small">
+              The big-M is not arbitrary: it is exactly the maximum installable
+              capacity declared for that technology, so the linear relaxation is as
+              tight as possible. Allowing repeated investments relaxes the second
+              constraint and admits staged expansions.
+            </p>
+
+            <h4 className="mdoc-h4">6.8 · CAPEX budget</h4>
+            <M>{`Σ  CAPEX_y  ≤  capex_budget          (only if the scenario sets a budget)
+y∈Y`}</M>
+            <p className="mdoc-small">
+              It uses the same CAPEX_y expression as the objective — new investments,
+              forced and repeated purchases, and renewals of the existing fleet —,
+              undiscounted and before the tax shield and salvage value. So the total
+              CAPEX reported in the results never exceeds the budget. If the budget
+              makes the scenario infeasible, the diagnosis says so and gives the exact
+              minimum CAPEX that would make it feasible.
+            </p>
+          </S>
+
+          <S id="naturaleza" title="7 · Nature of the problem">
+            <ul className="mdoc-list">
+              <li>
+                <strong>Pure MILP.</strong> Linear objective and constraints; the only
+                source of integrality are the build binaries, N·|K| in total (30 in the
+                10-year instance). Relaxing them gives an LP that is usually a very good
+                bound.
+              </li>
+              <li>
+                <strong>Convex except for integrality.</strong> There are no bilinear
+                terms, complementarity or hidden disjunctions. With the binaries fixed,
+                what remains is a multi-period network flow problem with linear costs.
+              </li>
+              <li>
+                <strong>Symmetry and degeneracy.</strong> Steps with identical data and
+                equivalent technologies produce alternative optima with the same NPV. The
+                objective value is stable and reproducible; the exact split among
+                equivalent solutions may not be. That is why the relative <em>gap</em> is
+                set to 1e−6 and the tests compare against exact optima.
+              </li>
+              <li>
+                <strong>Inter-year coupling.</strong> It comes from four places: the
+                lifetime window in A[t,y], the emission cap trajectory, tax depreciation
+                and the cumulative CAPEX budget. Without them the problem would separate
+                by year.
+              </li>
+              <li>
+                <strong>Perfect foresight and determinism.</strong> The model knows the
+                whole future. It is the standard convention in least-cost planning, and
+                also its main bias: it overestimates the quality of the decisions a real
+                planner would make under uncertainty. The Pareto curve and the
+                sensitivity analysis exist to bound that bias.
+              </li>
+            </ul>
+          </S>
+
+          <S id="solver" title="8 · How it is solved">
+            <p>
+              The solver is <strong>HiGHS</strong> on both paths — the same C++ code,
+              compiled natively when the Julia engine runs, and compiled to
+              <strong> WebAssembly</strong> when it runs in the browser. Presolve, dual
+              simplex for the relaxations and <em>branch &amp; cut</em> for the binaries.
+            </p>
+            <ul className="mdoc-list">
+              <li><strong>Relative gap:</strong> 1e−6 (deliberately tight: the suite compares against exact optima).</li>
+              <li><strong>Time limit:</strong> 300 s per MILP; a reached limit is reported as such, never as optimal.</li>
+              <li><strong>Infeasibility:</strong> it is diagnosed and explained (which carrier, which node, which year, or the missing budget), instead of returning a raw solver status.</li>
+            </ul>
+            <p>
+              <strong>One run is not one MILP:</strong> the main scenario, six comparison
+              scenarios (status quo, least cost, with target, no offsets, high gas, high
+              carbon) and the points of the Pareto curve that sweeps the reduction
+              target. In the browser they are solved in a <em>Web Worker</em>, off the
+              interface thread, so the page does not freeze.
+            </p>
+            <div className="mdoc-note">
+              In the published version nothing travels to a server: the model is built
+              and solved <strong>on your machine</strong>, and your plant's data never
+              leaves the browser.
+            </div>
+          </S>
+
+          <S id="equivalencia" title="9 · Equivalence verification">
+            <p>
+              Two implementations of the same model are two chances to diverge. The
+              defense is a set of <strong>golden fixtures</strong>: the Julia engine
+              solves a catalog of instances and seals the optimum; the browser engine
+              must reproduce each one.
+            </p>
+            <M>{`verify:wasm   8/8 instances   ·   relative Δ ~1e−16`}</M>
+            <p className="mdoc-small">
+              That is: they match down to the last representable bit in double
+              precision, not «approximately». On top of that come the analytical
+              oracles of the Julia suite (1,308 tests), physical balance and determinism
+              invariants, and the check that the published flow diagram respects the
+              nodal balance convention. Every run is sealed with two fingerprints —of
+              the site and of the scenario— that make the result reproducible.
+            </p>
+          </S>
+
+          <S id="limitaciones" title="10 · Assumptions and limitations">
+            <p>
+              What the model does <strong>not</strong> do, stated explicitly. A result is
+              only well interpreted if its boundaries are known:
+            </p>
+            <ul className="mdoc-list">
+              <li><strong>No full chronology.</strong> Representative steps are used, not the 8760 hours in sequence. Storage cycles within the season: there is no seasonal arbitrage nor multi-day events.</li>
+              <li><strong>No unit commitment.</strong> There are no start-ups, technical minimums, minimum up/down times nor ramps. Dispatch is perfectly flexible within capacity.</li>
+              <li><strong>Transport network, not an electrical grid.</strong> Arcs are flows with capacity and linear loss. There are no Kirchhoff laws, AC or DC power flow, reactive power nor N−1 contingencies.</li>
+              <li><strong>Inelastic demand.</strong> It is data per carrier and lives at a single bus. There is no demand response nor energy efficiency as an endogenous decision.</li>
+              <li><strong>No uncertainty.</strong> A single deterministic future per run. Scenario exploration and the tornado replace —imperfectly— a stochastic model.</li>
+              <li><strong>Linear costs.</strong> No economies of scale, learning curves nor indivisibility costs beyond the purchase binary.</li>
+              <li><strong>Simplified taxation.</strong> Flat rate, straight-line depreciation, no loss carry-forward; renewals of the existing fleet generate no shield (conservative criterion).</li>
+              <li><strong>No reliability.</strong> No reserve margins nor supply adequacy criteria.</li>
+            </ul>
+            <p className="mdoc-small">
+              Several of these boundaries are deliberate: they keep the problem linear,
+              fast and auditable, which is what allows solving many instances even in
+              the browser. Ramps and technical minimums are in the work plan.
+            </p>
+          </S>
+
+          <footer className="mdoc-foot">
+            The reference formulation lives in
+            {" "}<span className="mdoc-code">src/model/objective.jl</span> and
+            {" "}<span className="mdoc-code">src/constraints/</span>; the mirror that runs
+            in the browser, in <span className="mdoc-code">frontend/src/lib/milp/lp.js</span>.
+          </footer>
+    </>
+  );
+}
+
+export default function ModelDoc({ onClose }) {
+  const { lang } = useI18n();
+  const en = lang === "en";
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    ref.current?.focus();
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const jump = (id) => (e) => {
+    e.preventDefault();
+    ref.current?.querySelector(`#${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return (
+    <div className="mdoc-backdrop" onMouseDown={(e) => {
+      if (e.target === e.currentTarget) onClose();
+    }}>
+      <div className="mdoc" role="dialog" aria-modal="true"
+           aria-label={en ? "Optimization model documentation" : "Documentación del modelo de optimización"}
+           tabIndex={-1} ref={ref}>
+        <header className="mdoc-head">
+          <div>
+            <h2>{en ? "The optimization model" : "El modelo de optimización"}</h2>
+            <p>
+              {en ? <>What is being solved when you press <em>Optimize</em> — the full formulation, not a popular summary.</>
+                  : <>Qué se está resolviendo cuando pulsas <em>Optimizar</em> — formulación completa, no un resumen divulgativo.</>}
+            </p>
+          </div>
+          <button className="mdoc-close" onClick={onClose} aria-label={en ? "close" : "cerrar"}>✕</button>
+        </header>
+
+        <nav className="mdoc-nav">
+          {SECCIONES.map(([id, es, enLabel]) => (
+            <a key={id} href={`#${id}`} onClick={jump(id)}>{en ? enLabel : es}</a>
+          ))}
+        </nav>
+
+        <div className="mdoc-body">
+          {en ? <BodyEN jump={jump} /> : <BodyES jump={jump} />}
         </div>
       </div>
     </div>

@@ -47,6 +47,22 @@ _body(resp) = JSON3.read(resp.body)
         @test p.dispatch === nothing                 # default liviano en la API
         @test p.emissions[end].net <= p.emissions[end].cap_net + 1e-3
 
+        # el override de texto (`currency`, M9) se acepta: la UI lo manda en
+        # cada corrida y antes devolvía 400 (la app caía al motor web)
+        resp = _post("/scenario", (site = "demo",
+                                   config_overrides = (horizon_years = 2, currency = "CLP")))
+        @test resp.status == 200
+        @test _body(resp).meta.currency == "CLP"
+        resp = _post("/scenario", (site = "demo", config_overrides = (currency = 5,)))
+        @test resp.status == 400
+
+        # GET /sites/{name}/config: la config base del sitio (sólo lectura)
+        resp = HTTP.get(API * "/sites/demo/config"; status_exception = false)
+        @test resp.status == 200
+        sc = _body(resp).scenario_config
+        @test sc.horizon_years == 10 && sc.wacc ≈ 0.08 && sc.capex_budget ≈ 4.0e7
+        @test HTTP.get(API * "/sites/no_such_site/config"; status_exception = false).status == 404
+
         # include_dispatch = true la incluye
         resp = _post("/scenario", (site = "demo", include_dispatch = true,
                                    config_overrides = (horizon_years = 2,)))

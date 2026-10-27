@@ -1,28 +1,28 @@
 // Verificación E2E de la planta con RED en el navegador y SIN backend, que es
-// exactamente como corre la versión publicada en GitHub Pages. Carga el sitio
-// embebido `planta_red`, comprueba que el mapa dibuja los equipos y el
-// recorrido de cada arco, optimiza con HiGHS en el worker y contrasta el VAN
-// mostrado contra el fixture dorado de Julia. La equivalencia numérica exacta
-// la cubren verify:wasm y verify:flows; esto verifica que el camino de la UI
-// —el que se ve en pantalla— llega hasta el final.
+// exactamente como corre la versión publicada (GitHub Pages): el sistema
+// embebido `planta_red` aparece en Sistemas, el mapa de infraestructura dibuja
+// sus equipos y cada conexión con su flecha, la optimización corre con HiGHS en
+// el worker y el VAN mostrado coincide con el fixture dorado de Julia. La
+// equivalencia numérica exacta la cubren verify:wasm y verify:flows; esto
+// verifica que el camino de la interfaz llega hasta el final.
 // Uso: npm run build && npx vite preview  →  npm run verify:topology
 import puppeteer from "puppeteer-core";
 import { existsSync, readFileSync } from "node:fs";
 
-const APP_URL = process.env.IETO_URL ?? "http://localhost:4173/";
-const SHOT = process.argv[2] ?? null;          // mapa del twin
-const SHOT2 = process.argv[3] ?? null;         // Sankey de resultados
-const EDGE = ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  "C:/Program Files/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
+const APP_URL = (process.env.IETO_URL ?? "http://localhost:4173").replace(/\/$/, "");
+const BROWSER = process.env.IETO_BROWSER ?? [
+  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+  "/usr/bin/google-chrome", "/usr/bin/chromium",
+].find(existsSync);
 
-const golden = JSON.parse(readFileSync(
-  new URL("../golden/planta_red_n10.json", import.meta.url)));
-// lo esperado sale del propio sitio: si el ejemplo cambia, el chequeo lo sigue
-const sitio = JSON.parse(readFileSync(
-  new URL("../src/demo/planta_red.json", import.meta.url)));
+const golden = JSON.parse(readFileSync(new URL("../golden/planta_red_n10.json", import.meta.url)));
+const sitio = JSON.parse(readFileSync(new URL("../src/demo/planta_red.json", import.meta.url)));
 const NEQUIPOS = sitio.layout.features.filter((f) => f.properties.role === "equipment").length;
 const NARCOS = sitio.arcs.length;
-const NFLECHAS = sitio.arcs.filter((a) => a.directed).length;
 let fails = 0;
 const step = (name, ok, extra = "") => {
   if (!ok) fails++;
@@ -30,61 +30,53 @@ const step = (name, ok, extra = "") => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const b = await puppeteer.launch({ executablePath: EDGE, headless: "new",
-  defaultViewport: { width: 1500, height: 1250 } });
+const b = await puppeteer.launch({ executablePath: BROWSER, headless: "new",
+  defaultViewport: { width: 1600, height: 1000 } });
 const p = await b.newPage();
 const errors = [];
 p.on("pageerror", (e) => errors.push(String(e)));
-await p.goto(APP_URL, { waitUntil: "networkidle2", timeout: 60_000 });
+const text = async () => (await p.evaluate(() => document.body.innerText)).toLowerCase();
+const waitText = async (txt, ms = 30000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) { if ((await text()).includes(txt.toLowerCase())) return true; await sleep(300); }
+  return false;
+};
 
-// 1 · sin backend, el ejemplo con red está disponible y viene preseleccionado
-await p.waitForSelector('select[aria-label="sitio a cargar"]', { timeout: 30_000 });
-const { opciones, elegido } = await p.evaluate(() => {
-  const s = document.querySelector('select[aria-label="sitio a cargar"]');
-  return { opciones: [...s.options].map((o) => o.value), elegido: s.value };
-});
-step("el ejemplo con red se ofrece sin backend", opciones.includes("planta_red"),
-     `sitios: ${opciones.join(", ")}`);
-step("viene preseleccionado", elegido === "planta_red", `selección: ${elegido}`);
+await p.goto(APP_URL + "/", { waitUntil: "networkidle2", timeout: 60000 });
+await p.evaluate(() => { localStorage.clear(); localStorage.setItem("ieto.lang", "es"); });
+await p.goto(`${APP_URL}/?r=${Date.now()}#/systems`, { waitUntil: "networkidle2" });
+const card = await p.waitForSelector('[data-testid="system-planta_red"]', { timeout: 15000 }).catch(() => null);
+step("el ejemplo con red se ofrece sin backend", !!card);
 
-// 2 · cargarlo dibuja la red en el mapa: equipos, recorridos y sentido
-await p.evaluate(() => [...document.querySelectorAll("button")]
-  .find((x) => x.textContent.trim() === "Cargar").click());
-await p.waitForSelector(".twin-run", { timeout: 60_000 });
-await sleep(1500);   // leaflet monta los markers tras el fitBounds
+// mapa de infraestructura
+await p.evaluate(() => { localStorage.setItem("ieto.infra.view", JSON.stringify("map")); });
+await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/planta_red/infrastructure`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sm-map", { timeout: 30000 });
+await sleep(1500);
 const mapa = await p.evaluate(() => ({
-  equipos: document.querySelectorAll(".tw-marker").length,
-  trazos: document.querySelectorAll(".twin-map path.leaflet-interactive").length,
-  flechas: [...document.querySelectorAll(".leaflet-marker-icon")]
-    .filter((n) => n.textContent.includes("➤")).length,
+  equipos: document.querySelectorAll(".sm-marker").length,
+  flechas: document.querySelectorAll(".sm-arrow").length,
 }));
-step("el mapa dibuja los equipos", mapa.equipos === NEQUIPOS,
-     `${mapa.equipos} de ${NEQUIPOS}`);
-step("el mapa dibuja los arcos con su sentido",
-     mapa.trazos >= NARCOS + 1 && mapa.flechas === NFLECHAS,
-     `${mapa.trazos} trazos (${NARCOS} arcos + límite) · ${mapa.flechas} de ${NFLECHAS} flechas`);
-if (SHOT) await p.screenshot({ path: SHOT });
+step("el mapa dibuja los equipos", mapa.equipos === NEQUIPOS, `${mapa.equipos}/${NEQUIPOS}`);
+step("el mapa dibuja cada conexión con su flecha", mapa.flechas === NARCOS, `${mapa.flechas}/${NARCOS}`);
 
-// 3 · optimizar en el navegador y comparar el VAN con el dorado de Julia
-await p.click(".twin-run");
-await p.waitForSelector(".kpi .value", { timeout: 300_000 });
-const txt = await p.evaluate(() => document.body.innerText);
-step("la corrida termina OPTIMAL en el navegador", txt.includes("OPTIMAL"));
-const esperado = (golden.expected_npv / 1e6).toFixed(1).replace(".", ",");
-step("el VAN mostrado es el del motor Julia", txt.includes(esperado),
-     `esperado ${esperado} MUSD en pantalla`);
+// optimización en el navegador
+await p.goto(`${APP_URL}/#/sys/planta_red/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 30000 });
+await p.evaluate(() => [...document.querySelectorAll(".sum-runbar button")].find((x) => x.textContent.includes("Optimización")).click());
+await waitText("Nueva optimización");
+await p.evaluate(() => [...document.querySelectorAll(".ui-modal button")].find((x) => x.textContent.includes("Optimizar")).click());
+step("la corrida termina en el navegador", await waitText("Inversión total", 240000));
+await p.evaluate(() => document.querySelector(".ui-content").scrollTo(0, 1e6));
+await sleep(1000);
+const paths = await p.evaluate(() => document.querySelectorAll(".recharts-wrapper path").length);
+step("el Resumen traza el diagrama de flujos", paths > 20, `${paths} trazos`);
 
-// 4 · el Sankey de resultados se traza (los puentes entre barras y sus
-//     pérdidas están verificados numéricamente en verify:flows)
-await p.evaluate(() => [...document.querySelectorAll(".tab")]
-  .find((x) => x.textContent === "Summary").click());
-await sleep(2500);
-const paths = await p.evaluate(() =>
-  document.querySelectorAll(".recharts-surface path, .sankey path, svg path").length);
-step("el Summary traza el diagrama de flujos", paths > 20, `${paths} trazos`);
-if (SHOT2) await p.screenshot({ path: SHOT2, fullPage: true });
-
+// el VAN de la pantalla es el del motor Julia
+const esperado = `${(golden.expected_npv / 1e6).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MUSD`;
+await p.evaluate(() => { window.location.hash = "#/sys/planta_red/kpis"; });
+step("el VAN mostrado es el del motor Julia", await waitText(esperado, 30000), `esperado ${esperado}`);
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 await b.close();
-console.log(fails ? `\nTOPOLOGÍA WEB: ${fails} FALLA(S)` : "\nTOPOLOGÍA WEB OK");
-process.exit(fails ? 1 : 0);
+if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }
+console.log("\nTOPOLOGÍA WEB OK: la planta con red corre completa en el navegador, sin backend.");

@@ -9,15 +9,19 @@ import {
 import { num } from "../../lib/format.js";
 import { hasPeakSteps, addPeakSteps, removePeakSteps, PEAK_HOURS }
   from "../../lib/twin.js";
+import { useL } from "../../ui/i18n.jsx";
 
 const SEASON_ES = { winter: "invierno", spring: "primavera", summer: "verano",
                     autumn: "otoño" };
+const SEASON_EN = { winter: "winter", spring: "spring", summer: "summer", autumn: "autumn" };
 
 /** Vista previa de una serie de 96 pasos (una serie → sin leyenda). */
 function Spark({ values, timesteps, unit }) {
+  const L = useL();
+  const SEASON = L(SEASON_ES, SEASON_EN);
   const data = values.map((v, i) => ({
     i, v,
-    label: `${SEASON_ES[timesteps[i]?.season] ?? timesteps[i]?.season} · ${timesteps[i]?.hour}h`,
+    label: `${SEASON[timesteps[i]?.season] ?? timesteps[i]?.season} · ${timesteps[i]?.hour}h`,
   }));
   return (
     <ResponsiveContainer width="100%" height={96}>
@@ -45,6 +49,8 @@ function Spark({ values, timesteps, unit }) {
  * agregación reportado) o valor plano para todo el año.
  */
 function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onRemove }) {
+  const L = useL();
+  const SEASON = L(SEASON_ES, SEASON_EN);
   const [open, setOpen] = useState(false);
   const [flat, setFlat] = useState("");
   const [hemisphere, setHemisphere] = useState("south");
@@ -60,8 +66,8 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
     onChange(agg.series);
     setCsvInfo({
       name: file.name,
-      msg: `8760 h → 96 pasos · total anual ${num(agg.originalTotal, 0)} → ` +
-           `${num(agg.aggTotal, 0)} (Δ ${num(agg.pctErr, 2)}%)`,
+      msg: L(`8760 h → ${timesteps.length} pasos · total anual ${num(agg.originalTotal, 0)} → ${num(agg.aggTotal, 0)} (Δ ${num(agg.pctErr, 2)}%)`,
+             `8760 h → ${timesteps.length} steps · annual total ${num(agg.originalTotal, 0)} → ${num(agg.aggTotal, 0)} (Δ ${num(agg.pctErr, 2)}%)`),
     });
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -72,12 +78,12 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
         <button className="series-name" onClick={() => setOpen((v) => !v)}>
           <span className="series-caret">{open ? "▾" : "▸"}</span> {label}
           <span className="series-stats">
-            {" "}prom {num(st.avg, 1)} · mín {num(st.min, 1)} · máx {num(st.max, 1)} {unit}
-            {st.annual != null && ` · ${num(st.annual / 1000, 1)} GWh/año`}
+            {" "}{L("prom", "avg")} {num(st.avg, 1)} · {L("mín", "min")} {num(st.min, 1)} · {L("máx", "max")} {num(st.max, 1)} {unit}
+            {st.annual != null && ` · ${num(st.annual / 1000, 1)} ${L("GWh/año", "GWh/yr")}`}
           </span>
         </button>
         {onRemove && (
-          <button className="chart-toggle danger" onClick={onRemove}>quitar</button>
+          <button className="chart-toggle danger" onClick={onRemove}>{L("quitar", "remove")}</button>
         )}
       </div>
       {open && (
@@ -86,14 +92,14 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
           <div className="series-seasons">
             {seasonAverages(values, timesteps).map(({ season, avg }) => (
               <span key={season}>
-                {SEASON_ES[season] ?? season}: <strong>{num(avg, 1)}</strong>
+                {SEASON[season] ?? season}: <strong>{num(avg, 1)}</strong>
               </span>
             ))}
           </div>
 
           <div className="series-actions">
             <div className="series-mode">
-              <label>Valor plano todo el año ({unit})</label>
+              <label>{L("Valor plano todo el año", "Flat value all year")} ({unit})</label>
               <div className="range-row">
                 <input type="number" className="series-flat-input" value={flat}
                        placeholder={num(st.avg, 1)}
@@ -101,18 +107,18 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
                 <button className="chart-toggle series-flat-apply"
                         disabled={flat === "" || !Number.isFinite(+flat)}
                         onClick={() => { onChange(flatSeries(values.length, +flat)); setCsvInfo(null); }}>
-                  Aplicar
+                  {L("Aplicar", "Apply")}
                 </button>
               </div>
             </div>
             <div className="series-mode">
-              <label>CSV horario (8760 valores, parte en enero)</label>
+              <label>{L("CSV horario (8760 valores, parte en enero)", "Hourly CSV (8760 values, starting in January)")}</label>
               <div className="range-row">
                 <select value={hemisphere}
                         onChange={(e) => setHemisphere(e.target.value)}
-                        title="a qué estación corresponde enero">
-                  <option value="south">Hemisferio Sur</option>
-                  <option value="north">Hemisferio Norte</option>
+                        title={L("a qué estación corresponde enero", "which season January belongs to")}>
+                  <option value="south">{L("Hemisferio Sur", "Southern hemisphere")}</option>
+                  <option value="north">{L("Hemisferio Norte", "Northern hemisphere")}</option>
                 </select>
                 <input ref={fileRef} type="file" accept=".csv,.txt"
                        className="series-csv-input"
@@ -131,17 +137,18 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
 }
 
 function AddSeries({ options, onAdd }) {
+  const L = useL();
   const [sel, setSel] = useState("");
   if (options.length === 0) return null;
   return (
     <div className="range-row" style={{ marginTop: 10 }}>
       <select value={sel} onChange={(e) => setSel(e.target.value)}>
-        <option value="">agregar serie para…</option>
+        <option value="">{L("agregar serie para…", "add series for…")}</option>
         {options.map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
       <button className="chart-toggle" disabled={!sel}
               onClick={() => { onAdd(sel); setSel(""); }}>
-        + agregar
+        {L("+ agregar", "+ add")}
       </button>
     </div>
   );
@@ -149,6 +156,7 @@ function AddSeries({ options, onAdd }) {
 
 /** Demandas, precios de mercado y factores de emisión del twin (fase 3). */
 export default function SeriesEditor({ siteJson, patchSite }) {
+  const L = useL();
   const ts = siteJson.timesteps;
   const nsteps = ts.length;
   const carriers = siteJson.carriers;
@@ -185,44 +193,40 @@ export default function SeriesEditor({ siteJson, patchSite }) {
   return (
     <>
       <p className="section-label">
-        Demandas y mercados — CSV horario (8760) o valor plano; el año-plantilla
-        resultante se escala por año con las tasas del escenario
+        {L("Demandas y mercados — CSV horario (8760) o valor plano; el año tipo resultante se escala por año con las tasas del escenario", "Demands and markets — hourly CSV (8760) or flat value; the resulting template year is scaled per year with the scenario rates")}
       </p>
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-head">
           <h3 className="card-title">
-            Pasos de punta por estación {peaks ? "· activos" : ""}
+            {L("Pasos de punta por estación", "Peak steps per season")} {peaks ? L("· activos", "· active") : ""}
           </h3>
           {peaks ? (
             <button className="chart-toggle danger"
                     onClick={() => patchSite(removePeakSteps)}>
-              Quitar
+              {L("Quitar", "Remove")}
             </button>
           ) : (
             <div className="range-row">
               <input type="number" min={0} max={100} step={1} value={uplift}
-                     style={{ width: 70 }} aria-label="factor de punta %"
+                     style={{ width: 70 }} aria-label={L("factor de punta %", "peak factor %")}
                      onChange={(e) => setUplift(+e.target.value)} />
-              <span style={{ fontSize: 12.5 }}>% sobre la hora peor</span>
+              <span style={{ fontSize: 12.5 }}>{L("% sobre la hora peor", "% above the worst hour")}</span>
               <button className="chart-toggle"
                       onClick={() => patchSite((sj) => addPeakSteps(sj, uplift))}>
-                Agregar punta
+                {L("Agregar punta", "Add peak")}
               </button>
             </div>
           )}
         </div>
         <p className="card-sub">
-          El año-plantilla de días promedio subestima puntas: sin esto, los
-          cargos por demanda máxima dan falsa precisión (§8.3). Cada estación
-          gana un paso en su hora de mayor demanda ({PEAK_HOURS} h/año de peso,
-          Σ = 8760 se preserva) con la demanda × factor de punta — usa el dato
-          real de tu planta (punta registrada ÷ promedio de la hora peor).
-          {peaks && ` Año-plantilla actual: ${nsteps} pasos (incluye los de punta).`}
+          {L(`El año tipo de días promedio subestima puntas: sin esto, los cargos por demanda máxima dan falsa precisión. Cada estación gana un paso en su hora de mayor demanda (${PEAK_HOURS} h/año de peso, Σ = 8760 se preserva) con la demanda × factor de punta — usa el dato real de tu planta (punta registrada ÷ promedio de la hora peor).`,
+             `The average-day template year underestimates peaks: without this, peak demand charges give false precision. Each season gains a step at its highest-demand hour (${PEAK_HOURS} h/yr weight, Σ = 8760 is preserved) with demand × peak factor — use your plant's real data (recorded peak ÷ worst-hour average).`)}
+          {peaks && L(` Año tipo actual: ${nsteps} pasos (incluye los de punta).`, ` Current template year: ${nsteps} steps (including peaks).`)}
         </p>
       </div>
       <div className="grid cols-2">
         <div className="card">
-          <h3 className="card-title">Demandas (MW por paso)</h3>
+          <h3 className="card-title">{L("Demandas (MW por paso)", "Demands (MW per step)")}</h3>
           {Object.entries(siteJson.demands).map(([c, v]) => (
             <SeriesRow key={c} id={`demands:${c}`} label={c} unit="MW"
                        values={v} timesteps={ts} isDemand
@@ -234,10 +238,10 @@ export default function SeriesEditor({ siteJson, patchSite }) {
         </div>
 
         <div className="card">
-          <h3 className="card-title">Mercados — precios (USD/MWh)</h3>
+          <h3 className="card-title">{L("Mercados — precios (USD/MWh)", "Markets — prices (USD/MWh)")}</h3>
           {Object.entries(siteJson.prices).map(([c, v]) => (
             <SeriesRow key={c} id={`prices:${c}`}
-                       label={c === "grid_export" ? "grid_export (precio de venta)" : c}
+                       label={c === "grid_export" ? L("grid_export (precio de venta)", "grid_export (sale price)") : c}
                        unit="USD/MWh" values={v} timesteps={ts}
                        onChange={(nv) => setSeries("prices", c, nv)}
                        onRemove={() => dropSeries("prices", c)} />
@@ -248,11 +252,11 @@ export default function SeriesEditor({ siteJson, patchSite }) {
           {(siteJson.markets ?? []).length > 0 && (
             <>
               <h3 className="card-title" style={{ marginTop: 18 }}>
-                Precios por contrato (mercados)
+                {L("Precios por contrato (mercados)", "Prices per contract (markets)")}
               </h3>
               {siteJson.markets.map((mk) => (
                 <SeriesRow key={mk.market_id} id={`markets:${mk.market_id}`}
-                           label={`${mk.name} (${mk.direction === "buy" ? "compra" : "venta"} · ${mk.carrier_id})`}
+                           label={`${mk.name} (${mk.direction === "buy" ? L("compra", "buy") : L("venta", "sell")} · ${mk.carrier_id})`}
                            unit="USD/MWh" values={mk.price} timesteps={ts}
                            onChange={(nv) => patchSite((sj) => ({
                              ...sj,
@@ -264,7 +268,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
           )}
 
           <h3 className="card-title" style={{ marginTop: 18 }}>
-            Factores de emisión (tCO₂e/MWh)
+            {L("Factores de emisión (tCO₂e/MWh)", "Emission factors (tCO₂e/MWh)")}
           </h3>
           {siteJson.emission_factors.map((f, i) => (
             <div className="range-row" key={`${f.carrier_id}-${f.scope}`}

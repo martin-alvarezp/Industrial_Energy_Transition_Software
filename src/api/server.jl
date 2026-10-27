@@ -93,6 +93,8 @@ function build_router(data_dir::AbstractString;
                    req -> handle_list_sites(req, data_dir))
     HTTP.register!(router, "GET", "/sites/{name}",
                    req -> handle_get_site(req, data_dir))
+    HTTP.register!(router, "GET", "/sites/{name}/config",
+                   req -> handle_get_site_config(req, data_dir))
     HTTP.register!(router, "PUT", "/sites/{name}",
                    req -> handle_put_site(req, data_dir))
     HTTP.register!(router, "DELETE", "/sites/{name}",

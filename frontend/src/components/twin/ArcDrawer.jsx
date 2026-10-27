@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   slugId, arcProblems, arcCarrierOptions, arcEndpointLabel, carrierLabel,
 } from "../../lib/twin.js";
+import { useL } from "../../ui/i18n.jsx";
 
 /**
  * Editor de una conexión (arco, roadmap M14): sentido del flujo (dirigido
@@ -11,6 +12,7 @@ import {
  */
 export default function ArcDrawer({ draft: initial, isNew, siteJson,
                                     onSave, onDelete, onClose }) {
+  const L = useL();
   const [draft, setDraft] = useState(initial);
   useEffect(() => setDraft(initial), [initial]);
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
@@ -46,27 +48,27 @@ export default function ArcDrawer({ draft: initial, isNew, siteJson,
     <div className="drawer-backdrop" onClick={onClose}>
       <aside className="drawer" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-head">
-          <h3>{isNew ? "Nueva conexión" : draft.name || "Conexión"}</h3>
-          <button className="chart-toggle" onClick={onClose}>Cerrar</button>
+          <h3>{isNew ? L("Nueva conexión", "New connection") : draft.name || L("Conexión", "Connection")}</h3>
+          <button className="chart-toggle" onClick={onClose}>{L("Cerrar", "Close")}</button>
         </div>
         <p className="hint">
           {from} {draft.directed ? "→" : "↔"} {to}
         </p>
 
-        <p className="drawer-section">Identidad y sentido</p>
+        <p className="drawer-section">{L("Identidad y sentido", "Identity and direction")}</p>
         <div className="control">
-          <label>Nombre</label>
+          <label>{L("Nombre", "Name")}</label>
           <input type="text" value={draft.name}
                  placeholder={`${from} → ${to}`}
                  onChange={(e) => set({ name: e.target.value })} />
         </div>
         <div className="switch-row">
           <div>
-            <div className="sw-label">Dirigido (A → B)</div>
+            <div className="sw-label">{L("Dirigido (A → B)", "Directed (A → B)")}</div>
             <div className="sw-note">
               {draft.directed
-                ? `el flujo va solo de ${from} a ${to}`
-                : "bidireccional: el flujo puede ir en ambos sentidos"}
+                ? L(`el flujo va solo de ${from} a ${to}`, `flow only goes from ${from} to ${to}`)
+                : L("bidireccional: el flujo puede ir en ambos sentidos", "bidirectional: flow can go both ways")}
             </div>
           </div>
           <button type="button" role="switch" aria-checked={draft.directed}
@@ -74,10 +76,9 @@ export default function ArcDrawer({ draft: initial, isNew, siteJson,
                   onClick={() => set({ directed: !draft.directed })} />
         </div>
 
-        <p className="drawer-section">Vectores que transporta</p>
+        <p className="drawer-section">{L("Vectores que transporta", "Carriers it transports")}</p>
         <p className="hint" style={{ marginTop: 0 }}>
-          capacidad en MW (vacío = sin tope) · η de transporte en (0,1]
-          (entrega = η × envío; pérdidas de línea/pipeline)
+          {L("capacidad en MW (vacío = sin tope) · η de transporte en (0,1] (entrega = η × envío; pérdidas de línea o cañería)", "capacity in MW (empty = no cap) · transport η in (0,1] (delivery = η × sent; line or pipe losses)")}
         </p>
         {draft.ports.map((port, i) => (
           <div className="range-row" key={i} style={{ marginBottom: 6 }}>
@@ -99,12 +100,12 @@ export default function ArcDrawer({ draft: initial, isNew, siteJson,
                    value={port.efficiency}
                    onChange={(e) => setPort(i, { efficiency:
                      e.target.value === "" ? 1 : +e.target.value })} />
-            <button className="chart-toggle danger" title="quitar vector"
+            <button className="chart-toggle danger" title={L("quitar vector", "remove carrier")}
                     disabled={draft.ports.length <= 1}
                     onClick={() => removePort(i)}>−</button>
           </div>
         ))}
-        <button className="chart-toggle" onClick={addPort}>+ vector</button>
+        <button className="chart-toggle" onClick={addPort}>{L("+ vector", "+ carrier")}</button>
 
         {problems.length > 0 && (
           <div className="drawer-problems" style={{ marginTop: 10 }}>
@@ -114,13 +115,13 @@ export default function ArcDrawer({ draft: initial, isNew, siteJson,
         <div className="drawer-actions">
           <button className="btn-run" style={{ flex: 1 }}
                   disabled={problems.length > 0} onClick={save}>
-            {isNew ? "Crear conexión" : "Guardar cambios"}
+            {isNew ? L("Crear conexión", "Create connection") : L("Guardar cambios", "Save changes")}
           </button>
           {!isNew && (
             <button className="chart-toggle danger"
-                    title="eliminar esta conexión"
+                    title={L("eliminar esta conexión", "delete this connection")}
                     onClick={() => onDelete(draft.arc_id)}>
-              Eliminar
+              {L("Eliminar", "Delete")}
             </button>
           )}
         </div>

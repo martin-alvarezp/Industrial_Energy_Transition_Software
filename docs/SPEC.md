@@ -115,6 +115,18 @@ Los CSV del año-plantilla **no cambian de formato** respecto a v0.1 (siguen sie
 > scenario_config.yaml acepta `salvage_value: bool` (default false, crédito por
 > vida útil no consumida al año N); un `layout.geojson` opcional (digital twin)
 > convive en el directorio y el motor lo ignora.
+>
+> **`topology.json` (opcional, desde la interfaz v1):** la topología de red del
+> sitio (M14) —`nodes`, `arcs` con sus puertos, `demand_nodes` y `tech_nodes`
+> (nodo de cada equipo)— con el mismo esquema que el JSON del twin. Antes se
+> perdía al guardar un sitio: volvía de disco como placa de cobre. Sin el
+> archivo, el sitio es de una sola barra, exactamente como siempre.
+>
+> **`layout.geojson` extendido (presentación, el motor lo ignora):** además del
+> límite, los equipos y el recorrido de los arcos, guarda las **ubicaciones**
+> del sistema (polígonos con nombre, `role: "location"`), la ubicación asignada
+> a cada equipo (`location_id`) y, en `properties`, el nombre visible
+> (`title`), una descripción y una imagen de portada.
 
 **`timesteps.csv`** → `step_id, season, hour, weight_hours`
 **`carriers.csv`** → `carrier_id, name, unit, category`

@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import ChartCard, { Legend, VizTooltip } from "../ChartCard.jsx";
 import { tons, num, calYear } from "../../lib/format.js";
+import { useL } from "../../ui/i18n.jsx";
 
 const C = {
   net: "var(--s-pv)",       // la serie que importa: acento
@@ -13,6 +14,7 @@ const C = {
 
 /** Trayectoria de emisiones: neta (acento) vs bruta (contexto) contra el cap. */
 export default function EmissionsChart({ emissions, baseYear = 0 }) {
+  const L = useL();
   const data = emissions.map((e) => ({
     year: calYear(baseYear, e.year), gross: e.gross, net: e.net, cap: e.cap_net,
   }));
@@ -20,23 +22,23 @@ export default function EmissionsChart({ emissions, baseYear = 0 }) {
 
   return (
     <ChartCard
-      title="Trayectoria de emisiones"
-      sub="tCO₂e por año — la meta neta (cap) es la restricción del optimizador"
+      title={L("Trayectoria de emisiones", "Emissions trajectory")}
+      sub={L("tCO₂e por año — la meta neta (cap) es la restricción del optimizador", "tCO₂e per year — the net target (cap) is the optimizer's constraint")}
       table={{
         columns: [
-          { key: "year", label: "Año" },
-          { key: "gross", label: "Brutas (t)", fmt: (v) => num(v, 0) },
-          { key: "net", label: "Netas (t)", fmt: (v) => num(v, 0) },
-          { key: "cap", label: "Cap neto (t)", fmt: (v) => num(v, 0) },
+          { key: "year", label: L("Año", "Year") },
+          { key: "gross", label: L("Brutas (t)", "Gross (t)"), fmt: (v) => num(v, 0) },
+          { key: "net", label: L("Netas (t)", "Net (t)"), fmt: (v) => num(v, 0) },
+          { key: "cap", label: L("Cap neto (t)", "Net cap (t)"), fmt: (v) => num(v, 0) },
         ],
         rows: data,
       }}
     >
       <Legend
         items={[
-          { label: "Netas (con offsets)", color: "#008165", kind: "line" },
-          { label: "Brutas", color: "#9aa7a3", kind: "line" },
-          { label: "Cap neto", color: "#41504c", kind: "line", dashed: true },
+          { label: L("Netas (con compensaciones)", "Net (with offsets)"), color: "#008165", kind: "line" },
+          { label: L("Brutas", "Gross"), color: "#9aa7a3", kind: "line" },
+          { label: L("Cap neto", "Net cap"), color: "#41504c", kind: "line", dashed: true },
         ]}
       />
       <ResponsiveContainer width="100%" height={260}>
@@ -45,7 +47,7 @@ export default function EmissionsChart({ emissions, baseYear = 0 }) {
           <XAxis
             dataKey="year" tickLine={false} axisLine={{ stroke: "var(--baseline)" }}
             tick={{ fill: "var(--muted)", fontSize: 11 }}
-            label={{ value: "año", position: "insideBottomRight", offset: -2, fill: "var(--muted)", fontSize: 11 }}
+            label={{ value: L("año", "year"), position: "insideBottomRight", offset: -2, fill: "var(--muted)", fontSize: 11 }}
           />
           <YAxis
             tickLine={false} axisLine={false}
@@ -54,14 +56,14 @@ export default function EmissionsChart({ emissions, baseYear = 0 }) {
             width={40}
           />
           <Tooltip
-            content={<VizTooltip labelFmt={(l) => `Año ${l}`} valueFmt={(v) => tons(v)} />}
+            content={<VizTooltip labelFmt={(l) => `${L("Año", "Year")} ${l}`} valueFmt={(v) => tons(v)} />}
             cursor={{ stroke: "var(--baseline)", strokeWidth: 1 }}
           />
-          <Line name="Cap neto" dataKey="cap" stroke={C.cap} strokeWidth={1.5}
+          <Line name={L("Cap neto", "Net cap")} dataKey="cap" stroke={C.cap} strokeWidth={1.5}
             strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-          <Line name="Brutas" dataKey="gross" stroke={C.gross} strokeWidth={2}
+          <Line name={L("Brutas", "Gross")} dataKey="gross" stroke={C.gross} strokeWidth={2}
             dot={false} strokeLinecap="round" isAnimationActive={false} />
-          <Line name="Netas (con offsets)" dataKey="net" stroke={C.net} strokeWidth={2}
+          <Line name={L("Netas (con compensaciones)", "Net (with offsets)")} dataKey="net" stroke={C.net} strokeWidth={2}
             dot={false} strokeLinecap="round" isAnimationActive={false} />
           {last && (
             <ReferenceDot

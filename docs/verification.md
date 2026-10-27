@@ -68,18 +68,24 @@ un 500 ni una excepción cruda.
 
 ## E2E de navegador (camino dorado)
 
-`npm run verify:e2e` (con el servidor arriba) recorre en un navegador real:
-arranque en blanco → carga del demo → equipo desde el catálogo (con su vector
-auto-creado) → validación del payload → optimización → KPIs del cockpit en
-años calendario → Summary con medidas y Sankey trazado → guardar corrida →
-recargarla sin re-resolver → memo ejecutivo. Falla al primer paso roto y
-verifica que no hubo errores de consola en todo el flujo.
+`npm run verify:e2e` (con el servidor arriba) recorre en un navegador real la
+interfaz: Sistemas → crear un sistema a partir del demo → agregar un componente
+desde el catálogo (con su vector creado solo) → el guardado automático lo deja
+en disco → ajustar Parámetros → optimizar desde el Resumen → KPIs, medidas,
+emisiones evitadas y Sankey → la corrida queda guardada y se reabre sola al
+recargar → la interfaz en inglés → se elimina el sistema de prueba. Falla al
+primer paso roto y verifica que no hubo errores de página en todo el flujo.
+
+`npm run verify:ui` recorre **todas** las vistas (29) en español y en inglés y
+falla si alguna muestra una clave de texto cruda, si falta una traducción o si
+la página lanza un error. Después las recorre a ancho de celular (375 px) y
+falla si algún elemento se sale de la pantalla.
 
 `npm run verify:topology` recorre el otro modo de uso: la app publicada, **sin
-backend**, resolviendo en el navegador. Carga la planta de ejemplo con red,
-comprueba que el mapa dibuja sus equipos y el recorrido de cada arco, optimiza
-con HiGHS wasm y contrasta el VAN de la pantalla contra el fixture dorado de
-Julia.
+backend** (`vite preview` no tiene proxy a la API), resolviendo en el
+navegador. Abre la planta de ejemplo con red, comprueba que el mapa dibuja sus
+equipos y cada conexión con su flecha, optimiza con HiGHS wasm y contrasta el
+VAN de la pantalla contra el fixture dorado de Julia.
 
 ## Cómo reproducir
 
@@ -93,6 +99,9 @@ cd frontend && npm run verify:wasm && npm run verify:flows
 # camino dorado en navegador (server en 127.0.0.1:8080)
 julia --project=. launcher/server.jl        # terminal 1
 cd frontend && npm run verify:e2e           # terminal 2
+
+# todas las vistas en los dos idiomas (server en 127.0.0.1:8080)
+cd frontend && npm run verify:ui
 
 # la app publicada, sin backend (build servida por vite preview)
 cd frontend && npm run build && npm run preview   # terminal 1

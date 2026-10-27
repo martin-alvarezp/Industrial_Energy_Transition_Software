@@ -1,5 +1,5 @@
 # Persistencia de sitios (digital twin fase 5): escribe un Site a los 8 CSV
-# del contrato §9 (+ layout.geojson opcional). Garantía: save → load produce
+# del contrato §9 (+ layout.geojson y topology.json opcionales). Garantía: save → load produce
 # el mismo sitio físico (misma site_version) — verificado en tests.
 
 """
@@ -98,6 +98,22 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
             p = joinpath(dir, f)
             isfile(p) && rm(p)
         end
+    end
+
+    # topología de red (M14): un JSON opcional con nodos, arcos, el nodo de
+    # cada equipo y el de cada demanda. Los arcos llevan puertos anidados, que
+    # en CSV quedarían en dos tablas; el JSON reusa el esquema del twin. Sin
+    # topología no se escribe (y se limpia uno anterior): save → load es fiel.
+    topo_path = joinpath(dir, "topology.json")
+    if !isempty(site.nodes) || !isempty(site.arcs) || !isempty(site.node_of) ||
+       !isempty(site.demand_node)
+        topo = (nodes = get(sj, :nodes, []), arcs = get(sj, :arcs, []),
+                demand_nodes = get(sj, :demand_nodes, (;)),
+                tech_nodes = (; (k => String(site.node_of[k])
+                                 for k in sort!(collect(keys(site.node_of))))...))
+        open(io -> JSON3.write(io, topo), topo_path, "w")
+    else
+        isfile(topo_path) && rm(topo_path)
     end
 
     layout !== nothing &&

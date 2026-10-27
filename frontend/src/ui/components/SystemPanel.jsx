@@ -1,0 +1,302 @@
+// Panel flotante de la vista de infraestructura: el sistema (info,
+// ubicaciones, componentes) o, con una ubicación elegida, esa ubicación
+// (info, componentes, perfil climático).
+import { useMemo, useState } from "react";
+import {
+  MdArrowBack, MdExpandLess, MdExpandMore, MdOutlineInfo, MdOutlineViewInAr,
+  MdOutlineWbSunny, MdLocationOn, MdAdd, MdHistory, MdEdit, MdDelete, MdPolyline,
+  MdOutlineLocationOn,
+} from "react-icons/md";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useI18n } from "../i18n.jsx";
+import { useStudio } from "../studio.jsx";
+import { NAV_ICONS } from "../icons.jsx";
+import { Menu, Modal } from "../kit.jsx";
+import { hrefFor, navigate } from "../router.js";
+import { locationOf, polygonCentroid } from "../layout.js";
+import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
+import { polygonAreaM2 } from "../../lib/twin.js";
+import { fetchSolarProfile } from "../../lib/api.js";
+import { aggregate8760 } from "../../lib/series.js";
+import { num } from "../../lib/format.js";
+
+
+const MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function SaveStatus() {
+  const { t } = useI18n();
+  const { saveStatus } = useStudio();
+  const s = saveStatus?.state;
+  if (!s || s === "idle") return null;
+  const label = { saved: "save.saved", saving: "save.saving", pending: "save.pending",
+                  readonly: "save.readonly", local: "save.local", error: "save.error" }[s];
+  return <span className={"ip-save" + (s === "error" ? " err" : "")}
+               title={saveStatus.message ?? ""}>{t(label)}</span>;
+}
+
+function SaveCopy() {
+  const { t } = useI18n();
+  const { saveCurrentSite, sites } = useStudio();
+  const [name, setName] = useState(null);
+  const [err, setErr] = useState(null);
+  const id = (name ?? "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+  const go = async () => {
+    try { const r = await saveCurrentSite(id); navigate(hrefFor({ site: r.saved, page: "infrastructure" })); setName(null); }
+    catch (e) { setErr(e.message); }
+  };
+  return (
+    <>
+      <button className="ui-btn outline sm" onClick={() => setName("mi_planta")}>{t("save.copy")}</button>
+      {name != null && (
+        <Modal title={t("save.copy")} onClose={() => setName(null)}
+               footer={<>
+                 <button className="ui-btn ghost" onClick={() => setName(null)}>{t("common.cancel")}</button>
+                 <button className="ui-btn primary" disabled={!id || id === "demo" || (sites ?? []).includes(id)}
+                         onClick={go}>{t("common.save")}</button>
+               </>}>
+          <div className="ui-field">
+            <label>{t("save.copyName")}</label>
+            <input className="ui-input" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+            <p className="ui-hint">id: {id || "—"}</p>
+            {err && <p className="ui-error">{err}</p>}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function WeatherTab({ loc, techs }) {
+  const { t, lang } = useI18n();
+  const { twin, patchSite } = useStudio();
+  const [state, setState] = useState(null);
+  const center = loc?.polygon ? polygonCentroid(loc.polygon) : twin.layout.center;
+  const solar = techs.filter((x) => x.type === "generator" && !/wind|eolic|eólic/i.test(x.tech_id + x.name));
+  const load = async () => {
+    setState({ loading: true });
+    try {
+      const r = await fetchSolarProfile(center[0].toFixed(4), center[1].toFixed(4));
+      const cf = r.cf_hourly;
+      const months = Array(12).fill(0), counts = Array(12).fill(0), hours = Array(24).fill(0);
+      const dpm = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let h = 0;
+      dpm.forEach((d, m) => { for (let i = 0; i < d * 24; i++, h++) { months[m] += cf[h]; counts[m]++; hours[h % 24] += cf[h]; } });
+      setState({
+        source: r.source, cf,
+        mean: cf.reduce((a, b) => a + b, 0) / cf.length, peak: Math.max(...cf),
+        monthly: months.map((s, m) => ({ m: (lang === "en" ? MONTHS_EN : MONTHS_ES)[m], cf: s / counts[m] })),
+        daily: hours.map((s, hh) => ({ h: hh, cf: s / 365 })),
+      });
+    } catch (e) { setState({ error: e.message }); }
+  };
+  const apply = () => {
+    const agg = aggregate8760(state.cf, twin.siteJson.timesteps, center[0] < 0 ? "south" : "north");
+    patchSite((sj) => ({ ...sj, generation_profiles: {
+      ...sj.generation_profiles, ...Object.fromEntries(solar.map((x) => [x.tech_id, agg.series])) } }),
+      `Perfil solar PVGIS aplicado a ${solar.map((x) => x.name).join(", ")}`);
+    setState((s) => ({ ...s, applied: solar.map((x) => x.name).join(", ") }));
+  };
+  if (!center) return <p className="ui-hint" style={{ padding: "16px 0" }}>{t("wx.noGeo")}</p>;
+  return (
+    <div style={{ padding: "16px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600 }}>{t("wx.title")}</div>
+          <div className="ui-hint">{center[0].toFixed(4)}, {center[1].toFixed(4)}</div>
+        </div>
+        <button className="ui-btn primary sm" onClick={load} disabled={state?.loading}>
+          <MdOutlineWbSunny /> {state?.loading ? t("wx.loading") : t("wx.load")}
+        </button>
+      </div>
+      {state?.error && <p className="ui-error">{state.error}</p>}
+      {state?.monthly && (
+        <>
+          <dl className="ip-kv" style={{ paddingTop: 4 }}>
+            <dt>{t("wx.cf")}</dt><dd>{num(state.mean * 100, 1)}%</dd>
+            <dt>{t("wx.yield")}</dt><dd>{num(state.mean * 8760, 0)} kWh/kWp·año</dd>
+            <dt>{t("wx.peak")}</dt><dd>{num(state.peak, 2)}</dd>
+          </dl>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ height: 180 }}>
+              <ResponsiveContainer>
+                <AreaChart data={state.monthly} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#eee" vertical={false} />
+                  <XAxis dataKey="m" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toFixed(2)} />
+                  <Tooltip formatter={(v) => v.toFixed(3)} />
+                  <Area dataKey="cf" stroke="#f0a400" fill="#f9c74f" fillOpacity={0.35} name="cf" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ height: 180 }}>
+              <ResponsiveContainer>
+                <AreaChart data={state.daily} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#eee" vertical={false} />
+                  <XAxis dataKey="h" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toFixed(2)} />
+                  <Tooltip formatter={(v) => v.toFixed(3)} labelFormatter={(h) => `${t("wx.hour")} ${h}`} />
+                  <Area dataKey="cf" stroke="#936bff" fill="#936bff" fillOpacity={0.2} name="cf" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            {solar.length
+              ? <button className="ui-btn outline sm" onClick={apply}>{t("wx.apply", { n: solar.length })}</button>
+              : <p className="ui-hint">{t("wx.none")}</p>}
+            {state.applied && <p className="ui-hint" style={{ color: "var(--ui-ok)" }}>✓ {t("wx.applied", { names: state.applied })}</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function SystemPanel({
+  route, collapsed, setCollapsed, compView, setCompView, builtYears,
+  onOpenComponent, onAddComponent, onDrawLocation, onRedrawLocation, onLocateComponent,
+  onDeleteComponent,
+}) {
+  const { t } = useI18n();
+  const { siteName, twin, patchLayout, readonly } = useStudio();
+  const { siteJson, layout } = twin;
+  const locId = route.query?.loc ?? null;
+  const loc = locId ? layout.locations?.find((l) => l.id === locId) : null;
+  const [tab, setTab] = useState(null);
+  const setLoc = (id, extra = {}) =>
+    navigate(hrefFor({ site: siteName, page: "infrastructure", query: { ...(id ? { loc: id } : {}), ...extra } }));
+  const techs = siteJson.technologies.filter((x) => x.tech_id !== "offsets");
+  const inLoc = useMemo(
+    () => (loc ? techs.filter((x) => locationOf(layout, x.tech_id) === loc.id) : techs),
+    [loc, techs, layout]);
+  const tabs = loc
+    ? [["info", MdOutlineInfo, "panel.info"], ["components", MdOutlineViewInAr, "panel.components"],
+       ["weather", MdOutlineWbSunny, "panel.weather"]]
+    : [["info", MdOutlineInfo, "panel.info"], ["locations", MdOutlineLocationOn, "panel.locations"],
+       ["components", MdOutlineViewInAr, "panel.components"]];
+  const curTab = tabs.some(([k]) => k === (route.query?.tab ?? tab)) ? (route.query?.tab ?? tab) : "components";
+  const pickTab = (k) => { setTab(k); setLoc(locId, { tab: k }); };
+  const area = polygonAreaM2(loc ? loc.polygon : layout.boundary);
+  const SysIcon = NAV_ICONS.systems;
+
+  const renameLoc = (name) => patchLayout((l) => ({
+    locations: l.locations.map((x) => (x.id === loc.id ? { ...x, name } : x)) }));
+  const describeLoc = (description) => patchLayout((l) => ({
+    locations: l.locations.map((x) => (x.id === loc.id ? { ...x, description } : x)) }));
+  const deleteLoc = () => {
+    if (!window.confirm(t("panel.deleteLocConfirm", { name: loc.name }))) return;
+    patchLayout((l) => ({
+      locations: l.locations.filter((x) => x.id !== loc.id),
+      equipmentLocation: Object.fromEntries(Object.entries(l.equipmentLocation ?? {}).filter(([, v]) => v !== loc.id)),
+    }), `Ubicación '${loc.name}' eliminada`);
+    setLoc(null);
+  };
+
+  return (
+    <div className={"ip-panel" + (collapsed ? " collapsed" : "")} data-testid="system-panel">
+      <div className="ip-panel-head">
+        <button className="ui-dots" aria-label={t("common.back")}
+                onClick={() => (loc ? setLoc(null) : navigate("#/systems"))}><MdArrowBack /></button>
+        <h2>{loc ? <MdLocationOn /> : <SysIcon />}{loc ? loc.name : layout.title || siteJson.name || siteName}</h2>
+        <SaveStatus />
+        {readonly && <SaveCopy />}
+        {loc && (
+          <Menu items={[
+            { label: t("panel.redraw"), icon: MdPolyline, onClick: () => onRedrawLocation(loc.id) },
+            "-",
+            { label: t("panel.deleteLoc"), icon: MdDelete, danger: true, onClick: deleteLoc },
+          ]} />
+        )}
+        <button className="ui-dots" aria-label="toggle" onClick={() => setCollapsed(!collapsed)}>
+          {collapsed ? <MdExpandMore /> : <MdExpandLess />}
+        </button>
+      </div>
+      {!collapsed && (
+        <>
+          <div className="ui-tabs" style={{ margin: "0 18px" }}>
+            {tabs.map(([k, I, key]) => (
+              <button key={k} className={curTab === k ? "on" : ""} onClick={() => pickTab(k)}>
+                <I /> {t(key)}
+              </button>
+            ))}
+          </div>
+          <div className="ip-panel-body">
+            {curTab === "info" && !loc && (
+              <>
+                <dl className="ip-kv">
+                  <dt>{t("common.name")}</dt>
+                  <dd><input className="ui-input" value={layout.title || ""} placeholder={siteJson.name ?? siteName}
+                             onChange={(e) => patchLayout({ title: e.target.value })} /></dd>
+                  <dt>{t("panel.address")}</dt><dd>{layout.address ?? t("panel.noAddress")}</dd>
+                  <dt>{t("panel.area")}</dt><dd>{area > 0 ? `${num(area / 10_000, 2)} ha` : t("panel.noBoundary")}</dd>
+                  <dt>{t("panel.nLocations")}</dt><dd>{layout.locations?.length ?? 0}</dd>
+                  <dt>{t("panel.nComponents")}</dt><dd>{techs.length}</dd>
+                  <dt>{t("panel.carriers")}</dt><dd>{siteJson.carriers.filter((c) => !["emissions", "offset"].includes(c.category)).map((c) => c.name).join(", ")}</dd>
+                  <dt>{t("panel.markets")}</dt><dd>{(siteJson.markets ?? []).length || "—"}</dd>
+                  <dt>{t("panel.description")}</dt>
+                  <dd><textarea className="ui-textarea" value={layout.description ?? ""}
+                                onChange={(e) => patchLayout({ description: e.target.value })} /></dd>
+                </dl>
+              </>
+            )}
+            {curTab === "info" && loc && (
+              <dl className="ip-kv">
+                <dt>{t("common.name")}</dt>
+                <dd><input className="ui-input" value={loc.name}
+                           onChange={(e) => renameLoc(e.target.value)} /></dd>
+                <dt>{t("panel.area")}</dt><dd>{area > 0 ? `${num(area / 10_000, 2)} ha` : "—"}</dd>
+                <dt>{t("panel.nComponents")}</dt><dd>{inLoc.length}</dd>
+                <dt>{t("panel.center")}</dt>
+                <dd>{loc.polygon ? polygonCentroid(loc.polygon).map((v) => v.toFixed(5)).join(", ") : "—"}</dd>
+                <dt>{t("panel.description")}</dt>
+                <dd><textarea className="ui-textarea" value={loc.description ?? ""}
+                              onChange={(e) => describeLoc(e.target.value)} /></dd>
+              </dl>
+            )}
+            {curTab === "locations" && (
+              <>
+                <div className="ip-panel-bar">
+                  <button className="ui-btn primary" onClick={onDrawLocation}>
+                    <MdAdd /> {t("common.add")}
+                  </button>
+                  <span className="count">{(layout.locations ?? []).length} {t("panel.locations").toLowerCase()}</span>
+                </div>
+                {(layout.locations ?? []).length === 0 && <p className="ui-hint">{t("panel.noLocations")}</p>}
+                <div className="ip-loc-list">
+                  {(layout.locations ?? []).map((l) => {
+                    const n = techs.filter((x) => locationOf(layout, x.tech_id) === l.id).length;
+                    return (
+                      <button key={l.id} className="ip-loc-row" onClick={() => setLoc(l.id, { tab: "components" })}>
+                        <MdLocationOn size={22} /> {l.name} <small>{countLabel(t, n)}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            {curTab === "components" && (
+              <>
+                <div className="ip-panel-bar">
+                  <button className="ui-btn primary" onClick={() => onAddComponent(loc?.id ?? null)}>
+                    <MdAdd /> {t("common.add")}
+                  </button>
+                  <button className="ui-btn ghost icon" title={t("panel.history")}
+                          onClick={() => navigate(hrefFor({ site: siteName, page: "changelog" }))}>
+                    <MdHistory />
+                  </button>
+                  <span className="count">{countLabel(t, inLoc.length)}</span>
+                  <span style={{ marginLeft: "auto" }}><ViewToggle view={compView} setView={setCompView} /></span>
+                </div>
+                <ComponentCollection techs={inLoc} layout={layout} view={compView} builtYears={builtYears}
+                                     onOpen={onOpenComponent} onLocate={onLocateComponent}
+                                     onDelete={onDeleteComponent} />
+              </>
+            )}
+            {curTab === "weather" && loc && <WeatherTab loc={loc} techs={inLoc} />}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

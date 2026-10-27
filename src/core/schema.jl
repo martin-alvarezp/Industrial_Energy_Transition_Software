@@ -241,9 +241,35 @@ function load_site(dir::AbstractString; name::AbstractString = basename(abspath(
 
     factors = load_emission_factors(dir)
     markets = load_markets(dir, nsteps)
+    nodes, arcs, node_of, demand_node = load_topology(dir)
 
     return Site(String(name), steps, carriers, sources, converters, generators,
-                storages, demands, prices, factors, markets)
+                storages, demands, prices, factors, markets,
+                nodes, arcs, node_of, demand_node)
+end
+
+"""
+    load_topology(dir) -> (nodes, arcs, node_of, demand_node)
+
+Topología de red (M14) de un sitio guardado: `topology.json`, opcional. Sin
+el archivo el sitio es de una sola barra (`:main`), como siempre.
+"""
+function load_topology(dir::AbstractString)
+    path = joinpath(dir, "topology.json")
+    isfile(path) || return (Dict{Symbol,Node}(), Dict{Symbol,Arc}(),
+                            Dict{Symbol,Symbol}(), Dict{Symbol,Symbol}())
+    obj = try
+        JSON3.read(read(path, String))
+    catch e
+        throw(SchemaError("topology.json no es JSON válido: $(sprint(showerror, e))"))
+    end
+    nodes, arcs, demand_node = _topology_from_json(obj)
+    node_of = Dict{Symbol,Symbol}()
+    tn = get(obj, :tech_nodes, nothing)
+    tn === nothing || for (k, v) in pairs(tn)
+        node_of[Symbol(k)] = Symbol(v)
+    end
+    return nodes, arcs, node_of, demand_node
 end
 
 _get_num(d::Dict, key::String, default) = Float64(get(d, key, default))

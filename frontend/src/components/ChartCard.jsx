@@ -1,3 +1,4 @@
+import { useL } from "../ui/i18n.jsx";
 import { useState } from "react";
 
 /**
@@ -6,6 +7,7 @@ import { useState } from "react";
  * `table = { columns: [{key,label,fmt?}], rows: [...] }`
  */
 export default function ChartCard({ title, sub, table, children, footnote }) {
+  const L = useL();
   const [showTable, setShowTable] = useState(false);
   return (
     <div className="card">
@@ -20,7 +22,7 @@ export default function ChartCard({ title, sub, table, children, footnote }) {
             onClick={() => setShowTable((v) => !v)}
             aria-pressed={showTable}
           >
-            {showTable ? "Ver gráfico" : "Ver tabla"}
+            {showTable ? L("Ver gráfico", "Show chart") : L("Ver tabla", "Show table")}
           </button>
         )}
       </div>

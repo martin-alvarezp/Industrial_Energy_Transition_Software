@@ -3,17 +3,20 @@ import {
 } from "recharts";
 import ChartCard, { Legend, VizTooltip } from "../ChartCard.jsx";
 import { musd, num, calYear } from "../../lib/format.js";
+import { useL } from "../../ui/i18n.jsx";
 
 // Componentes de costo (identidad → categórico, orden fijo por slot)
-const SERIES = [
-  { key: "capex", name: "CAPEX", color: "#2b62c4" },
-  { key: "opex", name: "OPEX", color: "#5f3f9c" },
-  { key: "energy", name: "Energía", color: "#b97e14" },
-  { key: "climate", name: "Carbono + offsets", color: "#008165" },
+const SERIES_DEF = [
+  { key: "capex", name: ["CAPEX", "CAPEX"], color: "#2b62c4" },
+  { key: "opex", name: ["OPEX", "OPEX"], color: "#5f3f9c" },
+  { key: "energy", name: ["Energía", "Energy"], color: "#b97e14" },
+  { key: "climate", name: ["Carbono + compensaciones", "Carbon + offsets"], color: "#008165" },
 ];
 
 /** Desglose del costo anual (§6 del SPEC), apilado por componente. */
 export default function CostChart({ costs, baseYear = 0 }) {
+  const L = useL();
+  const SERIES = SERIES_DEF.map((s) => ({ ...s, name: L(...s.name) }));
   const data = costs.map((c) => ({
     year: calYear(baseYear, c.year),
     capex: c.capex,
@@ -25,11 +28,11 @@ export default function CostChart({ costs, baseYear = 0 }) {
 
   return (
     <ChartCard
-      title="Costo anual por componente"
-      sub="USD del año (sin descontar) — el ingreso por export se descuenta del total"
+      title={L("Costo anual por componente", "Annual cost by component")}
+      sub={L("USD del año (sin descontar) — el ingreso por venta se descuenta del total", "USD of the year (undiscounted) — sales revenue is subtracted from the total")}
       table={{
         columns: [
-          { key: "year", label: "Año" },
+          { key: "year", label: L("Año", "Year") },
           ...SERIES.map((s) => ({ key: s.key, label: s.name, fmt: (v) => musd(v) })),
           { key: "total", label: "Total", fmt: (v) => musd(v) },
         ],
@@ -50,7 +53,7 @@ export default function CostChart({ costs, baseYear = 0 }) {
             tickFormatter={(v) => num(v / 1e6, 0) + " M"}
           />
           <Tooltip
-            content={<VizTooltip labelFmt={(l) => `Año ${l}`} valueFmt={(v) => musd(v)} />}
+            content={<VizTooltip labelFmt={(l) => `${L("Año", "Year")} ${l}`} valueFmt={(v) => musd(v)} />}
             cursor={{ fill: "rgba(18,33,30,0.05)" }}
           />
           {SERIES.map((s, i) => (

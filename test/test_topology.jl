@@ -210,6 +210,31 @@ end
     @test site_version(site2) == site_version(site)   # canónico ⇒ misma huella
 end
 
+@testset "M14: save_site → load_site preserva la topología (topology.json)" begin
+    # antes se perdía al guardar: el sitio volvía de disco como placa de cobre
+    site, cfg = island_site(arc = true)
+    dir = mktempdir()
+    save_site(dir, site)
+    @test isfile(joinpath(dir, "topology.json"))
+    site2 = load_site(dir; name = "island")
+    @test site2.node_of[:grid_import] == :A
+    @test site2.demand_node[:electricity] == :B
+    @test site2.arcs[:ab].from == :A && site2.arcs[:ab].to == :B
+    @test site_version(site2) == site_version(site)
+    # y el sitio cargado de disco resuelve igual que el original
+    npv(s) = (im = build_model(s, cfg); JuMP.optimize!(im.model); JuMP.objective_value(im.model))
+    @test npv(site2) ≈ npv(site) rtol = 1e-9
+
+    # sin topología no queda el archivo (ni uno de un guardado anterior)
+    flat, _ = island_site(arc = false)
+    flat = Site(flat.name, flat.timesteps, flat.carriers, flat.sources, flat.converters,
+                flat.generators, flat.storages, flat.demands, flat.prices,
+                flat.emission_factors, flat.markets)
+    save_site(dir, flat)
+    @test !isfile(joinpath(dir, "topology.json"))
+    @test isempty(load_site(dir).arcs)
+end
+
 @testset "M14: validación de arcos incoherentes" begin
     bad = Site("bad", _topo_steps(), ELEC,
         Dict(:grid_import => Source(:grid_import, "Red", :electricity, 100.0, 0.0,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listRuns, fetchRun } from "../lib/api.js";
 import { musd, pct, num, calYear } from "../lib/format.js";
+import { useL } from "../ui/i18n.jsx";
 
 const kpiOf = (payload) => {
   const r = payload?.result;
@@ -23,20 +24,21 @@ const kpiOf = (payload) => {
 };
 
 const ROWS = [
-  ["Escenario", (k) => k.escenario],
-  ["Horizonte", (k) => k.horizonte],
-  ["Factible", (k) => (k.feasible === false ? "NO" : "sí")],
-  ["VAN", (k) => musd(k.npv)],
-  ["Inversión total", (k) => musd(k.capex)],
-  ["OPEX total", (k) => musd(k.opex)],
-  ["Costo total", (k) => musd(k.total)],
-  ["Emisiones netas finales", (k) => (k.net_final == null ? "—" : `${num(k.net_final, 0)} t`)],
-  ["Reducción de emisiones", (k) => (k.reduccion == null ? "—" : pct(k.reduccion, 0))],
-  ["Medidas nuevas", (k) => k.medidas],
+  [["Escenario", "Scenario"], (k) => k.escenario],
+  [["Horizonte", "Horizon"], (k) => k.horizonte],
+  [["Factible", "Feasible"], (k) => (k.feasible === false ? "NO" : "✓")],
+  [["VAN", "NPV"], (k) => musd(k.npv)],
+  [["Inversión total", "Total investment"], (k) => musd(k.capex)],
+  [["OPEX total", "Total OPEX"], (k) => musd(k.opex)],
+  [["Costo total", "Total cost"], (k) => musd(k.total)],
+  [["Emisiones netas finales", "Final net emissions"], (k) => (k.net_final == null ? "—" : `${num(k.net_final, 0)} t`)],
+  [["Reducción de emisiones", "Emissions reduction"], (k) => (k.reduccion == null ? "—" : pct(k.reduccion, 0))],
+  [["Medidas nuevas", "New measures"], (k) => k.medidas],
 ];
 
 /** Comparación lado a lado entre corridas guardadas (P1 → v0.8). */
 export default function CompareRuns({ siteName }) {
+  const L = useL();
   const [runs, setRuns] = useState([]);
   const [sel, setSel] = useState([]);          // ids marcados
   const [cols, setCols] = useState(null);      // [{name, kpi}] cargadas
@@ -60,10 +62,9 @@ export default function CompareRuns({ siteName }) {
   if (runs.length < 2)
     return (
       <div className="card">
-        <h3 className="card-title">Comparar corridas</h3>
+        <h3 className="card-title">{L("Comparar corridas", "Compare runs")}</h3>
         <p className="card-sub">
-          guarda al menos dos corridas (arriba) para compararlas lado a lado —
-          p. ej. BaU vs Economic Optimum vs "forzar CHP 2030"
+          {L("necesitas al menos dos corridas para compararlas lado a lado", "you need at least two runs to compare them side by side")}
         </p>
       </div>
     );
@@ -71,9 +72,9 @@ export default function CompareRuns({ siteName }) {
   return (
     <div className="card">
       <div className="card-head" style={{ flexWrap: "wrap", gap: 8 }}>
-        <h3 className="card-title">Comparar corridas</h3>
+        <h3 className="card-title">{L("Comparar corridas", "Compare runs")}</h3>
         <button className="chart-toggle" disabled={sel.length < 2} onClick={compare}>
-          Comparar ({sel.length})
+          {L("Comparar", "Compare")} ({sel.length})
         </button>
       </div>
       <div className="range-row" style={{ flexWrap: "wrap", gap: 10 }}>
@@ -100,8 +101,8 @@ export default function CompareRuns({ siteName }) {
             </thead>
             <tbody>
               {ROWS.map(([label, fmt]) => (
-                <tr key={label}>
-                  <td style={{ color: "var(--muted)" }}>{label}</td>
+                <tr key={label[0]}>
+                  <td style={{ color: "var(--muted)" }}>{L(...label)}</td>
                   {cols.map((c) => (
                     <td key={c.name} style={{ textAlign: "right" }}>
                       {c.kpi ? fmt(c.kpi) : "—"}
@@ -110,7 +111,7 @@ export default function CompareRuns({ siteName }) {
                 </tr>
               ))}
               <tr>
-                <td style={{ color: "var(--muted)" }}>Δ VAN vs primera</td>
+                <td style={{ color: "var(--muted)" }}>{L("Δ VAN vs primera", "Δ NPV vs first")}</td>
                 {cols.map((c, i) => (
                   <td key={c.name} style={{ textAlign: "right", fontWeight: 600 }}>
                     {i === 0 || c.kpi?.npv == null || cols[0].kpi?.npv == null
@@ -121,8 +122,7 @@ export default function CompareRuns({ siteName }) {
             </tbody>
           </table>
           <p className="footnote">
-            Δ VAN positivo = esa corrida cuesta más que la primera — el precio
-            de su política/escenario
+            {L("Δ VAN positivo = esa corrida cuesta más que la primera — el precio de su política o escenario", "Positive Δ NPV = that run costs more than the first — the price of its policy or scenario")}
           </p>
         </div>
       )}

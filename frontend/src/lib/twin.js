@@ -23,18 +23,24 @@ export const techGlyph = (t) => TECH_TYPE_META[t.type]?.glyph ?? "•";
 // ── Vectores energéticos (roadmap M10) ─────────────────────────────────────
 // Semántica de cada categoría en el motor (types.jl: CARRIER_CATEGORIES).
 export const CARRIER_CATEGORY_META = {
-  energy:    { label: "Energía",     color: "#2b62c4",
-               hint: "lleva balance nodal por paso (electricidad, H₂…)" },
-  heat:      { label: "Calor",       color: "#b3305f",
-               hint: "balance nodal; cada nivel de temperatura/presión es un vector aparte" },
-  cooling:   { label: "Frío",        color: "#2a9dab",
-               hint: "balance nodal; lo producen chillers/bombas de calor" },
-  fuel:      { label: "Combustible", color: "#7a6120",
-               hint: "se compra fuera del sistema al precio de su serie (necesita precio y factor scope 1)" },
-  emissions: { label: "Emisiones",   color: "#5a5f63",
-               hint: "contabilidad climática — no lleva balance" },
-  offset:    { label: "Offsets",     color: "#3c7a44",
-               hint: "compensaciones compradas — motor de emisiones" },
+  energy:    { label: "Energía",     label_en: "Energy", color: "#2b62c4",
+               hint: "lleva balance nodal por paso (electricidad, H₂…)",
+               hint_en: "nodal balance per step (electricity, H₂…)" },
+  heat:      { label: "Calor",       label_en: "Heat", color: "#b3305f",
+               hint: "balance nodal; cada nivel de temperatura/presión es un vector aparte",
+               hint_en: "nodal balance; each temperature/pressure level is a separate carrier" },
+  cooling:   { label: "Frío",        label_en: "Cooling", color: "#2a9dab",
+               hint: "balance nodal; lo producen chillers/bombas de calor",
+               hint_en: "nodal balance; produced by chillers/heat pumps" },
+  fuel:      { label: "Combustible", label_en: "Fuel", color: "#7a6120",
+               hint: "se compra fuera del sistema al precio de su serie (necesita precio y factor scope 1)",
+               hint_en: "bought outside the system at its series price (needs a price and a scope 1 factor)" },
+  emissions: { label: "Emisiones",   label_en: "Emissions", color: "#5a5f63",
+               hint: "contabilidad climática — no lleva balance",
+               hint_en: "climate accounting — no balance" },
+  offset:    { label: "Offsets",     label_en: "Offsets", color: "#3c7a44",
+               hint: "compensaciones compradas — motor de emisiones",
+               hint_en: "purchased offsets — emissions engine" },
 };
 
 export const carrierColor = (c) =>

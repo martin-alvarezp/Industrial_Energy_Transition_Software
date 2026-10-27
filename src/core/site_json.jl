@@ -396,6 +396,21 @@ function site_from_json(obj; default_name::AbstractString = "twin")
     end
 
     # ── topología de red (M14): nodos, arcos y demanda por nodo ──
+    nodes, arcs, demand_node = _topology_from_json(obj)
+
+    return Site(name, steps, carriers, sources, converters, generators,
+                storages, demands, prices, factors, markets,
+                nodes, arcs, node_of, demand_node)
+end
+
+"""
+    _topology_from_json(obj) -> (nodes, arcs, demand_node)
+
+Topología de red (M14) desde el esquema del twin: `nodes`, `arcs` y
+`demand_nodes`. La usan `site_from_json` y la carga de `topology.json` de un
+sitio guardado, así ambos caminos leen la topología igual.
+"""
+function _topology_from_json(obj)
     nodes = Dict{Symbol,Node}()
     nodes_raw = _twin_get(obj, :nodes)
     if nodes_raw !== nothing
@@ -437,9 +452,7 @@ function site_from_json(obj; default_name::AbstractString = "twin")
         end
     end
 
-    return Site(name, steps, carriers, sources, converters, generators,
-                storages, demands, prices, factors, markets,
-                nodes, arcs, node_of, demand_node)
+    return nodes, arcs, demand_node
 end
 
 """

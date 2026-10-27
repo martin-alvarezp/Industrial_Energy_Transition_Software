@@ -169,6 +169,7 @@ con status 400 (input/validación), 404 (sitio o ruta), 405 o 500.
 | `GET /scenarios`    | —                                                                  | `{"scenarios": [{"name", "description"}, ...]}` |
 | `GET /sites`        | —                                                                  | `{"sites": ["demo", "mi_planta", ...]}`         |
 | `GET /sites/{name}` | —                                                                  | el sitio completo como JSON (esquema del digital twin, docs/digital_twin_spec.md §7) + `site_version` + `layout` (GeoJSON o null) |
+| `GET /sites/{name}/config` | —                                                           | `{"scenario_config": {...}}`: el scenario_config.yaml del sitio, con el formato de `assumptions.scenario_config` (sólo lectura; los cambios viajan como `config_overrides`) |
 | `PUT /sites/{name}` | `{"site_payload": {...}, "layout": {GeoJSON}?}`                    | persiste el twin (8 CSVs + layout.geojson; copia el scenario_config del demo si el sitio es nuevo): `{"saved", "site_version", "n_techs"}`. `demo` es intocable (403) |
 | `POST /scenario`    | `{"site": "demo", "scenario": "emissions_cap", "config_overrides": {"horizon_years": 10, ...}, "include_dispatch": false, "shadow_prices": true, "site_payload": {...}}` | el esquema del §2 (results_payload)             |
 | `POST /pareto`      | `{"site": "demo", "points": 6, "cap_end_min": 0.0, "config_overrides": {...}, "site_payload": {...}}` | `{"meta": {...}, "pareto": [filas del §2]}`     |

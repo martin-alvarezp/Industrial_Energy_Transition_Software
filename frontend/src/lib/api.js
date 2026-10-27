@@ -88,7 +88,22 @@ export function toOverrides(cfg) {
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",
+    // parámetros del escenario que la vista Parámetros permite sobrescribir;
+    // sólo viajan si el usuario los cambió (si no, rige el YAML del sitio)
+    ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => cfg[k] != null).map((k) => [k, cfg[k]])),
   };
+}
+
+export const EXTRA_OVERRIDES = ["wacc", "carbon_price", "price_escalation", "demand_growth",
+  "emissions_cap_gross", "max_offset_share", "offset_price", "offset_availability"];
+
+/** GET /sites/{name}/config: scenario_config.yaml del sitio (null sin API). */
+export async function fetchSiteConfig(name) {
+  if (!(await apiAvailable())) return null;
+  try {
+    const r = await fetch(`${API_BASE}/sites/${encodeURIComponent(name)}/config`);
+    return r.ok ? (await r.json()).scenario_config : null;
+  } catch { return null; }
 }
 
 const scenarioName = (cfg) =>
@@ -246,6 +261,14 @@ export async function compute(cfg, sitePayload = null, siteName = "demo",
   // el mock no consume ediciones del twin: se marca para que la UI lo diga
   return { ...computeViaMock(cfg), twinIgnored: !!sitePayload || siteName !== "demo" };
 }
+
+/** POST /pareto a pedido: barrido de la meta final entre 100% y `capMin`. */
+export const runParetoSweep = (cfg, sitePayload, siteName, points = 9, capEndMin = null) =>
+  post("/pareto", {
+    site: siteName, points, config_overrides: toOverrides(cfg),
+    ...(capEndMin != null ? { cap_end_min: capEndMin } : {}),
+    ...(sitePayload ? { site_payload: sitePayload } : {}),
+  }, { timeoutMs: 600_000 });
 
 /** POST /portfolio (D5): mismo escenario sobre N sitios + agregado grupo. */
 export const runPortfolio = (sites, scenario, cfg) =>

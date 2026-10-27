@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import ChartCard, { VizTooltip } from "../ChartCard.jsx";
 import { musd, tons, num, usdPerTon } from "../../lib/format.js";
+import { useL } from "../../ui/i18n.jsx";
 
 /**
  * Curva Pareto: VAN vs meta final de emisiones (una serie → sin caja de
@@ -11,6 +12,7 @@ import { musd, tons, num, usdPerTon } from "../../lib/format.js";
  * como banda, no como puntos.
  */
 export default function ParetoChart({ pareto }) {
+  const L = useL();
   const feasible = pareto.filter((p) => p.feasible);
   const infeasible = pareto.filter((p) => !p.feasible);
   const data = feasible.map((p) => ({
@@ -26,24 +28,24 @@ export default function ParetoChart({ pareto }) {
 
   return (
     <ChartCard
-      title="Curva Pareto — VAN vs meta final"
-      sub="cada punto es una corrida con distinta meta al año final; la pendiente entre puntos es el MACC del tramo"
+      title={L("Curva Pareto — VAN vs meta final", "Pareto curve — NPV vs final target")}
+      sub={L("cada punto es una corrida con distinta meta al año final; la pendiente entre puntos es el MACC del tramo", "each point is a run with a different final-year target; the slope between points is the segment MACC")}
       footnote={[
         flat
-          ? "La curva es casi plana: el precio de carbono ya paga la transición y endurecer la meta casi no cuesta — hasta acercarse al piso físico."
+          ? L("La curva es casi plana: el precio del carbono ya paga la transición y endurecer la meta casi no cuesta — hasta acercarse al piso físico.", "The curve is almost flat: the carbon price already pays for the transition and tightening the target costs almost nothing — until the physical floor.")
           : null,
         floor != null
-          ? `Bajo ~${tons(floor)} netas la meta es físicamente inalcanzable con las tecnologías y offsets permitidos.`
+          ? L(`Bajo ~${tons(floor)} netas la meta es físicamente inalcanzable con las tecnologías y compensaciones permitidas.`, `Below ~${tons(floor)} net the target is physically unreachable with the allowed technologies and offsets.`)
           : null,
       ]
         .filter(Boolean)
         .join(" ")}
       table={{
         columns: [
-          { key: "cap_net_end", label: "Meta final (t)", fmt: (v) => num(v, 0) },
-          { key: "feasible", label: "Factible", fmt: (v) => (v ? "sí" : "no") },
-          { key: "npv", label: "VAN", fmt: (v) => musd(v) },
-          { key: "macc_segment", label: "MACC tramo", fmt: (v) => (v == null ? "—" : usdPerTon(v)) },
+          { key: "cap_net_end", label: L("Meta final (t)", "Final target (t)"), fmt: (v) => num(v, 0) },
+          { key: "feasible", label: L("Factible", "Feasible"), fmt: (v) => (v ? L("sí", "yes") : "no") },
+          { key: "npv", label: L("VAN", "NPV"), fmt: (v) => musd(v) },
+          { key: "macc_segment", label: L("MACC tramo", "Segment MACC"), fmt: (v) => (v == null ? "—" : usdPerTon(v)) },
         ],
         rows: pareto,
       }}
@@ -57,7 +59,7 @@ export default function ParetoChart({ pareto }) {
             tickLine={false} axisLine={{ stroke: "var(--baseline)" }}
             tick={{ fill: "var(--muted)", fontSize: 11 }}
             tickFormatter={(v) => num(v / 1000, 0) + "k"}
-            label={{ value: "meta neta al año final (tCO₂e) → más estricta", position: "insideBottom", offset: -10, fill: "var(--muted)", fontSize: 11 }}
+            label={{ value: L("meta neta al año final (tCO₂e) → más estricta", "final-year net target (tCO₂e) → stricter"), position: "insideBottom", offset: -10, fill: "var(--muted)", fontSize: 11 }}
           />
           <YAxis
             tickLine={false} axisLine={false} width={56}
@@ -68,7 +70,7 @@ export default function ParetoChart({ pareto }) {
           <Tooltip
             content={
               <VizTooltip
-                labelFmt={(l) => `Meta final: ${tons(l)}`}
+                labelFmt={(l) => `${L("Meta final", "Final target")}: ${tons(l)}`}
                 valueFmt={(v, key) => (key === "npv" ? musd(v) : v)}
               />
             }
@@ -77,11 +79,11 @@ export default function ParetoChart({ pareto }) {
           {floor != null && (
             <ReferenceArea
               x1={0} x2={floor} fill="rgba(18,33,30,0.06)" stroke="none"
-              label={{ value: "inalcanzable", fill: "var(--muted)", fontSize: 11, position: "insideBottomLeft" }}
+              label={{ value: L("inalcanzable", "unreachable"), fill: "var(--muted)", fontSize: 11, position: "insideBottomLeft" }}
             />
           )}
           <Line
-            dataKey="npv" name="VAN" stroke="#008165" strokeWidth={2}
+            dataKey="npv" name={L("VAN", "NPV")} stroke="#008165" strokeWidth={2}
             strokeLinecap="round" isAnimationActive={false}
             dot={{ r: 4.5, fill: "#008165", stroke: "var(--surface)", strokeWidth: 2 }}
             activeDot={{ r: 6 }}
