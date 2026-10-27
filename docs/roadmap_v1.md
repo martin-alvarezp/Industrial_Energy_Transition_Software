@@ -72,8 +72,10 @@ Requiere agregación que preserve puntas (día de punta por estación o paso
 "peak" explícito con peso pequeño).
 
 ### M3 · Cierres pendientes ya conocidos (deuda declarada)
-- `capex_budget` **enforcement** en el MILP (restricción acumulada; hoy solo
-  se traza — el mock del frontend sí lo aplica: divergencia a matar).
+- ✅ `capex_budget` **enforcement** en el MILP (SPEC §7.8, 13-oct-2026): cuenta
+  todo el CAPEX, incluidas las renovaciones; mismo tope en el motor web (fixture
+  dorado `demo_budget_n10`) y diagnóstico de infactibilidad con el mínimo
+  exacto. El mock conserva su heurística.
 - `allow_new_fossil` real: bloquear candidatas cuyo input sea categoría fuel.
 - Unificar/retirar el mock del frontend (solo modo demo sin backend).
 

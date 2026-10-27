@@ -477,6 +477,17 @@ export function buildLP(site, cfg) {
       row(`forced_${sane(tech)}_${yrel}`,
           { [`nc_${sane(tech)}_${yrel}`]: 1 }, ">=", mw);
   }
+  // presupuesto CAPEX (§7.8, espejo de add_budget_constraint!): el mismo
+  // CAPEX bruto y sin descontar — inversiones nuevas + renovaciones (éstas son
+  // constantes y pasan restando al lado derecho)
+  if (cfg.capex_budget != null) {
+    const tb = T();
+    for (const tc of cands)
+      for (const y of years)
+        inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * 1000);
+    row("budget", tb, "<=",
+        cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
+  }
 
   const objBody = Object.entries(obj).filter(([, c]) => c !== 0)
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");

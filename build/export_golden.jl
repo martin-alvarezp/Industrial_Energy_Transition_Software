@@ -55,4 +55,11 @@ site_red = IETO.site_from_json(planta; default_name = "planta_red")
 dump("planta_red_n5", site_red, with_config(cfg0; horizon_years = 5))
 dump("planta_red_n10", site_red, with_config(cfg0; horizon_years = 10))
 
+# 7 · presupuesto CAPEX que muerde (§7.8): sin tope el plan gasta 31,9 MUSD;
+# con 20 MUSD queda fuera la batería. Los demás casos usan 40 MUSD, que no
+# muerde: sin este caso la fila del presupuesto del motor web no tendría ancla.
+s7, c7 = apply_scenario(site0, with_config(cfg0; horizon_years = 10,
+                                           capex_budget = 20e6), :least_cost)
+dump("demo_budget_n10", s7, c7)
+
 println("fixtures dorados en ", out)

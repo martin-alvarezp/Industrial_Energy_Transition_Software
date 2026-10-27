@@ -93,6 +93,8 @@ ExportRevenue_y= Σ_step price_export[step,y]·grid_export_p[step,y]·weight_hou
 
 **7.7 Emisiones (ver §8), indexadas por año.**
 
+**7.8 Presupuesto CAPEX:** `Σ_y CAPEX_y ≤ capex_budget`, con `CAPEX_y` el del §6: inversiones nuevas (incluidas las compras forzadas y las repetidas) + renovaciones del parque existente. Sin descontar y bruto (antes del escudo fiscal y del valor residual): es el mismo `total_capex` que reportan el XLSX y el JSON, así que el presupuesto nunca queda por debajo del CAPEX que ve el usuario. `capex_budget = nothing` ⇒ sin restricción. Si el escenario resulta infactible con tope, el diagnóstico (categoría `budget`) dice si lo obligatorio (renovaciones + compras forzadas) ya no cabe, o cuál es el mínimo CAPEX con el que el escenario sí es factible (un solve extra, con objetivo `min Σ CAPEX_y` y sin tope). El motor web aplica la misma restricción, pero no tiene diagnóstico de infactibilidad.
+
 ## 8. Motor de emisiones — trayectoria multi-año
 
 - Scope 1 (combustibles) + Scope 2 location-based (electricidad importada) → `gross_emissions[y]`.
@@ -143,7 +145,7 @@ offset_price: 80
 offset_availability: 10000
 carbon_price: 50
 
-capex_budget: 20000000                 # opcional, acumulado sobre el horizonte
+capex_budget: 20000000                 # opcional, acumulado sobre el horizonte; todo el CAPEX (§7.8)
 allow_new_fossil: false
 allowed_techs: [grid_import, gas_boiler, electric_boiler, heat_pump, pv, battery, offsets]
 ```

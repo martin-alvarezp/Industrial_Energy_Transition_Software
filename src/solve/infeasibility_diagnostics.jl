@@ -2,7 +2,7 @@
 # analíticas identifican QUÉ restricción/recurso falta y por cuánto, en el
 # lenguaje del usuario (capacidad, piso de emisiones, red), sin resolver IIS.
 
-"Hallazgo de infactibilidad: categoría (:capacity | :emissions | :grid | :unknown) + mensaje accionable."
+"Hallazgo de infactibilidad: categoría (:budget | :capacity | :emissions | :grid | :unknown) + mensaje accionable."
 struct InfeasibilityFinding
     category::Symbol
     message::String
@@ -15,6 +15,10 @@ _r0(x) = round(Int, x)
     diagnose_infeasibility(site, cfg) -> Vector{InfeasibilityFinding}
 
 Chequeos, en orden de causa más frecuente:
+0. **Presupuesto CAPEX** (§7.8): lo obligatorio —renovaciones del parque
+   existente + compras forzadas— ya supera `capex_budget`. Exacto, sin
+   resolver. (El caso en que el tope no alcanza para lo que el escenario
+   exige se resuelve aparte, con `budget_floor`.)
 1. **Capacidad pico por carrier** (§7.1-7.2): demanda pico del año N (con
    crecimiento) vs máximo instalable que produce ese carrier (+ red).
 2. **Piso de emisiones año a año** (§8): cota inferior analítica del net —
@@ -38,6 +42,23 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
                    (isempty(cfg.allowed_techs) || :grid_import in cfg.allowed_techs)
     import_limit = grid_allowed ? grid.existing_capacity : 0.0
     ef2 = _factor(site, grid_carrier, :scope2)
+
+    # ── 0 · presupuesto: lo obligatorio ya no cabe ──
+    if cfg.capex_budget !== nothing
+        params = build_parameters(site, cfg)
+        renewals = sum(params.renewal_capex; init = 0.0)
+        forced = sum(params.costs[t].capex_per_kw * KW_PER_MW * mw
+                     for (t, y, mw) in params.forced_builds
+                     if t in sets.candidates && 1 <= y <= N; init = 0.0)
+        if renewals + forced > cfg.capex_budget + 1e-6
+            push!(findings, InfeasibilityFinding(:budget,
+                "presupuesto: el tope de $(_musd3(cfg.capex_budget)) MUSD no " *
+                "alcanza lo obligatorio — renovaciones $(_musd3(renewals)) MUSD + " *
+                "compras forzadas $(_musd3(forced)) MUSD = " *
+                "$(_musd3(renewals + forced)) MUSD; sube el presupuesto al menos " *
+                "a eso o quita renovaciones/compras forzadas"))
+        end
+    end
 
     # ── 1 · capacidad pico por carrier ──
     for c in sets.demand_carriers
@@ -218,6 +239,48 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         "entre trayectoria de caps, presupuesto y límites de red por paso)"))
     return findings
 end
+
+"""
+    budget_floor(site, cfg; solver=SolverConfig()) -> Union{Float64,Nothing}
+
+El mínimo CAPEX (USD, misma métrica que `total_capex`) con el que el escenario
+es factible: el mismo modelo **sin** tope y con objetivo `min Σ capex_y`.
+`nothing` si el escenario es infactible aun sin tope —entonces el presupuesto
+no es la causa—. Exacto, no una cota: cuesta un solve.
+"""
+function budget_floor(site::Site, cfg::ScenarioConfig;
+                      solver::SolverConfig = SolverConfig())
+    im = build_model(site, with_config(cfg; capex_budget = nothing);
+                     silent = solver.silent)
+    m = im.model
+    JuMP.@objective(m, Min, sum(m[:capex_y][y] for y in im.sets.years))
+    solve!(im; solver)
+    JuMP.is_solved_and_feasible(m) || return nothing
+    return JuMP.objective_value(m)
+end
+
+"""
+    add_budget_floor!(findings, site, cfg; solver) -> findings
+
+Si el escenario tiene tope y ningún chequeo analítico culpó al presupuesto,
+calcula `budget_floor`: si supera el tope, el presupuesto es la causa y su
+hallazgo reemplaza al genérico de "límites combinados".
+"""
+function add_budget_floor!(findings::Vector{InfeasibilityFinding}, site::Site,
+                           cfg::ScenarioConfig; solver::SolverConfig = SolverConfig())
+    cfg.capex_budget === nothing && return findings
+    any(f -> f.category == :budget, findings) && return findings
+    floor = budget_floor(site, cfg; solver)
+    (floor === nothing || floor <= cfg.capex_budget + 1e-6) && return findings
+    filter!(f -> f.category != :unknown, findings)
+    pushfirst!(findings, InfeasibilityFinding(:budget,
+        "presupuesto: con un tope de $(_musd3(cfg.capex_budget)) MUSD el " *
+        "escenario no es factible; el mínimo CAPEX con el que sí lo es es " *
+        "$(_musd3(floor)) MUSD — sube el presupuesto al menos a eso"))
+    return findings
+end
+
+_musd3(x) = round(x / 1e6; digits = 3)
 
 "Mensajes planos de los hallazgos (para logs, Results.diagnostics y la API)."
 diagnostic_messages(findings::Vector{InfeasibilityFinding}) =

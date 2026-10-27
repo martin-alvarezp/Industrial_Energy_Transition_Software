@@ -135,7 +135,7 @@ docs/
 
 Implementado: modelo multi-año completo (§4-§8), escenarios predefinidos y
 Pareto (§11), Results + export (§10), API (§12), frontend ejecutivo con
-paleta accesible validada (CVD all-pairs ≥ 12). Documentado como pendiente:
-enforcement de `capex_budget` en el MILP (se acepta en config), retiro de
+paleta accesible validada (CVD all-pairs ≥ 12), presupuesto CAPEX como
+restricción del MILP (SPEC §7.8). Documentado como pendiente: retiro de
 activos, series custom por año y curvas de aprendizaje (no-goals del MVP,
 SPEC §15).

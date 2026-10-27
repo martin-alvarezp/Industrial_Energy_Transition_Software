@@ -40,6 +40,7 @@ include("constraints/storage.jl")
 include("constraints/grid.jl")
 include("constraints/arcs.jl")
 include("constraints/emissions.jl")
+include("constraints/budget.jl")
 include("constraints/constraints.jl")
 
 # results: extracción de resultados y resumen (SPEC §10)
@@ -81,11 +82,12 @@ export build_model, build_sets, build_parameters, add_variables!, set_objective!
 export add_constraints!, add_carrier_balance!,
        add_capacity_constraints!, add_generator_constraints!,
        add_storage_constraints!, add_grid_constraints!, add_arc_constraints!,
-       add_emissions_constraints!, net_cap_shadow_prices
+       add_emissions_constraints!, add_budget_constraint!, net_cap_shadow_prices
 # solve + results
 export SolverConfig, configure_solver!, solve!, run_scenario, apply_scenario,
        with_config, PREDEFINED_SCENARIOS, run_batch, pareto_sweep, export_table,
        diagnose_infeasibility, diagnostic_messages, InfeasibilityFinding,
+       budget_floor,
        Results, extract_results, infeasible_results, print_summary,
        extract_dispatch, extract_financials, extract_capacity,
        extract_emissions_summary, res_share_by_year,

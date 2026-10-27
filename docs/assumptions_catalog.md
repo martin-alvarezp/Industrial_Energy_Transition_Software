@@ -35,8 +35,10 @@
   falta, el export no genera ingreso). Límite de export = capacidad de
   conexión del import.
 - **OPEX variable del storage** se aplica a la descarga (su "dispatch").
-- **`capex_budget`**: aceptado y trazado en el config, **aún sin enforcement
-  en el MILP** (pendiente documentado).
+- **`capex_budget`**: restricción del MILP (SPEC §7.8). Cuenta **todo** el CAPEX
+  acumulado en el horizonte —inversiones nuevas, compras forzadas, inversiones
+  repetidas y renovaciones— sin descontar y antes del escudo fiscal y del valor
+  residual: el mismo `total_capex` que se reporta.
 - **`allow_new_fossil`**: sin efecto en el MVP (no hay candidatas fósiles).
 - Scope 2 **location-based** con factor de red constante en el horizonte (sin
   descarbonización exógena de la red).
@@ -70,7 +72,9 @@ electricidad de red 0,30 t/MWh (scope 2).
 **Escenario base** (`scenario_config.yaml`): horizonte 10 años, wacc 8%,
 cap neto 42.000 → 20.000 t (lineal), cap bruto 48.000 t, offsets permitidos
 (tope 15% del bruto, 5.000 t/año, 80 USD/t), carbono 50 USD/t, presupuesto
-40 MUSD (sin enforcement).
+40 MUSD (no muerde: el plan óptimo gasta 32,0 MUSD; con el escenario base, bajo
+32 MUSD el plan recorta y bajo 28,263 MUSD no se puede cumplir la trayectoria
+de emisiones).
 
 **Propiedades emergentes del demo** (resultados, no inputs — útiles para
 interpretar): con carbono a 50, PV + bomba de calor + batería son rentables
@@ -102,7 +106,8 @@ re-solve MILP para restaurar el estado); `shadow_prices=false` lo evita.
 
 `frontend/src/lib/mockEngine.js` reproduce el contrato con heurísticas
 calibradas a este catálogo (misma física anual y los mismos órdenes de
-magnitud del optimizador). El mock **sí** aplica `capex_budget` (recorta
-tecnologías por prioridad PV > HP > batería); el backend todavía no — la
-diferencia desaparece cuando la API está viva, que es el modo por defecto si
-responde en `http://127.0.0.1:8080`.
+magnitud del optimizador). El mock aplica `capex_budget` con una heurística
+(recorta tecnologías por prioridad PV > HP > batería, sin renovaciones); el
+motor Julia y el motor web lo aplican como restricción exacta del MILP (§7.8).
+Con la API viva, el modo por defecto si responde en
+`http://127.0.0.1:8080`, manda el motor.

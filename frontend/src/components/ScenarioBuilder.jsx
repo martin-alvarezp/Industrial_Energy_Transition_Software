@@ -292,7 +292,7 @@ export default function ScenarioBuilder({ draft, setDraft, applied, onRun, runni
           <p className="hint">
             {draft.capex_budget_musd == null
               ? "Sin límite: el optimizador invierte todo lo que sea rentable o necesario."
-              : `Máximo ${num(draft.capex_budget_musd, 0)} MUSD acumulados en el horizonte — bajo ~29 MUSD el plan empieza a recortar tecnologías.`}
+              : `Máximo ${num(draft.capex_budget_musd, 0)} MUSD acumulados en el horizonte, incluidas renovaciones y compras forzadas. Si no alcanza para cumplir el escenario, el plan sale infactible.`}
           </p>
         </div>
 

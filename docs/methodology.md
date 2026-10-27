@@ -56,6 +56,14 @@ sucia en el intertanto; el optimizador resuelve ese trade-off por año.
   **cíclico por estación** (el paso previo de la hora 0 es la hora 23 de la
   misma estación) e independiente año a año; SOC ≤ capacidad·4 h.
 - **Red**: import/export ≤ capacidad de conexión existente.
+- **Presupuesto CAPEX** (§7.8, opcional): `Σ_y capex_y ≤ capex_budget`, sobre la
+  **misma expresión** `capex_y` del objetivo —nuevas + renovaciones, sin
+  descontar—, de modo que el `total_capex` reportado nunca supera el tope. Se
+  agrega después del objetivo porque reutiliza esa expresión. Si el escenario
+  resulta infactible con tope, el diagnóstico prueba primero lo obligatorio
+  (renovaciones + compras forzadas) y después resuelve el mismo modelo sin tope
+  con objetivo `min Σ capex_y`: si ese mínimo supera el tope, el presupuesto es
+  la causa y se informa el mínimo exacto (en el demo base, 28,263 MUSD).
 
 ## 5. Motor climático (§8) — embebido, no post-cálculo
 

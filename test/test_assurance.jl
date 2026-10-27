@@ -233,6 +233,77 @@ end
     @test all(iszero, r0.cost_breakdown.tax)
 end
 
+@testset "oráculo A10: presupuesto CAPEX que muerde — compra parcial, VAN exacto" begin
+    # el sitio de A4 (sin tope construye 10 MW y el VAN es 9.760.000) con un
+    # tope de 400.000 USD: alcanza para 4 MW de PV a 100 USD/kW
+    pv = Generator(:pv, "PV", :electricity, 0.0, 10.0, true,
+                   TechCosts(100.0, 0.0, 0.0, 30), fill(0.5, 4))
+    site = a_site(
+        carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy)),
+        sources = Dict(:grid_import =>
+            Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, A_TC0)),
+        generators = Dict(:pv => pv),
+        demands = Dict(:electricity => Demand(:electricity, fill(10.0, 4))),
+        prices = Dict(:electricity => PriceSeries(:electricity, fill(100.0, 4))))
+    im = a_solve(site, a_cfg(2, 0.0; capex_budget = 4e5))
+    @test JuMP.value(im.model[:new_capacity][:pv, 1]) ≈ 4.0 atol = 1e-6
+    @test sum(JuMP.value(im.model[:capex_y][y]) for y in 1:2) ≈ 4e5 rtol = 1e-9
+    # VAN = capex 4e5 + red (10 − 0.5·4) MW × 8760 h × 100 USD × 2 años
+    @test JuMP.objective_value(im.model) ≈ 4e5 + 8 * 8760 * 100 * 2 rtol = 1e-9
+    # sin tope: el modelo no lleva la restricción (legacy exacto)
+    im0 = a_solve(site, a_cfg(2, 0.0))
+    @test !haskey(JuMP.object_dictionary(im0.model), :capex_budget)
+    @test JuMP.objective_value(im0.model) ≈ 1e6 + 5 * 8760 * 100 * 2 rtol = 1e-9
+end
+
+@testset "oráculo A11: las renovaciones cuentan contra el presupuesto" begin
+    # el sitio de A5: renovaciones de 4 MUSD en los años 3, 6 y 9 (12 MUSD)
+    ch = Converter(:ch, "Chiller", :electricity, :cool, 3.0, 8.0, 0.0, false,
+                   TechCosts(500.0, 0.0, 0.0, 3))
+    ch = Converter(:ch, "Chiller", ch.inputs, ch.outputs, 8.0, 0.0, false,
+                   ch.costs, Float64[], 2)
+    site = a_site(
+        carriers = Dict(:electricity => Carrier(:electricity, "E", "MWh", :energy),
+                        :cool => Carrier(:cool, "Frío", "MWh", :cooling)),
+        sources = Dict(:grid_import =>
+            Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, A_TC0)),
+        converters = Dict(:ch => ch),
+        demands = Dict(:cool => Demand(:cool, fill(6.0, 4))),
+        prices = Dict(:electricity => PriceSeries(:electricity, fill(50.0, 4))),
+        factors = [EmissionFactor(:electricity, :scope2, 0.3)])
+    cfg = with_config(a_cfg(10, 0.0); renew_existing = true)
+    # justo lo obligatorio: factible
+    im = build_model(site, with_config(cfg; capex_budget = 12e6))
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    # un dólar menos de lo obligatorio: infactible, y el diagnóstico lo nombra
+    tight = with_config(cfg; capex_budget = 12e6 - 1)
+    im2 = build_model(site, tight)
+    JuMP.optimize!(im2.model)
+    @test JuMP.termination_status(im2.model) == JuMP.MOI.INFEASIBLE
+    f = filter(x -> x.category == :budget, diagnose_infeasibility(site, tight))
+    @test length(f) == 1
+    @test occursin("renovaciones", f[1].message)
+end
+
+@testset "diagnóstico: presupuesto bajo el mínimo que cumple la meta" begin
+    # demo, emissions_cap a 10 años: sin tope el plan gasta 32,007 MUSD; con
+    # 25 MUSD no alcanza para la trayectoria de emisiones
+    site, cfg0 = load_and_validate(DEMO_DIR)
+    r = run_scenario(site, with_config(cfg0; capex_budget = 25e6);
+                     verbose = false, shadow_prices = false)
+    @test !r.feasible
+    msg = filter(m -> occursin("presupuesto", m), r.diagnostics)
+    @test length(msg) == 1
+    @test !any(m -> occursin("límites combinados", m), r.diagnostics)
+    # el piso exacto: 28,263 MUSD (verificado desde los dos lados: con 28,25
+    # el escenario es infactible, con 28,27 factible), entre el tope que falla
+    # y los 32,007 que gasta el óptimo libre
+    floor = budget_floor(site, with_config(cfg0; capex_budget = 25e6))
+    @test floor ≈ 28.263e6 rtol = 1e-4
+    @test 25e6 < floor < 32.007e6
+end
+
 # ─────────────────── B · INVARIANTES SOBRE EL DEMO ───────────────────
 
 @testset "invariante B1: el balance físico cierra en cada carrier·paso·año" begin
@@ -288,6 +359,19 @@ end
     # cap de emisiones más laxo ⇒ VAN ≤
     @test npv(with_config(cfg; emissions_cap_net_start = 1e9,
                           emissions_cap_net_end = 1e9)) <= base + 1e-4
+end
+
+@testset "invariante B3b: un presupuesto que muerde sube el VAN y nunca se excede" begin
+    # B3 compara con el tope de 40 MUSD del demo, que no muerde; aquí uno que sí
+    site, cfg0 = load_and_validate(DEMO_DIR)
+    free = run_scenario(site, with_config(cfg0; capex_budget = nothing);
+                        verbose = false, shadow_prices = false)
+    tight = run_scenario(site, with_config(cfg0; capex_budget = 30e6);
+                         verbose = false, shadow_prices = false)
+    @test free.feasible && tight.feasible
+    @test free.total_capex > 30e6                      # el tope de verdad muerde
+    @test tight.total_capex <= 30e6 + 1e-3
+    @test tight.npv >= free.npv - 1e-4
 end
 
 @testset "invariante B4: determinismo — misma corrida, mismo resultado y huellas" begin

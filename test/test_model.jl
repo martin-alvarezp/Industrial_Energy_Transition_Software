@@ -50,9 +50,11 @@
     # restricciones §7-8: balance (2 carriers × 96 × 10) + capacidad de
     # conversores (3) + generadores (1) + storage (4 familias × 1) + red (2),
     # todas × 96 × 10; + link de inversión (4×10) + build-once (4) +
-    # emisiones (6 familias × 10)
+    # emisiones (6 familias × 10) + presupuesto CAPEX (§7.8: una sola fila,
+    # porque el demo trae capex_budget = 40 MUSD; sin tope no existe)
     @test JuMP.num_constraints(m; count_variable_in_set_constraints = false) ==
-          (2 + 3 + 1 + 4 + 2) * S * Y + 4 * Y + 4 + 6 * Y
+          (2 + 3 + 1 + 4 + 2) * S * Y + 4 * Y + 4 + 6 * Y + 1
+    @test m[:capex_budget] isa JuMP.ConstraintRef
     @test length(m[:carrier_balance]) == 2 * S * Y
     @test length(m[:converter_capacity]) == 3 * S * Y
     @test length(m[:generator_capacity]) == 1 * S * Y

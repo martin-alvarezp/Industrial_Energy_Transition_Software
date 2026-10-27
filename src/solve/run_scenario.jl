@@ -105,7 +105,9 @@ function run_scenario(site::Site, cfg::ScenarioConfig;
     if !JuMP.is_solved_and_feasible(im.model)
         diagnostics = String[]
         if status in (JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED)
-            diagnostics = diagnostic_messages(diagnose_infeasibility(site2, cfg2))
+            findings = add_budget_floor!(diagnose_infeasibility(site2, cfg2),
+                                         site2, cfg2; solver)
+            diagnostics = diagnostic_messages(findings)
             @warn "El escenario '$sname' es infactible para el sitio " *
                   "'$(site2.name)'. Diagnóstico:\n  - " * join(diagnostics, "\n  - ")
         else

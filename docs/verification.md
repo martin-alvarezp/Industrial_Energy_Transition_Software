@@ -31,6 +31,12 @@ exactamente (rtol 1e-9). Cubren la aritmética nuclear del motor:
   renovación → recompras exactamente en los años 3, 6 y 9.
 - **A6 — no-arbitraje**: batería con η < 1 y precios planos no cicla (ciclar
   destruye valor).
+- **A10 — presupuesto que muerde**: el sitio de A4 con un tope de 400.000 USD
+  construye exactamente 4 MW de PV, gasta el tope y el VAN es
+  400.000 + 8 MW de red × 8760 h × 100 × 2 años, exacto.
+- **A11 — las renovaciones cuentan**: el sitio de A5 con 12 MUSD de
+  renovaciones es factible con un tope de 12 MUSD e infactible con un dólar
+  menos, y el diagnóstico culpa a las renovaciones.
 
 Además, cada feature tiene su oráculo en su archivo: CHP multiport
 (`test_multiport.jl`), cargos por demanda y potencia contratada — punta 10 MW
