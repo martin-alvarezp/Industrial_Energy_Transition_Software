@@ -75,8 +75,19 @@ end
     open(io -> println(io, "milestone_years: [1, 2, 4]"), joinpath(dir, "d", "scenario_config.yaml"), "a")
     site, c = load_and_validate(joinpath(dir, "d"))
     @test c.milestone_years == [1, 2, 4]
+    # override de la API (la UI siempre lo manda, vacío o no)
+    @test IETO._coerce(Vector{Int}, Any[]) == Int[]
+    @test IETO._coerce(Vector{Int}, Any[2026, 2028]) == [2026, 2028]
+    @test IETO._apply_overrides(c, JSON3.read("""{"milestone_years": [1, 3]}""")).milestone_years == [1, 3]
     bad(; kw...) = validate_scenario(with_config(c; kw...), site)
     @test_throws IETO.ValidationError bad(milestone_years = [1, c.horizon_years + 1])
     @test_throws IETO.ValidationError bad(milestone_years = [1, 2, 2])
     @test_throws IETO.ValidationError bad(milestone_years = [1, 2], forced_builds = [(:heat_pump, 3, 1.0)])
+end
+
+@testset "API: todo campo de la configuración se puede mandar como override" begin
+    # la UI manda los campos nuevos siempre; sin _coerce la corrida da 400
+    sin = [f for f in fieldnames(ScenarioConfig)
+           if !hasmethod(IETO._coerce, Tuple{Type{fieldtype(ScenarioConfig, f)}, Any})]
+    @test isempty(sin)
 end
