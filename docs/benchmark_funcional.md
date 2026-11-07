@@ -252,7 +252,7 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   (2 unidades) donde en continuo compraría 9. Golden `unidades_enteras_n1`
   (verify:wasm 21/21; `demo_operacion_lineal_n3` cambió su VAN porque su
   bomba usa unidades de 2,5 MW). Las medidas muestran «N × u MW». Julia
-  1470/1470. **Pendiente:** el E2E `scripts/verify_units.mjs` quedó sin
-  commitear porque tiene un error de sintaxis por corregir.
+  1470/1470. E2E `verify:units`: compras en múltiplos exactos de 2,5 MW y
+  medidas en unidades.
 - 🔜 **3.3 · Presupuesto CAPEX anual** y **bloque 4** (tarifas por horas de
   utilización y por bloques, ETS, topes por alcance, ROI, LCOE): por hacer.
