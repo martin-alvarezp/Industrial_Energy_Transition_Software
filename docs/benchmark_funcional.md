@@ -514,3 +514,19 @@ días tipo (k por año) con cronología.
   disco y optimización con el motor real).
   *Pendiente:* enlazar el SOC entre días con el mapa (almacenamiento
   estacional o de varios días, como el TES con autodescarga diaria).
+- ✅ **R8 · Días tipo enlazados** (2026-11-07). `day_sequence` (el período de
+  cada día del año, en orden): el SOC deja de ser cíclico dentro de cada día y
+  pasa de un día al siguiente. Cada período arranca en `soc_start`; un nivel
+  entre días L[d] evoluciona como L[d+1] = κ·L[d] + (SOC final − κ·SOC inicial)
+  del día tipo de d (κ = autodescarga del día; año cíclico), y el SOC real de
+  cada día, L[d] + la oscilación del día tipo, queda dentro de la banda. Así
+  un almacenamiento de varios días o estacional (como el TES con CSP) se
+  modela con días tipo, sin las 8760 h. La UI lo activa sola con la plantilla
+  de días tipo (interruptor en Parámetros; manda la secuencia del mapa de la
+  plantilla). Oráculo (test_linked_days.jl): semanas de 5 días baratos y 2
+  caros con precio plano; sin enlace no hay arbitraje (3 120 000 USD), con
+  enlace la batería de 480 MWh cubre el fin de semana (873 600 USD exactos);
+  con autodescarga queda en medio. Goldens `dias_enlazados_n1`,
+  `dias_enlazados_fisica_n1` y `demo_dias_enlazados_n3` (verify:wasm 51/51).
+  *Simplificación:* dentro del día la autodescarga del nivel entre días se
+  aplica en bloque (κ), no hora a hora.

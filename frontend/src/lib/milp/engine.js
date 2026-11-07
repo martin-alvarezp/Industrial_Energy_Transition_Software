@@ -50,6 +50,7 @@ export function toConfig(cfg) {
     financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
     financing_years: cfg.financing_years ?? 0,
     milestone_years: cfg.milestone_years ?? [],             // R6: años hito
+    day_sequence: cfg.day_sequence ?? [],                   // R8: días tipo enlazados
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

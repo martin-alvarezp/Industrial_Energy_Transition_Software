@@ -555,6 +555,13 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    # R8: la secuencia de días nombra períodos del sitio
+    if !isempty(cfg.day_sequence)
+        seasons = Set(ts.season for ts in site.timesteps)
+        bad = setdiff(Set(cfg.day_sequence), seasons)
+        isempty(bad) || push!(problems,
+            "day_sequence: nombra períodos que el sitio no tiene ($(join(sort!(collect(bad)), ", ")))")
+    end
     # R4: financiamiento
     0 <= cfg.financing_rate < 1 || push!(problems,
         "scenario_config.yaml: financing_rate debe estar en [0,1) (valor: $(cfg.financing_rate))")

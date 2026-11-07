@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG } from "../lib/mockEngine.js";
 import {
   compute, fetchSite, apiAvailable, listSites, saveSite as apiSaveSite,
   deleteSite as apiDeleteSite, listRuns, fetchRun, saveRun, deleteRun, enginePayload,
+  daySequence,
 } from "../lib/api.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite } from "../lib/twin.js";
@@ -213,7 +214,11 @@ export function StudioProvider({ children }) {
   /** Ejecuta la optimización con la config vigente; la guarda como corrida. */
   const run = useCallback(async ({ name, notes = "", cfg: cfgOverride } = {}) => {
     if (!twin) return null;
-    const cfg = cfgOverride ?? draft;
+    const cfg0 = cfgOverride ?? draft;
+    // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del
+    // twin (el payload al motor va sin `hourly`)
+    const seq = daySequence(cfg0, twin.siteJson);
+    const cfg = seq.length ? { ...cfg0, day_sequence: seq } : cfg0;
     const apiSite = twin.saved ? siteName : "demo";
     const payload = !twin.saved || twin.dirty ? twin.siteJson : null;
     // la foto del sitio que acompaña a la corrida no lleva las series crudas

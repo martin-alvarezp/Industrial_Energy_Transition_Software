@@ -690,14 +690,20 @@ export function buildLP(site0, cfg0) {
       const etaD = (st.discharge_efficiency ?? 0) > 0 ? st.discharge_efficiency : st.efficiency;
       const selfD = st.self_discharge ?? 0;
       const lo = st.soc_min ?? 0, hi = (st.soc_max ?? 0) > 0 ? st.soc_max : 1;
+      // días tipo enlazados (R8): cada período arranca en ss_ (no en su última hora)
+      const linked = (cfg.day_sequence ?? []).length > 0;
+      const gname = (grp) => ts[grp[0] - 1].season;
+      const ordOf = {};
       for (const grp of seasonSteps) {
         // orden cronológico: hour y, a igual hour, step_id (sort estable)
         const ordered = [...grp].sort((a, b) => ts[a - 1].hour - ts[b - 1].hour);
+        ordOf[gname(grp)] = ordered;
         ordered.forEach((s, k) => {
           const prev = ordered[k === 0 ? ordered.length - 1 : k - 1];
           const d = dt[s - 1];   // Δt: MW × Δt = MWh del paso
           const t = { [`soc_${id}_${s}_${y}`]: 1 };
-          inc(t, `soc_${id}_${prev}_${y}`, -Math.pow(1 - selfD, d));
+          inc(t, linked && k === 0 ? `ss_${id}_${sane(gname(grp))}_${y}` : `soc_${id}_${prev}_${y}`,
+              -Math.pow(1 - selfD, d));
           inc(t, `ch_${id}_${s}_${y}`, -etaC * d);
           inc(t, `dc_${id}_${s}_${y}`, d / etaD);
           row(`soc_${id}_${s}_${y}`, t, "=", 0);
@@ -719,6 +725,34 @@ export function buildLP(site0, cfg0) {
           const t = { [`${pref}_${id}_${s}_${y}`]: 1 };
           for (const v of a.ncs) inc(t, v, -1);
           row(`${pref}cap_${id}_${s}_${y}`, t, "<=", a.k);
+        }
+      }
+      // R8: nivel entre días lv_[d] (espejo de storage.jl):
+      //   lv[d+1] = κ·lv[d] + soc_fin − κ·ss ; lv[d] + swh ≤ hi·E ; lv[d] − swn ≥ lo·E
+      if (linked) {
+        const D = cfg.day_sequence.length;
+        for (const [g, ord] of Object.entries(ordOf)) {
+          const gi = sane(g), ss = `ss_${id}_${gi}_${y}`;
+          for (const s of ord) {
+            row(`swh_${id}_${gi}_${s}_${y}`, { [`swh_${id}_${gi}_${y}`]: 1, [`soc_${id}_${s}_${y}`]: -1, [ss]: 1 }, ">=", 0);
+            row(`swn_${id}_${gi}_${s}_${y}`, { [`swn_${id}_${gi}_${y}`]: 1, [`soc_${id}_${s}_${y}`]: 1, [ss]: -1 }, ">=", 0);
+          }
+        }
+        for (let d = 1; d <= D; d++) {
+          const g = cfg.day_sequence[d - 1], gi = sane(g), ord = ordOf[g];
+          const kap = ord.reduce((a, s) => a * Math.pow(1 - selfD, dt[s - 1]), 1);
+          const nxt = d === D ? 1 : d + 1;
+          const t1 = { [`lv_${id}_${nxt}_${y}`]: 1 };
+          inc(t1, `lv_${id}_${d}_${y}`, -kap);
+          inc(t1, `soc_${id}_${ord[ord.length - 1]}_${y}`, -1);
+          inc(t1, `ss_${id}_${gi}_${y}`, kap);
+          row(`lvb_${id}_${d}_${y}`, t1, "=", 0);
+          const t2 = { [`lv_${id}_${d}_${y}`]: 1, [`swh_${id}_${gi}_${y}`]: 1 };
+          for (const [v, c] of eV) inc(t2, v, -hi * c);
+          row(`lvh_${id}_${d}_${y}`, t2, "<=", hi * eK);
+          const t3 = { [`lv_${id}_${d}_${y}`]: 1, [`swn_${id}_${gi}_${y}`]: -1 };
+          for (const [v, c] of eV) inc(t3, v, -lo * c);
+          row(`lvl_${id}_${d}_${y}`, t3, ">=", lo * eK);
         }
       }
       // ciclos equivalentes por año: descarga anual ≤ ciclos × energía útil

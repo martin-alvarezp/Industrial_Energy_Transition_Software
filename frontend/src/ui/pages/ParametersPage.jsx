@@ -110,6 +110,10 @@ export default function ParametersPage({ route }) {
                    }} />
           </Field>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.milestonesHint")}</p>
+          {twin.siteJson.hourly?.template?.method === "typical" && <>
+            <Toggle on={draft.link_days !== false} onChange={(x) => set({ link_days: x })} label={t("par.linkDays")} />
+            <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.linkDaysHint")}</p>
+          </>}
         </section>
 
         <section className="ui-card ui-card-pad">

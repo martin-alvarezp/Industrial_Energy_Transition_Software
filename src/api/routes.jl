@@ -105,6 +105,7 @@ _coerce(::Type{Symbol}, v) = v isa AbstractString ? Symbol(v) :
 _coerce(::Type{Dict{Symbol,Vector{Float64}}}, v) =
     Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in xs] for (k, xs) in pairs(v))
 _coerce(::Type{Vector{Int}}, v) = Int[Int(x) for x in v]   # años hito (R6)
+_coerce(::Type{Vector{String}}, v) = String[String(x) for x in v]   # días enlazados (R8)
 _coerce(::Type{Dict{Symbol,Vector{Int}}}, v) =
     Dict{Symbol,Vector{Int}}(Symbol(k) => Int[Int(x) for x in xs] for (k, xs) in pairs(v))
 _coerce(::Type{Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}}, v) =

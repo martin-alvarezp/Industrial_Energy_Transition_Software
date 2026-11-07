@@ -122,6 +122,7 @@ export function toOverrides(cfg) {
     financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
     financing_years: cfg.financing_years ?? 0,
     milestone_years: cfg.milestone_years ?? [],             // R6: años hito
+    day_sequence: cfg.day_sequence ?? [],                   // R8: días tipo enlazados
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",
@@ -294,8 +295,19 @@ export function computeViaMock(cfg) {
 
 /** API si responde; si no, el motor WEB (HiGHS en tu navegador — resuelve
  * de verdad el sitio editado); último recurso, el mock. */
+/** Secuencia de días tipo del sitio (R8): período de cada día del año si la
+ *  plantilla es de días tipo y el enlace está activo; si no, []. */
+export function daySequence(cfg, siteJson) {
+  const tpl = siteJson?.hourly?.template;
+  if (cfg?.link_days === false || tpl?.method !== "typical" || tpl.day_map?.length !== 365) return [];
+  return tpl.day_map.map((g) => `D${String(g + 1).padStart(2, "0")}`);
+}
+
 export async function compute(cfg, sitePayload = null, siteName = "demo",
                               snapshot = null, onProgress = null) {
+  // días tipo enlazados (R8): el SOC cruza los días según el mapa de la plantilla
+  const seq = daySequence(cfg, sitePayload ?? snapshot);
+  if (seq.length) cfg = { ...cfg, day_sequence: seq };
   // con la API arriba, su error SE MUESTRA: caer al motor web o al mock
   // presentaría como resultado del sistema algo que el motor real no dijo
   if (await apiAvailable()) {

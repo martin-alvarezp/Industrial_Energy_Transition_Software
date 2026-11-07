@@ -170,6 +170,15 @@ step("en disco: 12 días tipo, mapa de 365 días y energía conservada",
      s.hourly?.template?.method === "typical" && s.hourly.template.day_map?.length === 365 &&
      Math.abs(tplE - rawE) <= 1e-6 * rawE, `${tplE.toFixed(1)} vs ${rawE.toFixed(1)} MWh`);
 step("optimización con días tipo resuelta por el motor real", await optimize("Dias tipo"));
+{
+  // R8: con días tipo la corrida lleva la secuencia del año y enlaza el SOC
+  const runs = await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`);
+  const r = runs.find((x) => x.name === "Dias tipo");
+  const pl = r && await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`);
+  const seq = pl?.result?.assumptions?.scenario_config?.day_sequence ?? [];
+  step("la corrida enlaza los días tipo con la secuencia del año", seq.length === 365 &&
+       seq.every((g, d) => g === `D${String(s.hourly.template.day_map[d] + 1).padStart(2, "0")}`), `${seq.length} días`);
+}
 
 // 3 · año completo, horizonte 1
 await timeseries();

@@ -553,7 +553,14 @@ struct ScenarioConfig
     # ── años hito (benchmark R6) ──
     milestone_years::Vector{Int}             # años que se optimizan (calendario si hay
                                              # base_year); vacío = todos los del horizonte
+    # ── días tipo enlazados (benchmark R8) ──
+    day_sequence::Vector{String}             # período (día tipo) de cada día del año, en
+                                             # orden; con valor, el SOC se enlaza entre
+                                             # días (almacenamiento de varios días)
 end
+
+# retro-compatibilidad: 55 campos → sin días enlazados
+ScenarioConfig(a::Vararg{Any,55}) = ScenarioConfig(a..., String[])
 
 # retro-compatibilidad: 52 campos → sin financiamiento
 ScenarioConfig(a::Vararg{Any,52}) = ScenarioConfig(a..., 0.0, 0)

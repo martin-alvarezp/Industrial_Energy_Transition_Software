@@ -385,5 +385,6 @@ function load_scenario_config(path::AbstractString)
         _get_num(d, "financing_rate", 0.0),
         Int(get(d, "financing_years", 0)),
         Int[Int(x) for x in get(d, "milestone_years", [])],
+        String[String(x) for x in get(d, "day_sequence", [])],
     )
 end

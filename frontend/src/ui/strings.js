@@ -85,6 +85,8 @@ extend({
   "par.learning": ["%/año de caída", "%/yr decline"],
   "par.trajectory": ["factores por año", "factors per year"],
   "par.milestones": ["Años hito", "Milestone years"],
+  "par.linkDays": ["Enlazar el almacenamiento entre días tipo", "Link storage across typical days"],
+  "par.linkDaysHint": ["Con días tipo, el SOC pasa de un día al siguiente según el calendario del año (almacenamiento de varios días o estacional). Apagado, cada día tipo es cíclico.", "With typical days, the state of charge carries from one day to the next following the year's calendar (multi-day or seasonal storage). Off, each typical day is cyclic."],
   "par.allYears": ["todos los años", "all years"],
   "par.milestonesHint": ["Optimiza solo estos años (separados por coma; calendario si hay año base, o 1, 2, 3…). Cada hito se descuenta en su año y paga lo que pasa desde el hito anterior (compras forzadas, renovaciones). Vacío = todos los años del horizonte.", "Optimize only these years (comma-separated; calendar years if there is a base year, or 1, 2, 3…). Each milestone is discounted in its year and pays what happens since the previous milestone (forced builds, renewals). Empty = every year of the horizon."],
   "par.financingRate": ["Tasa de financiamiento", "Financing rate"],

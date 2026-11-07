@@ -239,4 +239,13 @@ dump("demo_hitos_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 
      milestone_years = [2026, 2027, 2029, 2031, 2035], renew_existing = true, tax_rate = 0.25,
      year_factors = Dict(:price => Dict(:electricity => [(2029, 0.9)])),
      build_window = Dict(:battery => [2028, 2031])))
+# 27 · días tipo enlazados (R8): la semana de 5 días baratos y 2 caros, sin
+# autodescarga y con 1 %/h; y el demo con dos días tipo alternados
+s29, c29 = linked_site()
+dump("dias_enlazados_n1", s29, with_config(c29; day_sequence = WEEKS))
+bat29 = IETO._with(s29.storages[:bat]; phys = StoragePhysics(0.0, 0.0, 0.01, 0.05, 0.95, 0.0, 0.0))
+dump("dias_enlazados_fisica_n1", IETO._with(s29; storages = Dict(:bat => bat29)),
+     with_config(c29; day_sequence = WEEKS))
+dump("demo_dias_enlazados_n3", site0, with_config(cfg0; horizon_years = 3,
+     day_sequence = repeat(["winter", "spring", "summer", "autumn"], 30)))
 println("fixtures dorados en ", out)
