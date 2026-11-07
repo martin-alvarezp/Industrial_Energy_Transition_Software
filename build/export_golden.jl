@@ -209,4 +209,19 @@ dump("energia_propia_tope_n3", s26, with_config(c26; horizon_years = 3, storage_
      storage_energy_max = Dict(:bat => 200.0), salvage_value = true, tax_rate = 0.25))
 dump("demo_energia_propia_n5", site0, with_config(cfg0; horizon_years = 5,
      storage_energy_capex = Dict(:battery => 250.0), storage_energy_max = Dict(:battery => 60.0)))
+# 25 · factores por año (R3): el sitio de operación con precio, demanda, OPEX,
+# cargo por demanda y factor de emisión por año (con precio de carbono), y el
+# demo en años calendario con precio, demanda y OPEX fijo
+s27, c27 = op_site(NO_OPERATION_LIMITS)
+hp27 = IETO._with(s27.converters[:hp]; costs = TechCosts(0.0, 1000.0, 2.0, 30))
+s27 = IETO._with(s27; converters = Dict(:hp => hp27, :eb => s27.converters[:eb]),
+                 markets = Dict(:buy => Market(:buy, "Compra", :electricity, :buy, fill(100.0, 24),
+                                               Inf, Inf, 0.4, :grid_import, 5.0)))
+dump("factores_anio_n3", s27, with_config(c27; horizon_years = 3, carbon_price = 50.0, wacc = 0.05,
+     year_factors = Dict(:price => Dict(:buy => [(2, 0.5)]), :demand => Dict(:heat => [(3, 2.0)]),
+                         :fixed_opex => Dict(:hp => [(2, 3.0)]), :variable_opex => Dict(:hp => [(3, 0.0)]),
+                         :demand_charge => Dict(:buy => [(2, 2.0)]), :emission_factor => Dict(:buy => [(2, 0.5)]))))
+dump("demo_factores_anio_n5", site0, with_config(cfg0; horizon_years = 5, base_year = 2030,
+     year_factors = Dict(:price => Dict(:electricity => [(2031, 0.9), (2033, 0.8)], :natural_gas => [(2032, 1.3)]),
+                         :demand => Dict(:hot_water => [(2032, 1.1)]), :fixed_opex => Dict(:pv => [(2031, 1.2)]))))
 println("fixtures dorados en ", out)

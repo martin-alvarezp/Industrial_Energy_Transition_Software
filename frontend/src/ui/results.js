@@ -7,6 +7,7 @@
 
 import { CATEGORICAL, SLR } from "./palette.js";
 import { techColor, carrierColor } from "../lib/twin.js";
+import { yearFactor } from "../lib/milp/lp.js";
 
 const KW = 1000;
 
@@ -46,7 +47,8 @@ function priceSeries(siteJson, carrier) {
   return mk?.price ?? siteJson?.prices?.[carrier] ?? null;
 }
 
-const esc = (cfg, carrier, y) => (1 + (cfg?.price_escalation?.[carrier] ?? 0)) ** (y - 1);
+const esc = (cfg, carrier, y) => (1 + (cfg?.price_escalation?.[carrier] ?? 0)) ** (y - 1) *
+  (cfg ? yearFactor(cfg, "price", carrier, y) : 1);   // R3: factor del vector
 
 /** Inversión por año: {year, items: {nombre: USD}} (+ "Renovaciones"). */
 export function investmentByYear(result, siteJson, labels) {
@@ -308,7 +310,8 @@ export function operationDay(result, siteJson, year, season, carrier, labels, da
   for (const r of result?.dispatch ?? []) if (r.year === year) idx.set(`${r.tech}|${r.flow}|${r.step}`, r.value);
   const get = (tech, flow, step) => idx.get(`${tech}|${flow}|${step}`) ?? 0;
   const gridC = T.find((x) => x.tech_id === "grid_import")?.output_carrier ?? "electricity";
-  const growth = (1 + (result?.assumptions?.scenario_config?.demand_growth ?? 0)) ** (year - 1);
+  const scfg = result?.assumptions?.scenario_config ?? {};
+  const growth = (1 + (scfg.demand_growth ?? 0)) ** (year - 1) * yearFactor(scfg, "demand", carrier, year);   // R3
   const keys = new Set();
   const rows = steps.map((s) => {
     const o = { hour: long ? +(((s.hour * dt) % 24).toFixed(2)) : s.hour };

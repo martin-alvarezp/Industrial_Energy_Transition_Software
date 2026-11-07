@@ -540,6 +540,37 @@ struct ScenarioConfig
                                              # (el capex_per_kw queda como el de potencia)
     storage_energy_max::Dict{Symbol,Float64} # MWh máximos por compra (default:
                                              # max_new_capacity · horas)
+    # ── factores por año en escalón (benchmark R3) ──
+    year_factors::Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}  # tipo → objetivo → [(año, factor)]:
+                                             # el factor rige desde su año hasta el
+                                             # siguiente (antes del primero, 1). Tipos:
+                                             # price, demand, emission_factor,
+                                             # demand_charge, fixed_opex, variable_opex
+end
+
+# retro-compatibilidad: 51 campos → sin factores por año
+ScenarioConfig(a::Vararg{Any,51}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}())
+
+"Tipos de factor por año (R3) y a qué apuntan."
+const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex)
+
+"""
+    year_factor(cfg, kind, target, y) -> Float64
+
+Factor del año relativo `y` para `target` (R3): el del último punto con año
+≤ y (escalón, sin interpolar); 1 antes del primero o sin puntos. Los años son
+calendario si hay `base_year` (como `forced_builds`).
+"""
+function year_factor(cfg::ScenarioConfig, kind::Symbol, target::Symbol, y::Integer)
+    targets = get(cfg.year_factors, kind, nothing)
+    pts = targets === nothing ? nothing : get(targets, target, nothing)
+    (pts === nothing || isempty(pts)) && return 1.0
+    v = 1.0
+    for (yr, f) in sort(pts; by = p -> rel_year(cfg, p[1]))
+        rel_year(cfg, yr) <= y || break
+        v = f
+    end
+    return v
 end
 
 # retro-compatibilidad: 49 campos → sin almacenamiento con energía propia

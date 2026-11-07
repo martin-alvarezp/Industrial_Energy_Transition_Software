@@ -106,6 +106,11 @@ _coerce(::Type{Dict{Symbol,Vector{Float64}}}, v) =
     Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in xs] for (k, xs) in pairs(v))
 _coerce(::Type{Dict{Symbol,Vector{Int}}}, v) =
     Dict{Symbol,Vector{Int}}(Symbol(k) => Int[Int(x) for x in xs] for (k, xs) in pairs(v))
+_coerce(::Type{Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}}, v) =
+    Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}(
+        Symbol(k) => Dict{Symbol,Vector{Tuple{Int,Float64}}}(
+            Symbol(t) => Tuple{Int,Float64}[(Int(p[1]), Float64(p[2])) for p in pts] for (t, pts) in pairs(tg))
+        for (k, tg) in pairs(v))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{EfficiencyMeasure}}, v) =

@@ -450,3 +450,24 @@ días tipo (k por año) con cronología.
   impuestos) y `demo_energia_propia_n5` (verify:wasm 43/43). Parámetros →
   "Almacenamiento: energía propia"; el resumen asigna el CAPEX de energía al
   equipo. E2E en `verify:storage` (compra 51 MWh con tope de 60). Julia 1624/1624.
+- ✅ **R3 · Factores por año en escalón** (2026-11-07). `year_factors`:
+  tipo → objetivo → `[(año, factor)]`. El factor rige desde su año hasta el
+  punto siguiente, sin interpolar (como la herramienta de referencia), y vale 1
+  antes del primero; años calendario si hay año base. Tipos: `price` (mercado
+  o vector; se multiplica con la escalación), `demand` (vector: cubre la
+  demanda que crece distinto por año), `emission_factor` (mercado),
+  `demand_charge` (mercado: cargo y penalidad), `fixed_opex` y `variable_opex`
+  (tecnología). Los casos sueltos que ya existían (`capex_by_year`,
+  `grid_ef_by_year`, `carbon_price_by_year`) siguen igual. Oráculos
+  (test_year_factors.jl, sitio de operación a 3 años): precio a la mitad desde
+  el año 2 (y se mantiene en el 3), producto con el factor del vector y la
+  escalación, demanda doble en el año 3 (la caldera cubre lo que la bomba no),
+  OPEX fijo ×3 y variable 0, cargo por demanda ×2 y factor de emisión ×0,5; en
+  años calendario los puntos se ordenan solos. Goldens `factores_anio_n3`
+  (todos los tipos, con carbono y wacc) y `demo_factores_anio_n5` (verify:wasm
+  45/45). Parámetros → "Factores por año"; la vista de despacho y el desglose
+  por ítem usan los mismos factores. E2E en `verify:capex` (precio a la mitad:
+  compras de 9,98 a 4,45 MUSD).
+  *Pendiente:* la eficiencia de un conversor por año (cambia razones de los
+  puertos en todo el balance) y la forma del perfil de demanda por año; hoy
+  se escala el perfil, no se reemplaza.

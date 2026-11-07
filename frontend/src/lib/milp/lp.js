@@ -140,6 +140,17 @@ export const buildAllowed = (cfg, tech, y) => {
   return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
 };
 export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+/** Factor por año en escalón (R3), espejo de year_factor en types.jl. */
+export const yearFactor = (cfg, kind, target, y) => {
+  const pts = cfg.year_factors?.[kind]?.[target];
+  if (!pts?.length) return 1;
+  let v = 1;
+  for (const [yr, f] of [...pts].sort((a, b) => relYear(cfg, a[0]) - relYear(cfg, b[0]))) {
+    if (relYear(cfg, yr) > y) break;
+    v = f;
+  }
+  return v;
+};
 /** Almacenamiento con energía propia (R2): sus compras agregan MWh (eng_) aparte de los MW. */
 export const ownEnergy = (cfg, t) => t.type === "storage" && !!t.investable &&
   cfg.storage_energy_capex?.[t.tech_id] != null;
@@ -228,8 +239,12 @@ export function buildLP(site0, cfg0) {
   const years = Array.from({ length: N }, (_, i) => i + 1);
   const steps = Array.from({ length: S }, (_, i) => i + 1);
   const disc = years.map((y) => 1 / Math.pow(1 + cfg.wacc, y));
-  const growth = (y) => Math.pow(1 + cfg.demand_growth, y - 1);
-  const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), y - 1);
+  const growth0 = (y) => Math.pow(1 + cfg.demand_growth, y - 1);
+  const esc0 = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), y - 1);
+  // R3: factores por año sobre el crecimiento y la escalación
+  const dgrow = (c, y) => growth0(y) * yearFactor(cfg, "demand", c, y);
+  const esc = (c, y) => esc0(c, y) * yearFactor(cfg, "price", c, y);
+  const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, y);
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])
@@ -296,6 +311,7 @@ export function buildLP(site0, cfg0) {
       mktEF[mk.market_id] = years.map((y) =>
         onGrid && cfg.grid_ef_by_year?.length ? cfg.grid_ef_by_year[y - 1] : base);
     }
+    mktEF[mk.market_id] = mktEF[mk.market_id].map((v, i) => v * yearFactor(cfg, "emission_factor", mk.market_id, i + 1));
   }
 
   // vida útil: existente vivo hasta remaining (0 = siempre; renew ⇒ siempre)
@@ -401,18 +417,20 @@ export function buildLP(site0, cfg0) {
     }
     for (const tc of [...convs, ...gens, ...stors]) {
       const a = avail(tc, y);
-      constDed(D * tc.fixed_opex * a.k);
-      for (const v of a.ncs) addDed(v, D * tc.fixed_opex);
+      const fo = tc.fixed_opex * yearFactor(cfg, "fixed_opex", tc.tech_id, y);      // R3
+      const vo = tc.variable_opex * yearFactor(cfg, "variable_opex", tc.tech_id, y);
+      constDed(D * fo * a.k);
+      for (const v of a.ncs) addDed(v, D * fo);
       if (tc.type !== "storage")
         for (const s of steps)
-          addDed(`d_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
+          addDed(`d_${sane(tc.tech_id)}_${s}_${y}`, D * vo * w[s - 1]);
       // arranques (2.1): costo × veces que el paso ocurre en el año (w/Δt)
       if (commitIds.has(tc.tech_id) && (tc.startup_cost ?? 0) > 0)
         for (const s of steps)
           addDed(`su_${sane(tc.tech_id)}_${s}_${y}`, D * tc.startup_cost * w[s - 1] / dt[s - 1]);
       else
         for (const s of steps)
-          addDed(`dc_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
+          addDed(`dc_${sane(tc.tech_id)}_${s}_${y}`, D * vo * w[s - 1]);
     }
     for (const mk of mkts) {
       const sign = mk.direction === "buy" ? 1 : -1;   // venta = ingreso
@@ -420,7 +438,7 @@ export function buildLP(site0, cfg0) {
       if (nm) continue;                                // su ingreso va por nm_
       for (const s of steps)
         addDed(`mf_${sane(mk.market_id)}_${s}_${y}`,
-            sign * D * mk.price[s - 1] * esc(mk.carrier_id, y) * w[s - 1]);
+            sign * D * mk.price[s - 1] * mpx(mk, y) * w[s - 1]);
     }
     // compra implícita de combustibles SIN mercado
     for (const t of convs)
@@ -452,9 +470,10 @@ export function buildLP(site0, cfg0) {
     addDed(`off_${y}`, D * cfg.offset_price);
     // cargos por demanda (M2/M2b)
     for (const mk of buys) {
-      const dc = mk.demand_charge ?? 0;
+      const fdc = yearFactor(cfg, "demand_charge", mk.market_id, y);   // R3
+      const dc = (mk.demand_charge ?? 0) * fdc;
       const cp = mk.contracted_power;
-      const pen = mk.excess_penalty ?? 0;
+      const pen = (mk.excess_penalty ?? 0) * fdc;
       if (!(dc > 0 || (cp != null && pen > 0))) continue;
       for (let se = 1; se <= nse; se++) {
         if (cp != null) {
@@ -475,7 +494,7 @@ export function buildLP(site0, cfg0) {
         const wsum = p.reduce((a, s) => a + w[s - 1], 0);
         const retail = paired.length === 0 ? 0 :
           paired.reduce((a, b) =>
-            a + p.reduce((x, s) => x + b.price[s - 1] * esc(b.carrier_id, y) * w[s - 1], 0)
+            a + p.reduce((x, s) => x + b.price[s - 1] * mpx(b, y) * w[s - 1], 0)
               / wsum, 0) / Math.max(paired.length, 1);
         addDed(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`, -disc[y - 1] * retail);
       });
@@ -532,7 +551,7 @@ export function buildLP(site0, cfg0) {
             if (l.from === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, -1);
           }
           const dem = demandNode(c) === n
-            ? (site.demands?.[c]?.[s - 1] ?? 0) * growth(y) : 0;
+            ? (site.demands?.[c]?.[s - 1] ?? 0) * dgrow(c, y) : 0;
           // carga desplazada (5.4): demanda efectiva = dem + sube − baja
           if (dem && FX.includes(c)) {
             inc(t, `fup_${sane(c)}_${s}_${y}`, -1);
@@ -875,7 +894,7 @@ export function buildLP(site0, cfg0) {
           if (mkts.some((m) => m.direction === "buy" && m.connection === src.tech_id && m.carrier_id === c))
             grid += allowed(src.tech_id) ? src.existing_capacity : 0;
       if (grid > 0) row(`bkg_${sane(c)}_${y}`, { [L]: 1 }, ">=", grid);
-      const peak = Math.max(...site.demands[c]) * growth(y);
+      const peak = Math.max(...site.demands[c]) * dgrow(c, y);
       inc(firm, L, -1);
       row(`bkn1_${sane(c)}_${y}`, firm, ">=", bsh * peak - firmK - grid);
     }
@@ -947,7 +966,7 @@ export function buildLP(site0, cfg0) {
     const f = cfg.demand_flexibility[c], id = sane(c);
     for (const y of years) {
       for (const s of steps) {
-        const d = (site.demands[c][s - 1] ?? 0) * growth(y);
+        const d = (site.demands[c][s - 1] ?? 0) * dgrow(c, y);
         row(`fupc_${id}_${s}_${y}`, { [`fup_${id}_${s}_${y}`]: 1 }, "<=", f * d);
         row(`fdnc_${id}_${s}_${y}`, { [`fdn_${id}_${s}_${y}`]: 1 }, "<=", f * d);
       }

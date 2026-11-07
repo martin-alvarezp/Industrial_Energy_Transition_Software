@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -28,7 +28,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const years = Array.from({ length: N }, (_, i) => i + 1);
   const steps = Array.from({ length: S }, (_, i) => i + 1);
   const disc = years.map((y) => 1 / Math.pow(1 + cfg.wacc, y));
-  const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), y - 1);
+  // R3: factores por año sobre la escalación (espejo de lp.js)
+  const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), y - 1) * yearFactor(cfg, "price", c, y);
+  const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, y);
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])
@@ -198,11 +200,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         year: y, reduction: em.reduction, capex: em.capex * capexFactor(cfg, em.id, y) });
     }
     for (const t of [...convs, ...gens, ...stors]) {
-      fixed += t.fixed_opex * availOf(t, y);
+      fixed += t.fixed_opex * yearFactor(cfg, "fixed_opex", t.tech_id, y) * availOf(t, y);
       for (const s of steps) {
         const v = t.type === "storage" ? V(`dc_${sane(t.tech_id)}_${s}_${y}`)
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
-        varop += t.variable_opex * v * w[s - 1];
+        varop += t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, y) * v * w[s - 1];
       }
       // (la carga desplazada de 5.4 se suma después, una vez por año)
       // arranques (2.1): parte del OPEX variable, como en Julia
@@ -222,7 +224,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         if (f > 0 && site.demands?.[c])
           for (const s of steps) varop += cfg.flex_cost * V(`fdn_${sane(c)}_${s}_${y}`) * w[s - 1];
     for (const mk of buys) for (const s of steps)
-      energy += mk.price[s - 1] * esc(mk.carrier_id, y) *
+      energy += mk.price[s - 1] * mpx(mk, y) *
                 V(`mf_${sane(mk.market_id)}_${s}_${y}`) * w[s - 1];
     for (const cv of convs) for (const p of portsOf(cv).ins)
       if (catOf[p.carrier] === "fuel" && !fuelWithMkt.has(p.carrier) &&
@@ -231,8 +233,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           energy += site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                     p.ratio * drive(cv, s, y) * w[s - 1];
     for (const mk of buys) {
-      const dc = mk.demand_charge ?? 0, cp = mk.contracted_power,
-            pen = mk.excess_penalty ?? 0;
+      const fdc = yearFactor(cfg, "demand_charge", mk.market_id, y);   // R3
+      const dc = (mk.demand_charge ?? 0) * fdc, cp = mk.contracted_power,
+            pen = (mk.excess_penalty ?? 0) * fdc;
       if (!(dc > 0 || (cp != null && pen > 0))) continue;
       for (let se = 1; se <= nse; se++)
         dcharges += cp != null
@@ -259,13 +262,13 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           const wsum = p.reduce((a, s) => a + w[s - 1], 0);
           const retail = paired.length === 0 ? 0 :
             paired.reduce((a, b) => a + p.reduce((x, s) =>
-              x + b.price[s - 1] * esc(b.carrier_id, y) * w[s - 1], 0) / wsum, 0)
+              x + b.price[s - 1] * mpx(b, y) * w[s - 1], 0) / wsum, 0)
             / Math.max(paired.length, 1);
           exportRev += retail * V(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`);
         });
       } else {
         for (const s of steps)
-          exportRev += mk.price[s - 1] * esc(mk.carrier_id, y) *
+          exportRev += mk.price[s - 1] * mpx(mk, y) *
                        V(`mf_${sane(mk.market_id)}_${s}_${y}`) * w[s - 1];
       }
     }
@@ -281,7 +284,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       resGen += V(`d_${sane(g.tech_id)}_${s}_${y}`) * w[s - 1];
     for (const [c, series] of Object.entries(site.demands ?? {}))
       demTot += series.reduce((a, v, i) => a + v * w[i], 0) *
-                Math.pow(1 + cfg.demand_growth, y - 1);
+                Math.pow(1 + cfg.demand_growth, y - 1) * yearFactor(cfg, "demand", c, y);
 
     // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita
     const carbon = cprice(y) * ge +

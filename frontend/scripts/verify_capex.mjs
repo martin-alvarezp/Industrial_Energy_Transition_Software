@@ -189,6 +189,39 @@ const bad2 = pr.result.cost_breakdown.filter((cb) => {
 });
 step("el CAPEX de cada año suma el fijo de cada compra", bad2.length === 0, `${bad2.length} años no cuadran`);
 
+// 6 · factores por año (R3): el primer precio del sitio a la mitad desde el año 2
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="add-yf"]', { timeout: 30000 });
+await p.click('[data-testid="add-yf"]');
+await p.waitForSelector("[data-yf-points]", { timeout: 10000 });
+const yfKey = await p.evaluate(() => document.querySelector("[data-yf-points]").dataset.yfPoints);
+await p.click("[data-yf-points]");
+await p.type("[data-yf-points]", "2:0.5");
+await p.click('[data-testid="add-yf"] ~ *, h4.par-sub');   // blur
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Factores");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pf = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Factores");
+  if (r) { pf = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const [yk, yt] = yfKey.split(":");
+const yfc = pf?.result?.assumptions?.scenario_config?.year_factors ?? {};
+step("corrida con factores por año resuelta por el motor real",
+     pf?.source === "api" && pf.result.meta.feasible && JSON.stringify(yfc[yk]?.[yt]) === "[[2,0.5]]",
+     `${yfKey} → ${JSON.stringify(yfc)}`);
+const ep = pf.result.cost_breakdown.map((c) => c.energy_purchases);
+step("desde el año 2 las compras de energía caen con el precio", ep[1] < 0.8 * ep[0] && ep[2] < 0.8 * ep[0],
+     ep.slice(0, 3).map((x) => (x / 1e6).toFixed(2)).join(" · ") + " MUSD");
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nCAPEX OK: curva de aprendizaje y trayectoria → motor real → CAPEX por año exacto.");

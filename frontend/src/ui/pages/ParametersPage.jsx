@@ -394,6 +394,53 @@ export default function ParametersPage({ route }) {
               </div>
             );
           })}
+          {/* factores por año en escalón (R3): tipo · objetivo · "año:factor, …" */}
+          <h4 className="par-sub">{t("par.yearFactors")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.yearFactorsHint")}</p>
+          {(() => {
+            const sj = twin.siteJson;
+            const mk = (sj.markets ?? []).map((m) => [m.market_id, m.name ?? m.market_id]);
+            const tech = sj.technologies.map((x) => [x.tech_id, x.name ?? x.tech_id]);
+            const dem = Object.keys(sj.demands ?? {}).map((c) => [c, c]);
+            const pr = Object.keys(sj.prices ?? {}).map((c) => [c, c]);
+            const TARGETS = { price: [...mk, ...pr], demand: dem, emission_factor: mk, demand_charge: mk,
+                              fixed_opex: tech, variable_opex: tech };
+            const yf = draft.year_factors ?? {};
+            const rows = Object.entries(yf).flatMap(([kind, tg]) =>
+              Object.entries(tg ?? {}).map(([target, pts]) => ({ kind, target, pts })));
+            const write = (list) => {
+              const o = {};
+              for (const r of list) (o[r.kind] ??= {})[r.target] = r.pts;
+              set({ year_factors: o });
+            };
+            const parse = (txt) => txt.split(/[,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => {
+              const [yr, f] = x.split(/[:=\s]+/).map(Number);
+              return [Math.round(yr), f];
+            }).filter(([yr, f]) => Number.isFinite(yr) && yr > 0 && Number.isFinite(f) && f >= 0);
+            return <>
+              {rows.map((r, k) => (
+                <div key={`${r.kind}-${r.target}-${k}`} className="par-forced par-capex" data-yf={`${r.kind}:${r.target}`}>
+                  <select className="ui-select par-capex-num" value={r.kind} aria-label={t("par.yfKind")}
+                          onChange={(e) => { const kind = e.target.value;
+                            write(rows.map((x, j) => j === k ? { ...x, kind, target: TARGETS[kind][0]?.[0] ?? x.target } : x)); }}>
+                    {Object.keys(TARGETS).map((kd) => <option key={kd} value={kd}>{t(`par.yf.${kd}`)}</option>)}
+                  </select>
+                  <select className="ui-select par-capex-traj" value={r.target} aria-label={t("par.yfTarget")}
+                          onChange={(e) => write(rows.map((x, j) => j === k ? { ...x, target: e.target.value } : x))}>
+                    {TARGETS[r.kind]?.map(([id, nm]) => <option key={id} value={id}>{nm}</option>)}
+                  </select>
+                  <input className="ui-input par-capex-traj" placeholder="2028:0.9, 2030:0.85" aria-label={t("par.yfPoints")}
+                         defaultValue={r.pts.map(([yr, f]) => `${yr}:${f}`).join(", ")} data-yf-points={`${r.kind}:${r.target}`}
+                         onBlur={(e) => write(rows.map((x, j) => j === k ? { ...x, pts: parse(e.target.value) } : x))} />
+                  <button className="ui-dots" onClick={() => write(rows.filter((_, j) => j !== k))}><MdDelete /></button>
+                </div>
+              ))}
+              <button className="ui-btn outline sm" data-testid="add-yf"
+                      onClick={() => write([...rows, { kind: "price", target: TARGETS.price[0]?.[0] ?? "electricity", pts: [] }])}>
+                <MdAdd /> {t("par.addYearFactor")}
+              </button>
+            </>;
+          })()}
           {/* almacenamiento con energía propia (R2): USD/kWh y tope de MWh por compra */}
           {candidates.some((c) => c.type === "storage") && <>
             <h4 className="par-sub">{t("par.ownEnergy")}</h4>

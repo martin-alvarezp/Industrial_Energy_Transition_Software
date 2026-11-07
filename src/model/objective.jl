@@ -37,15 +37,15 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # FixedOPEX_y = Σ_tech fixed_opex · available_capacity[tech,y]
     #             + cargos fijos de las conexiones de red (USD/año, M11)
     JuMP.@expression(m, fixed_opex_y[y in years],
-        sum(params.costs[t].fixed_opex * available_capacity[t, y]
+        sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, y) * available_capacity[t, y]
             for t in all_techs; init = 0.0) + params.fixed_charges)
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)
     JuMP.@expression(m, var_opex_y[y in years],
-        sum(params.costs[t].variable_opex * dispatch[t, s, y] * w[s]
+        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, y) * dispatch[t, s, y] * w[s]
             for t in sets.dispatch_techs, s in steps; init = 0.0) +
-        sum(params.costs[st].variable_opex * discharge[st, s, y] * w[s]
+        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, y) * discharge[st, s, y] * w[s]
             for st in sets.storages, s in steps; init = 0.0) +
         m[:startup_cost_y][y] +  # arranques (2.1): parte del OPEX variable
         m[:flex_cost_y][y])      # carga desplazada (5.4)
@@ -72,10 +72,11 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                   (isfinite(contracted(mk)) &&
                    get(params.market_excess_penalty, mk, 0.0) > 0)]
     dc_term(mk, se, y) = begin
-        c = params.market_demand_charge[mk] * KW_PER_MW * months_per_season
+        f = year_factor(cfg, :demand_charge, mk, y)   # R3: cargo y penalidad por año
+        c = params.market_demand_charge[mk] * KW_PER_MW * months_per_season * f
         if isfinite(contracted(mk))
             c * contracted(mk) +
-            params.market_excess_penalty[mk] * KW_PER_MW * months_per_season *
+            params.market_excess_penalty[mk] * KW_PER_MW * months_per_season * f *
             m[:market_excess][mk, se, y]
         else
             c * m[:market_peak][mk, se, y]

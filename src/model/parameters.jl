@@ -96,10 +96,16 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         c == :grid_export && continue
         esc = get(cfg.price_escalation, c, 0.0)
         price[c] = _scaled_matrix(ps.values, esc, years)
+        for y in years   # factores por año (R3), sobre la escalación
+            price[c][:, y] .*= year_factor(cfg, :price, c, y)
+        end
     end
 
     demand = Dict(c => _scaled_matrix(d.values, cfg.demand_growth, years)
                   for (c, d) in site.demands)
+    for (c, M) in demand, y in years
+        M[:, y] .*= year_factor(cfg, :demand, c, y)
+    end
 
     discount = [discount_factor(cfg.wacc, y) for y in years]
 
@@ -160,6 +166,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         mk = mkts[id]
         esc = get(cfg.price_escalation, mk.carrier, 0.0)
         market_price[id] = _scaled_matrix(mk.price, esc, years)
+        for y in years   # R3: factor del mercado y del vector
+            market_price[id][:, y] .*= year_factor(cfg, :price, id, y) * year_factor(cfg, :price, mk.carrier, y)
+        end
         market_carrier[id] = mk.carrier
         market_dir[id] = mk.direction
         market_power_cap[id] = mk.max_power
@@ -181,6 +190,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         else
             zeros(length(years))
         end
+        market_ef[id] .*= [year_factor(cfg, :emission_factor, id, y) for y in years]   # R3
         market_demand_charge[id] = mk.direction == :buy ? mk.demand_charge : 0.0
         if mk.connection != Symbol("")
             side = mk.direction == :buy ? conn_buy : conn_sell

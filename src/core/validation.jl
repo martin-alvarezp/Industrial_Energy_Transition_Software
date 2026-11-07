@@ -542,6 +542,26 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         cand(t) || push!(problems, "fixed_capex: '$t' no es una tecnología candidata a inversión")
         c >= 0 || push!(problems, "fixed_capex['$t']: debe ser ≥ 0")
     end
+    # R3: factores por año — tipo conocido, objetivo que existe, factor ≥ 0
+    techs_all = Set(all_tech_ids(site))
+    for (kind, targets) in cfg.year_factors
+        if !(kind in YEAR_FACTOR_KINDS)
+            push!(problems, "year_factors: tipo desconocido '$kind' (válidos: $(join(YEAR_FACTOR_KINDS, ", ")))")
+            continue
+        end
+        for (tg, pts) in targets
+            ok = kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
+                 kind == :demand ? haskey(site.demands, tg) :
+                 kind in (:emission_factor, :demand_charge) ? haskey(site.markets, tg) :
+                 tg in techs_all
+            ok || push!(problems, "year_factors.$kind: '$tg' no existe en el sitio")
+            for (yr, f) in pts
+                f >= 0 || push!(problems, "year_factors.$kind['$tg']: factor negativo en $yr")
+                rel_year(cfg, yr) >= 1 || push!(problems,
+                    "year_factors.$kind['$tg']: el año $yr cae antes del horizonte")
+            end
+        end
+    end
     # R2: energía propia solo en almacenamientos candidatos
     for (f, d) in (("storage_energy_capex", cfg.storage_energy_capex), ("storage_energy_max", cfg.storage_energy_max)),
         (t, c) in d
