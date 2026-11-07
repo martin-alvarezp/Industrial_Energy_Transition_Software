@@ -11,6 +11,7 @@ import EquipmentDrawer from "../../components/twin/EquipmentDrawer.jsx";
 import { blankMarket, upsertMarket, removeMarket, legacyMarkets, upsertTech, isMultiport } from "../../lib/twin.js";
 import { num } from "../../lib/format.js";
 import { seriesColors } from "../results.js";
+import { templateKind, expandTo8760 } from "../../lib/templates.js";
 
 
 export default function TradePage() {
@@ -27,9 +28,28 @@ export default function TradePage() {
   const sources = sj.technologies.filter((x) => x.type === "source" && x.tech_id !== "offsets");
   const profile = useMemo(() => {
     if (!shown?.price) return null;
-    const seasons = [...new Set(sj.timesteps.map((s) => s.season))];
     const rows = Array.from({ length: 24 }, (_, h) => ({ h }));
-    sj.timesteps.forEach((s, i) => { const r = rows[s.hour]; if (r) r[s.season] = shown.price[i]; });
+    let seasons;
+    if (templateKind(sj.timesteps) === "seasonal") {
+      seasons = [...new Set(sj.timesteps.map((s) => s.season))];
+      sj.timesteps.forEach((s, i) => { const r = rows[s.hour]; if (r) r[s.season] = shown.price[i]; });
+    } else {
+      // plantilla mensual o año completo (bloque 1.2): día promedio por
+      // estación, reconstruyendo el año — 24 períodos o 8760 h no se leen
+      const hemi = sj.hourly?.template?.hemisphere ?? "south";
+      const full = expandTo8760(shown.price, sj.timesteps, hemi);
+      const qs = hemi === "north" ? ["winter", "spring", "summer", "autumn"] : ["summer", "autumn", "winter", "spring"];
+      const bounds = [0, 91, 182, 273, 365];
+      seasons = ["winter", "spring", "summer", "autumn"];
+      qs.forEach((se, q) => {
+        const nd = bounds[q + 1] - bounds[q];
+        for (let h = 0; h < 24; h++) {
+          let acc = 0;
+          for (let d = bounds[q]; d < bounds[q + 1]; d++) acc += full[d * 24 + h];
+          rows[h][se] = acc / nd;
+        }
+      });
+    }
     const label = (x) => (t("season." + x) === "season." + x ? x : t("season." + x));
     const labels = seasons.map(label);
     return { rows, seasons, label, labels, colors: seriesColors(labels) };

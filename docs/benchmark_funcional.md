@@ -142,3 +142,43 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   (partir en cuartos de hora y partir cada estación en 3 meses dan el mismo
   VAN). Espejo web: `timeGroups` y Δt en `lp.js`, con los goldens
   `tarifa_mensual_n1` y `demo_cuartos_n2`; verify:wasm 10/10. 1330 tests.
+- ✅ **1.2 · Plantillas temporales con series crudas** (2026-11-07). El sitio
+  guarda las series crudas de 8760 h o 35 040 cuartos de hora en
+  `hourly.json`, junto al sitio (como `layout`). El motor no las lee:
+  optimiza la plantilla ya armada, y a las corridas viaja la plantilla, no el
+  crudo. Hay tres plantillas en *Series de tiempo → Resolución temporal*:
+  **estacional 4×24** (96 pasos), **mensual con día de punta** (por mes, el
+  día promedio más el día REAL de mayor demanda, con mes en cada paso: 576
+  pasos, punta tarifaria mensual sobre la punta registrada) y **año
+  completo** (8760 pasos, o 35 040 de Δt = 0,25 si todas las crudas son de
+  15 min). Las series con crudo se re-agregan exactas (el peso de cada paso
+  es el número de horas que promedia, así que la energía anual se conserva);
+  las demás se proyectan desde su perfil por estación y hora. El CSV y PVGIS
+  guardan el crudo; un valor editado a mano lo descarta. En Operación, los
+  períodos largos se recorren eligiendo el día del año. Motor (demo): mensual
+  a 10 años en 16 s, año completo a 1 año en 16 s. Verificación:
+  `verify:templates` (oráculos exactos), `verify:resolution` (E2E con la API
+  real) y tests de la API (`hourly.json`: se conserva, se borra con `null` y
+  un largo inválido da 400 sin escribir nada).
+  *Hallazgo para 1.3:* con el año completo, la UI corre además Pareto (9
+  puntos) y 6 escenarios de comparación sobre 8760 pasos (16 MILPs en serie,
+  ~4 min). El modo despacho debe correr solo lo necesario.
+- ✅ **1.3 · Modo despacho y corridas únicas** (2026-11-07). `dispatch_only` +
+  `fixed_capacity` en la configuración (YAML, overrides de la API y espejo
+  web): infraestructura FIJA (la existente o la de un año de una corrida
+  guardada); nada invierte, nada se retira, sin compras forzadas, sin
+  renovación y sin presupuesto. El MILP queda como LP sin binarias. Ancla:
+  despachar 1 año con el parque del año 1 de una planificación cuesta
+  exactamente su año 1 sin el CAPEX (10⁻⁶). En el modal *Nueva optimización*
+  se elige el **tipo de corrida** (planificación o despacho, con el origen
+  de las capacidades y los años a despachar) y el **alcance**: análisis
+  completo (corrida + Pareto + 6 comparaciones) o **solo esta corrida**, que
+  es el default con plantillas de más de 200 pasos. Golden
+  `demo_despacho_n1` (0 binarias); verify:wasm 11/11; `verify:dispatch`
+  E2E.
+  *Corregido de paso:* cada consulta a la API cortaba a los 120 s. Con la
+  cola del server (que resuelve en serie), una corrida pesada abortaba, caía
+  al motor web y terminaba en el **mock sin avisar**, mostrando números del
+  demo para un sistema real. Ahora las optimizaciones esperan hasta 15 min y,
+  si la API está arriba y falla, el error se muestra en lugar de cambiar de
+  motor en silencio.

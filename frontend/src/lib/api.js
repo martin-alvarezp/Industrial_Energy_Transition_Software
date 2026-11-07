@@ -8,6 +8,18 @@ import {
 import { tornadoLevers, buildTornado } from "./sensitivity.js";
 import plantaRed from "../demo/planta_red.json";
 
+/** ¿Solo la corrida pedida? Modo despacho o "solo esta corrida" del modal:
+ *  sin Pareto ni escenarios de comparación (misma regla que milp/engine.js). */
+export const isSingleRun = (cfg) => !!cfg?.dispatch_only || cfg?.analysis === "single";
+
+/** El sitio que ve el MOTOR: sin las series crudas (`hourly`, bloque 1.2), que
+ *  solo sirven para re-armar la plantilla y pesan MB. */
+export const enginePayload = (sj) => {
+  if (!sj || sj.hourly === undefined) return sj;
+  const { hourly, ...rest } = sj;
+  return rest;
+};
+
 // Sitios que la app lleva embebidos para funcionar SIN backend (GitHub Pages).
 // `planta_red` es la planta de ejemplo con topología de red (M14): barras por
 // equipo, alimentadores y colectores con tope y pérdida. Su resultado está
@@ -88,6 +100,9 @@ export function toOverrides(cfg) {
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",
+    // modo despacho (1.3): infraestructura fija
+    dispatch_only: !!cfg.dispatch_only,
+    fixed_capacity: cfg.fixed_capacity ?? {},
     // parámetros del escenario que la vista Parámetros permite sobrescribir;
     // sólo viajan si el usuario los cambió (si no, rige el YAML del sitio)
     ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => cfg[k] != null).map((k) => [k, cfg[k]])),
@@ -133,16 +148,27 @@ export async function apiAvailable() {
 export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") {
   const overrides = toOverrides(cfg);
   const site = siteName;
-  const payload = sitePayload ? { site_payload: sitePayload } : {};
+  const payload = sitePayload ? { site_payload: enginePayload(sitePayload) } : {};
+  // el server resuelve en SERIE: con plantillas pesadas una consulta espera
+  // en cola detrás de las otras — 120 s abortaba corridas sanas (y la UI caía
+  // al mock sin decirlo)
+  const SOLVE_MS = 900_000;
   const run = (scenario, extra = {}) =>
     post("/scenario", { site, scenario, config_overrides: overrides,
-                        ...payload, ...extra });
+                        ...payload, ...extra }, { timeoutMs: SOLVE_MS });
 
+  // modo despacho o "solo esta corrida": una sola optimización (con 8760
+  // pasos, Pareto + 6 comparaciones eran 15 MILPs más, en serie en el server)
+  if (isSingleRun(cfg)) {
+    const result = await run(scenarioName(cfg), { include_dispatch: true, shadow_prices: true });
+    return { source: "api", result, reference: null, referenceLabel: null, bau: null,
+             bauFeasible: null, pareto: null, batch: [], single: true };
+  }
   const compareNames = ["bau", "least_cost", "emissions_cap", "no_offsets",
                         "high_gas", "high_carbon"];
   const [result, paretoResp, ...compare] = await Promise.all([
     run(scenarioName(cfg), { include_dispatch: true, shadow_prices: true }),
-    post("/pareto", { site, points: 9, config_overrides: overrides, ...payload }),
+    post("/pareto", { site, points: 9, config_overrides: overrides, ...payload }, { timeoutMs: SOLVE_MS }),
     ...compareNames.map((s) => run(s, { shadow_prices: false })),
   ]);
 
@@ -186,7 +212,7 @@ export async function runTornado(cfg, siteJson, siteName = "demo", baselineNpv, 
   const overrides = toOverrides(cfg);
   const solve = async (payload) => {
     const r = await post("/scenario", {
-      site: siteName, scenario, config_overrides: overrides, site_payload: payload,
+      site: siteName, scenario, config_overrides: overrides, site_payload: enginePayload(payload),
     });
     return r.meta.feasible ? r.kpis.npv : null;
   };
@@ -219,7 +245,7 @@ export function computeViaWebEngine(cfg, siteJson, onProgress) {
     _webWorker.onerror = (e) => { clearTimeout(timer); reject(new Error(e.message)); };
     const wasmUrl = new URL(`${import.meta.env.BASE_URL}highs.wasm`,
                             window.location.href).href;
-    _webWorker.postMessage({ cfg, siteJson, wasmUrl });
+    _webWorker.postMessage({ cfg, siteJson: enginePayload(siteJson), wasmUrl });
   });
 }
 
@@ -242,11 +268,16 @@ export function computeViaMock(cfg) {
  * de verdad el sitio editado); último recurso, el mock. */
 export async function compute(cfg, sitePayload = null, siteName = "demo",
                               snapshot = null, onProgress = null) {
+  // con la API arriba, su error SE MUESTRA: caer al motor web o al mock
+  // presentaría como resultado del sistema algo que el motor real no dijo
   if (await apiAvailable()) {
     try {
       return await computeViaApi(cfg, sitePayload, siteName);
     } catch (err) {
       console.warn("IETO API falló:", err);
+      throw new Error(err?.name === "AbortError"
+        ? "la optimización superó el tiempo de espera del servidor"
+        : (err?.message ?? String(err)));
     }
   }
   // sin API: el motor web resuelve el SITIO REAL (payload o snapshot del twin)
@@ -267,7 +298,7 @@ export const runParetoSweep = (cfg, sitePayload, siteName, points = 9, capEndMin
   post("/pareto", {
     site: siteName, points, config_overrides: toOverrides(cfg),
     ...(capEndMin != null ? { cap_end_min: capEndMin } : {}),
-    ...(sitePayload ? { site_payload: sitePayload } : {}),
+    ...(sitePayload ? { site_payload: enginePayload(sitePayload) } : {}),
   }, { timeoutMs: 600_000 });
 
 /** POST /portfolio (D5): mismo escenario sobre N sitios + agregado grupo. */
@@ -289,8 +320,10 @@ export async function listSites() {
 /** PUT /sites/{name}: persiste el twin (CSVs + layout.geojson). */
 export async function saveSite(name, siteJson, layoutGeoJSON) {
   return post(`/sites/${encodeURIComponent(name)}`, {
-    site_payload: siteJson,
+    site_payload: enginePayload(siteJson),
     layout: layoutGeoJSON,
+    // series crudas y plantilla (bloque 1.2): van a hourly.json, no al motor
+    ...(siteJson?.hourly !== undefined ? { hourly: siteJson.hourly } : {}),
   }, { method: "PUT" });
 }
 
@@ -309,7 +342,7 @@ export async function validateTwin(sitePayload, cfg, siteName = "demo") {
   try {
     const out = await post("/validate", {
       site: siteName,
-      site_payload: sitePayload,
+      site_payload: enginePayload(sitePayload),
       config_overrides: toOverrides(cfg),
     });
     return { ok: true, site_version: out.site_version, problems: [] };
@@ -347,7 +380,7 @@ export async function downloadXlsx(cfg, sitePayload = null, siteName = "demo") {
       site: siteName,
       scenario: scenarioName(cfg),
       config_overrides: toOverrides(cfg),
-      ...(sitePayload ? { site_payload: sitePayload } : {}),
+      ...(sitePayload ? { site_payload: enginePayload(sitePayload) } : {}),
     }),
   });
   if (!resp.ok) {

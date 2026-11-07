@@ -1,0 +1,104 @@
+// Verifica las plantillas temporales (lib/templates.js, benchmark bloque 1.2)
+// con oráculos exactos, sin navegador ni backend:
+//   1. Σ pesos = 8760 y mes en todos los pasos o en ninguno, en cada plantilla.
+//   2. La energía anual de una serie CRUDA se conserva exacta (peso = horas
+//      promediadas).
+//   3. El día de punta de cada mes ("monthly") toma la punta REGISTRADA.
+//   4. El demo (96 pasos, sin crudas) re-aplicado en "seasonal" reproduce sus
+//      valores; en "full", la serie de cada hora es la de su estación × hora.
+//   5. Una serie de 15 min en "full" da 35 040 pasos de Δt = 0.25 y conserva
+//      la energía.
+// Uso: npm run verify:templates
+import { readFileSync } from "node:fs";
+import {
+  applyTemplate, setRawSeries, templateSteps, expandTo8760, getSeries, seriesKeys, HOURS,
+} from "../src/lib/templates.js";
+
+const problems = [];
+const check = (ok, msg) => { if (!ok) problems.push(msg); };
+const close = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+const energy = (vals, ts) => vals.reduce((s, v, i) => s + v * ts[i].weight_hours, 0);
+
+// demo canónico: el fixture dorado trae el site_json completo
+const demo = JSON.parse(readFileSync(new URL("../golden/demo_least_cost_n5.json", import.meta.url))).site;
+
+// serie cruda sintética determinística (patrón diario + estacional + ruido fijo)
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const raw = Array.from({ length: HOURS }, (_, t) =>
+  20 + 8 * Math.sin((2 * Math.PI * (t % 24)) / 24) + 5 * Math.cos((2 * Math.PI * t) / HOURS) + 3 * rnd());
+const rawTotal = raw.reduce((a, b) => a + b, 0);
+
+for (const method of ["seasonal", "monthly", "full"]) {
+  const s = setRawSeries(applyTemplate(demo, method), "demands.electricity", raw);
+  const ts = s.timesteps;
+  const W = ts.reduce((a, t) => a + t.weight_hours, 0);
+  check(close(W, HOURS), `${method}: Σ pesos = ${W}, debe ser 8760`);
+  const nm = ts.filter((t) => (t.month ?? 0) > 0).length;
+  check(nm === 0 || nm === ts.length, `${method}: mes en ${nm} de ${ts.length} pasos`);
+  for (const k of seriesKeys(s))
+    check(getSeries(s, k).length === ts.length, `${method}: ${k} tiene ${getSeries(s, k).length} valores para ${ts.length} pasos`);
+  const e = energy(getSeries(s, "demands.electricity"), ts);
+  check(close(e, rawTotal, 1e-7), `${method}: energía ${e.toFixed(3)} ≠ cruda ${rawTotal.toFixed(3)}`);
+  console.log(`✓ ${method.padEnd(8)} ${String(ts.length).padStart(5)} pasos · Σ pesos ${W} · energía ${(100 * (e / rawTotal - 1)).toExponential(1)} %`);
+}
+
+// 3 · día de punta mensual = punta registrada del mes
+{
+  const s = setRawSeries(applyTemplate(demo, "monthly"), "demands.electricity", raw);
+  const d = getSeries(s, "demands.electricity");
+  // el driver es la suma de demandas: sin otras demandas crudas, la del demo
+  // proyectada también suma — compara contra el driver real
+  const driver = new Array(HOURS).fill(0);
+  for (const k of seriesKeys(s).filter((k) => k.startsWith("demands."))) {
+    const v = k === "demands.electricity" ? raw : expandTo8760(getSeries(demo, k), demo.timesteps);
+    v.forEach((x, t) => (driver[t] += x));
+  }
+  const steps = templateSteps("monthly", { driver });
+  for (let m = 1; m <= 12; m++) {
+    const peakSteps = steps.filter((st) => st.season === `M${String(m).padStart(2, "0")}p`);
+    check(peakSteps.length === 24, `monthly: mes ${m} sin día de punta`);
+    const dmax = Math.max(...peakSteps.map((st) => driver[st.src[0]]));
+    const monthHours = steps.filter((st) => st.month === m).flatMap((st) => st.src);
+    check(close(dmax, Math.max(...monthHours.map((t) => driver[t]))), `monthly: el día de punta del mes ${m} no tiene la punta del mes`);
+  }
+  check(s.timesteps.length === 576, `monthly: ${s.timesteps.length} pasos, se esperaban 576`);
+  console.log("✓ monthly  día de punta = punta registrada en los 12 meses");
+  void d;
+}
+
+// 4 · el demo sin crudas vuelve a sí mismo en "seasonal" y se expande bien en "full"
+{
+  const s = applyTemplate(demo, "seasonal");
+  for (const k of seriesKeys(demo)) {
+    const a = getSeries(demo, k), b = getSeries(s, k);
+    check(a.every((v, i) => close(v, b[i])), `seasonal: ${k} no reproduce el demo`);
+  }
+  const f = applyTemplate(demo, "full");
+  check(f.timesteps.length === HOURS, `full: ${f.timesteps.length} pasos`);
+  const el = getSeries(f, "demands.electricity"), d0 = getSeries(demo, "demands.electricity");
+  // 15 de enero 10:00 → verano (hemisferio sur), hora 10
+  const i = demo.timesteps.findIndex((t) => t.season === "summer" && t.hour === 10);
+  check(close(el[14 * 24 + 10], d0[i]), "full: la hora del 15-ene 10:00 no toma verano·10");
+  console.log("✓ demo     seasonal reproduce las 96 · full proyecta estación × hora");
+}
+
+// 5 · cuartos de hora
+{
+  const q = raw.flatMap((v) => [v, v, v, v]);
+  let s = applyTemplate(demo, "full");
+  for (const k of seriesKeys(s))
+    s = setRawSeries(s, k, expandTo8760(getSeries(demo, k), demo.timesteps).flatMap((v) => [v, v, v, v]));
+  s = setRawSeries(s, "demands.electricity", q);
+  check(s.timesteps.length === 4 * HOURS, `full 15 min: ${s.timesteps.length} pasos`);
+  check(s.timesteps.every((t) => t.duration_hours === 0.25), "full 15 min: Δt ≠ 0.25");
+  const e = energy(getSeries(s, "demands.electricity"), s.timesteps);
+  check(close(e, rawTotal, 1e-7), `full 15 min: energía ${e} ≠ ${rawTotal}`);
+  console.log("✓ full     15 min: 35 040 pasos de Δt = 0.25, energía exacta");
+}
+
+if (problems.length) {
+  console.error("\n✗ " + problems.join("\n✗ "));
+  process.exit(1);
+}
+console.log("\nPLANTILLAS OK");

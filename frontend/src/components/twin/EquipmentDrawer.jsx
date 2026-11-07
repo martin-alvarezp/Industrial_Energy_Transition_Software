@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { TECH_TYPE_META, slugId, techProblems, carrierLabel, techRefs }
   from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
-import { aggregate8760 } from "../../lib/series.js";
+import { projectRaw } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
 import { useL } from "../../ui/i18n.jsx";
 
@@ -77,10 +77,10 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
     try {
       const [lat, lon] = center;
       const r = await fetchSolarProfile(lat, lon);
-      const agg = aggregate8760(r.cf_hourly, siteJson.timesteps,
-                                lat < 0 ? "south" : "north");
-      const mean = agg.series.reduce((a, b) => a + b, 0) / agg.series.length;
-      setDraft((d) => ({ ...d, cf_profile: agg.series }));
+      // proyectado a la plantilla VIGENTE (estacional, mensual o año completo)
+      const series = projectRaw(siteJson, r.cf_hourly, { hemisphere: lat < 0 ? "south" : "north" });
+      const mean = series.reduce((a, b) => a + b, 0) / series.length;
+      setDraft((d) => ({ ...d, cf_profile: series }));
       setPvState({ msg: L(`✓ ${r.source} · cf medio ${num(mean, 3)} (se guarda al crear/guardar)`, `✓ ${r.source} · mean cf ${num(mean, 3)} (saved on create/save)`) });
     } catch (e) {
       setPvState({ error: e.message });

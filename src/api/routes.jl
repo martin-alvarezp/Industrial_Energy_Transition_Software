@@ -331,8 +331,11 @@ handle_list_sites(::HTTP.Request, data_dir::AbstractString) = _json_response(200
                        isfile(joinpath(data_dir, n, "technologies.csv"))]),))
 
 """
-PUT /sites/{name} — persiste un twin: body `{site_payload, layout?}`. Escribe
-los 8 CSV del contrato + layout.geojson; si el sitio no tenía
+PUT /sites/{name} — persiste un twin: body `{site_payload, layout?, hourly?}`.
+Escribe los 8 CSV del contrato + layout.geojson; `hourly` (series crudas de
+8760/35 040 valores y la plantilla elegida, bloque 1.2) va a hourly.json — el
+motor no lo lee, optimiza sobre la plantilla ya armada; `hourly: null` lo
+borra y sin la clave se conserva el anterior. Si el sitio no tenía
 scenario_config.yaml, copia el del demo como base. `demo` es el dataset de
 referencia y no se puede sobrescribir.
 """
@@ -351,7 +354,21 @@ function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
     validate_site(site)   # ValidationError → 400: no se persiste un sitio roto
 
     dir = joinpath(data_dir, name)
+    # series crudas: se validan ANTES de escribir nada (un 400 no deja el
+    # sitio guardado a medias)
+    h = get(body, :hourly, nothing)
+    if h !== nothing
+        h isa JSON3.Object || throw(ApiError(400, "hourly debe ser un objeto {series, template}"))
+        for (k, v) in pairs(get(h, :series, (;)))
+            v isa AbstractVector && length(v) in (8760, 35040) ||
+                throw(ApiError(400, "hourly.series.$k: se esperaban 8760 o 35040 valores"))
+        end
+    end
     save_site(dir, site; layout = get(body, :layout, nothing))
+    if haskey(body, :hourly)
+        hp = joinpath(dir, "hourly.json")
+        h === nothing ? (isfile(hp) && rm(hp)) : open(io -> JSON3.write(io, h), hp, "w")
+    end
     yaml = joinpath(dir, "scenario_config.yaml")
     if !isfile(yaml)
         base = joinpath(data_dir, "demo", "scenario_config.yaml")
@@ -386,7 +403,8 @@ end
 """
 GET /sites/{name} — el sitio completo como JSON (esquema §7 del digital twin):
 el estado inicial de la tab Sitio. Incluye `layout` (GeoJSON de
-layout.geojson) si existe; null si no.
+layout.geojson) y `hourly` (hourly.json: series crudas y plantilla) si
+existen; null si no.
 """
 function handle_get_site(req::HTTP.Request, data_dir::AbstractString)
     name = get(HTTP.getparams(req), "name", "")
@@ -394,9 +412,11 @@ function handle_get_site(req::HTTP.Request, data_dir::AbstractString)
     site, _ = load_and_validate(dir)
     layout_path = joinpath(dir, "layout.geojson")
     layout = isfile(layout_path) ? JSON3.read(read(layout_path, String)) : nothing
+    hourly_path = joinpath(dir, "hourly.json")
+    hourly = isfile(hourly_path) ? JSON3.read(read(hourly_path, String)) : nothing
     return _json_response(200,
         merge(site_json(site), (site_version = site_version(site),
-                                layout = layout)))
+                                layout = layout, hourly = hourly)))
 end
 
 """

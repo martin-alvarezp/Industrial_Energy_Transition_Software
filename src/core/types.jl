@@ -315,7 +315,23 @@ struct ScenarioConfig
     currency::String                         # etiqueta de moneda ("USD"): el motor
                                              # es agnóstico — todos los montos en la
                                              # MISMA moneda; esto solo rotula la UI
+    # ── modo despacho (benchmark 1.3) ──
+    dispatch_only::Bool                      # infraestructura FIJA: nada invierte,
+                                             # nada se retira; solo se optimiza la
+                                             # operación (LP, sin binarias)
+    fixed_capacity::Dict{Symbol,Float64}     # MW por tecnología que reemplazan a la
+                                             # capacidad existente en modo despacho
+                                             # (p. ej. las de una corrida previa)
 end
+
+# retro-compatibilidad: 25 campos → sin modo despacho
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
+               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
+               cur::AbstractString) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
+                   false, Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =

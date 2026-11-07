@@ -343,6 +343,13 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # modo despacho (1.3): capacidades fijas de tecnologías que existen, ≥ 0
+    for (id, mw) in cfg.fixed_capacity
+        id in all_tech_ids(site) || push!(problems,
+            "scenario_config.yaml: fixed_capacity nombra '$id', que no es una tecnología del sitio")
+        mw >= 0 || push!(problems,
+            "scenario_config.yaml: fixed_capacity[$id] debe ser ≥ 0 (valor: $mw)")
+    end
     cfg.depreciation_years >= 0 || push!(problems,
         "scenario_config.yaml: depreciation_years debe ser ≥ 0 (0 = vida útil)")
     isempty(strip(cfg.currency)) && push!(problems,

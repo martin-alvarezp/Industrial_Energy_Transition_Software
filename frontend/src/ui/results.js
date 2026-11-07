@@ -266,10 +266,16 @@ function inPorts(t) {
  * cada componente (+), red, descarga (+) / carga (−) de almacenamiento,
  * consumo de conversores (−) y la demanda del año.
  */
-export function operationDay(result, siteJson, year, season, carrier, labels) {
+export function operationDay(result, siteJson, year, season, carrier, labels, day = 0) {
   const T = siteJson?.technologies ?? [];
-  const steps = (siteJson?.timesteps ?? []).map((s, i) => ({ ...s, idx: i + 1 }))
-    .filter((s) => s.season === season).sort((a, b) => a.hour - b.hour);
+  let steps = (siteJson?.timesteps ?? []).map((s, i) => ({ ...s, idx: i + 1 }))
+    .filter((s) => s.season === season).sort((a, b) => a.hour - b.hour || a.idx - b.idx);
+  // período largo (año completo, bloque 1.2): se grafica UN día, el `day`
+  // (0-based) del período; `hour` es entonces el orden en el período
+  const long = steps.length > 48;
+  const dt = steps[0]?.duration_hours ?? 1;
+  const days = long ? Math.ceil((steps.length * dt) / 24) : 1;
+  if (long) steps = steps.filter((s) => Math.floor((s.hour * dt) / 24) === day);
   const idx = new Map();
   for (const r of result?.dispatch ?? []) if (r.year === year) idx.set(`${r.tech}|${r.flow}|${r.step}`, r.value);
   const get = (tech, flow, step) => idx.get(`${tech}|${flow}|${step}`) ?? 0;
@@ -277,7 +283,7 @@ export function operationDay(result, siteJson, year, season, carrier, labels) {
   const growth = (1 + (result?.assumptions?.scenario_config?.demand_growth ?? 0)) ** (year - 1);
   const keys = new Set();
   const rows = steps.map((s) => {
-    const o = { hour: s.hour };
+    const o = { hour: long ? +(((s.hour * dt) % 24).toFixed(2)) : s.hour };
     const put = (k, v) => { if (Math.abs(v) > 1e-9) { o[k] = (o[k] ?? 0) + v; keys.add(k); } };
     for (const t of T) {
       if (t.type === "storage") {
@@ -298,7 +304,7 @@ export function operationDay(result, siteJson, year, season, carrier, labels) {
     o.__demand = d != null ? d * growth : null;
     return o;
   });
-  return { rows, keys: [...keys] };
+  return { rows, keys: [...keys], days };
 }
 
 /** Por componente, en un año: capacidad, compra, energía y horas equivalentes. */

@@ -18,7 +18,7 @@ import { locationOf, polygonCentroid } from "../layout.js";
 import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
 import { polygonAreaM2 } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
-import { aggregate8760 } from "../../lib/series.js";
+import { setRawSeries } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
 
 
@@ -92,9 +92,11 @@ function WeatherTab({ loc, techs }) {
     } catch (e) { setState({ error: e.message }); }
   };
   const apply = () => {
-    const agg = aggregate8760(state.cf, twin.siteJson.timesteps, center[0] < 0 ? "south" : "north");
-    patchSite((sj) => ({ ...sj, generation_profiles: {
-      ...sj.generation_profiles, ...Object.fromEntries(solar.map((x) => [x.tech_id, agg.series])) } }),
+    // el perfil horario se GUARDA como crudo (bloque 1.2) y se expresa en la
+    // plantilla vigente; cambiar la resolución lo re-agrega
+    const hemisphere = center[0] < 0 ? "south" : "north";
+    patchSite((sj) => solar.reduce(
+      (acc, x) => setRawSeries(acc, `generation_profiles.${x.tech_id}`, state.cf, { hemisphere }), sj),
       `Perfil solar PVGIS aplicado a ${solar.map((x) => x.name).join(", ")}`);
     setState((s) => ({ ...s, applied: solar.map((x) => x.name).join(", ") }));
   };

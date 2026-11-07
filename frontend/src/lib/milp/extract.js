@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups } from "./lp.js";
+import { timeGroups, fixInfrastructure } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -19,7 +19,8 @@ const fnv12 = (s) => {
  * extractPayload(site, cfg, sol, constant, scenario) → results_payload
  * `sol` es el resultado de highs.solve(lp); `constant` viene de buildLP.
  */
-export function extractPayload(site, cfg, sol, constant, scenario = "web") {
+export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
+  const { site, cfg } = fixInfrastructure(site0, cfg0);   // modo despacho (1.3)
   const N = cfg.horizon_years;
   const ts = site.timesteps;
   const S = ts.length;

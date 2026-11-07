@@ -31,9 +31,12 @@ export function parseHourlyCsv(text) {
     }
     values.push(v);
   }
-  if (values.length !== 8760) {
-    const leap = values.length === 8784 ? " (año bisiesto: quita el 29 de febrero)" : "";
-    return { error: `se esperaban 8760 valores horarios, hay ${values.length}${leap}` };
+  // 8760 horarios o 35 040 de cuarto de hora (bloque 1.2: el crudo se guarda
+  // y la plantilla elegida decide cómo se agrega)
+  if (values.length !== 8760 && values.length !== 35040) {
+    const leap = values.length === 8784 || values.length === 35136
+      ? " (año bisiesto: quita el 29 de febrero)" : "";
+    return { error: `se esperaban 8760 valores horarios o 35040 de 15 min, hay ${values.length}${leap}` };
   }
   return { values };
 }

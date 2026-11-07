@@ -18,6 +18,9 @@ variables según SPEC §5, restricciones §7-8 y objetivo VAN según SPEC §6.
 """
 function build_model(site::Site, cfg::ScenarioConfig;
                      optimizer = HiGHS.Optimizer, silent::Bool = true)
+    # modo despacho (1.3): infraestructura fija — el modelo y los resultados
+    # usan el sitio transformado
+    cfg.dispatch_only && ((site, cfg) = fix_infrastructure(site, cfg))
     sets = build_sets(site, cfg)
     params = build_parameters(site, cfg)
 

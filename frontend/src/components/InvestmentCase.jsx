@@ -18,6 +18,18 @@ export default function InvestmentCase({ plan, bau, referenceLabel }) {
   const baseYear = plan?.meta?.base_year ?? 0;
   const discount = plan.cost_breakdown.map((r) => r.discount_factor);
 
+  // corrida única (despacho o "solo esta corrida", 1.3): el caso base no se
+  // calculó — decirlo, no confundirlo con un BAU infactible
+  if (bau == null) {
+    return (
+      <div className="narrative">
+        <h3>{L("Caso de inversión", "Investment case")}</h3>
+        <p>{L("Esta corrida no se comparó contra el caso base “no invertir” (se corrió sola, sin análisis completo).",
+              "This run was not compared against the “do not invest” base case (it ran alone, without the full analysis).")}</p>
+      </div>
+    );
+  }
+
   // BAU infactible = no invertir no es viable: mensaje ejecutivo, no un hueco
   if (!bau?.meta?.feasible) {
     return (

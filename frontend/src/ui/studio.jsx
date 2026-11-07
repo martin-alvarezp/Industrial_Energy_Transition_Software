@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef,
 import { DEFAULT_CONFIG } from "../lib/mockEngine.js";
 import {
   compute, fetchSite, apiAvailable, listSites, saveSite as apiSaveSite,
-  deleteSite as apiDeleteSite, listRuns, fetchRun, saveRun, deleteRun,
+  deleteSite as apiDeleteSite, listRuns, fetchRun, saveRun, deleteRun, enginePayload,
 } from "../lib/api.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite } from "../lib/twin.js";
@@ -216,7 +216,9 @@ export function StudioProvider({ children }) {
     const cfg = cfgOverride ?? draft;
     const apiSite = twin.saved ? siteName : "demo";
     const payload = !twin.saved || twin.dirty ? twin.siteJson : null;
-    const snapshot = payload ?? twin.siteJson ?? null;
+    // la foto del sitio que acompaña a la corrida no lleva las series crudas
+    // (bloque 1.2): pesan MB y la corrida ya tiene su plantilla expresada
+    const snapshot = enginePayload(payload ?? twin.siteJson ?? null);
     setRunning(true); setRunError(null);
     try {
       const d = await compute(cfg, payload, apiSite, snapshot);

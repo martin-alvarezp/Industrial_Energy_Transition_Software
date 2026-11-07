@@ -70,4 +70,10 @@ include(joinpath(root, "test", "helpers_temporal.jl"))
 s8, c8 = monthly_tariff_site()
 dump("tarifa_mensual_n1", s8, c8)
 dump("demo_cuartos_n2", refine_steps(site0, 4), with_config(cfg0; horizon_years = 2))
+# 9 · modo despacho (1.3): infraestructura fija con capacidades impuestas
+# (fixed_capacity) — sin candidatos ni binarias. El sitio va SIN transformar:
+# el motor web debe aplicar fixInfrastructure igual que Julia.
+dump("demo_despacho_n1", site0,
+     with_config(cfg0; horizon_years = 1, dispatch_only = true,
+                 fixed_capacity = Dict(:pv => 20.0, :battery => 5.0, :heat_pump => 8.0)))
 println("fixtures dorados en ", out)

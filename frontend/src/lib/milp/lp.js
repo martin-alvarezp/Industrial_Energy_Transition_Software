@@ -95,7 +95,34 @@ export function timeGroups(ts) {
   return { seasonSteps, billingSteps };
 }
 
-export function buildLP(site, cfg) {
+/**
+ * Modo despacho (benchmark 1.3) — espejo de src/model/dispatch_mode.jl:
+ * capacidades fijas (existente o cfg.fixed_capacity), nada invertible, sin
+ * retiro, y config sin compras forzadas, renovación ni presupuesto.
+ * Idempotente; sin dispatch_only devuelve lo mismo.
+ */
+export function fixInfrastructure(site, cfg) {
+  if (!cfg?.dispatch_only) return { site, cfg };
+  const fc = cfg.fixed_capacity ?? {};
+  const technologies = site.technologies.map((t) => ({
+    ...t,
+    existing_capacity: fc[t.tech_id] ?? t.existing_capacity,
+    max_new_capacity: 0,
+    investable: false,
+    // conexión: la venta conserva su capacidad (ausente = la de compra
+    // ORIGINAL), como en Julia, aunque se fije la de compra
+    ...(t.type === "source"
+      ? { export_capacity: t.export_capacity ?? t.existing_capacity }
+      : { remaining_life: 0 }),
+  }));
+  return {
+    site: { ...site, technologies },
+    cfg: { ...cfg, forced_builds: [], renew_existing: false, capex_budget: null },
+  };
+}
+
+export function buildLP(site0, cfg0) {
+  const { site, cfg } = fixInfrastructure(site0, cfg0);
   const ts = site.timesteps;
   const S = ts.length, N = cfg.horizon_years;
   const w = ts.map((t) => t.weight_hours);

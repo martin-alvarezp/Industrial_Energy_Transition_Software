@@ -107,6 +107,14 @@ export function CostsPage() {
   );
 }
 
+// 0-based día del año → "15 ene" (año no bisiesto, como la plantilla)
+const DAY_MONTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function dayLabel(d) {
+  let m = 0;
+  while (m < 11 && d >= DAY_MONTHS[m]) { d -= DAY_MONTHS[m]; m++; }
+  return new Date(2026, m, d + 1).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
 export function OperationPage() {
   const { t } = useI18n();
   const { result, siteJson } = useBundle();
@@ -116,13 +124,14 @@ export function OperationPage() {
   const [year, setYear] = useState(1);
   const [season, setSeason] = useState(null);
   const [carrier, setCarrier] = useState(null);
+  const [dayIdx, setDayIdx] = useState(0);   // período largo (año completo): qué día
   const s = season ?? seasons[0];
   const c = carrier ?? carriers[0]?.carrier_id;
   const day = useMemo(() => (result && siteJson && c
     ? operationDay(result, siteJson, Math.min(year, N), s, c, {
         import: t("res.import"), export: t("res.export"), charge: t("res.charge"),
-        discharge: t("res.discharge"), consumption: t("res.consumption") })
-    : null), [result, siteJson, year, s, c, N, t]);
+        discharge: t("res.discharge"), consumption: t("res.consumption") }, dayIdx)
+    : null), [result, siteJson, year, s, c, N, t, dayIdx]);
   const cname = carriers.find((x) => x.carrier_id === c)?.name ?? c;
   // la demanda NO ocupa slot: es la línea punteada en color de texto
   const dayColors = useMemo(() => {
@@ -147,6 +156,15 @@ export function OperationPage() {
                   aria-label={t("res.carrier")}>
             {carriers.map((x) => <option key={x.carrier_id} value={x.carrier_id}>{x.name}</option>)}
           </select>
+          {day.days > 1 && (
+            <label className="ui-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {t("res.day")}
+              <input type="number" className="ui-select" style={{ width: 90 }} min={1} max={day.days}
+                     value={dayIdx + 1} aria-label={t("res.day")}
+                     onChange={(e) => setDayIdx(Math.min(day.days, Math.max(1, +e.target.value || 1)) - 1)} />
+              <span>{dayLabel(dayIdx)}</span>
+            </label>
+          )}
         </div>
         <ChartPanel title={t("res.dayTitle", { c: cname })}>
           <ChartLegend keys={[...day.keys, t("res.demand")]} colors={dayColors} />
@@ -294,10 +312,10 @@ export function DashboardsPage() {
           <h3 className="ui-card-title">{t("res.emissions")}</h3>
           <EmissionsChart emissions={result.emissions} baseYear={result.meta.base_year ?? 0} />
         </section>
-        <section className="ui-card ui-card-pad">
+        {data.pareto?.length > 0 && <section className="ui-card ui-card-pad">
           <h3 className="ui-card-title">{t("res.pareto")}</h3>
           <ParetoChart pareto={data.pareto} />
-        </section>
+        </section>}
         <section className="ui-card ui-card-pad dash-wide">
           <h3 className="ui-card-title">{t("res.tornado")}</h3>
           <Tornado config={applied} siteJson={siteJson} siteName={appliedSite} baselineNpv={k?.npv} source={data.source} />

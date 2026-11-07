@@ -576,3 +576,12 @@ select { cursor: pointer; }
   .mdoc { border-radius: 0; max-height: 100%; height: 100%; }
   .mdoc-body { padding: 4px 16px 24px; }
 }
+
+/* resolución temporal (bloque 1.2): tres opciones como tarjetas de radio */
+.template-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 8px; }
+.template-option { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline;
+  border: 1px solid var(--ui-border-2, var(--hairline)); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.template-option.on { border-color: var(--ui-primary, currentColor); background: var(--ui-primary-wash, transparent); }
+.template-option input { grid-row: span 3; margin: 2px 0 0; }
+.template-name { font-weight: 620; font-size: 13px; }
+.template-desc { grid-column: 2; font-size: 12px; color: var(--muted); line-height: 1.4; }

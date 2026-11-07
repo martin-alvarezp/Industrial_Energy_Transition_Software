@@ -30,6 +30,7 @@ include("model/sets.jl")
 include("model/parameters.jl")
 include("model/variables.jl")
 include("model/objective.jl")
+include("model/dispatch_mode.jl")
 include("model/build_model.jl")
 
 # constraints: restricciones físicas y climáticas (SPEC §7-8)
@@ -76,7 +77,7 @@ export load_site, load_scenario_config, load_and_validate,
        emissions_cap_net, n_steps, all_tech_ids, find_tech, calendar_year,
        site_json, site_from_json, site_version, default_timesteps, save_site
 # model API
-export build_model, build_sets, build_parameters, add_variables!, set_objective!,
+export fix_infrastructure, build_model, build_sets, build_parameters, add_variables!, set_objective!,
        expected_variable_count, IETOModel, ModelSets, ModelParameters
 # constraints
 export add_constraints!, add_carrier_balance!,

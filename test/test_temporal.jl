@@ -87,3 +87,36 @@ end
     vm, _ = _npv(mo, cfg)
     @test vm ≈ base rtol = 1e-7
 end
+
+@testset "temporal: PUT/GET /sites persiste las series crudas (hourly.json)" begin
+    tmp_data = mktempdir()
+    cp(DEMO_DIR, joinpath(tmp_data, "demo"))
+    server = start_server(; port = 8182, data_dir = tmp_data, verbose = false)
+    api = "http://127.0.0.1:8182"
+    req(method, path, body = nothing) = HTTP.request(method, api * path;
+        headers = ["Content-Type" => "application/json"],
+        body = body === nothing ? "" : JSON3.write(body), status_exception = false)
+    try
+        p = JSON3.read(req("GET", "/sites/demo").body)
+        @test p.hourly === nothing                       # el demo no trae crudas
+        site_payload = Dict(k => v for (k, v) in pairs(p) if k ∉ (:hourly, :layout, :site_version))
+        hourly = (series = Dict("demands.electricity" => fill(12.5, 8760)),
+                  template = (method = "seasonal", hemisphere = "south"))
+        @test req("PUT", "/sites/crudas", (site_payload = site_payload, hourly = hourly)).status == 200
+        @test isfile(joinpath(tmp_data, "crudas", "hourly.json"))
+        g = JSON3.read(req("GET", "/sites/crudas").body)
+        @test length(g.hourly.series[Symbol("demands.electricity")]) == 8760
+        @test g.hourly.template.method == "seasonal"
+        # sin la clave `hourly` se conserva; con `hourly: null` se borra
+        @test req("PUT", "/sites/crudas", (site_payload = site_payload,)).status == 200
+        @test isfile(joinpath(tmp_data, "crudas", "hourly.json"))
+        @test req("PUT", "/sites/crudas", Dict("site_payload" => site_payload, "hourly" => nothing)).status == 200
+        @test !isfile(joinpath(tmp_data, "crudas", "hourly.json"))
+        # largo inválido: 400 y no se escribe
+        bad = (series = Dict("demands.electricity" => fill(1.0, 100)),)
+        @test req("PUT", "/sites/crudas", (site_payload = site_payload, hourly = bad)).status == 400
+        @test !isfile(joinpath(tmp_data, "crudas", "hourly.json"))
+    finally
+        close(server)
+    end
+end

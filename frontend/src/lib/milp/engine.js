@@ -37,8 +37,14 @@ export function toConfig(cfg) {
     currency: cfg.currency ?? "USD",
     carbon_price_by_year: [],
     grid_ef_by_year: [],
+    dispatch_only: !!cfg.dispatch_only,
+    fixed_capacity: cfg.fixed_capacity ?? {},
   };
 }
+
+/** ¿Solo la corrida pedida? Modo despacho, o "solo esta corrida" del modal:
+ *  sin Pareto ni escenarios de comparación (16 MILPs → 1). */
+export const isSingleRun = (uiCfg) => !!uiCfg.dispatch_only || uiCfg.analysis === "single";
 
 /** Espejo de apply_scenario (run_scenario.jl). */
 export function applyScenario(site, cfg, scenario) {
@@ -112,6 +118,9 @@ export function computeViaWeb(highs, uiCfg, siteJson, onProgress = () => {}) {
                         "high_gas", "high_carbon"];
   onProgress(`optimizando escenario ${main}…`);
   const result = runScenarioWeb(highs, siteJson, cfg, main);
+  if (isSingleRun(uiCfg))
+    return { source: "web", result, reference: null, referenceLabel: null, bau: null,
+             bauFeasible: null, pareto: null, batch: [], single: true };
   const compare = compareNames.map((sc, i) => {
     onProgress(`comparando escenarios (${i + 1}/${compareNames.length})…`);
     return runScenarioWeb(highs, siteJson, cfg, sc);

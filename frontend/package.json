@@ -11,7 +11,10 @@
     "verify:flows": "node scripts/verify_flows.mjs",
     "verify:topology": "node scripts/verify_topology_web.mjs",
     "verify:wasm": "node scripts/verify_wasm.mjs",
-    "verify:ui": "node scripts/verify_ui.mjs"
+    "verify:ui": "node scripts/verify_ui.mjs",
+    "verify:templates": "node scripts/verify_templates.mjs",
+    "verify:resolution": "node scripts/verify_resolution.mjs",
+    "verify:dispatch": "node scripts/verify_dispatch.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",
