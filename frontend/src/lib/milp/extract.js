@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -188,7 +188,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         energy = 0, dcharges = 0, exportRev = 0, s1 = 0, s2 = 0,
         resGen = 0, demTot = 0;
     for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) +
-                                    fixedCapex(cfg, t.tech_id) * Math.round(V(`b_${sane(t.tech_id)}_${y}`));   // R1
+                                    fixedCapex(cfg, t.tech_id) * Math.round(V(`b_${sane(t.tech_id)}_${y}`)) +   // R1
+                                    (ownEnergy(cfg, t) ? energyCapex(cfg, t, y) * V(`eng_${sane(t.tech_id)}_${y}`) : 0);  // R2
     // medidas de eficiencia (5.3)
     for (const em of EMs) {
       const on = V(`em_${sane(em.id)}_${y}`);
@@ -296,7 +297,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           ? cfg.depreciation_years : tc.lifetime_years;
         for (const yp of years)
           if (yp <= y && y < yp + Dp)
-            dep += tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yp) * 1000 * V(`nc_${sane(tc.tech_id)}_${yp}`) / Dp;
+            dep += (tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yp) * 1000 * V(`nc_${sane(tc.tech_id)}_${yp}`) +
+                    (ownEnergy(cfg, tc) ? energyCapex(cfg, tc, yp) * V(`eng_${sane(tc.tech_id)}_${yp}`) : 0)) / Dp;
       }
       tax = -tr * (fixed + varop + energy + dcharges + carbon + offCost - exportRev)
             - tr * dep;
@@ -317,7 +319,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   if (cfg.salvage_value) {
     let salv = 0;
     for (const t of cands) for (const y of years)
-      salv += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) *
+      salv += (t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) +
+               (ownEnergy(cfg, t) ? energyCapex(cfg, t, y) * V(`eng_${sane(t.tech_id)}_${y}`) : 0)) *
               Math.max(0, (t.lifetime_years - (N - y + 1)) / t.lifetime_years);
     if (salv > 1e-9) {
       const last = cost_breakdown[N - 1];
@@ -340,6 +343,17 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       res_share_final: res_share[N - 1],
     },
     investments, capacity, cost_breakdown, emissions, res_share, dispatch, efficiency_measures,
+    // energía de cada almacenamiento por año (R2), espejo de Results.storage_energy
+    storage_energy: stors.flatMap((st) => years.map((y) => {
+      const en = years.filter((yp) => yp <= y && y - yp < st.lifetime_years);
+      const nw = !st.investable ? 0 : ownEnergy(cfg, st) ? V(`eng_${sane(st.tech_id)}_${y}`)
+        : (st.storage_hours ?? 4) * V(`nc_${sane(st.tech_id)}_${y}`);
+      const f = 1 - (st.degradation ?? 0), hrs = st.storage_hours ?? 4;
+      const mwh = hrs * (alive(st, y) ? st.existing_capacity : 0) * Math.pow(f, y - 1) +
+        (st.investable ? en.reduce((a, yp) => a + Math.pow(f, y - yp) *
+          (ownEnergy(cfg, st) ? V(`eng_${sane(st.tech_id)}_${yp}`) : hrs * V(`nc_${sane(st.tech_id)}_${yp}`)), 0) : 0);
+      return { tech: st.tech_id, year: y, mwh, new_mwh: nw };
+    })),
     infeasibility: null,
   };
 }

@@ -534,7 +534,16 @@ struct ScenarioConfig
                                              # base_year) en que se PUEDE construir
     min_build::Dict{Symbol,Float64}          # MW mínimos de cada compra
     fixed_capex::Dict{Symbol,Float64}        # USD por compra, además del USD/kW
+    # ── almacenamiento con energía propia (benchmark R2) ──
+    storage_energy_capex::Dict{Symbol,Float64}   # USD/kWh: con valor, la ENERGÍA de las
+                                             # compras se dimensiona aparte de la potencia
+                                             # (el capex_per_kw queda como el de potencia)
+    storage_energy_max::Dict{Symbol,Float64} # MWh máximos por compra (default:
+                                             # max_new_capacity · horas)
 end
+
+# retro-compatibilidad: 49 campos → sin almacenamiento con energía propia
+ScenarioConfig(a::Vararg{Any,49}) = ScenarioConfig(a..., Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 46 campos → sin reglas de construcción por tecnología
 ScenarioConfig(a::Vararg{Any,46}) =

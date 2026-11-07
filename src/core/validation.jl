@@ -542,6 +542,17 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         cand(t) || push!(problems, "fixed_capex: '$t' no es una tecnología candidata a inversión")
         c >= 0 || push!(problems, "fixed_capex['$t']: debe ser ≥ 0")
     end
+    # R2: energía propia solo en almacenamientos candidatos
+    for (f, d) in (("storage_energy_capex", cfg.storage_energy_capex), ("storage_energy_max", cfg.storage_energy_max)),
+        (t, c) in d
+        (haskey(site.storages, t) && site.storages[t].investable) || push!(problems,
+            "$f: '$t' no es un almacenamiento candidato a inversión")
+        c >= 0 || push!(problems, "$f['$t']: debe ser ≥ 0")
+    end
+    for t in keys(cfg.storage_energy_max)
+        haskey(cfg.storage_energy_capex, t) || push!(problems,
+            "storage_energy_max['$t']: falta su storage_energy_capex (USD/kWh)")
+    end
     for (t, yr, mw) in cfg.forced_builds
         y = rel_year(cfg, yr)
         build_allowed(cfg, t, y) || push!(problems,

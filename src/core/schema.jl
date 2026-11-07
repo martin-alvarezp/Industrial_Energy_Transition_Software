@@ -375,5 +375,7 @@ function load_scenario_config(path::AbstractString)
                                  for (k, v) in get(d, "build_window", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "min_build", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_capex", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_capex", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_max", Dict())),
     )
 end

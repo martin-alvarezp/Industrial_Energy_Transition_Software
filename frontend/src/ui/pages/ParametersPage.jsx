@@ -394,6 +394,32 @@ export default function ParametersPage({ route }) {
               </div>
             );
           })}
+          {/* almacenamiento con energía propia (R2): USD/kWh y tope de MWh por compra */}
+          {candidates.some((c) => c.type === "storage") && <>
+            <h4 className="par-sub">{t("par.ownEnergy")}</h4>
+            <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.ownEnergyHint")}</p>
+            {candidates.filter((c) => c.type === "storage").map((c) => {
+              const setKey = (field, val) => {
+                const { [c.tech_id]: _, ...rest } = draft[field] ?? {};
+                set({ [field]: val == null ? rest : { ...rest, [c.tech_id]: val } });
+              };
+              return (
+                <div key={c.tech_id} className="par-forced par-capex" data-ownenergy={c.tech_id}>
+                  <span className="par-capex-name">{c.name}</span>
+                  <input className="ui-input par-capex-num" type="number" min={0} step={1}
+                         value={draft.storage_energy_capex?.[c.tech_id] ?? ""} aria-label={t("par.energyCapex")}
+                         data-energy-capex={c.tech_id}
+                         onChange={(e) => setKey("storage_energy_capex", e.target.value === "" ? null : Math.max(0, +e.target.value))} />
+                  <span className="unit">{t("par.energyCapex")}</span>
+                  <input className="ui-input par-capex-num" type="number" min={0} step={1}
+                         value={draft.storage_energy_max?.[c.tech_id] ?? ""} aria-label={t("par.energyMax")}
+                         data-energy-max={c.tech_id}
+                         onChange={(e) => setKey("storage_energy_max", e.target.value === "" ? null : Math.max(0, +e.target.value))} />
+                  <span className="unit">{t("par.energyMax")}</span>
+                </div>
+              );
+            })}
+          </>}
           {/* reglas de construcción (R1): ventana de años, tamaño mínimo y CAPEX fijo */}
           <h4 className="par-sub">{t("par.buildRules")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.buildRulesHint")}</p>

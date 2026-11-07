@@ -24,6 +24,7 @@ struct Results
     res_share::Vector{Float64}          # participación renovable por año
     diagnostics::Vector{String}         # causas de infactibilidad (vacío si factible)
     measures::DataFrame                 # medidas de eficiencia compradas (5.3): id, name, year
+    storage_energy::DataFrame           # almacenamiento (R2): tech, year, mwh, new_mwh
 end
 
 """
@@ -53,7 +54,21 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         res_share_by_year(im),
         String[],
         _measures_bought(im),
+        _storage_energy(im),
     )
+end
+
+# energía de cada almacenamiento por año (R2): disponible y comprada
+function _storage_energy(im::IETOModel)
+    df = DataFrame(tech = Symbol[], year = Int[], mwh = Float64[], new_mwh = Float64[])
+    E = JuMP.axes(im.model[:new_energy], 1)
+    for st in im.sets.storages, y in im.sets.years
+        nw = st in E ? JuMP.value(im.model[:new_energy][st, y]) :
+             st in im.sets.candidates ?
+             im.site.storages[st].hours_ratio * JuMP.value(im.model[:new_capacity][st, y]) : 0.0
+        push!(df, (st, y, JuMP.value(im.model[:storage_energy][st, y]), nw))
+    end
+    return df
 end
 
 # medidas de eficiencia compradas (5.3): id, nombre, año (relativo), reducción
@@ -75,7 +90,7 @@ function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
                             status::Symbol, diagnostics::Vector{String} = String[])
     return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
-                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame())
+                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame(), DataFrame())
 end
 
 _fmt(x; d = 1) = isnan(x) ? "—" : string(round(x; digits = d))

@@ -30,6 +30,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             new_capacity[t, y] for t in sets.candidates; init = 0.0) +
         sum(get(cfg.fixed_capex, t, 0.0) * m[:build][t, y]   # CAPEX fijo por compra (R1)
             for t in sets.candidates; init = 0.0) +
+        m[:energy_capex_y][y] +   # energía propia del almacenamiento (R2)
         params.renewal_capex[y] +  # CAPEX del año de compra (3.1)
         m[:measures_capex_y][y])   # medidas de eficiencia (5.3)
 
@@ -116,11 +117,15 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     t = cfg.tax_rate
     depy(tech) = cfg.depreciation_years > 0 ? cfg.depreciation_years :
                  params.costs[tech].lifetime_years
+    E = JuMP.axes(m[:new_energy], 1)
+    ecap(tc, yp) = cfg.storage_energy_capex[tc] * KW_PER_MW * capex_factor(cfg, tc, yp) * m[:new_energy][tc, yp]
     JuMP.@expression(m, dep_y[y in years],
         t == 0 ? JuMP.AffExpr(0.0) :
         sum(params.costs[tc].capex_per_kw * capex_factor(cfg, tc, yp) * KW_PER_MW / depy(tc) *
             new_capacity[tc, yp]
             for tc in sets.candidates, yp in years
+            if yp <= y < yp + depy(tc); init = 0.0) +
+        sum(ecap(tc, yp) / depy(tc) for tc in E, yp in years
             if yp <= y < yp + depy(tc); init = 0.0))
     JuMP.@expression(m, tax_y[y in years],
         t == 0 ? JuMP.AffExpr(0.0) :
@@ -133,7 +138,10 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # descontado al año N. Sin él, invertir tarde en activos longevos queda
     # castigado por el truncamiento del VAN (la vida útil sería solo traza).
     N = last(years)
+    sfrac(t, y) = cfg.salvage_value ?
+        max(0.0, (params.costs[t].lifetime_years - (N - y + 1)) / params.costs[t].lifetime_years) : 0.0
     JuMP.@expression(m, salvage_credit,
+        sum(ecap(tc, y) * sfrac(tc, y) for tc in E, y in years; init = 0.0) +
         sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW *
             new_capacity[t, y] *
             (cfg.salvage_value ?

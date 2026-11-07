@@ -61,6 +61,12 @@ export function investmentByYear(result, siteJson, labels) {
       items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, c.tech, cb.year) +
         (result?.assumptions?.scenario_config?.fixed_capex?.[c.tech] ?? 0);   // CAPEX fijo por compra (R1)
     }
+    // energía propia del almacenamiento (R2): su USD/kWh va al ítem del equipo
+    const ecap = result?.assumptions?.scenario_config?.storage_energy_capex ?? {};
+    for (const e of (result.storage_energy ?? []).filter((r) => r.year === cb.year && r.new_mwh > 1e-6 && ecap[r.tech] != null)) {
+      const t = T[e.tech];
+      if (t) items[t.name ?? e.tech] = (items[t.name ?? e.tech] ?? 0) + e.new_mwh * KW * ecap[e.tech] * capexFactor(result, e.tech, cb.year);
+    }
     // medidas de eficiencia (5.3): su CAPEX por nombre (si no, sería "Renovaciones")
     for (const em of result.efficiency_measures ?? [])
       if (em.year === cb.year) items[em.name] = (items[em.name] ?? 0) + em.capex;

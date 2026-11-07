@@ -18,7 +18,8 @@ Registra `m[:soc_balance]`, `m[:soc_capacity]`, `m[:charge_capacity]` y
 `available_capacity · hours_ratio` (MWh por MW de potencia).
 """
 function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
-                                  params::ModelParameters, site::Site)
+                                  params::ModelParameters, site::Site,
+                                  cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
     soc, charge, discharge = m[:soc], m[:charge], m[:discharge]
     available_capacity = m[:available_capacity]
@@ -56,17 +57,28 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     # año 1, cada compra desde su año)
     hours = Dict(st => S[st].hours_ratio for st in sets.storages)
     newcap = m[:new_capacity]
+    # energía propia (R2): las compras de estos almacenamientos agregan MWh
+    # (new_energy) independientes de los MW; el existente sigue siendo MW × horas
+    E = [st for st in sets.storages if st in sets.candidates && haskey(cfg.storage_energy_capex, st)]
+    JuMP.@variable(m, new_energy[E, years] >= 0)
+    emax(st) = get(cfg.storage_energy_max, st, params.max_new_capacity[st] * hours[st])
+    m[:new_energy_link] = JuMP.@constraint(m, [st in E, y in years],
+        new_energy[st, y] <= emax(st) * m[:build][st, y])
+    JuMP.@expression(m, energy_capex_y[y in years],
+        sum(cfg.storage_energy_capex[st] * KW_PER_MW * capex_factor(cfg, st, y) * new_energy[st, y]
+            for st in E; init = 0.0))
     function energy(st, y)
         d = S[st].phys.degradation
-        d == 0 && return hours[st] * available_capacity[st, y]
+        d == 0 && !(st in E) && return hours[st] * available_capacity[st, y]
         f = 1 - d
         rl = get(params.remaining_life, st, 0)
         alive = rl == 0 || params.renew_existing || y <= rl
         ex = alive ? params.existing_capacity[st] * f^(y - 1) : 0.0
+        bought(yp) = st in E ? new_energy[st, yp] : hours[st] * newcap[st, yp]
         nw = st in sets.candidates ?
-             sum(newcap[st, yp] * f^(y - yp) for yp in 1:y
+             sum(bought(yp) * f^(y - yp) for yp in 1:y
                  if y - yp < params.costs[st].lifetime_years; init = 0.0) : 0.0
-        return hours[st] * (ex + nw)
+        return hours[st] * ex + nw
     end
     JuMP.@expression(m, storage_energy[st in sets.storages, y in years], energy(st, y))
     lo = Dict(st => soc_band(S[st])[1] for st in sets.storages)

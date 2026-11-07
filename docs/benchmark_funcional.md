@@ -434,3 +434,19 @@ días tipo (k por año) con cronología.
   Goldens `reglas_minimo_fijo_n1`, `reglas_ventana_n2` y `demo_reglas_n5`
   (verify:wasm 40/40). Parámetros → "Reglas de construcción"; el resumen suma
   el fijo al ítem de la compra. E2E en `verify:capex`. Julia 1604/1604.
+- ✅ **R2 · Almacenamiento con energía propia** (2026-11-07).
+  `storage_energy_capex` (USD/kWh) por almacenamiento candidato: con valor, sus
+  compras agregan MWh (`new_energy`) independientes de los MW, y el CAPEX del
+  catálogo queda como el de potencia. `storage_energy_max` topa los MWh de
+  cada compra (por defecto, potencia máxima × horas). Lo existente sigue siendo
+  MW × horas. La energía comprada entra a `capex_y`, a la depreciación, al
+  valor residual y al presupuesto, y envejece con la degradación por cohorte.
+  Resultados: `storage_energy` (MWh disponibles y comprados por año).
+  Oráculo (test_storage_energy.jl, batería de arbitraje 50/150 USD/MWh): a 20
+  USD/kWh y 30 USD/kW cada MWh movido por día cuesta 22 500 USD y ahorra 36 500,
+  así que llena el tope: 80 MWh con 80/12 MW (o 120 MWh y 10 MW con tope de 200,
+  donde manda la demanda de día); a 40 USD/kWh no compra. Goldens
+  `energia_propia_n1`, `energia_propia_tope_n3` (con valor residual e
+  impuestos) y `demo_energia_propia_n5` (verify:wasm 43/43). Parámetros →
+  "Almacenamiento: energía propia"; el resumen asigna el CAPEX de energía al
+  equipo. E2E en `verify:storage` (compra 51 MWh con tope de 60). Julia 1624/1624.

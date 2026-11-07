@@ -110,6 +110,44 @@ const inBand = soc.every((d) => d.value >= 0.05 * capY[d.year] - 1e-4 && d.value
 step("el SOC despachado queda dentro de la banda 5-95 %", soc.length > 0 && inBand,
      `${soc.length} pasos con batería`);
 
+// 2b · energía propia (R2): la batería a 30 USD/kWh con tope de 60 MWh por compra
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-energy-capex="battery"]', { timeout: 30000 });
+step("Parámetros muestra la energía propia del almacenamiento", true);
+for (const [sel, v] of [['[data-energy-capex="battery"]', "30"], ['[data-energy-max="battery"]', "60"]]) {
+  await p.evaluate((sel, v) => {
+    const inp = document.querySelector(sel);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, sel, v);
+  await sleep(150);
+}
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Energia");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pe = null;
+for (let t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Energia");
+  if (r) { pe = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const se = pe?.result?.assumptions?.scenario_config ?? {};
+const eb = (pe?.result?.storage_energy ?? []).filter((r) => r.tech === "battery");
+step("corrida con energía propia resuelta por el motor real",
+     pe?.source === "api" && pe.result.meta.feasible && se.storage_energy_capex?.battery === 30 &&
+     se.storage_energy_max?.battery === 60 && eb.length > 0, JSON.stringify(eb.slice(0, 3)));
+step("cada compra de energía respeta su tope de 60 MWh", eb.some((r) => r.new_mwh > 1e-6) && eb.every((r) => r.new_mwh <= 60 + 1e-6),
+     JSON.stringify(eb.filter((r) => r.new_mwh > 0)));
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await waitText("Costo de inversión", 30000);
+step("el resumen asigna el CAPEX de energía a la batería (sin Renovaciones)", !(await text()).includes("Renovaciones"));
+
 // 3 · validación de cliente
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/components?c=battery`, { waitUntil: "networkidle2" });
 await p.waitForSelector('.drawer [data-testid="storage-physics"]', { timeout: 30000 });

@@ -200,4 +200,13 @@ dump("reglas_minimo_fijo_n1", s25, with_config(c25; min_build = Dict(:hp => 10.0
 dump("reglas_ventana_n2", s25, with_config(c25; horizon_years = 2, build_window = Dict(:hp => [2, 2])))
 dump("demo_reglas_n5", site0, with_config(cfg0; horizon_years = 5, build_window = Dict(:heat_pump => [2, 4]),
      min_build = Dict(:heat_pump => 1.5), fixed_capex = Dict(:heat_pump => 250000.0, :battery => 400000.0)))
+# 24 · almacenamiento con energía propia (R2): la batería de arbitraje con
+# 20 USD/kWh (tope de energía por defecto y de 200 MWh, con valor residual e
+# impuestos), y el demo con la batería a 250 USD/kWh
+s26, c26 = st_site(IDEAL_STORAGE; existing = 0.0, investable = true, max_new = 20.0)
+dump("energia_propia_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat => 20.0)))
+dump("energia_propia_tope_n3", s26, with_config(c26; horizon_years = 3, storage_energy_capex = Dict(:bat => 20.0),
+     storage_energy_max = Dict(:bat => 200.0), salvage_value = true, tax_rate = 0.25))
+dump("demo_energia_propia_n5", site0, with_config(cfg0; horizon_years = 5,
+     storage_energy_capex = Dict(:battery => 250.0), storage_energy_max = Dict(:battery => 60.0)))
 println("fixtures dorados en ", out)

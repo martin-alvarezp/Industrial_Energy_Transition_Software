@@ -44,6 +44,8 @@ export function toConfig(cfg) {
     build_window: cfg.build_window ?? {},                // R1: reglas de construcción
     min_build: cfg.min_build ?? {},
     fixed_capex: cfg.fixed_capex ?? {},
+    storage_energy_capex: cfg.storage_energy_capex ?? {},   // R2: energía propia
+    storage_energy_max: cfg.storage_energy_max ?? {},
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

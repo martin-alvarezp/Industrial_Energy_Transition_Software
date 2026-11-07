@@ -116,6 +116,8 @@ export function toOverrides(cfg) {
     build_window: cfg.build_window ?? {},                // R1: reglas de construcción
     min_build: cfg.min_build ?? {},
     fixed_capex: cfg.fixed_capex ?? {},
+    storage_energy_capex: cfg.storage_energy_capex ?? {},   // R2: energía propia
+    storage_energy_max: cfg.storage_energy_max ?? {},
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

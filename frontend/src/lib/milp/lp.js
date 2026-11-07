@@ -140,6 +140,12 @@ export const buildAllowed = (cfg, tech, y) => {
   return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
 };
 export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+/** Almacenamiento con energía propia (R2): sus compras agregan MWh (eng_) aparte de los MW. */
+export const ownEnergy = (cfg, t) => t.type === "storage" && !!t.investable &&
+  cfg.storage_energy_capex?.[t.tech_id] != null;
+/** USD por MWh de energía propia comprada en el año y (R2). */
+export const energyCapex = (cfg, t, y) => (cfg.storage_energy_capex?.[t.tech_id] ?? 0) * 1000 *
+  capexFactor(cfg, t.tech_id, y);
 
 export const capexFactor = (cfg, tech, y) => {
   const v = cfg?.capex_by_year?.[tech];
@@ -306,6 +312,18 @@ export function buildLP(site0, cfg0) {
       : [],
   });
 
+  // energía (MWh) del almacenamiento en el año y (espejo de storage.jl):
+  // existente × horas + compras vivas (nc × horas, o ne con energía propia),
+  // con degradación por cohorte
+  const energyOf = (st, y) => {
+    const a = avail(st, y), hrs = st.storage_hours ?? 4, f = 1 - (st.degradation ?? 0);
+    const k = hrs * a.k * Math.pow(f, y - 1);
+    const vars = ownEnergy(cfg, st)
+      ? a.ncs.map((v) => { const yp = +v.split("_").pop(); return [`eng_${sane(st.tech_id)}_${yp}`, Math.pow(f, y - yp)]; })
+      : a.ncs.map((v) => [v, hrs * Math.pow(f, y - +v.split("_").pop())]);
+    return { k, vars };
+  };
+
   // renovación determinística (constante del objetivo)
   const renewalCapex = years.map(() => 0);
   if (cfg.renew_existing)
@@ -359,6 +377,16 @@ export function buildLP(site0, cfg0) {
       add(`nc_${sane(tc.tech_id)}_${y}`, D * cpk * 1000);
       if (fixedCapex(cfg, tc.tech_id) > 0)                               // CAPEX fijo por compra (R1)
         add(`b_${sane(tc.tech_id)}_${y}`, D * fixedCapex(cfg, tc.tech_id));
+      if (ownEnergy(cfg, tc)) {                                          // energía propia (R2)
+        const ne = `eng_${sane(tc.tech_id)}_${y}`, ec = energyCapex(cfg, tc, y);
+        add(ne, D * ec);
+        if (cfg.salvage_value)
+          add(ne, -disc[N - 1] * ec * Math.max(0, (tc.lifetime_years - (N - y + 1)) / tc.lifetime_years));
+        if (t > 0) {
+          const Dp = depYears(tc);
+          for (let yy = y; yy <= Math.min(y + Dp - 1, N); yy++) add(ne, -disc[yy - 1] * t * ec / Dp);
+        }
+      }
       if (cfg.salvage_value) {
         const frac = Math.max(0, (tc.lifetime_years - (N - y + 1)) / tc.lifetime_years);
         add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * cpk * 1000 * frac);
@@ -630,9 +658,7 @@ export function buildLP(site0, cfg0) {
       }
       // energía (MWh) del año: horas × potencia, con degradación por cohorte
       const a = avail(st, y);
-      const f = 1 - (st.degradation ?? 0);
-      const eK = hrs * a.k * Math.pow(f, y - 1);
-      const eV = a.ncs.map((v) => [v, hrs * Math.pow(f, y - +v.split("_").pop())]);
+      const { k: eK, vars: eV } = energyOf(st, y);
       for (const s of steps) {
         const tS = { [`soc_${id}_${s}_${y}`]: 1 };
         for (const [v, c] of eV) inc(tS, v, -hi * c);
@@ -682,8 +708,9 @@ export function buildLP(site0, cfg0) {
           row(`asd_${id}_${s}_${y}`, c2, "<=", a.k);
           row(`asoc1_${id}_${s}_${y}`, { [`soc_${id}_${s}_${y}`]: 1, [up]: -1 }, ">=", 0);
           const c3 = { [`soc_${id}_${s}_${y}`]: 1, [dn]: 1 };
-          for (const n of a.ncs) inc(c3, n, -hrs * Math.pow(f, y - +n.split("_").pop()));
-          row(`asoc2_${id}_${s}_${y}`, c3, "<=", hrs * a.k * Math.pow(f, y - 1));
+          const en = energyOf(t, y);
+          for (const [n, c] of en.vars) inc(c3, n, -c);
+          row(`asoc2_${id}_${s}_${y}`, c3, "<=", en.k);
         } else {
           const fa = av ? av[s - 1] : 1, d = `d_${id}_${s}_${y}`;
           const rowHi = (v) => {             // re·d ± v ≤ re·disp·cap
@@ -896,6 +923,9 @@ export function buildLP(site0, cfg0) {
           { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);
       // reglas de construcción (R1): ventana y tamaño mínimo
       if (!buildAllowed(cfg, t.tech_id, y)) row(`bwin_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
+      if (ownEnergy(cfg, t))                                             // R2: eng ≤ Emáx·b
+        row(`elink_${id}_${y}`, { [`eng_${id}_${y}`]: 1,
+          [`b_${id}_${y}`]: -(cfg.storage_energy_max?.[t.tech_id] ?? t.max_new_capacity * (t.storage_hours ?? 4)) }, "<=", 0);
       const mb = cfg.min_build?.[t.tech_id] ?? 0;
       if (mb > 0) row(`bmin_${id}_${y}`, { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -mb }, ">=", 0);
     }
@@ -973,6 +1003,7 @@ export function buildLP(site0, cfg0) {
       {
         inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
         if (fixedCapex(cfg, tc.tech_id) > 0) inc(tb, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
+        if (ownEnergy(cfg, tc)) inc(tb, `eng_${sane(tc.tech_id)}_${y}`, energyCapex(cfg, tc, y));
       }
     row("budget", tb, "<=",
         cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
@@ -984,6 +1015,7 @@ export function buildLP(site0, cfg0) {
       for (const tc of cands) {
         inc(ta, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
         if (fixedCapex(cfg, tc.tech_id) > 0) inc(ta, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
+        if (ownEnergy(cfg, tc)) inc(ta, `eng_${sane(tc.tech_id)}_${y}`, energyCapex(cfg, tc, y));
       }
       row(`budget_y${y}`, ta, "<=", cfg.capex_budget_annual - renewalCapex[y - 1]);
     }
