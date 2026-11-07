@@ -1,0 +1,33 @@
+# Sitio de prueba de la operación detallada (benchmark 2.1): un día de 24 h
+# con calor servido por una bomba de calor CON límites de operación y una
+# caldera eléctrica sin límites. Lo usan test_operation.jl y los fixtures
+# dorados del motor web (build/export_golden.jl).
+
+const TCOP = TechCosts(0.0, 0.0, 0.0, 30)
+
+function op_site(ops::OperationLimits; demand = [fill(3.0, 12); fill(8.0, 12)],
+                 hp_existing = 10.0, hp_investable = false, hp_max_new = 0.0)
+    steps = [TimeStep(i, "day", i - 1, 365.0) for i in 1:24]
+    carriers = Dict(:electricity => Carrier(:electricity, "Electricity", "MWh", :energy),
+                    :heat => Carrier(:heat, "Heat", "MWh", :heat))
+    sources = Dict(:grid_import => Source(:grid_import, "Red", :electricity, 100.0, 0.0,
+                                          false, TCOP, 0.0, 0.0))
+    hp = Converter(:hp, "HP", [ConverterPort(:electricity, 1 / 3)], [ConverterPort(:heat, 1.0)],
+                   hp_existing, hp_max_new, hp_investable, TCOP, Float64[], 0, ops)
+    eb = Converter(:eb, "EB", [ConverterPort(:electricity, 1.0)], [ConverterPort(:heat, 1.0)],
+                   20.0, 0.0, false, TCOP, Float64[], 0, NO_OPERATION_LIMITS)
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy, fill(100.0, 24),
+                               Inf, Inf, nothing, :grid_import))
+    site = Site("op", steps, carriers, sources, Dict(:hp => hp, :eb => eb),
+                Dict{Symbol,Generator}(), Dict{Symbol,Storage}(),
+                Dict(:heat => Demand(:heat, demand)), Dict{Symbol,PriceSeries}(),
+                [EmissionFactor(:electricity, :scope2, 0.0)], mkts)
+    cfg = ScenarioConfig(1, 0.0, Dict{Symbol,Float64}(), 0.0, 1e9, 1e9, 1e9,
+                         false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    # los oráculos son del compromiso EXACTO (en planificación el default
+    # :auto sería lineal)
+    return site, with_config(cfg; commitment = :integer)
+end
+
+ops(; kw...) = OperationLimits((Float64(get(kw, k, 0.0)) for k in fieldnames(OperationLimits))...)
+

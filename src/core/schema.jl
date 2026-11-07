@@ -144,17 +144,18 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
             ports_raw = hasproperty(r, :ports) && !ismissing(r.ports) &&
                         !isempty(strip(String(r.ports))) ? r.ports : nothing
             avail = get(profiles, id, Float64[])
+            ops = operation_limits(k -> hasproperty(r, k) && !ismissing(r[k]) ? r[k] : nothing)
             if ports_raw !== nothing
                 pj = JSON3.read(String(ports_raw))
                 mk(list) = [ConverterPort(_sym(p.carrier), Float64(p.ratio)) for p in list]
                 converters[id] = Converter(id, name, mk(pj.inputs), mk(pj.outputs),
                                            Float64(ex), Float64(mx), inv, c,
-                                           avail, rlife)
+                                           avail, rlife, ops)
             else
                 base = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
                 converters[id] = Converter(id, name, base.inputs, base.outputs,
                                            Float64(ex), Float64(mx), inv, c,
-                                           avail, rlife)
+                                           avail, rlife, ops)
             end
         elseif kind == :generator
             prof = get(profiles, id, Float64[])
@@ -333,5 +334,6 @@ function load_scenario_config(path::AbstractString)
         Bool(get(d, "dispatch_only", false)),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v)
                              for (k, v) in get(d, "fixed_capacity", Dict())),
+        Symbol(get(d, "commitment", "auto")),
     )
 end

@@ -84,6 +84,15 @@ function validate_site(site::Site)
         _check_nonneg!(problems, s.max_new_capacity, "technologies.csv[$(s.id)].max_new_capacity")
     end
     for c in values(site.converters)
+        # operación detallada (2.1)
+        for k in OPERATION_KEYS
+            _check_nonneg!(problems, getfield(c.ops, k), "technologies.csv[$(c.id)].$k")
+        end
+        c.ops.min_load <= 1 || push!(problems,
+            "technologies.csv[$(c.id)].min_load: es una fracción de la carga (≤ 1), valor $(c.ops.min_load)")
+        has_commitment(c.ops) && c.investable && c.ops.unit_size == 0 && push!(problems,
+            "technologies.csv[$(c.id)]: con carga mínima, arranques o tiempos mínimos un equipo " *
+            "invertible necesita unit_size (MW por unidad) — sin él no se sabe cuántas unidades hay")
         isempty(c.inputs) && push!(problems,
             "technologies.csv[$(c.id)]: un conversor necesita al menos un carrier de entrada")
         isempty(c.outputs) && push!(problems,
@@ -343,6 +352,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    cfg.commitment in (:auto, :integer, :linear) || push!(problems,
+        "scenario_config.yaml: commitment debe ser auto, integer o linear (valor: $(cfg.commitment))")
     # modo despacho (1.3): capacidades fijas de tecnologías que existen, ≥ 0
     for (id, mw) in cfg.fixed_capacity
         id in all_tech_ids(site) || push!(problems,

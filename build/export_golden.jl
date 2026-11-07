@@ -76,4 +76,26 @@ dump("demo_cuartos_n2", refine_steps(site0, 4), with_config(cfg0; horizon_years 
 dump("demo_despacho_n1", site0,
      with_config(cfg0; horizon_years = 1, dispatch_only = true,
                  fixed_capacity = Dict(:pv => 20.0, :battery => 5.0, :heat_pump => 8.0)))
+# 10 · operación detallada (2.1): unit commitment entero (General en el LP),
+# arranques con costo, mínimos de encendido/apagado, rampas con holgura de
+# arranque, y unidades de un parque invertible. Sin estos casos las enteras
+# del motor web no tendrían ancla.
+include(joinpath(root, "test", "helpers_operation.jl"))
+valle = [fill(8.0, 10); 3.0; 3.0; fill(8.0, 12)]
+s10, c10 = op_site(ops(min_load = 0.4, startup_cost = 500, min_up_hours = 3,
+                       min_down_hours = 2); demand = valle)
+dump("op_compromiso_n1", s10, c10)
+s11, c11 = op_site(ops(min_load = 0.4, startup_cost = 300, ramp_rate = 0.15))
+dump("op_rampa_n1", s11, c11)
+s12, c12 = op_site(ops(unit_size = 2.5, min_load = 0.6, startup_cost = 100, ramp_rate = 0.5);
+                   hp_existing = 0.0, hp_investable = true, hp_max_new = 10.0)
+dump("op_unidades_n1", s12, c12)
+# 11 · el demo con operación detallada en PLANIFICACIÓN: commitment :auto ⇒
+# lineal (relajación rápida). Caldera a gas existente con mínimo 30 %,
+# arranque y 4 h mínimas; bomba de calor invertible en unidades de 2,5 MW.
+convs = copy(site0.converters)
+convs[:gas_boiler] = IETO._with(convs[:gas_boiler]; ops = OperationLimits(0.0, 0.3, 1000.0, 4.0, 0.0, 0.0))
+convs[:heat_pump] = IETO._with(convs[:heat_pump]; ops = OperationLimits(2.5, 0.3, 200.0, 0.0, 0.0, 0.5))
+dump("demo_operacion_lineal_n3", IETO._with(site0; converters = convs),
+     with_config(cfg0; horizon_years = 3))
 println("fixtures dorados en ", out)

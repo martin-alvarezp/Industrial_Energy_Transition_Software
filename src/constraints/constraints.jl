@@ -15,6 +15,8 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_capacity_constraints!(m, sets, params)
     add_generator_constraints!(m, sets, params)
     add_storage_constraints!(m, sets, params, site)
+    add_operation_constraints!(m, sets, params, site;   # 2.1 (opt-in por equipo)
+                               integer = commitment_integer(cfg))
     add_grid_constraints!(m, sets, params)
     add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)

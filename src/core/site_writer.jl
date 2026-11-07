@@ -37,7 +37,7 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
 
     techs = sj.technologies
     optnum(t, k) = something(get(t, k, nothing), missing)
-    CSV.write(joinpath(dir, "technologies.csv"), DataFrame(
+    techdf = DataFrame(
         tech_id = [t.tech_id for t in techs],
         name = [t.name for t in techs],
         type = [t.type for t in techs],
@@ -54,7 +54,12 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         export_capacity = [optnum(t, :export_capacity) for t in techs],
         fixed_charge = [optnum(t, :fixed_charge) for t in techs],
         # vida útil restante del existente (M5): clave opcional
-        remaining_life = [optnum(t, :remaining_life) for t in techs]))
+        remaining_life = [optnum(t, :remaining_life) for t in techs])
+    # operación detallada (2.1): columnas solo si algún equipo las usa
+    for k in OPERATION_KEYS
+        any(t -> haskey(t, k), techs) && (techdf[!, k] = [optnum(t, k) for t in techs])
+    end
+    CSV.write(joinpath(dir, "technologies.csv"), techdf)
 
     CSV.write(joinpath(dir, "technology_costs.csv"), DataFrame(
         tech_id = [t.tech_id for t in techs],

@@ -499,6 +499,14 @@ export function techProblems(tech, siteJson) {
     p.push("las capacidades deben ser ≥ 0");
   if (tech.investable && !(tech.max_new_capacity > 0))
     p.push("una candidata a inversión necesita capacidad máxima nueva > 0");
+  // operación detallada (2.1): espejo de validation.jl
+  if (tech.type === "converter") {
+    const commit = (tech.min_load ?? 0) > 0 || (tech.startup_cost ?? 0) > 0 ||
+      (tech.min_up_hours ?? 0) > 0 || (tech.min_down_hours ?? 0) > 0;
+    if ((tech.min_load ?? 0) > 1) p.push("la carga mínima no puede superar el 100 %");
+    if (commit && tech.investable && !((tech.unit_size ?? 0) > 0))
+      p.push("con carga mínima, arranques o tiempos mínimos, un equipo invertible necesita tamaño de unidad");
+  }
 
   const factorMissing = (carrier) => {
     const cat = siteJson.carriers.find((c) => c.carrier_id === carrier)?.category;

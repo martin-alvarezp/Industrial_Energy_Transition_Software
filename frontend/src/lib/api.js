@@ -103,6 +103,7 @@ export function toOverrides(cfg) {
     // modo despacho (1.3): infraestructura fija
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
+    commitment: cfg.commitment ?? "auto",   // 2.1: entero en despacho, lineal en planificación
     // parámetros del escenario que la vista Parámetros permite sobrescribir;
     // sólo viajan si el usuario los cambió (si no, rige el YAML del sitio)
     ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => cfg[k] != null).map((k) => [k, cfg[k]])),

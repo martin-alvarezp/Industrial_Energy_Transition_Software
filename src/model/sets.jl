@@ -18,6 +18,8 @@ struct ModelSets
     sell_markets::Vector{Symbol}
     nodes::Vector{Symbol}            # nodos del sitio (M14; :main si no hay topología)
     arc_flows::Vector{Symbol}        # claves de arc_flow (un enlace dirigido por vector)
+    commit_techs::Vector{Symbol}     # conversores con unit commitment (2.1): on/su/sd
+    ramp_techs::Vector{Symbol}       # conversores con límite de rampa (2.1)
 end
 
 """
@@ -62,5 +64,10 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         [id for id in mkt_ids if mkts[id].direction == :sell],
         site_nodes(site),
         [l[1] for l in arc_links(site)],
+        # operación detallada (2.1): con tamaño de unidad conocido (propio, o
+        # el parque fijo como una sola unidad)
+        [id for id in convs if has_commitment(site.converters[id].ops) &&
+             unit_mw(site.converters[id]) > 0],
+        [id for id in convs if has_ramp(site.converters[id].ops)],
     )
 end

@@ -155,6 +155,42 @@ struct ConverterPort
 end
 
 """
+Límites de operación detallada de un conversor (benchmark 2.1). Todos en 0
+⇒ operación ideal (lineal, sin binarias): el comportamiento de siempre.
+
+- `unit_size`: MW de cada unidad. El parque son `capacidad / unit_size`
+  unidades que se encienden enteras (con capacidad fija puede omitirse: una
+  sola unidad del tamaño del parque).
+- `min_load`: fracción mínima de carga de una unidad encendida (0.25 ⇒ un
+  quemador no opera entre 0 y 25 %: apagado o ≥ 25 %).
+- `startup_cost`: USD por arranque de una unidad (combustible de
+  precalentamiento, purga, desgaste).
+- `min_up_hours` / `min_down_hours`: tiempo mínimo encendida / apagada
+  después de arrancar / parar (anti-ciclado).
+- `ramp_rate`: fracción de la capacidad que puede subir o bajar por hora
+  (0 = sin límite).
+"""
+struct OperationLimits
+    unit_size::Float64
+    min_load::Float64
+    startup_cost::Float64
+    min_up_hours::Float64
+    min_down_hours::Float64
+    ramp_rate::Float64
+end
+const NO_OPERATION_LIMITS = OperationLimits(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+"Claves de los límites de operación en CSV/JSON (mismo orden que el struct)."
+const OPERATION_KEYS = fieldnames(OperationLimits)
+"OperationLimits desde un lector `get(k) -> número | nothing` (CSV o JSON)."
+operation_limits(get) = OperationLimits(
+    (Float64(something(get(k), 0.0)) for k in OPERATION_KEYS)...)
+"¿Requiere unit commitment (variables enteras de encendido)?"
+has_commitment(o::OperationLimits) =
+    o.min_load > 0 || o.startup_cost > 0 || o.min_up_hours > 0 || o.min_down_hours > 0
+has_ramp(o::OperationLimits) = o.ramp_rate > 0
+is_default(o::OperationLimits) = o == NO_OPERATION_LIMITS
+
+"""
 Conversor multi-puerto (v0.3, roadmap M1). `outputs[1]` es la salida de
 REFERENCIA: la capacidad (MW) y el dispatch se miden ahí; cada puerto escala
 linealmente con el dispatch (input_j = ratio_j·d, output_k = ratio_k·d).
@@ -177,7 +213,22 @@ struct Converter
                                   # vacío = disponible siempre
     remaining_life::Int           # años de vida útil del activo EXISTENTE (M5);
                                   # 0 = no retira en el horizonte (legacy)
+    ops::OperationLimits          # operación detallada (2.1); default: ideal
 end
+
+# retro-compatibilidad: 10 campos (pre-2.1) → operación ideal
+Converter(id::Symbol, name::String, ins::Vector{ConverterPort},
+          outs::Vector{ConverterPort}, ex::Float64, mx::Float64, inv::Bool,
+          costs::TechCosts, avail::Vector{Float64}, rl::Integer) =
+    Converter(id, name, ins, outs, ex, mx, inv, costs, avail, Int(rl), NO_OPERATION_LIMITS)
+
+"""
+MW por unidad del unit commitment (2.1): `unit_size` si está, o el parque
+existente como UNA unidad si el equipo no es invertible; 0 si no se puede
+saber (invertible sin unit_size — la validación lo reporta).
+"""
+unit_mw(c::Converter) = c.ops.unit_size > 0 ? c.ops.unit_size :
+                        (c.investable ? 0.0 : c.existing_capacity)
 
 # retro-compatibilidad: 9 campos (M4) y 8 campos (pre-M4)
 Converter(id::Symbol, name::AbstractString, ins::Vector{ConverterPort},
@@ -322,7 +373,23 @@ struct ScenarioConfig
     fixed_capacity::Dict{Symbol,Float64}     # MW por tecnología que reemplazan a la
                                              # capacidad existente en modo despacho
                                              # (p. ej. las de una corrida previa)
+    # ── operación detallada (benchmark 2.1) ──
+    commitment::Symbol                       # :auto (entero en despacho, lineal en
+                                             # planificación) | :integer | :linear
 end
+
+"¿El unit commitment va con variables enteras? (:auto ⇒ solo en despacho)"
+commitment_integer(cfg::ScenarioConfig) =
+    cfg.commitment == :integer || (cfg.commitment == :auto && cfg.dispatch_only)
+
+# retro-compatibilidad: 27 campos → commitment automático
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
+               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
+               cur::AbstractString, dso::Bool, fc::AbstractDict) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
+                   dso, Dict{Symbol,Float64}(fc), :auto)
 
 # retro-compatibilidad: 25 campos → sin modo despacho
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -331,7 +398,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                cur::AbstractString) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   false, Dict{Symbol,Float64}())
+                   false, Dict{Symbol,Float64}(), :auto)
 
 # retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =

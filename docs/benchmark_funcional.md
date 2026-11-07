@@ -182,3 +182,24 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   demo para un sistema real. Ahora las optimizaciones esperan hasta 15 min y,
   si la API está arriba y falla, el error se muestra en lugar de cambiar de
   motor en silencio.
+- ✅ **2.1 · Operación detallada: unit commitment, carga mínima, arranques,
+  tiempos mínimos y rampas** (2026-11-07). Parámetros opcionales por
+  conversor (`OperationLimits`): `unit_size`, `min_load`, `startup_cost`,
+  `min_up_hours`, `min_down_hours` y `ramp_rate`. En 0 el equipo opera como
+  siempre. Con límites, el parque son capacidad ÷ unidad unidades: entero de
+  encendidas y de arranques por paso, con mínimos cíclicos dentro de cada
+  período y rampas escaladas por Δt (más la holgura de arrancar o parar una
+  unidad a su mínimo). El costo de arranque se multiplica por las veces que el
+  paso ocurre en el año y entra al OPEX variable. **Commitment** `auto |
+  integer | linear`: entero (exacto) en despacho y lineal (relajación) en
+  planificación. En el demo a 10 años, la versión entera tarda ~3 min
+  (3840 enteras) y la lineal 1,4 s (VAN 76,10 contra 77,43 la exacta y
+  75,91 sin límites); en el modal se elige "aproximada" o "exacta".
+  Oráculos (test_operation.jl, 48 tests): apagada o ≥ mínimo con balance
+  exacto, 1 arranque por día × 365, "no arranca si cuesta más de lo que
+  ahorra", mínimos de encendido y apagado, rampas, unidades enteras de un
+  parque invertible. Espejo web con sección `General` (enteras); goldens
+  `op_compromiso_n1`, `op_rampa_n1`, `op_unidades_n1` y
+  `demo_operacion_lineal_n3`, verify:wasm 15/15. La tolerancia del payload
+  pasa a 1e-5 porque highs-js entrega las variables con ~6 cifras
+  (el VAN se compara con precisión completa). E2E `verify:operation`.

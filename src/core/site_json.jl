@@ -121,11 +121,18 @@ function site_json(site::Site)
                    merge(nt, (remaining_life = x.remaining_life,))
     for id in keys(site.converters)
         c = site.converters[id]
-        push!(techs, rlife(_tech_nt(id, c.name, "converter", primary_input(c),
-                              primary_output(c), c.existing_capacity,
-                              c.max_new_capacity, reference_efficiency(c),
-                              c.investable, c.costs, nothing;
-                              ports = _converter_ports(c)), c))
+        nt = rlife(_tech_nt(id, c.name, "converter", primary_input(c),
+                            primary_output(c), c.existing_capacity,
+                            c.max_new_capacity, reference_efficiency(c),
+                            c.investable, c.costs, nothing;
+                            ports = _converter_ports(c)), c)
+        # operación detallada (2.1): solo los límites activos — la huella de
+        # los sitios sin ellos no cambia
+        for k in OPERATION_KEYS
+            v = getfield(c.ops, k)
+            v == 0.0 || (nt = merge(nt, NamedTuple{(k,)}((v,))))
+        end
+        push!(techs, nt)
     end
     for id in keys(site.generators)
         g = site.generators[id]
@@ -319,6 +326,9 @@ function site_from_json(obj; default_name::AbstractString = "twin")
             fch = fch_raw === nothing ? 0.0 : _twin_num(fch_raw, :fixed_charge, ctx)
             sources[id] = Source(id, tname, outc, ex, mx, inv, costs, expc, fch)
         elseif kind == :converter
+            ops = operation_limits(k -> begin
+                v = _twin_get(t, k); v === nothing ? nothing : _twin_num(v, k, ctx)
+            end)
             ports = _twin_get(t, :ports)
             if ports !== nothing   # multi-puerto (CHP, electrolizador, …)
                 mkports(list, side) = [ConverterPort(
@@ -329,12 +339,12 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 outs = mkports(_twin_req(ports, :outputs, "$ctx.ports"), "outputs")
                 converters[id] = Converter(id, tname, ins, outs, Float64(ex),
                                            Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]), rlife)
+                                           get(profiles, id, Float64[]), rlife, ops)
             else
                 base = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
                 converters[id] = Converter(id, tname, base.inputs, base.outputs,
                                            Float64(ex), Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]), rlife)
+                                           get(profiles, id, Float64[]), rlife, ops)
             end
         elseif kind == :generator
             haskey(profiles, id) || throw(SchemaError(

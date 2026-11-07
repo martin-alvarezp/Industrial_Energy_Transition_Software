@@ -121,6 +121,34 @@ export function fixInfrastructure(site, cfg) {
   };
 }
 
+// ── operación detallada (2.1) — espejo de src/constraints/operation.jl ──
+/** ¿Unit commitment? (carga mínima, arranques o tiempos mínimos) */
+export const hasCommitment = (t) =>
+  (t.min_load ?? 0) > 0 || (t.startup_cost ?? 0) > 0 ||
+  (t.min_up_hours ?? 0) > 0 || (t.min_down_hours ?? 0) > 0;
+/** MW por unidad: unit_size, o el parque fijo como una unidad; 0 = indefinido */
+/** ¿Commitment entero? auto ⇒ solo en despacho (espejo de commitment_integer) */
+export const commitmentInteger = (cfg) => cfg?.commitment === "integer" ||
+  ((cfg?.commitment ?? "auto") === "auto" && !!cfg?.dispatch_only);
+export const unitMw = (t) => (t.unit_size ?? 0) > 0 ? t.unit_size
+  : (t.investable ? 0 : t.existing_capacity);
+/** Pasos de cada período en orden cronológico (hour, step_id) y prev cíclico. */
+export function chronology(ts) {
+  const { seasonSteps } = timeGroups(ts);
+  const periods = seasonSteps.map((g) => [...g].sort(
+    (a, b) => ts[a - 1].hour - ts[b - 1].hour || a - b));
+  const prev = {}, plen = {};
+  for (const p of periods) p.forEach((s, k) => {
+    prev[s] = p[k === 0 ? p.length - 1 : k - 1]; plen[s] = p.length;
+  });
+  return { prev, plen };
+}
+const lookback = (prev, s, n, plen) => {
+  const out = [s]; let x = s;
+  for (let i = 2; i <= Math.min(n, plen); i++) { x = prev[x]; out.push(x); }
+  return out;
+};
+
 export function buildLP(site0, cfg0) {
   const { site, cfg } = fixInfrastructure(site0, cfg0);
   const ts = site.timesteps;
@@ -140,6 +168,8 @@ export function buildLP(site0, cfg0) {
     !cfg.allowed_techs?.length || cfg.allowed_techs.includes(id);
   const techs = site.technologies.filter((t) => allowed(t.tech_id));
   const convs = techs.filter((t) => t.type === "converter");
+  const commitIds = new Set(convs.filter((t) => hasCommitment(t) && unitMw(t) > 0)
+    .map((t) => t.tech_id));
   const gens = techs.filter((t) => t.type === "generator");
   const stors = techs.filter((t) => t.type === "storage");
   const sources = site.technologies.filter((t) => t.type === "source");
@@ -164,6 +194,10 @@ export function buildLP(site0, cfg0) {
   const { seasonSteps, billingSteps } = timeGroups(ts);
   const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
   const dt = ts.map((t) => t.duration_hours ?? 1);
+  // operación detallada (2.1): equipos con unit commitment (tamaño conocido)
+  const integers = [];
+  const commitInt = commitmentInteger(cfg);
+  const { prev, plen } = chronology(ts);
 
   // combustible con mercado de compra ⇒ lleva balance
   const fuelWithMkt = new Set(buys.map((m) => m.carrier_id)
@@ -255,6 +289,10 @@ export function buildLP(site0, cfg0) {
       if (tc.type !== "storage")
         for (const s of steps)
           addDed(`d_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
+      // arranques (2.1): costo × veces que el paso ocurre en el año (w/Δt)
+      if (commitIds.has(tc.tech_id) && (tc.startup_cost ?? 0) > 0)
+        for (const s of steps)
+          addDed(`su_${sane(tc.tech_id)}_${s}_${y}`, D * tc.startup_cost * w[s - 1] / dt[s - 1]);
       else
         for (const s of steps)
           addDed(`dc_${sane(tc.tech_id)}_${s}_${y}`, D * tc.variable_opex * w[s - 1]);
@@ -381,6 +419,55 @@ export function buildLP(site0, cfg0) {
         const t = { [`d_${sane(cv.tech_id)}_${s}_${y}`]: 1 };
         for (const v of a.ncs) inc(t, v, -f);
         row(`cap_${sane(cv.tech_id)}_${s}_${y}`, t, "<=", f * a.k);
+      }
+    }
+    // operación detallada (2.1): unit commitment entero y rampas
+    for (const cv of convs) {
+      const id = sane(cv.tech_id);
+      const uc = commitIds.has(cv.tech_id), rr = cv.ramp_rate ?? 0;
+      if (!uc && !(rr > 0)) continue;
+      const a = avail(cv, y);
+      const u = unitMw(cv), ml = cv.min_load ?? 0;
+      const av = site.generation_profiles?.[cv.tech_id];
+      const nst = (h, s) => (h > 0 ? Math.ceil(h / dt[s - 1] - 1e-9) : 0);
+      for (const s of steps) {
+        const d = `d_${id}_${s}_${y}`, dp = `d_${id}_${prev[s]}_${y}`;
+        if (uc) {
+          const on = `on_${id}_${s}_${y}`, onp = `on_${id}_${prev[s]}_${y}`;
+          const su = `su_${id}_${s}_${y}`, sd = `sd_${id}_${s}_${y}`;
+          if (commitInt) integers.push(on, su);
+          const tU = { [on]: 1 }; for (const v of a.ncs) inc(tU, v, -1 / u);
+          row(`ucap_${id}_${s}_${y}`, tU, "<=", a.k / u);
+          row(`cmax_${id}_${s}_${y}`, { [d]: 1, [on]: -(av ? av[s - 1] : 1) * u }, "<=", 0);
+          row(`cmin_${id}_${s}_${y}`, { [d]: 1, [on]: -ml * u }, ">=", 0);
+          const tS = { [su]: 1 }; inc(tS, on, -1); inc(tS, onp, 1);
+          row(`sud_${id}_${s}_${y}`, tS, ">=", 0);
+          const tD = { [sd]: 1 }; inc(tD, onp, -1); inc(tD, on, 1);
+          row(`sdd_${id}_${s}_${y}`, tD, ">=", 0);
+          const UT = nst(cv.min_up_hours ?? 0, s), DT = nst(cv.min_down_hours ?? 0, s);
+          if (UT > 1) {
+            const t2 = { [on]: 1 };
+            for (const k of lookback(prev, s, UT, plen[s])) inc(t2, `su_${id}_${k}_${y}`, -1);
+            row(`mup_${id}_${s}_${y}`, t2, ">=", 0);
+          }
+          if (DT > 1) {
+            const t2 = { [on]: -1 };
+            for (const v of a.ncs) inc(t2, v, 1 / u);
+            for (const k of lookback(prev, s, DT, plen[s])) inc(t2, `sd_${id}_${k}_${y}`, -1);
+            row(`mdn_${id}_${s}_${y}`, t2, ">=", -a.k / u);
+          }
+        }
+        if (rr > 0) {
+          const up = T(); inc(up, d, 1); inc(up, dp, -1);
+          const dn = T(); inc(dn, dp, 1); inc(dn, d, -1);
+          for (const v of a.ncs) { inc(up, v, -rr * dt[s - 1]); inc(dn, v, -rr * dt[s - 1]); }
+          if (uc) {
+            inc(up, `su_${id}_${s}_${y}`, -ml * u);
+            inc(dn, `sd_${id}_${s}_${y}`, -ml * u);
+          }
+          row(`rup_${id}_${s}_${y}`, up, "<=", rr * dt[s - 1] * a.k);
+          row(`rdn_${id}_${s}_${y}`, dn, "<=", rr * dt[s - 1] * a.k);
+        }
       }
     }
     // generadores: dispatch ≤ cf·capacidad
@@ -539,7 +626,8 @@ export function buildLP(site0, cfg0) {
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
   const lp = `Minimize\n obj: ${objBody}\nSubject To\n${rows.join("\n")}\n` +
     (usesZero ? "Bounds\n zero_ = 0\n" : "") +
-    (binaries.length ? `Binary\n ${binaries.join(" ")}\n` : "") + "End\n";
-  return { lp, constant, meta: { S, N, binaries: binaries.length, rows: rows.length,
+    (binaries.length ? `Binary\n ${binaries.join(" ")}\n` : "") +
+    (integers.length ? `General\n ${integers.join(" ")}\n` : "") + "End\n";
+  return { lp, constant, meta: { S, N, binaries: binaries.length, integers: integers.length, rows: rows.length,
                                  nodes: nodes.length, arc_links: links.length } };
 }

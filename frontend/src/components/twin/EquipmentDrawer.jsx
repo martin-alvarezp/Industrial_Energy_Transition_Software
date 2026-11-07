@@ -240,6 +240,44 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                  onChange={(v) => set({ availability_constant: v })} />
           </Field>
         )}
+        {draft.type === "converter" && (
+          <>
+            <p className="drawer-section" data-testid="ops-section">
+              {L("Operación detallada (opcional)", "Detailed operation (optional)")}
+            </p>
+            <p className="hint" style={{ marginTop: -4 }}>
+              {L("En 0 el equipo opera de forma ideal (cualquier carga, sin costo de arranque). Con carga mínima, arranques o tiempos mínimos se modela cada unidad encendida o apagada (variables enteras: más lento).",
+                 "At 0 the unit operates ideally (any load, no start-up cost). With minimum load, start-ups or minimum times, each unit is modeled on or off (integer variables: slower).")}
+            </p>
+            <Field label={L("Tamaño de unidad (MW)", "Unit size (MW)")}
+                   hint={L("el parque son capacidad ÷ tamaño unidades; si el equipo no es invertible puede quedar en 0 (una sola unidad)", "the fleet is capacity ÷ size units; if not investable it can stay at 0 (a single unit)")}>
+              <Num value={draft.unit_size ?? 0} step={0.5} min={0} data-ops="unit_size"
+                   onChange={(v) => set({ unit_size: v })} />
+            </Field>
+            <Field label={L("Carga mínima (% de la unidad)", "Minimum load (% of the unit)")}
+                   hint={L("apagada o por sobre este mínimo: un quemador con 25 % no opera entre 0 y 25 %", "off or above this minimum: a burner at 25% cannot run between 0 and 25%")}>
+              <Num value={+((draft.min_load ?? 0) * 100).toFixed(2)} step={5} min={0} max={100} data-ops="min_load"
+                   onChange={(v) => set({ min_load: v / 100 })} />
+            </Field>
+            <Field label={L("Costo de arranque (USD por arranque)", "Start-up cost (USD per start)")}>
+              <Num value={draft.startup_cost ?? 0} step={50} min={0} data-ops="startup_cost"
+                   onChange={(v) => set({ startup_cost: v })} />
+            </Field>
+            <Field label={L("Mínimo encendida / apagada (h)", "Minimum up / down time (h)")}>
+              <div className="range-row">
+                <Num value={draft.min_up_hours ?? 0} step={1} min={0} data-ops="min_up_hours"
+                     onChange={(v) => set({ min_up_hours: v })} />
+                <Num value={draft.min_down_hours ?? 0} step={1} min={0} data-ops="min_down_hours"
+                     onChange={(v) => set({ min_down_hours: v })} />
+              </div>
+            </Field>
+            <Field label={L("Rampa máxima (% de la capacidad por hora)", "Max ramp (% of capacity per hour)")}
+                   hint={L("0 = sin límite", "0 = no limit")}>
+              <Num value={+((draft.ramp_rate ?? 0) * 100).toFixed(2)} step={5} min={0} data-ops="ramp_rate"
+                   onChange={(v) => set({ ramp_rate: v / 100 })} />
+            </Field>
+          </>
+        )}
         {draft.type === "storage" && (
           <Field label={L("Horas de almacenamiento (MWh por MW)", "Storage hours (MWh per MW)")}>
             <Num value={draft.storage_hours ?? 4} step={0.5} min={0.5}

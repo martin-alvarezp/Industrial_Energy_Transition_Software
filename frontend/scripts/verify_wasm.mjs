@@ -34,7 +34,11 @@ for (const f of readdirSync(goldenDir).filter((x) => x.endsWith(".json"))) {
       const relPay = Math.abs(pay.kpis.npv - npv) / Math.abs(npv);
       const emisOk = pay.emissions.every((e) =>
         Math.abs(e.gross - (e.scope1 + e.scope2)) < 1e-5);
-      ok = sol.Status === "Optimal" && rel < 1e-6 && relPay < 1e-6 && emisOk;
+      // el VAN se compara con el objetivo de HiGHS (precisión completa); el
+      // payload se recalcula con los valores de las variables, que highs-js
+      // entrega con ~6 cifras significativas (2,66667 por 8/3): su cota es
+      // esa precisión, no la del solver
+      ok = sol.Status === "Optimal" && rel < 1e-6 && relPay < 1e-5 && emisOk;
       detail = `julia ${g.expected_npv.toFixed(2)} · wasm ${npv.toFixed(2)} · ` +
                `Δrel ${rel.toExponential(1)} · payload Δ ${relPay.toExponential(1)}` +
                `${emisOk ? "" : " · EMISIONES NO CUADRAN"} · ${meta.binaries} bin · ${secs}s`;

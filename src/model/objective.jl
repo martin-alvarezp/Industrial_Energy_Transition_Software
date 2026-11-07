@@ -41,7 +41,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         sum(params.costs[t].variable_opex * dispatch[t, s, y] * w[s]
             for t in sets.dispatch_techs, s in steps; init = 0.0) +
         sum(params.costs[st].variable_opex * discharge[st, s, y] * w[s]
-            for st in sets.storages, s in steps; init = 0.0))
+            for st in sets.storages, s in steps; init = 0.0) +
+        m[:startup_cost_y][y])   # arranques (2.1): parte del OPEX variable
 
     # EnergyPurchases_y = Σ mercados de compra (precio·flujo·peso, M11)
     #                   + compra implícita de combustibles SIN mercado

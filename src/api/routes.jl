@@ -100,6 +100,8 @@ _coerce(::Type{Union{Float64,Nothing}}, v) = v === nothing ? nothing : Float64(v
 # caía en MethodError → 400 y la UI degradaba en silencio al motor web
 _coerce(::Type{String}, v) = v isa AbstractString ? String(v) :
     throw(ArgumentError("se esperaba texto"))
+_coerce(::Type{Symbol}, v) = v isa AbstractString ? Symbol(v) :
+    throw(ArgumentError("se esperaba texto"))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{Tuple{Symbol,Int,Float64}}}, v) =

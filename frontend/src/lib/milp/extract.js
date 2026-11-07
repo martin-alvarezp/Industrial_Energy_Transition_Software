@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -186,6 +186,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
         varop += t.variable_opex * v * w[s - 1];
       }
+      // arranques (2.1): parte del OPEX variable, como en Julia
+      if (t.type === "converter" && (t.startup_cost ?? 0) > 0 && hasCommitment(t) && unitMw(t) > 0)
+        for (const s of steps)
+          varop += t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
+                   w[s - 1] / (ts[s - 1].duration_hours ?? 1);
     }
     for (const mk of buys) for (const s of steps)
       energy += mk.price[s - 1] * esc(mk.carrier_id, y) *

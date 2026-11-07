@@ -32,6 +32,11 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   const [years, setYears] = useState(1);
   const [analysis, setAnalysis] = useState(steps > HEAVY_STEPS ? "single" : "full");
   const [capError, setCapError] = useState(null);
+  // equipos con operación detallada (2.1): misma regla que el motor
+  const nCommit = (twin?.siteJson?.technologies ?? []).filter((x) => x.type === "converter" &&
+    ((x.min_load ?? 0) > 0 || (x.startup_cost ?? 0) > 0 || (x.min_up_hours ?? 0) > 0 ||
+     (x.min_down_hours ?? 0) > 0)).length;
+  const [commitment, setCommitment] = useState("linear");
   const srcRun = runs.find((r) => r.id === capSource);
   const dispatch = mode === "dispatch";
 
@@ -48,11 +53,11 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   const go = async () => {
     setCapError(null);
     try {
-      let extra = { analysis };
+      let extra = { analysis, commitment: nCommit > 0 ? commitment : "auto" };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
         extra = { analysis: "single", dispatch_only: true, fixed_capacity: fixed,
-                  horizon_years: Math.max(1, +years || 1) };
+                  horizon_years: Math.max(1, +years || 1), commitment: "auto" };
       }
       const cfg = { ...draft, price_scenario: scenario === "emissions_cap" ? "base" : scenario, ...extra };
       const b = await run({ name, notes, cfg });
@@ -125,6 +130,16 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
             <option value="single">{t("run.single")}</option>
           </select>
           {steps > HEAVY_STEPS && <p className="ui-hint">{t("run.heavyHint", { n: steps.toLocaleString() })}</p>}
+        </div>
+      )}
+      {!dispatch && nCommit > 0 && (
+        <div className="ui-field">
+          <label>{t("run.commit", { n: nCommit })}</label>
+          <select className="ui-select" value={commitment} onChange={(e) => setCommitment(e.target.value)} data-testid="run-commit">
+            <option value="linear">{t("run.commitLinear")}</option>
+            <option value="integer">{t("run.commitInteger")}</option>
+          </select>
+          <p className="ui-hint">{t("run.commitHint")}</p>
         </div>
       )}
       <div className="ui-field">

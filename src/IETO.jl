@@ -42,6 +42,7 @@ include("constraints/grid.jl")
 include("constraints/arcs.jl")
 include("constraints/emissions.jl")
 include("constraints/budget.jl")
+include("constraints/operation.jl")
 include("constraints/constraints.jl")
 
 # results: extracción de resultados y resumen (SPEC §10)
@@ -64,7 +65,8 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
+export OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
+       Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
        PriceSeries, EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts,
        primary_input, primary_output, reference_efficiency, is_multiport,
        CARRIER_CATEGORIES, BALANCED_CATEGORIES, is_balanced,

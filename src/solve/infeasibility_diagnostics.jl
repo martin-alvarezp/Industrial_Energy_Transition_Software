@@ -2,7 +2,7 @@
 # analíticas identifican QUÉ restricción/recurso falta y por cuánto, en el
 # lenguaje del usuario (capacidad, piso de emisiones, red), sin resolver IIS.
 
-"Hallazgo de infactibilidad: categoría (:budget | :capacity | :emissions | :grid | :unknown) + mensaje accionable."
+"Hallazgo de infactibilidad: categoría (:budget | :capacity | :emissions | :grid | :operation | :unknown) + mensaje accionable."
 struct InfeasibilityFinding
     category::Symbol
     message::String
@@ -30,6 +30,8 @@ Chequeos, en orden de causa más frecuente:
    cuenta en la punta nocturna).
 """
 function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
+    # modo despacho (1.3): el diagnóstico ve el parque FIJO que vio el modelo
+    cfg.dispatch_only && ((site, cfg) = fix_infrastructure(site, cfg))
     findings = InfeasibilityFinding[]
     sets = build_sets(site, cfg)
     w = [ts.weight_hours for ts in site.timesteps]
@@ -231,6 +233,30 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
                 "($(_r1(need)) MW) supera el límite de import + storage " *
                 "($(_r1(have)) MW) — amplía la conexión o el storage"))
         end
+    end
+
+    # ── 4 · carga mínima (2.1): único productor de un vector con un mínimo
+    # por sobre la demanda — no puede bajar, y apagado nadie más la cubre ──
+    for t in sets.commit_techs
+        c = site.converters[t]
+        k = primary_output(c)
+        minmw = c.ops.min_load * unit_mw(c)
+        minmw > 0 || continue
+        others = any(x -> x.id != t && any(p -> p.carrier == k, x.outputs) &&
+                          (x.existing_capacity > 0 || (x.investable && x.max_new_capacity > 0)) &&
+                          x.id in sets.converters, values(site.converters)) ||
+                 any(g -> g.output_carrier == k && g.id in sets.generators, values(site.generators)) ||
+                 any(st -> st.carrier == k && st.id in sets.storages, values(site.storages)) ||
+                 any(mk -> mk.carrier == k && mk.direction == :buy, values(effective_markets(site)))
+        others && continue
+        d = haskey(site.demands, k) ? site.demands[k].values : Float64[]
+        low = [v for v in d if 0 < v < minmw - 1e-9]
+        isempty(low) && continue
+        push!(findings, InfeasibilityFinding(:operation,
+            "operación detallada: la carga mínima de '$(c.name)' ($(_r1(minmw)) MW) " *
+            "supera la demanda de $k en $(length(low)) paso(s) (mínimo $(_r1(minimum(low))) MW) " *
+            "y ningún otro equipo produce $k — baja la carga mínima, usa unidades más " *
+            "chicas (unit_size) o agrega otro equipo para $k"))
     end
 
     isempty(findings) && push!(findings, InfeasibilityFinding(:unknown,

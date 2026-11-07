@@ -39,6 +39,7 @@ export function toConfig(cfg) {
     grid_ef_by_year: [],
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
+    commitment: cfg.commitment ?? "auto",
   };
 }
 
