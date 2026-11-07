@@ -123,6 +123,7 @@ export function toOverrides(cfg) {
     financing_years: cfg.financing_years ?? 0,
     milestone_years: cfg.milestone_years ?? [],             // R6: años hito
     day_sequence: cfg.day_sequence ?? [],                   // R8: días tipo enlazados
+    coupling: cfg.coupling ?? [],                           // R9: acoplamientos
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

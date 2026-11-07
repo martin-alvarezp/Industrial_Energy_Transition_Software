@@ -470,6 +470,40 @@ export default function ParametersPage({ route }) {
               </button>
             </>;
           })()}
+          {/* acoplamiento de generación (R9): a = k·b o a ≤ k·b en cada paso */}
+          <h4 className="par-sub">{t("par.coupling")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.couplingHint")}</p>
+          {(() => {
+            const gen = twin.siteJson.technologies.filter((x) => x.type === "converter" || x.type === "generator");
+            const list = (draft.coupling ?? []).map((c) => (Array.isArray(c) ? { a: c[0], b: c[1], k: c[2], mode: c[3] } : c));
+            const write = (l) => set({ coupling: l });
+            const upd = (k, v) => write(list.map((x, j) => (j === k ? { ...x, ...v } : x)));
+            return <>
+              {list.map((c, k) => (
+                <div key={k} className="par-forced par-capex" data-coupling={k}>
+                  <select className="ui-select par-capex-traj" value={c.a} onChange={(e) => upd(k, { a: e.target.value })}>
+                    {gen.map((x) => <option key={x.tech_id} value={x.tech_id}>{x.name}</option>)}
+                  </select>
+                  <select className="ui-select par-capex-num" value={c.mode ?? "eq"} onChange={(e) => upd(k, { mode: e.target.value })}>
+                    <option value="eq">=</option><option value="le">≤</option>
+                  </select>
+                  <input className="ui-input par-capex-num" type="number" min={0} step={0.1} value={c.k ?? 1}
+                         onChange={(e) => upd(k, { k: Math.max(0, +e.target.value) })} />
+                  <span className="unit">×</span>
+                  <select className="ui-select par-capex-traj" value={c.b} onChange={(e) => upd(k, { b: e.target.value })}>
+                    {gen.map((x) => <option key={x.tech_id} value={x.tech_id}>{x.name}</option>)}
+                  </select>
+                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><MdDelete /></button>
+                </div>
+              ))}
+              {gen.length >= 2 && (
+                <button className="ui-btn outline sm" data-testid="add-coupling"
+                        onClick={() => write([...list, { a: gen[0].tech_id, b: gen[1].tech_id, k: 1, mode: "eq" }])}>
+                  <MdAdd /> {t("par.addCoupling")}
+                </button>
+              )}
+            </>;
+          })()}
           {/* almacenamiento con energía propia (R2): USD/kWh y tope de MWh por compra */}
           {candidates.some((c) => c.type === "storage") && <>
             <h4 className="par-sub">{t("par.ownEnergy")}</h4>

@@ -248,4 +248,10 @@ dump("dias_enlazados_fisica_n1", IETO._with(s29; storages = Dict(:bat => bat29))
      with_config(c29; day_sequence = WEEKS))
 dump("demo_dias_enlazados_n3", site0, with_config(cfg0; horizon_years = 3,
      day_sequence = repeat(["winter", "spring", "summer", "autumn"], 30)))
+# 28 · acoplamiento de generación (R9): caldera = bomba y bomba ≤ 0,5·caldera
+# en el sitio de operación, y el demo con la bomba ≤ 2·caldera a gas
+s30, c30 = op_site(NO_OPERATION_LIMITS)
+dump("acople_igual_n1", s30, with_config(c30; coupling = [(:eb, :hp, 1.0, :eq)]))
+dump("acople_cota_n1", s30, with_config(c30; coupling = [(:hp, :eb, 0.5, :le)]))
+dump("demo_acople_n5", site0, with_config(cfg0; horizon_years = 5, coupling = [(:heat_pump, :gas_boiler, 2.0, :le)]))
 println("fixtures dorados en ", out)

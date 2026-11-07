@@ -1023,6 +1023,15 @@ export function buildLP(site0, cfg0) {
       row(`forced_${sane(tech)}_${k}`,
           { [`nc_${sane(tech)}_${k}`]: 1 }, ">=", mw);
   }
+  // acoplamiento de generación (R9) — espejo de capacity.jl
+  const dispIds = new Set([...convs, ...gens].map((t) => t.tech_id));
+  (cfg.coupling ?? []).map((c) => (Array.isArray(c) ? c : [c.a, c.b, c.k ?? 1, c.mode ?? "eq"]))
+    .forEach(([a, b, k, mode], ci) => {
+      if (!dispIds.has(a) || !dispIds.has(b)) return;
+      for (const y of years) for (const s of steps)
+        row(`cpl_${ci}_${s}_${y}`, { [`d_${sane(a)}_${s}_${y}`]: 1, [`d_${sane(b)}_${s}_${y}`]: -k },
+            mode === "le" ? "<=" : "=", 0);
+    });
   // flexibilidad de carga (5.4): sube/baja ≤ f·d y neutral por período
   for (const c of FX) {
     const f = cfg.demand_flexibility[c], id = sane(c);

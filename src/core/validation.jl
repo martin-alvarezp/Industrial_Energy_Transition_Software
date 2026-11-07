@@ -555,6 +555,16 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    # R9: acoplamientos entre conversores o generadores del sitio
+    for (a, b, k, mode) in cfg.coupling
+        for t in (a, b)
+            (haskey(site.converters, t) || haskey(site.generators, t)) || push!(problems,
+                "coupling: '$t' no es un conversor ni un generador del sitio")
+        end
+        a == b && push!(problems, "coupling: '$a' no se puede acoplar consigo mismo")
+        k >= 0 || push!(problems, "coupling ($a, $b): k debe ser ≥ 0")
+        mode in (:eq, :le) || push!(problems, "coupling ($a, $b): modo '$mode' desconocido (eq | le)")
+    end
     # R8: la secuencia de días nombra períodos del sitio
     if !isempty(cfg.day_sequence)
         seasons = Set(ts.season for ts in site.timesteps)

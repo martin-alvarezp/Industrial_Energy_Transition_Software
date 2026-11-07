@@ -57,5 +57,14 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     m[:forced_builds] = [JuMP.@constraint(m,
         m[:new_capacity][t, y] >= mw) for (t, y, mw) in forced]
 
+    # acoplamiento de generación (R9): d_a = k·d_b o d_a ≤ k·d_b en cada paso
+    # (reparto fijo entre calderas, una que no pase de k veces la otra)
+    D = sets.dispatch_techs
+    m[:coupling] = [mode == :eq ?
+        JuMP.@constraint(m, dispatch[a, s, y] == k * dispatch[b, s, y]) :
+        JuMP.@constraint(m, dispatch[a, s, y] <= k * dispatch[b, s, y])
+        for (a, b, k, mode) in cfg.coupling if a in D && b in D
+        for s in steps, y in years]
+
     return m
 end

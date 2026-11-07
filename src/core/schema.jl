@@ -386,5 +386,7 @@ function load_scenario_config(path::AbstractString)
         Int(get(d, "financing_years", 0)),
         Int[Int(x) for x in get(d, "milestone_years", [])],
         String[String(x) for x in get(d, "day_sequence", [])],
+        Tuple{Symbol,Symbol,Float64,Symbol}[(Symbol(c["a"]), Symbol(c["b"]), Float64(get(c, "k", 1.0)),
+                                             Symbol(get(c, "mode", "eq"))) for c in get(d, "coupling", [])],
     )
 end

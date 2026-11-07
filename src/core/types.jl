@@ -557,7 +557,13 @@ struct ScenarioConfig
     day_sequence::Vector{String}             # período (día tipo) de cada día del año, en
                                              # orden; con valor, el SOC se enlaza entre
                                              # días (almacenamiento de varios días)
+    # ── acoplamiento de generación (benchmark R9) ──
+    coupling::Vector{Tuple{Symbol,Symbol,Float64,Symbol}}   # (a, b, k, modo): en cada paso,
+                                             # d_a = k·d_b (:eq) o d_a ≤ k·d_b (:le)
 end
+
+# retro-compatibilidad: 56 campos → sin acoplamientos
+ScenarioConfig(a::Vararg{Any,56}) = ScenarioConfig(a..., Vector{Tuple{Symbol,Symbol,Float64,Symbol}}())
 
 # retro-compatibilidad: 55 campos → sin días enlazados
 ScenarioConfig(a::Vararg{Any,55}) = ScenarioConfig(a..., String[])

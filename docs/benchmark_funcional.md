@@ -530,3 +530,10 @@ días tipo (k por año) con cronología.
   `dias_enlazados_fisica_n1` y `demo_dias_enlazados_n3` (verify:wasm 51/51).
   *Simplificación:* dentro del día la autodescarga del nivel entre días se
   aplica en bloque (κ), no hora a hora.
+- ✅ **R9 · Acoplamiento de generación** (2026-11-07). `coupling`: lista de
+  (a, b, k, modo); en cada paso, d_a = k·d_b (`eq`, reparto fijo entre
+  equipos) o d_a ≤ k·d_b (`le`, uno no pasa de k veces el otro), entre
+  conversores o generadores. Oráculos (test_coupling.jl): caldera = bomba
+  ⇒ 3 212 000 USD; bomba ≤ 0,5·caldera ⇒ 3 747 333 USD (a mano). Goldens
+  `acople_igual_n1`, `acople_cota_n1`, `demo_acople_n5` (verify:wasm 54/54).
+  Parámetros → "Acoplamiento de generación"; E2E en `verify:measures`.

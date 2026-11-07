@@ -239,6 +239,35 @@ step("la reserva suma ingresos y no empeora el VAN",
      rev(pb) > rev(pr) + 1 && pb.result.kpis.npv <= pr.result.kpis.npv + 1,
      `ingresos ${(rev(pr) / 1e6).toFixed(2)} → ${(rev(pb) / 1e6).toFixed(2)} MUSD · VAN ${(pr.result.kpis.npv / 1e6).toFixed(2)} → ${(pb.result.kpis.npv / 1e6).toFixed(2)}`);
 
+// acoplamiento de generación (R9): los dos primeros equipos con reparto 1:1
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="add-coupling"]', { timeout: 30000 });
+await p.click('[data-testid="add-coupling"]');
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Acople");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pc = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Acople");
+  if (r) { pc = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const cp = pc?.result?.assumptions?.scenario_config?.coupling?.[0];
+const cpa = cp && (Array.isArray(cp) ? cp : [cp.a, cp.b]);
+const out = (tech) => Object.fromEntries((pc?.result?.dispatch ?? [])
+  .filter((d) => d.tech === tech && d.flow === "output").map((d) => [`${d.year}|${d.step}`, d.value]));
+const da = cpa ? out(cpa[0]) : {}, db = cpa ? out(cpa[1]) : {};
+const offs = Object.keys(da).filter((k) => Math.abs(da[k] - (db[k] ?? 0)) > 1e-4);
+step("corrida con acoplamiento resuelta por el motor real: a = b en cada paso",
+     pc?.source === "api" && pc.result.meta.feasible && Object.keys(da).length > 0 && offs.length === 0,
+     `${JSON.stringify(cpa)} · ${offs.length} pasos fuera`);
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");
