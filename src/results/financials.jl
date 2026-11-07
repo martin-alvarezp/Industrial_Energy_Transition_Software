@@ -39,7 +39,8 @@ function extract_financials(im::IETOModel)
     end
     df.discount_factor = im.params.discount
     # anualidad de financiamiento (R4): vista, fuera del total y del VAN
-    df.capex_annuity = capex_annuity(df.capex, im.config.financing_rate, im.config.financing_years)
+    df.capex_annuity = capex_annuity(df.capex, im.config.financing_rate, im.config.financing_years;
+                                     years = im.sets.year_of)
     df.npv = df.total .* df.discount_factor
 
     return (breakdown = df,

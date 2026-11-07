@@ -384,5 +384,6 @@ function load_scenario_config(path::AbstractString)
             for (kind, targets) in get(d, "year_factors", Dict())),
         _get_num(d, "financing_rate", 0.0),
         Int(get(d, "financing_years", 0)),
+        Int[Int(x) for x in get(d, "milestone_years", [])],
     )
 end

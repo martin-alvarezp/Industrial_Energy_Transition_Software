@@ -5,7 +5,7 @@
 "Conjuntos de índices derivados del sitio y el escenario."
 struct ModelSets
     steps::UnitRange{Int}            # pasos del año-plantilla, 1:96
-    years::UnitRange{Int}            # y ∈ 1:horizon_years
+    years::UnitRange{Int}            # y ∈ 1:K (K = hitos, o horizon_years)
     dispatch_techs::Vector{Symbol}   # conversores + generadores (dispatch[tech,step,y])
     converters::Vector{Symbol}
     generators::Vector{Symbol}
@@ -24,6 +24,7 @@ struct ModelSets
     part_load_segs::Int              # Σ tramos de esas curvas (variables por paso·año)
     discrete_techs::Vector{Symbol}   # candidatas que se compran en unidades enteras (3.2)
     exclusive_techs::Vector{Symbol}  # candidatas en algún grupo excluyente (5.2): ever_built
+    year_of::Vector{Int}             # año RELATIVO real de cada índice y (R6)
 end
 
 """
@@ -58,7 +59,7 @@ function build_sets(site::Site, cfg::ScenarioConfig)
 
     return ModelSets(
         1:n_steps(site),
-        1:cfg.horizon_years,
+        1:length(model_years(cfg)),
         vcat(convs, gens),
         convs,
         gens,
@@ -82,5 +83,6 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         [id for id in convs if site.converters[id].investable &&
              site.converters[id].ops.unit_size > 0],
         sort!(unique([t for g in cfg.exclusive_groups for t in g if t in candidates])),
+        model_years(cfg)
     )
 end

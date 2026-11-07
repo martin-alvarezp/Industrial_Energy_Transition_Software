@@ -35,8 +35,9 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     findings = InfeasibilityFinding[]
     sets = build_sets(site, cfg)
     w = [ts.weight_hours for ts in site.timesteps]
-    N = cfg.horizon_years
-    grow(y) = (1 + cfg.demand_growth)^(y - 1)
+    ry = sets.year_of             # años reales de cada índice (R6)
+    N = length(ry)
+    grow(y) = (1 + cfg.demand_growth)^(ry[y] - 1)
 
     grid = get(site.sources, :grid_import, nothing)
     grid_carrier = grid === nothing ? :electricity : grid.output_carrier
@@ -49,7 +50,7 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     if cfg.capex_budget !== nothing
         params = build_parameters(site, cfg)
         renewals = sum(params.renewal_capex; init = 0.0)
-        forced = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW * mw
+        forced = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW * mw
                      for (t, y, mw) in params.forced_builds
                      if t in sets.candidates && 1 <= y <= N; init = 0.0)
         if renewals + forced > cfg.capex_budget + 1e-6
@@ -66,7 +67,7 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     if cfg.capex_budget_annual !== nothing
         params = build_parameters(site, cfg)
         for y in 1:N
-            forced_y = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW * mw
+            forced_y = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW * mw
                            for (t, yy, mw) in params.forced_builds
                            if t in sets.candidates && yy == y; init = 0.0)
             need = params.renewal_capex[y] + forced_y

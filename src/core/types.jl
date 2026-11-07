@@ -550,10 +550,44 @@ struct ScenarioConfig
     # pagada; la anualidad solo se reporta ──
     financing_rate::Float64                  # tasa del crédito (0,0784 = 7,84 %)
     financing_years::Int                     # plazo en años; 0 = sin anualidad
+    # ── años hito (benchmark R6) ──
+    milestone_years::Vector{Int}             # años que se optimizan (calendario si hay
+                                             # base_year); vacío = todos los del horizonte
 end
 
 # retro-compatibilidad: 52 campos → sin financiamiento
 ScenarioConfig(a::Vararg{Any,52}) = ScenarioConfig(a..., 0.0, 0)
+# retro-compatibilidad: 54 campos → sin años hito
+ScenarioConfig(a::Vararg{Any,54}) = ScenarioConfig(a..., Int[])
+
+"""
+    model_years(cfg) -> Vector{Int}
+
+Años RELATIVOS (1 = año base) que optimiza el modelo (R6): los hitos
+ordenados, o 1..horizon_years sin hitos. El índice `y` del modelo recorre
+esta lista; todo lo que depende del año real (descuento, escalación, vida
+útil, factores, trayectorias) usa `model_years(cfg)[y]`.
+"""
+model_years(cfg::ScenarioConfig) = isempty(cfg.milestone_years) ? collect(1:cfg.horizon_years) :
+    sort!(unique!([rel_year(cfg, yr) for yr in cfg.milestone_years]))
+
+"""
+Índice del hito que paga lo que ocurre en el año relativo `yr` (R6): el primer
+hito ≥ yr (lo que pasa entre hitos se carga en el siguiente); `nothing` si cae
+después del último.
+"""
+milestone_index(ry::AbstractVector{<:Integer}, yr::Integer) = findfirst(>=(yr), ry)
+
+"""
+¿Se puede construir `tech` en el hito `y`? (R1 + R6): el hito representa los
+años (hito anterior, hito]; basta que la ventana toque ese tramo.
+"""
+function build_allowed(cfg::ScenarioConfig, tech::Symbol, ry::AbstractVector{<:Integer}, y::Integer)
+    w = get(cfg.build_window, tech, nothing)
+    w === nothing && return true
+    lo = y == 1 ? typemin(Int) : ry[y - 1] + 1
+    return rel_year(cfg, w[1]) <= ry[y] && rel_year(cfg, w[2]) >= lo
+end
 
 """
     annuity_factor(rate, years) -> Float64
@@ -573,10 +607,12 @@ end
 Anualidad de cada año del horizonte: cada CAPEX del año `yp` se paga en
 `years` cuotas desde `yp` (las que caen fuera del horizonte no se muestran).
 """
-function capex_annuity(capex::AbstractVector{<:Real}, rate::Real, years::Integer)
-    a = annuity_factor(rate, years)
+function capex_annuity(capex::AbstractVector{<:Real}, rate::Real, n::Integer;
+                       years::AbstractVector{<:Integer} = 1:length(capex))
+    a = annuity_factor(rate, n)
     N = length(capex)
-    return [sum((capex[yp] * a for yp in 1:y if y - yp < years); init = 0.0) for y in 1:N]
+    # con años hito (R6) el plazo se cuenta en años reales
+    return [sum((capex[yp] * a for yp in 1:y if years[y] - years[yp] < n); init = 0.0) for y in 1:N]
 end
 
 # retro-compatibilidad: 51 campos → sin factores por año

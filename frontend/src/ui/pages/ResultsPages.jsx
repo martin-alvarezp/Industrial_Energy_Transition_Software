@@ -13,7 +13,7 @@ import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { ChartPanel, StackedBars, ChartLegend } from "../charts.jsx";
 import NeedsRun, { RunPicker } from "../components/NeedsRun.jsx";
 import {
-  calYear, stackRows, investmentByYear, annuityByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors, lcoeByTech,
+  calYear, resultYears, stackRows, investmentByYear, annuityByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors, lcoeByTech,
   horizonKpis,
 } from "../results.js";
 import { techKind } from "../techkind.js";
@@ -147,20 +147,21 @@ function dayLabel(d) {
 export function OperationPage() {
   const { t } = useI18n();
   const { result, siteJson } = useBundle();
-  const N = result?.meta?.horizon_years ?? 1;
+  const yrs = resultYears(result);   // años de la corrida (R6: hitos)
   const seasons = [...new Set((siteJson?.timesteps ?? []).map((s) => s.season))];
   const carriers = (siteJson?.carriers ?? []).filter((c) => ["energy", "heat", "cooling"].includes(c.category));
   const [year, setYear] = useState(1);
+  const yv = yrs.includes(year) ? year : (yrs[0] ?? 1);
   const [season, setSeason] = useState(null);
   const [carrier, setCarrier] = useState(null);
   const [dayIdx, setDayIdx] = useState(0);   // período largo (año completo): qué día
   const s = season ?? seasons[0];
   const c = carrier ?? carriers[0]?.carrier_id;
   const day = useMemo(() => (result && siteJson && c
-    ? operationDay(result, siteJson, Math.min(year, N), s, c, {
+    ? operationDay(result, siteJson, yv, s, c, {
         import: t("res.import"), export: t("res.export"), charge: t("res.charge"),
         discharge: t("res.discharge"), consumption: t("res.consumption") }, dayIdx)
-    : null), [result, siteJson, year, s, c, N, t, dayIdx]);
+    : null), [result, siteJson, yv, s, c, t, dayIdx]);
   const cname = carriers.find((x) => x.carrier_id === c)?.name ?? c;
   // la demanda NO ocupa slot: es la línea punteada en color de texto
   const dayColors = useMemo(() => {
@@ -174,8 +175,8 @@ export function OperationPage() {
     <Page icon={NAV_ICONS.operation} title={t("nav.operation")} help={t("res.opHelp")}>
       {result && day && <>
         <div className="pg-toolbar">
-          <select className="ui-select" style={{ width: 140 }} value={year} onChange={(e) => setYear(+e.target.value)}>
-            {Array.from({ length: N }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
+          <select className="ui-select" style={{ width: 140 }} value={yv} onChange={(e) => setYear(+e.target.value)}>
+            {yrs.map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
           </select>
           <select className="ui-select" style={{ width: 180 }} value={s} onChange={(e) => setSeason(e.target.value)}
                   aria-label={t("res.season")}>
@@ -216,7 +217,7 @@ export function OperationPage() {
         </ChartPanel>
         <section className="rc-panel ui-legacy">
           <div className="rc-head"><h3>{t("res.engineering")}</h3></div>
-          <PlantEngineering result={result} siteJson={siteJson} year={Math.min(year, N)} />
+          <PlantEngineering result={result} siteJson={siteJson} year={yv} />
         </section>
       </>}
     </Page>
@@ -258,21 +259,22 @@ function ComponentTable({ rows, t, showLoc, layout }) {
 export function ResultsComponentsPage() {
   const { t } = useI18n();
   const { result, siteJson, twin } = useBundle();
-  const N = result?.meta?.horizon_years ?? 1;
+  const yrs = resultYears(result);   // años de la corrida (R6: hitos)
   const [year, setYear] = useState(1);
-  const rows = useMemo(() => (result && siteJson ? perComponent(result, siteJson, Math.min(year, N)) : []), [result, siteJson, year, N]);
+  const yv = yrs.includes(year) ? year : (yrs[0] ?? 1);
+  const rows = useMemo(() => (result && siteJson ? perComponent(result, siteJson, yv) : []), [result, siteJson, yv]);
   return (
     <Page icon={NAV_ICONS.rcomponents} title={t("nav.components")} help={t("res.compHelp")}>
       {result && <>
         <div className="pg-toolbar">
-          <select className="ui-select" style={{ width: 140 }} value={year} onChange={(e) => setYear(+e.target.value)}>
-            {Array.from({ length: N }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
+          <select className="ui-select" style={{ width: 140 }} value={yv} onChange={(e) => setYear(+e.target.value)}>
+            {yrs.map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
           </select>
         </div>
         <ComponentTable rows={rows} t={t} showLoc layout={twin?.layout} />
         <section className="rc-panel ui-legacy" style={{ marginTop: 24 }}>
           <div className="rc-head"><h3>{t("res.engineering")}</h3></div>
-          <PlantEngineering result={result} siteJson={siteJson} year={Math.min(year, N)} />
+          <PlantEngineering result={result} siteJson={siteJson} year={yv} />
         </section>
       </>}
     </Page>
@@ -282,10 +284,11 @@ export function ResultsComponentsPage() {
 export function ResultsLocationsPage() {
   const { t } = useI18n();
   const { result, siteJson, twin } = useBundle();
-  const N = result?.meta?.horizon_years ?? 1;
+  const yrs = resultYears(result);   // años de la corrida (R6: hitos)
   const [year, setYear] = useState(1);
+  const yv = yrs.includes(year) ? year : (yrs[0] ?? 1);
   const layout = twin?.layout;
-  const rows = useMemo(() => (result && siteJson ? perComponent(result, siteJson, Math.min(year, N)) : []), [result, siteJson, year, N]);
+  const rows = useMemo(() => (result && siteJson ? perComponent(result, siteJson, yv) : []), [result, siteJson, yv]);
   const groups = [...(layout?.locations ?? []).map((l) => ({ id: l.id, name: l.name })), { id: null, name: t("res.unassigned") }]
     .map((g) => ({ ...g, rows: rows.filter((r) => (layout ? locationOf(layout, r.t.tech_id) : null) === g.id) }))
     .filter((g) => g.rows.length);
@@ -293,8 +296,8 @@ export function ResultsLocationsPage() {
     <Page icon={NAV_ICONS.rlocations} title={t("nav.locations")} help={t("res.locHelp")}>
       {result && <>
         <div className="pg-toolbar">
-          <select className="ui-select" style={{ width: 140 }} value={year} onChange={(e) => setYear(+e.target.value)}>
-            {Array.from({ length: N }, (_, i) => i + 1).map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
+          <select className="ui-select" style={{ width: 140 }} value={yv} onChange={(e) => setYear(+e.target.value)}>
+            {yrs.map((y) => <option key={y} value={y}>{calYear(result, y)}</option>)}
           </select>
         </div>
         <div className="loc-kpis">

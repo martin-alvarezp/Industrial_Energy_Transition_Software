@@ -11,6 +11,7 @@ NPV = Σ_y [CAPEX_y + FixedOPEX_y + VarOPEX_y + EnergyPurchases_y
 function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                         cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
+    ry = sets.year_of        # año real de cada índice (R6)
     w = params.weight_hours
 
     dispatch = m[:dispatch]
@@ -26,7 +27,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # CAPEX_y = Σ_tech capex·1000·new_capacity + renovaciones determinísticas
     # del parque existente (M5, renew_existing)
     JuMP.@expression(m, capex_y[y in years],
-        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW *
+        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW *
             new_capacity[t, y] for t in sets.candidates; init = 0.0) +
         sum(get(cfg.fixed_capex, t, 0.0) * m[:build][t, y]   # CAPEX fijo por compra (R1)
             for t in sets.candidates; init = 0.0) +
@@ -37,15 +38,15 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # FixedOPEX_y = Σ_tech fixed_opex · available_capacity[tech,y]
     #             + cargos fijos de las conexiones de red (USD/año, M11)
     JuMP.@expression(m, fixed_opex_y[y in years],
-        sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, y) * available_capacity[t, y]
+        sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, ry[y]) * available_capacity[t, y]
             for t in all_techs; init = 0.0) + params.fixed_charges)
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)
     JuMP.@expression(m, var_opex_y[y in years],
-        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, y) * dispatch[t, s, y] * w[s]
+        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, ry[y]) * dispatch[t, s, y] * w[s]
             for t in sets.dispatch_techs, s in steps; init = 0.0) +
-        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, y) * discharge[st, s, y] * w[s]
+        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, ry[y]) * discharge[st, s, y] * w[s]
             for st in sets.storages, s in steps; init = 0.0) +
         m[:startup_cost_y][y] +  # arranques (2.1): parte del OPEX variable
         m[:flex_cost_y][y])      # carga desplazada (5.4)
@@ -72,7 +73,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                   (isfinite(contracted(mk)) &&
                    get(params.market_excess_penalty, mk, 0.0) > 0)]
     dc_term(mk, se, y) = begin
-        f = year_factor(cfg, :demand_charge, mk, y)   # R3: cargo y penalidad por año
+        f = year_factor(cfg, :demand_charge, mk, ry[y])   # R3: cargo y penalidad por año
         c = params.market_demand_charge[mk] * KW_PER_MW * months_per_season * f
         if isfinite(contracted(mk))
             c * contracted(mk) +
@@ -89,7 +90,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     cprice(y) = isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :
-                cfg.carbon_price_by_year[y]   # trayectoria regulatoria (M7)
+                cfg.carbon_price_by_year[ry[y]]   # trayectoria regulatoria (M7)
     # ETS (4.2): derechos sobre el alcance 1 por encima de la asignación
     # gratuita; el excedente se vende (término negativo). Suma al costo de carbono.
     JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y] +
@@ -119,15 +120,15 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     depy(tech) = cfg.depreciation_years > 0 ? cfg.depreciation_years :
                  params.costs[tech].lifetime_years
     E = JuMP.axes(m[:new_energy], 1)
-    ecap(tc, yp) = cfg.storage_energy_capex[tc] * KW_PER_MW * capex_factor(cfg, tc, yp) * m[:new_energy][tc, yp]
+    ecap(tc, yp) = cfg.storage_energy_capex[tc] * KW_PER_MW * capex_factor(cfg, tc, ry[yp]) * m[:new_energy][tc, yp]
     JuMP.@expression(m, dep_y[y in years],
         t == 0 ? JuMP.AffExpr(0.0) :
-        sum(params.costs[tc].capex_per_kw * capex_factor(cfg, tc, yp) * KW_PER_MW / depy(tc) *
+        sum(params.costs[tc].capex_per_kw * capex_factor(cfg, tc, ry[yp]) * KW_PER_MW / depy(tc) *
             new_capacity[tc, yp]
             for tc in sets.candidates, yp in years
-            if yp <= y < yp + depy(tc); init = 0.0) +
+            if yp <= y && ry[y] < ry[yp] + depy(tc); init = 0.0) +
         sum(ecap(tc, yp) / depy(tc) for tc in E, yp in years
-            if yp <= y < yp + depy(tc); init = 0.0))
+            if yp <= y && ry[y] < ry[yp] + depy(tc); init = 0.0))
     JuMP.@expression(m, tax_y[y in years],
         t == 0 ? JuMP.AffExpr(0.0) :
         -t * (fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
@@ -138,15 +139,15 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,
     # descontado al año N. Sin él, invertir tarde en activos longevos queda
     # castigado por el truncamiento del VAN (la vida útil sería solo traza).
-    N = last(years)
+    N = ry[last(years)]      # último año optimizado (R6)
     sfrac(t, y) = cfg.salvage_value ?
-        max(0.0, (params.costs[t].lifetime_years - (N - y + 1)) / params.costs[t].lifetime_years) : 0.0
+        max(0.0, (params.costs[t].lifetime_years - (N - ry[y] + 1)) / params.costs[t].lifetime_years) : 0.0
     JuMP.@expression(m, salvage_credit,
         sum(ecap(tc, y) * sfrac(tc, y) for tc in E, y in years; init = 0.0) +
-        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW *
+        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW *
             new_capacity[t, y] *
             (cfg.salvage_value ?
-             max(0.0, (params.costs[t].lifetime_years - (N - y + 1)) /
+             max(0.0, (params.costs[t].lifetime_years - (N - ry[y] + 1)) /
                       params.costs[t].lifetime_years) : 0.0)
             for t in sets.candidates, y in years; init = 0.0))
 

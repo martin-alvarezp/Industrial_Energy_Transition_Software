@@ -542,6 +542,19 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         cand(t) || push!(problems, "fixed_capex: '$t' no es una tecnología candidata a inversión")
         c >= 0 || push!(problems, "fixed_capex['$t']: debe ser ≥ 0")
     end
+    # R6: años hito dentro del horizonte, sin repetir
+    if !isempty(cfg.milestone_years)
+        rel = [rel_year(cfg, yr) for yr in cfg.milestone_years]
+        all(1 .<= rel .<= cfg.horizon_years) || push!(problems,
+            "milestone_years: todos los hitos deben caer en el horizonte " *
+            "($(calendar_year(cfg, 1))-$(calendar_year(cfg, cfg.horizon_years))); valores: $(cfg.milestone_years)")
+        allunique(rel) || push!(problems, "milestone_years: hay hitos repetidos ($(cfg.milestone_years))")
+        last_m = maximum(rel)
+        for (t, yr, _) in cfg.forced_builds
+            rel_year(cfg, yr) <= last_m || push!(problems,
+                "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
+        end
+    end
     # R4: financiamiento
     0 <= cfg.financing_rate < 1 || push!(problems,
         "scenario_config.yaml: financing_rate debe estar en [0,1) (valor: $(cfg.financing_rate))")

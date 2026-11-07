@@ -20,6 +20,12 @@ export function yearsOf(result) {
   return (result?.cost_breakdown ?? []).map((c) => c.year);
 }
 
+/** Años de una corrida (R6): los de su desglose (con hitos, solo esos), o 1..N. */
+export function resultYears(result) {
+  const ys = (result?.cost_breakdown ?? []).map((c) => c.year);
+  return ys.length ? ys : Array.from({ length: result?.meta?.horizon_years ?? 1 }, (_, i) => i + 1);
+}
+
 /** Factor nominal/real: real × (1+infl)^(y−1). Con impact="real" es 1. */
 export const nominalFactor = (impact, inflation, y) =>
   impact === "nominal" ? (1 + (inflation ?? 0)) ** (y - 1) : 1;

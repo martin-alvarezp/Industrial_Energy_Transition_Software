@@ -23,6 +23,7 @@ Sin medidas el modelo no cambia.
 function add_demand_side!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                           cfg::ScenarioConfig)
     years = sets.years
+    ry = sets.year_of        # año real de cada índice (R6)
     # ── 5.4 flexibilidad ──
     FX = sort!([c for (c, f) in cfg.demand_flexibility if f > 0 && haskey(params.demand, c)])
     m[:flex_carriers] = FX
@@ -56,7 +57,7 @@ function add_demand_side!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     JuMP.@expression(m, em_active[k in ids, y in years], sum(em_buy[k, yp] for yp in 1:y))
     cap = Dict(em.id => em.capex for em in EM)
     JuMP.@expression(m, measures_capex_y[y in years],
-        sum(cap[k] * capex_factor(cfg, k, y) * em_buy[k, y] for k in ids))
+        sum(cap[k] * capex_factor(cfg, k, ry[y]) * em_buy[k, y] for k in ids))
     for em in EM   # vector → [(reducción, medida)]
         push!(get!(m[:demand_adjust_terms], em.carrier, Tuple{Float64,Symbol}[]),
               (em.reduction, em.id))

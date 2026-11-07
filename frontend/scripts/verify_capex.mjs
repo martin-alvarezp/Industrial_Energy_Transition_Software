@@ -261,6 +261,44 @@ await p.waitForSelector('[data-testid="capex-view"] [data-view="annuity"]', { ti
 await p.click('[data-testid="capex-view"] [data-view="annuity"]');
 step("Costos cambia la inversión a anualidad", await waitText("cuotas prepagables", 10000));
 
+// 8 · años hito (R6): optimizar solo tres años; el desglose y los selectores
+// muestran solo esos y el VAN suma solo esos
+const B = pn.result.meta.base_year ?? 0;
+const ms = B > 0 ? [B, B + 2, B + 4] : [1, 3, 5];
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="milestones"]', { timeout: 30000 });
+await p.click('[data-testid="milestones"]', { clickCount: 3 });
+await p.type('[data-testid="milestones"]', ms.join(", "));
+await p.click('[data-testid="financing-rate"]');   // blur
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Hitos");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let ph = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Hitos");
+  if (r) { ph = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const cbh = ph?.result?.cost_breakdown ?? [];
+step("corrida con años hito resuelta por el motor real: solo esos años",
+     ph?.source === "api" && ph.result.meta.feasible && JSON.stringify(cbh.map((c) => c.year)) === "[1,3,5]" &&
+     JSON.stringify(ph.result.assumptions.scenario_config.milestone_years) === JSON.stringify(ms),
+     `${JSON.stringify(cbh.map((c) => c.year))} · hitos ${JSON.stringify(ph?.result?.assumptions?.scenario_config?.milestone_years)}`);
+step("el VAN es la suma descontada de los hitos",
+     Math.abs(cbh.reduce((a, c) => a + c.npv, 0) - ph.result.kpis.npv) <= 1e-6 * Math.abs(ph.result.kpis.npv));
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/rcomponents`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".pg-toolbar select", { timeout: 30000 }).catch(() => null);
+const opts = await p.evaluate(() => [...(document.querySelector(".pg-toolbar select")?.options ?? [])].map((o) => o.textContent));
+const expOpts = ms.map((y) => String(y));
+step("Resultados → Componentes ofrece solo los hitos", JSON.stringify(opts) === JSON.stringify(expOpts),
+     `${JSON.stringify(opts)} (esperado ${JSON.stringify(expOpts)})`);
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nCAPEX OK: curva de aprendizaje y trayectoria → motor real → CAPEX por año exacto.");

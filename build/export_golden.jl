@@ -224,4 +224,19 @@ dump("factores_anio_n3", s27, with_config(c27; horizon_years = 3, carbon_price =
 dump("demo_factores_anio_n5", site0, with_config(cfg0; horizon_years = 5, base_year = 2030,
      year_factors = Dict(:price => Dict(:electricity => [(2031, 0.9), (2033, 0.8)], :natural_gas => [(2032, 1.3)]),
                          :demand => Dict(:hot_water => [(2032, 1.1)]), :fixed_opex => Dict(:pv => [(2031, 1.2)]))))
+# 26 · años hito (R6): la bomba con hitos 1, 3, 5 (wacc 10 %), con vida corta,
+# compra forzada entre hitos y valor residual; y el demo a 10 años en
+# calendario optimizando 2026, 2027, 2029, 2031 y 2035 con renovación,
+# impuestos, factores por año y anualidad
+s28, c28 = discrete_case(0.0)
+dump("hitos_n5", s28, with_config(c28; horizon_years = 5, wacc = 0.1, milestone_years = [1, 3, 5]))
+hp28 = IETO._with(s28.converters[:hp]; costs = TechCosts(200.0, 500.0, 1.0, 3))
+s28b = IETO._with(s28; converters = Dict(:hp => hp28, :eb => s28.converters[:eb]))
+dump("hitos_vida_forzada_n6", s28b, with_config(c28; horizon_years = 6, wacc = 0.05, milestone_years = [1, 2, 4, 6],
+     repeat_investments = true, forced_builds = [(:hp, 3, 1.0)], salvage_value = true, tax_rate = 0.2,
+     price_escalation = Dict(:electricity => 0.03), financing_rate = 0.07, financing_years = 3))
+dump("demo_hitos_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
+     milestone_years = [2026, 2027, 2029, 2031, 2035], renew_existing = true, tax_rate = 0.25,
+     year_factors = Dict(:price => Dict(:electricity => [(2029, 0.9)])),
+     build_window = Dict(:battery => [2028, 2031])))
 println("fixtures dorados en ", out)

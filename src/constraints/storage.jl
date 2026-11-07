@@ -59,25 +59,26 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     newcap = m[:new_capacity]
     # energía propia (R2): las compras de estos almacenamientos agregan MWh
     # (new_energy) independientes de los MW; el existente sigue siendo MW × horas
+    ry = sets.year_of        # año real de cada índice (R6)
     E = [st for st in sets.storages if st in sets.candidates && haskey(cfg.storage_energy_capex, st)]
     JuMP.@variable(m, new_energy[E, years] >= 0)
     emax(st) = get(cfg.storage_energy_max, st, params.max_new_capacity[st] * hours[st])
     m[:new_energy_link] = JuMP.@constraint(m, [st in E, y in years],
         new_energy[st, y] <= emax(st) * m[:build][st, y])
     JuMP.@expression(m, energy_capex_y[y in years],
-        sum(cfg.storage_energy_capex[st] * KW_PER_MW * capex_factor(cfg, st, y) * new_energy[st, y]
+        sum(cfg.storage_energy_capex[st] * KW_PER_MW * capex_factor(cfg, st, ry[y]) * new_energy[st, y]
             for st in E; init = 0.0))
     function energy(st, y)
         d = S[st].phys.degradation
         d == 0 && !(st in E) && return hours[st] * available_capacity[st, y]
         f = 1 - d
         rl = get(params.remaining_life, st, 0)
-        alive = rl == 0 || params.renew_existing || y <= rl
-        ex = alive ? params.existing_capacity[st] * f^(y - 1) : 0.0
+        alive = rl == 0 || params.renew_existing || ry[y] <= rl
+        ex = alive ? params.existing_capacity[st] * f^(ry[y] - 1) : 0.0
         bought(yp) = st in E ? new_energy[st, yp] : hours[st] * newcap[st, yp]
         nw = st in sets.candidates ?
-             sum(bought(yp) * f^(y - yp) for yp in 1:y
-                 if y - yp < params.costs[st].lifetime_years; init = 0.0) : 0.0
+             sum(bought(yp) * f^(ry[y] - ry[yp]) for yp in 1:y
+                 if ry[y] - ry[yp] < params.costs[st].lifetime_years; init = 0.0) : 0.0
         return hours[st] * ex + nw
     end
     JuMP.@expression(m, storage_energy[st in sets.storages, y in years], energy(st, y))

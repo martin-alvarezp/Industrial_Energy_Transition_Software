@@ -36,7 +36,7 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
                          shadow_prices::Bool = true)
     fin = extract_financials(im)
     cap = extract_capacity(im)
-    return Results(
+    r = Results(
         im.site.name,
         scenario,
         im.config,
@@ -56,6 +56,18 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         _measures_bought(im),
         _storage_energy(im),
     )
+    # años hito (R6): las tablas llevan el año RELATIVO real, no el índice
+    ry = im.sets.year_of
+    if ry != collect(im.sets.years)
+        for df in (r.new_capacity, r.available_capacity, r.dispatch, r.cost_breakdown,
+                   r.emissions, r.measures, r.storage_energy)
+            hasproperty(df, :year) && (df.year = [ry[y] for y in df.year])
+        end
+        for (t, y) in r.investment_year
+            r.investment_year[t] = ry[y]
+        end
+    end
+    return r
 end
 
 # energía de cada almacenamiento por año (R2): disponible y comprada
@@ -80,7 +92,7 @@ function _measures_bought(im::IETOModel)
         em.id in JuMP.axes(im.model[:em_buy], 1) || continue
         JuMP.value(im.model[:em_buy][em.id, y]) > 0.5 &&
             push!(df, (em.id, em.name, em.carrier, y, em.reduction,
-                       em.capex * capex_factor(im.config, em.id, y)))
+                       em.capex * capex_factor(im.config, em.id, im.sets.year_of[y])))
     end
     return df
 end

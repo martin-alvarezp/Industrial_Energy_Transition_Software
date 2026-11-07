@@ -49,6 +49,7 @@ export function toConfig(cfg) {
     year_factors: cfg.year_factors ?? {},                   // R3: factores por año
     financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
     financing_years: cfg.financing_years ?? 0,
+    milestone_years: cfg.milestone_years ?? [],             // R6: años hito
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

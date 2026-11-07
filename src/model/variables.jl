@@ -54,13 +54,13 @@ function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
     techs = vcat(sets.dispatch_techs, sets.storages)
     alive(t, y) = begin
         rl = get(params.remaining_life, t, 0)
-        rl == 0 || params.renew_existing || y <= rl
+        rl == 0 || params.renew_existing || sets.year_of[y] <= rl
     end
     JuMP.@expression(m, available_capacity[t in techs, y in years],
         (alive(t, y) ? params.existing_capacity[t] : 0.0) +
         (t in sets.candidates ?
          sum(new_capacity[t, yp] for yp in 1:y
-             if y - yp < params.costs[t].lifetime_years; init = 0.0) : 0.0))
+             if sets.year_of[y] - sets.year_of[yp] < params.costs[t].lifetime_years; init = 0.0) : 0.0))
 
     return m
 end

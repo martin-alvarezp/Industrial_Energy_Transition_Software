@@ -69,10 +69,11 @@ struct ModelParameters
     arc_eff::Dict{Symbol,Float64}                    # key → η de transporte en (0,1]
 end
 
-function _scaled_matrix(base::Vector{Float64}, rate::Float64, years::UnitRange{Int})
-    m = Matrix{Float64}(undef, length(base), length(years))
-    for y in years
-        m[:, y] .= base .* (1.0 + rate)^(y - 1)
+# ry[y] = año relativo real del índice y (R6: años hito)
+function _scaled_matrix(base::Vector{Float64}, rate::Float64, ry::AbstractVector{<:Integer})
+    m = Matrix{Float64}(undef, length(base), length(ry))
+    for (y, r) in enumerate(ry)
+        m[:, y] .= base .* (1.0 + rate)^(r - 1)
     end
     return m
 end
@@ -88,6 +89,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     sets = build_sets(site, cfg)
     nsteps = n_steps(site)
     years = sets.years
+    ry = sets.year_of        # año real de cada índice (R6)
 
     weight = [ts.weight_hours for ts in site.timesteps]
 
@@ -95,19 +97,19 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     for (c, ps) in site.prices
         c == :grid_export && continue
         esc = get(cfg.price_escalation, c, 0.0)
-        price[c] = _scaled_matrix(ps.values, esc, years)
+        price[c] = _scaled_matrix(ps.values, esc, ry)
         for y in years   # factores por año (R3), sobre la escalación
-            price[c][:, y] .*= year_factor(cfg, :price, c, y)
+            price[c][:, y] .*= year_factor(cfg, :price, c, ry[y])
         end
     end
 
-    demand = Dict(c => _scaled_matrix(d.values, cfg.demand_growth, years)
+    demand = Dict(c => _scaled_matrix(d.values, cfg.demand_growth, ry)
                   for (c, d) in site.demands)
     for (c, M) in demand, y in years
-        M[:, y] .*= year_factor(cfg, :demand, c, y)
+        M[:, y] .*= year_factor(cfg, :demand, c, ry[y])
     end
 
-    discount = [discount_factor(cfg.wacc, y) for y in years]
+    discount = [discount_factor(cfg.wacc, ry[y]) for y in years]
 
     costs = Dict{Symbol,TechCosts}()
     existing = Dict{Symbol,Float64}()
@@ -165,9 +167,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     for id in sort!(collect(keys(mkts)))
         mk = mkts[id]
         esc = get(cfg.price_escalation, mk.carrier, 0.0)
-        market_price[id] = _scaled_matrix(mk.price, esc, years)
+        market_price[id] = _scaled_matrix(mk.price, esc, ry)
         for y in years   # R3: factor del mercado y del vector
-            market_price[id][:, y] .*= year_factor(cfg, :price, id, y) * year_factor(cfg, :price, mk.carrier, y)
+            market_price[id][:, y] .*= year_factor(cfg, :price, id, ry[y]) * year_factor(cfg, :price, mk.carrier, ry[y])
         end
         market_carrier[id] = mk.carrier
         market_dir[id] = mk.direction
@@ -185,12 +187,12 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                 grid0 = get(site.sources, :grid_import, nothing)
                 on_grid = grid0 !== nothing && mk.carrier == grid0.output_carrier
                 [on_grid && !isempty(cfg.grid_ef_by_year) ?
-                 cfg.grid_ef_by_year[y] : base for y in years]
+                 cfg.grid_ef_by_year[ry[y]] : base for y in years]
             end
         else
             zeros(length(years))
         end
-        market_ef[id] .*= [year_factor(cfg, :emission_factor, id, y) for y in years]   # R3
+        market_ef[id] .*= [year_factor(cfg, :emission_factor, id, ry[y]) for y in years]   # R3
         market_demand_charge[id] = mk.direction == :buy ? mk.demand_charge : 0.0
         if mk.connection != Symbol("")
             side = mk.direction == :buy ? conn_buy : conn_sell
@@ -236,7 +238,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         end
     end
 
-    cap_net = [emissions_cap_net(cfg, y) for y in years]
+    cap_net = [emissions_cap_net(cfg, ry[y]) for y in years]
 
     # agregados del carrier de red (diagnóstico y retro-compat)
     grid = get(site.sources, :grid_import, nothing)
@@ -282,16 +284,19 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     # vence (remaining_life > 0) se recompra al vencer — y cada vida útil
     # después — pagando su CAPEX; la capacidad nunca cae (BaU renovación).
     N = cfg.horizon_years
-    renewal_capex = zeros(N)
+    renewal_capex = zeros(length(years))
     if cfg.renew_existing
         for (id, rl) in remaining_life
             (rl > 0 && existing[id] > 0) || continue
-            y = rl + 1
-            while y <= N
-                # se renueva al precio de ESE año (3.1)
-                renewal_capex[y] += costs[id].capex_per_kw * capex_factor(cfg, id, y) *
+            yr = rl + 1
+            while yr <= N
+                # se renueva al precio de ESE año (3.1), cargado en el hito
+                # que cubre ese año (R6; sin hitos, el mismo año)
+                k = milestone_index(ry, yr)
+                k === nothing && break
+                renewal_capex[k] += costs[id].capex_per_kw * capex_factor(cfg, id, yr) *
                                     KW_PER_MW * existing[id]
-                y += max(costs[id].lifetime_years, 1)
+                yr += max(costs[id].lifetime_years, 1)
             end
         end
     end
@@ -300,7 +305,8 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     forced = Tuple{Symbol,Int,Float64}[]
     for (t, yr, mw) in cfg.forced_builds
         yrel = cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : yr
-        push!(forced, (t, yrel, Float64(mw)))
+        k = milestone_index(ry, yrel)          # R6: en el hito que lo cubre
+        k === nothing || push!(forced, (t, k, Float64(mw)))
     end
 
     # net metering (M2b): el crédito por kWh neteado vale el precio RETAIL

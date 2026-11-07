@@ -31,7 +31,7 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     # reglas de construcción (R1): fuera de la ventana no se compra; si se
     # compra, al menos min_build MW (la binaria build ya marca la compra)
     m[:build_window] = [JuMP.@constraint(m, build[t, y] == 0)
-                        for t in sets.candidates, y in years if !build_allowed(cfg, t, y)]
+                        for t in sets.candidates, y in years if !build_allowed(cfg, t, sets.year_of, y)]
     m[:min_build] = [JuMP.@constraint(m, new_capacity[t, y] >= cfg.min_build[t] * build[t, y])
                      for t in sets.candidates, y in years if get(cfg.min_build, t, 0.0) > 0]
     # unidades enteras (3.2): con tamaño de unidad la compra es u·n, n ∈ ℤ≥0

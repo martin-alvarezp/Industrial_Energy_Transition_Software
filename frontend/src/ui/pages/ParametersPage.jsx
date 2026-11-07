@@ -98,6 +98,18 @@ export default function ParametersPage({ route }) {
                      onChange={(e) => set({ horizon_years: Math.max(1, +e.target.value) })} />
             </Field>
           </div>
+          {/* años hito (R6): solo esos se optimizan y se ven */}
+          <Field t={t} label={t("par.milestones")}>
+            <input className="ui-input" data-testid="milestones" placeholder={t("par.allYears")}
+                   key={(draft.milestone_years ?? []).join(",")}
+                   defaultValue={(draft.milestone_years ?? []).join(", ")}
+                   onBlur={(e) => {
+                     const v = e.target.value.split(/[,;\s]+/).filter(Boolean).map(Number)
+                       .filter((x) => Number.isInteger(x) && x > 0);
+                     set({ milestone_years: [...new Set(v)].sort((a, b) => a - b) });
+                   }} />
+          </Field>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.milestonesHint")}</p>
         </section>
 
         <section className="ui-card ui-card-pad">

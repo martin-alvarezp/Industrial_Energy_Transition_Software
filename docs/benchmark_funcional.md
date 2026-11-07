@@ -482,3 +482,18 @@ días tipo (k por año) con cronología.
   Oráculos: el valor presente de las n cuotas es el capital (test_financing.jl
   y verify:finance), i = 0 da 1/n, y el VAN con y sin financiamiento es
   idéntico. Parámetros → tasa y plazo. E2E en `verify:capex`.
+- ✅ **R6 · Años hito elegidos por el usuario** (2026-11-07). `milestone_years`
+  (calendario si hay año base; vacío = todos los años). El modelo optimiza
+  solo esos años: el índice `y` recorre los hitos y todo lo que depende del
+  año real (descuento, escalación, vida útil, degradación, factores,
+  trayectorias de carbono y del tope, valor residual, depreciación, anualidad)
+  usa el año del hito. Lo que ocurre entre hitos (compras forzadas,
+  renovaciones) se carga en el hito siguiente; una ventana de construcción
+  vale en el hito que cubre ese tramo. Las tablas de resultados llevan el año
+  real; los selectores de año de Resultados muestran solo los hitos.
+  Oráculos (test_milestones.jl): VAN = Σ de los años hito de la corrida
+  completa descontados en su año, vida útil en años reales, compras
+  forzadas al hito siguiente. Goldens `hitos_n5`, `hitos_vida_forzada_n6` y
+  `demo_hitos_n10` (verify:wasm 48/48). Julia 1697/1697. Parámetros → "Años
+  hito". *Limitación:* TIR y payback del caso de inversión suponen años
+  consecutivos.
