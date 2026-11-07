@@ -399,6 +399,14 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # flexibilidad de carga (5.4): vectores con demanda, fracción en [0,1]
+    for (c, f) in cfg.demand_flexibility
+        haskey(site.demands, c) || push!(problems,
+            "scenario_config.yaml: demand_flexibility nombra '$c', que no tiene demanda")
+        0 <= f <= 1 || push!(problems,
+            "scenario_config.yaml: demand_flexibility[$c] debe estar en [0,1] (valor: $f)")
+    end
+    cfg.flex_cost >= 0 || push!(problems, "scenario_config.yaml: flex_cost debe ser ≥ 0")
     # medidas de eficiencia (5.3): vector con demanda, reducción en (0,1], CAPEX ≥ 0
     let ids = Symbol[]
         for em in cfg.efficiency_measures

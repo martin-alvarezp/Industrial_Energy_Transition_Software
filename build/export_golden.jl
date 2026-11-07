@@ -168,4 +168,11 @@ s19, c19 = apply_scenario(site0, with_config(cfg0; horizon_years = 5,
     efficiency_measures = [EfficiencyMeasure(:motores, "Motores IE4", :electricity, 0.08, 1.5e6),
                            EfficiencyMeasure(:aislacion, "Aislación", :hot_water, 0.12, 0.8e6)]), :least_cost)
 dump("medidas_eficiencia_n5", s19, c19)
+# 20 · flexibilidad de carga (5.4): el sitio de arbitraje sin batería con 20 %
+# desplazable y costo de 10 USD/MWh, y el demo con 15 % eléctrico flexible y
+# cargos por demanda (mover carga baja la punta)
+s20, c20 = st_site(IDEAL_STORAGE; existing = 0.0)
+dump("flex_arbitraje_n1", s20, with_config(c20; demand_flexibility = Dict(:electricity => 0.2), flex_cost = 10.0))
+dump("demo_flex_n5", site0, with_config(cfg0; horizon_years = 5,
+     demand_flexibility = Dict(:electricity => 0.15, :hot_water => 0.1), flex_cost = 2.0))
 println("fixtures dorados en ", out)

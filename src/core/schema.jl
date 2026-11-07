@@ -363,5 +363,7 @@ function load_scenario_config(path::AbstractString)
                                             Symbol(e["carrier"]), Float64(e["reduction"]),
                                             Float64(e["capex"]))
                           for e in get(d, "efficiency_measures", [])],
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "demand_flexibility", Dict())),
+        _get_num(d, "flex_cost", 0.0),
     )
 end

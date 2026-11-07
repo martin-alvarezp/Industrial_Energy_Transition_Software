@@ -202,12 +202,18 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
         varop += t.variable_opex * v * w[s - 1];
       }
+      // (la carga desplazada de 5.4 se suma después, una vez por año)
       // arranques (2.1): parte del OPEX variable, como en Julia
       if (t.type === "converter" && (t.startup_cost ?? 0) > 0 && hasCommitment(t) && unitMw(t) > 0)
         for (const s of steps)
           varop += t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
                    w[s - 1] / (ts[s - 1].duration_hours ?? 1);
     }
+    // carga desplazada (5.4): costo por MWh movido, en el OPEX variable
+    if ((cfg.flex_cost ?? 0) > 0)
+      for (const [c, f] of Object.entries(cfg.demand_flexibility ?? {}))
+        if (f > 0 && site.demands?.[c])
+          for (const s of steps) varop += cfg.flex_cost * V(`fdn_${sane(c)}_${s}_${y}`) * w[s - 1];
     for (const mk of buys) for (const s of steps)
       energy += mk.price[s - 1] * esc(mk.carrier_id, y) *
                 V(`mf_${sane(mk.market_id)}_${s}_${y}`) * w[s - 1];

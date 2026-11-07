@@ -350,3 +350,13 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   exactamente el VAN del demo con la demanda eléctrica × 0,9. Golden
   `medidas_eficiencia_n5` (verify:wasm 29/29); Parámetros → "Medidas de
   eficiencia"; E2E en `verify:measures`.
+- ✅ **5.4 · Flexibilidad de carga** (2026-11-07). `demand_flexibility` (por
+  vector, fracción de la demanda que se puede mover dentro de su período, el
+  día tipo) y `flex_cost` (USD por MWh movido, dentro del OPEX variable). La
+  demanda efectiva es d + sube − baja, con sube y baja ≤ f·d, y la energía de
+  cada período se conserva. Oráculos con precio 50/150 y 10 MW planos: con
+  20 % flexible se ahorran exactamente 876 000 USD/año; con 10 USD/MWh se
+  suman 87 600; si mover cuesta más que el diferencial, no se mueve. Goldens
+  `flex_arbitraje_n1` y `demo_flex_n5` (verify:wasm 31/31); Parámetros →
+  "Flexibilidad de carga"; E2E en `verify:measures` (el VAN pasa de 72,33 a
+  70,34 MUSD).

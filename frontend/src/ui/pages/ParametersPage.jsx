@@ -258,6 +258,26 @@ export default function ParametersPage({ route }) {
               )}
             </>;
           })()}
+          {/* flexibilidad de carga (5.4): % de cada demanda desplazable en el día */}
+          <h4 className="par-sub">{t("par.flex")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.flexHint")}</p>
+          <div className="par-row">
+            {Object.keys(twin.siteJson.demands ?? {}).map((c) => (
+              <Field key={c} t={t} label={c} unit="%">
+                <input className="ui-input" type="number" min={0} max={100} step={1} data-flex={c}
+                       value={+(((draft.demand_flexibility ?? {})[c] ?? 0) * 100).toFixed(2)}
+                       onChange={(e) => {
+                         const v = (+e.target.value || 0) / 100;
+                         const { [c]: _, ...rest } = draft.demand_flexibility ?? {};
+                         set({ demand_flexibility: v > 0 ? { ...rest, [c]: v } : rest });
+                       }} />
+              </Field>
+            ))}
+            <Field t={t} label={t("par.flexCost")} unit={`${cur}/MWh`}>
+              <input className="ui-input" type="number" min={0} data-testid="flex-cost"
+                     value={draft.flex_cost ?? 0} onChange={(e) => set({ flex_cost: +e.target.value || 0 })} />
+            </Field>
+          </div>
           {/* medidas de eficiencia (5.3): reducen la demanda de un vector */}
           <h4 className="par-sub">{t("par.effMeasures")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.effMeasuresHint")}</p>

@@ -129,6 +129,36 @@ await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "netwo
 step("el resumen muestra la medida", await waitText("Nueva medida", 30000));
 step("y no inventa «Renovaciones» por su CAPEX", !(await text()).includes("Renovaciones"));
 
+// flexibilidad de carga (5.4): 20 % eléctrico desplazable ⇒ mismo plan con
+// más libertad: el VAN no puede empeorar respecto de la corrida anterior
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-flex="electricity"]', { timeout: 30000 });
+await p.evaluate(() => {
+  const inp = document.querySelector('[data-flex="electricity"]');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  set.call(inp, "20"); inp.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Flexible");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pf = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Flexible");
+  if (r) { pf = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+step("corrida flexible resuelta por el motor real con 20 % eléctrico",
+     pf?.source === "api" && pf.result.meta.feasible &&
+     pf.result.assumptions.scenario_config.demand_flexibility?.electricity === 0.2);
+step("la flexibilidad no empeora el VAN", pf.result.kpis.npv <= pe.result.kpis.npv + 1,
+     `${(pe.result.kpis.npv / 1e6).toFixed(2)} → ${(pf.result.kpis.npv / 1e6).toFixed(2)} MUSD`);
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");

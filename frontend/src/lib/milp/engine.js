@@ -33,6 +33,8 @@ export function toConfig(cfg) {
     exclusive_groups: cfg.exclusive_groups ?? [],
     requires: cfg.requires ?? [],
     efficiency_measures: cfg.efficiency_measures ?? [],
+    demand_flexibility: cfg.demand_flexibility ?? {},
+    flex_cost: cfg.flex_cost ?? 0,
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

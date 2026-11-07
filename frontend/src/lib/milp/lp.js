@@ -241,6 +241,9 @@ export function buildLP(site0, cfg0) {
   const commitInt = commitmentInteger(cfg);
   // medidas de eficiencia (5.3) sobre vectores con demanda
   const EMs = (cfg.efficiency_measures ?? []).filter((em) => site.demands?.[em.carrier]);
+  // flexibilidad de carga (5.4): vectores con fracción desplazable
+  const FX = Object.entries(cfg.demand_flexibility ?? {})
+    .filter(([c, f]) => f > 0 && site.demands?.[c]).map(([c]) => c).sort();
   const { prev, plen } = chronology(ts);
 
   // combustible con mercado de compra ⇒ lleva balance
@@ -374,6 +377,10 @@ export function buildLP(site0, cfg0) {
               addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                   p.ratio * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
+    // carga desplazada (5.4): costo por MWh movido, dentro del OPEX variable
+    if ((cfg.flex_cost ?? 0) > 0)
+      for (const c of FX) for (const s of steps)
+        addDed(`fdn_${sane(c)}_${s}_${y}`, D * cfg.flex_cost * w[s - 1]);
     // CAPEX de las medidas de eficiencia del año (5.3; no deducible, como el CAPEX)
     for (const em of EMs) add(`em_${sane(em.id)}_${y}`, D * em.capex * capexFactor(cfg, em.id, y));
     // ETS (4.2): derechos sobre el alcance 1 sobre la asignación gratuita
@@ -465,6 +472,11 @@ export function buildLP(site0, cfg0) {
           }
           const dem = demandNode(c) === n
             ? (site.demands?.[c]?.[s - 1] ?? 0) * growth(y) : 0;
+          // carga desplazada (5.4): demanda efectiva = dem + sube − baja
+          if (dem && FX.includes(c)) {
+            inc(t, `fup_${sane(c)}_${s}_${y}`, -1);
+            inc(t, `fdn_${sane(c)}_${s}_${y}`, 1);
+          }
           // medidas activas reducen la demanda: r·dem·Σ_{y'≤y} em (al lado izquierdo)
           if (dem) for (const em of EMs) if (em.carrier === c)
             for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, em.reduction * dem);
@@ -772,6 +784,22 @@ export function buildLP(site0, cfg0) {
     if (yrel >= 1 && yrel <= N && cands.some((t) => t.tech_id === tech))
       row(`forced_${sane(tech)}_${yrel}`,
           { [`nc_${sane(tech)}_${yrel}`]: 1 }, ">=", mw);
+  }
+  // flexibilidad de carga (5.4): sube/baja ≤ f·d y neutral por período
+  for (const c of FX) {
+    const f = cfg.demand_flexibility[c], id = sane(c);
+    for (const y of years) {
+      for (const s of steps) {
+        const d = (site.demands[c][s - 1] ?? 0) * growth(y);
+        row(`fupc_${id}_${s}_${y}`, { [`fup_${id}_${s}_${y}`]: 1 }, "<=", f * d);
+        row(`fdnc_${id}_${s}_${y}`, { [`fdn_${id}_${s}_${y}`]: 1 }, "<=", f * d);
+      }
+      seasonSteps.forEach((grp, pi) => {
+        const t = T();
+        for (const s of grp) { inc(t, `fup_${id}_${s}_${y}`, dt[s - 1]); inc(t, `fdn_${id}_${s}_${y}`, -dt[s - 1]); }
+        row(`fneu_${id}_${pi}_${y}`, t, "=", 0);
+      });
+    }
   }
   // medidas de eficiencia (5.3): binarias, a lo más una compra en el horizonte
   for (const em of EMs) {
