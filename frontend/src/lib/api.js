@@ -104,6 +104,8 @@ export function toOverrides(cfg) {
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
     commitment: cfg.commitment ?? "auto",   // 2.1: entero en despacho, lineal en planificación
+    capex_learning: cfg.capex_learning ?? {},   // 3.1: CAPEX por año
+    capex_by_year: cfg.capex_by_year ?? {},
     // parámetros del escenario que la vista Parámetros permite sobrescribir;
     // sólo viajan si el usuario los cambió (si no, rige el YAML del sitio)
     ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => cfg[k] != null).map((k) => [k, cfg[k]])),

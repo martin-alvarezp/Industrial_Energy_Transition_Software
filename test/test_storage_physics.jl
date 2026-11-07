@@ -8,7 +8,7 @@
 #   costo/día = 50·(120 + E/ηc) + 150·(120 − E·ηd)
 # (la potencia de 10 MW nunca limita: 12 h alcanzan para 50 MWh).
 
-include("helpers_storage.jl")
+@isdefined(st_site) || include("helpers_storage.jl")
 
 daycost(E; ηc = 1.0, ηd = 1.0) = 50 * (120 + E / ηc) + 150 * (120 - E * ηd)
 

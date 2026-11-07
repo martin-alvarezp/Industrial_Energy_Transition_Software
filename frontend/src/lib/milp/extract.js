@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -165,7 +165,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       const rl = t.remaining_life ?? 0;
       if (rl > 0 && t.existing_capacity > 0)
         for (let y = rl + 1; y <= N; y += Math.max(t.lifetime_years, 1))
-          renewalCapex[y - 1] += t.capex_per_kw * 1000 * t.existing_capacity;
+          renewalCapex[y - 1] += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * t.existing_capacity;
     }
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
@@ -185,7 +185,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     let capex = renewalCapex[y - 1], fixed = fixedCharges, varop = 0,
         energy = 0, dcharges = 0, exportRev = 0, s1 = 0, s2 = 0,
         resGen = 0, demTot = 0;
-    for (const t of cands) capex += t.capex_per_kw * 1000 * V(`nc_${sane(t.tech_id)}_${y}`);
+    for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`);
     for (const t of [...convs, ...gens, ...stors]) {
       fixed += t.fixed_opex * availOf(t, y);
       for (const s of steps) {
@@ -263,7 +263,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           ? cfg.depreciation_years : tc.lifetime_years;
         for (const yp of years)
           if (yp <= y && y < yp + Dp)
-            dep += tc.capex_per_kw * 1000 * V(`nc_${sane(tc.tech_id)}_${yp}`) / Dp;
+            dep += tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yp) * 1000 * V(`nc_${sane(tc.tech_id)}_${yp}`) / Dp;
       }
       tax = -tr * (fixed + varop + energy + dcharges + carbon + offCost - exportRev)
             - tr * dep;
@@ -284,7 +284,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   if (cfg.salvage_value) {
     let salv = 0;
     for (const t of cands) for (const y of years)
-      salv += t.capex_per_kw * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) *
+      salv += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) *
               Math.max(0, (t.lifetime_years - (N - y + 1)) / t.lifetime_years);
     if (salv > 1e-9) {
       const last = cost_breakdown[N - 1];

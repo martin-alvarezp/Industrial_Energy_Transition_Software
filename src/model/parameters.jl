@@ -264,7 +264,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
             (rl > 0 && existing[id] > 0) || continue
             y = rl + 1
             while y <= N
-                renewal_capex[y] += costs[id].capex_per_kw * KW_PER_MW * existing[id]
+                # se renueva al precio de ESE año (3.1)
+                renewal_capex[y] += costs[id].capex_per_kw * capex_factor(cfg, id, y) *
+                                    KW_PER_MW * existing[id]
                 y += max(costs[id].lifetime_years, 1)
             end
         end

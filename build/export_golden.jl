@@ -124,4 +124,12 @@ s13, c13 = st_site(fis; N = 3)
 dump("alm_fisica_n3", s13, c13)
 s14, c14 = st_site(fis; N = 4, existing = 0.0, investable = true, max_new = 10.0)
 dump("alm_inversion_n4", s14, with_config(c14; repeat_investments = true))
+# 13 · CAPEX por año (3.1): curva de aprendizaje y trayectoria explícita,
+# junto con lo que usa el CAPEX del año de compra — escudo fiscal, valor
+# residual y presupuesto
+dump("demo_capex_por_anio_n5", site0,
+     with_config(cfg0; horizon_years = 5, tax_rate = 0.27, salvage_value = true,
+                 capex_budget = 40e6,
+                 capex_learning = Dict(:battery => 0.12, :heat_pump => 0.05),
+                 capex_by_year = Dict(:pv => [1.3, 1.1, 0.9, 0.8])))
 println("fixtures dorados en ", out)

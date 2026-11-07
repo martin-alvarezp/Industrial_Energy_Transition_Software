@@ -384,6 +384,19 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # CAPEX por año (3.1): tecnologías que existen, factores ≥ 0, caída < 100 %
+    for (id, r) in cfg.capex_learning
+        id in all_tech_ids(site) || push!(problems,
+            "scenario_config.yaml: capex_learning nombra '$id', que no es una tecnología del sitio")
+        0 <= r < 1 || push!(problems,
+            "scenario_config.yaml: capex_learning[$id] debe estar en [0,1) (valor: $r)")
+    end
+    for (id, v) in cfg.capex_by_year
+        id in all_tech_ids(site) || push!(problems,
+            "scenario_config.yaml: capex_by_year nombra '$id', que no es una tecnología del sitio")
+        all(>=(0), v) || push!(problems,
+            "scenario_config.yaml: capex_by_year[$id] tiene factores negativos")
+    end
     cfg.commitment in (:auto, :integer, :linear) || push!(problems,
         "scenario_config.yaml: commitment debe ser auto, integer o linear (valor: $(cfg.commitment))")
     # modo despacho (1.3): capacidades fijas de tecnologías que existen, ≥ 0

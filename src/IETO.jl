@@ -65,7 +65,7 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export uses_commitment, part_load_points, input_driver,
+export capex_factor, uses_commitment, part_load_points, input_driver,
        StoragePhysics, IDEAL_STORAGE, eta_charge, eta_discharge, soc_band,
        OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
        Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,

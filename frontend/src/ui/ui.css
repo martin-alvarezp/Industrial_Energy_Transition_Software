@@ -658,3 +658,9 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
      su lugar exacto (los extremos de la pista) */
   .ui-legacy .roadmap-axis .ticks span:not(:first-child):not(:last-child) { display: none; }
 }
+
+/* CAPEX por año (3.1): fila que se acomoda en pantallas chicas */
+.par-capex { flex-wrap: wrap; row-gap: 6px; }
+.par-capex-name { flex: 1 1 140px; min-width: 0; }
+.par-capex-num { width: 96px; max-width: 100%; }
+.par-capex-traj { flex: 1 1 160px; min-width: 0; max-width: 260px; }

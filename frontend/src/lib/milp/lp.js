@@ -121,6 +121,14 @@ export function fixInfrastructure(site, cfg) {
   };
 }
 
+/** Multiplicador del CAPEX de `tech` comprado en el año relativo `y` (3.1,
+ *  espejo de capex_factor): trayectoria explícita, curva de aprendizaje o 1. */
+export const capexFactor = (cfg, tech, y) => {
+  const v = cfg?.capex_by_year?.[tech];
+  if (v?.length) return v[Math.min(y, v.length) - 1];
+  return Math.pow(1 - (cfg?.capex_learning?.[tech] ?? 0), y - 1);
+};
+
 // ── operación detallada (2.1) — espejo de src/constraints/operation.jl ──
 /** ¿Unit commitment? (carga mínima, arranques o tiempos mínimos) */
 export const hasCommitment = (t) =>
@@ -265,7 +273,7 @@ export function buildLP(site0, cfg0) {
       const rl = t.remaining_life ?? 0;
       if (rl > 0 && t.existing_capacity > 0)
         for (let y = rl + 1; y <= N; y += Math.max(t.lifetime_years, 1))
-          renewalCapex[y - 1] += t.capex_per_kw * 1000 * t.existing_capacity;
+          renewalCapex[y - 1] += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * t.existing_capacity;
     }
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
@@ -293,17 +301,18 @@ export function buildLP(site0, cfg0) {
     constant += D * renewalCapex[y - 1];
     constDed(D * fixedCharges);
     for (const tc of cands) {
-      add(`nc_${sane(tc.tech_id)}_${y}`, D * tc.capex_per_kw * 1000);
+      const cpk = tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y);   // CAPEX del año de compra (3.1)
+      add(`nc_${sane(tc.tech_id)}_${y}`, D * cpk * 1000);
       if (cfg.salvage_value) {
         const frac = Math.max(0, (tc.lifetime_years - (N - y + 1)) / tc.lifetime_years);
-        add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * tc.capex_per_kw * 1000 * frac);
+        add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * cpk * 1000 * frac);
       }
       // escudo fiscal: −t·capex/D en la ventana de depreciación desde y
       if (t > 0) {
         const Dp = depYears(tc);
         for (let yy = y; yy <= Math.min(y + Dp - 1, N); yy++)
           add(`nc_${sane(tc.tech_id)}_${y}`,
-              -disc[yy - 1] * t * tc.capex_per_kw * 1000 / Dp);
+              -disc[yy - 1] * t * cpk * 1000 / Dp);
       }
     }
     for (const tc of [...convs, ...gens, ...stors]) {
@@ -680,7 +689,7 @@ export function buildLP(site0, cfg0) {
     const tb = T();
     for (const tc of cands)
       for (const y of years)
-        inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * 1000);
+        inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
     row("budget", tb, "<=",
         cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
   }

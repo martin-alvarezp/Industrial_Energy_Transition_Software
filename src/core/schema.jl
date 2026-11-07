@@ -341,5 +341,9 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Float64}(Symbol(k) => Float64(v)
                              for (k, v) in get(d, "fixed_capacity", Dict())),
         Symbol(get(d, "commitment", "auto")),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v)
+                             for (k, v) in get(d, "capex_learning", Dict())),
+        Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
+                                     for (k, v) in get(d, "capex_by_year", Dict())),
     )
 end

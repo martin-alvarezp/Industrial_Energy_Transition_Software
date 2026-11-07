@@ -49,7 +49,7 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
     if cfg.capex_budget !== nothing
         params = build_parameters(site, cfg)
         renewals = sum(params.renewal_capex; init = 0.0)
-        forced = sum(params.costs[t].capex_per_kw * KW_PER_MW * mw
+        forced = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW * mw
                      for (t, y, mw) in params.forced_builds
                      if t in sets.candidates && 1 <= y <= N; init = 0.0)
         if renewals + forced > cfg.capex_budget + 1e-6

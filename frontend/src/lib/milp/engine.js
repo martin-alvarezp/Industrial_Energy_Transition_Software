@@ -40,6 +40,8 @@ export function toConfig(cfg) {
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
     commitment: cfg.commitment ?? "auto",
+    capex_learning: cfg.capex_learning ?? {},
+    capex_by_year: cfg.capex_by_year ?? {},
   };
 }
 

@@ -439,7 +439,34 @@ struct ScenarioConfig
     # ── operación detallada (benchmark 2.1) ──
     commitment::Symbol                       # :auto (entero en despacho, lineal en
                                              # planificación) | :integer | :linear
+    # ── parámetros por año (benchmark 3.1) ──
+    capex_learning::Dict{Symbol,Float64}     # caída anual del CAPEX por tecnología
+                                             # (0.05 ⇒ ×(1−0.05)^(y−1))
+    capex_by_year::Dict{Symbol,Vector{Float64}}  # multiplicador del CAPEX por año
+                                             # relativo (1 = el del catálogo; más
+                                             # allá del último, el último). Manda
+                                             # sobre capex_learning.
 end
+
+"""
+Multiplicador del CAPEX de `tech` comprado en el año relativo `y` (3.1):
+trayectoria explícita, o curva de aprendizaje, o 1.
+"""
+function capex_factor(cfg::ScenarioConfig, tech::Symbol, y::Integer)
+    v = get(cfg.capex_by_year, tech, nothing)
+    v !== nothing && !isempty(v) && return v[min(y, length(v))]
+    return (1 - get(cfg.capex_learning, tech, 0.0))^(y - 1)
+end
+
+# retro-compatibilidad: 28 campos → CAPEX constante en el tiempo
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
+               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
+               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
+                   dso, Dict{Symbol,Float64}(fc), cm,
+                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}())
 
 "¿El unit commitment va con variables enteras? (:auto ⇒ solo en despacho)"
 commitment_integer(cfg::ScenarioConfig) =
@@ -452,7 +479,8 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                cur::AbstractString, dso::Bool, fc::AbstractDict) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), :auto)
+                   dso, Dict{Symbol,Float64}(fc), :auto,
+                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}())
 
 # retro-compatibilidad: 25 campos → sin modo despacho
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -461,7 +489,8 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                cur::AbstractString) =
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   false, Dict{Symbol,Float64}(), :auto)
+                   false, Dict{Symbol,Float64}(), :auto,
+                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}())
 
 # retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =

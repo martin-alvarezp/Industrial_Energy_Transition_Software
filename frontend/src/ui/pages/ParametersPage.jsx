@@ -195,6 +195,33 @@ export default function ParametersPage({ route }) {
               </button>
             </>
           )}
+          {/* CAPEX por año (3.1): curva de aprendizaje o trayectoria explícita */}
+          <h4 className="par-sub">{t("par.capexYears")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.capexYearsHint")}</p>
+          {candidates.map((c) => {
+            const learn = draft.capex_learning?.[c.tech_id] ?? 0;
+            const traj = draft.capex_by_year?.[c.tech_id];
+            const setKey = (field, val) => {
+              const { [c.tech_id]: _, ...rest } = draft[field] ?? {};
+              set({ [field]: val == null ? rest : { ...rest, [c.tech_id]: val } });
+            };
+            return (
+              <div key={c.tech_id} className="par-forced par-capex" data-capex={c.tech_id}>
+                <span className="par-capex-name">{c.name}</span>
+                <input className="ui-input par-capex-num" type="number" step={0.5} min={0} max={99}
+                       value={+(learn * 100).toFixed(2)} aria-label={t("par.learning")} data-capex-learning={c.tech_id}
+                       onChange={(e) => { const v = +e.target.value; setKey("capex_learning", v > 0 ? v / 100 : null); }} />
+                <span className="unit">{t("par.learning")}</span>
+                <input className="ui-input par-capex-traj" placeholder="1, 0.9, 0.85"
+                       defaultValue={traj?.join(", ") ?? ""} aria-label={t("par.trajectory")} data-capex-traj={c.tech_id}
+                       onBlur={(e) => {
+                         const v = e.target.value.split(/[,;\s]+/).filter(Boolean).map(Number);
+                         setKey("capex_by_year", v.length && v.every((x) => Number.isFinite(x) && x >= 0) ? v : null);
+                       }} />
+                <span className="unit">{t("par.trajectory")}</span>
+              </div>
+            );
+          })}
           </>}
         </section>
       </div>

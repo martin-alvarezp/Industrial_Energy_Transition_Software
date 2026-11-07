@@ -234,3 +234,15 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   (gas con alcance 1); verify:wasm 19/19. Editor: "Eficiencia a carga
   parcial" (el primer punto se sincroniza con la carga mínima).
   **Bloque 2 completo.**
+- ✅ **3.1 · CAPEX por año** (2026-11-07). `capex_learning` (caída anual por
+  tecnología) y `capex_by_year` (factores por año relativo sobre el CAPEX del
+  catálogo; el último se repite; manda sobre la caída) en la configuración,
+  así que se apilan como escenarios. El factor del **año de compra** se aplica
+  a las compras nuevas, a las renovaciones, al escudo fiscal, al valor residual
+  y al presupuesto. Tests: la identidad CAPEX_y = Σ MW × catálogo × factor, y
+  "un año 1 a ×10 posterga la compra al año 2". Golden
+  `demo_capex_por_anio_n5` (con impuestos, valor residual y presupuesto);
+  verify:wasm 20/20. Parámetros: sección "CAPEX por año"; los costos por ítem
+  del resumen usan el mismo factor (antes la diferencia habría aparecido como
+  "Renovaciones"). E2E `verify:capex`. verify:ui detectó que las filas nuevas
+  se salían de la pantalla en celular; quedó corregido.

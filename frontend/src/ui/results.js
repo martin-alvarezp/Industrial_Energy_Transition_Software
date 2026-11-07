@@ -23,6 +23,15 @@ export function yearsOf(result) {
 export const nominalFactor = (impact, inflation, y) =>
   impact === "nominal" ? (1 + (inflation ?? 0)) ** (y - 1) : 1;
 
+// CAPEX del año de compra (3.1; espejo de capex_factor del motor): la config
+// efectiva de la corrida trae la trayectoria o la curva de aprendizaje
+function capexFactor(result, tech, y) {
+  const cfg = result?.assumptions?.scenario_config ?? {};
+  const v = cfg.capex_by_year?.[tech];
+  if (v?.length) return v[Math.min(y, v.length) - 1];
+  return Math.pow(1 - (cfg.capex_learning?.[tech] ?? 0), y - 1);
+}
+
 function techIndex(siteJson) {
   return Object.fromEntries((siteJson?.technologies ?? []).map((t) => [t.tech_id, t]));
 }
@@ -49,7 +58,7 @@ export function investmentByYear(result, siteJson, labels) {
       const t = T[c.tech];
       if (!t) continue;
       const k = t.name ?? c.tech;
-      items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0);
+      items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, c.tech, cb.year);
     }
     const sum = Object.values(items).reduce((a, b) => a + b, 0);
     const rest = cb.capex - sum;
@@ -189,7 +198,7 @@ export function measures(result, siteJson) {
     if (c.new_mw > 1e-6) {
       const t = T[c.tech];
       rows.push({ tech: c.tech, name: t?.name ?? c.tech, year: calYear(result, c.year), mw: c.new_mw,
-                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0), t });
+                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0) * capexFactor(result, c.tech, c.year), t });
     }
   }
   return rows.sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));
