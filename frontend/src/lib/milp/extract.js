@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -333,6 +333,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     }
   }
 
+  // anualidad de financiamiento (R4): vista, fuera del total y del VAN
+  capexAnnuity(cost_breakdown.map((c) => c.capex), cfg.financing_rate ?? 0, cfg.financing_years ?? 0)
+    .forEach((v, i) => { cost_breakdown[i].capex_annuity = v; });
   const npv = cost_breakdown.reduce((a, c) => a + c.npv, 0);
   return {
     meta,

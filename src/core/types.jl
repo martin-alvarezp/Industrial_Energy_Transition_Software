@@ -546,6 +546,37 @@ struct ScenarioConfig
                                              # siguiente (antes del primero, 1). Tipos:
                                              # price, demand, emission_factor,
                                              # demand_charge, fixed_opex, variable_opex
+    # ── financiamiento como vista (benchmark R4): el objetivo usa la inversión
+    # pagada; la anualidad solo se reporta ──
+    financing_rate::Float64                  # tasa del crédito (0,0784 = 7,84 %)
+    financing_years::Int                     # plazo en años; 0 = sin anualidad
+end
+
+# retro-compatibilidad: 52 campos → sin financiamiento
+ScenarioConfig(a::Vararg{Any,52}) = ScenarioConfig(a..., 0.0, 0)
+
+"""
+    annuity_factor(rate, years) -> Float64
+
+Cuota anual PREPAGABLE (se paga al inicio de cada año) por USD financiado:
+CRF(i, n) / (1 + i), con CRF = i / (1 − (1 + i)^−n); 1/n si i = 0.
+"""
+function annuity_factor(rate::Real, years::Integer)
+    years <= 0 && return 0.0
+    rate == 0 && return 1 / years
+    return rate / (1 - (1 + rate)^(-years)) / (1 + rate)
+end
+
+"""
+    capex_annuity(capex, rate, years) -> Vector{Float64}
+
+Anualidad de cada año del horizonte: cada CAPEX del año `yp` se paga en
+`years` cuotas desde `yp` (las que caen fuera del horizonte no se muestran).
+"""
+function capex_annuity(capex::AbstractVector{<:Real}, rate::Real, years::Integer)
+    a = annuity_factor(rate, years)
+    N = length(capex)
+    return [sum((capex[yp] * a for yp in 1:y if y - yp < years); init = 0.0) for y in 1:N]
 end
 
 # retro-compatibilidad: 51 campos → sin factores por año

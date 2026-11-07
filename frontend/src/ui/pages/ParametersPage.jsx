@@ -124,6 +124,19 @@ export default function ParametersPage({ route }) {
                      onChange={(e) => set({ capex_budget_annual_musd: e.target.value === "" ? null : +e.target.value })} />
             </Field>
           </div>
+          <div className="par-grid">
+            <Field t={t} label={t("par.financingRate")} unit="%">
+              <input className="ui-input" type="number" min={0} max={99} step={0.01} data-testid="financing-rate"
+                     value={draft.financing_rate != null ? +(draft.financing_rate * 100).toFixed(4) : ""}
+                     onChange={(e) => set({ financing_rate: e.target.value === "" ? 0 : Math.max(0, +e.target.value) / 100 })} />
+            </Field>
+            <Field t={t} label={t("par.financingYears")} unit={t("par.buildYears")}>
+              <input className="ui-input" type="number" min={0} step={1} data-testid="financing-years"
+                     value={draft.financing_years || ""} placeholder={t("par.noFinancing")}
+                     onChange={(e) => set({ financing_years: Math.max(0, Math.round(+e.target.value || 0)) })} />
+            </Field>
+          </div>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.financingHint")}</p>
           <Toggle on={draft.salvage_value} onChange={(x) => set({ salvage_value: x })} label={t("par.salvage")} />
         </section>
 

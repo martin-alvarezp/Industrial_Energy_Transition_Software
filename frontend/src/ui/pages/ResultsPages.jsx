@@ -13,7 +13,7 @@ import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { ChartPanel, StackedBars, ChartLegend } from "../charts.jsx";
 import NeedsRun, { RunPicker } from "../components/NeedsRun.jsx";
 import {
-  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors, lcoeByTech,
+  calYear, stackRows, investmentByYear, annuityByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors, lcoeByTech,
   horizonKpis,
 } from "../results.js";
 import { techKind } from "../techkind.js";
@@ -90,11 +90,28 @@ export function CostsPage() {
   }), [t]);
   const unit = `mn ${currency() === "USD" ? "$" : currency()} (real)`;
   const prefs = useMemo(() => entityColors(siteJson, labels), [siteJson, labels]);
+  // anualidad de financiamiento (R4): vista; el VAN usa la inversión pagada
+  const scfg = result?.assumptions?.scenario_config ?? {};
+  const fin = { r: scfg.financing_rate ?? 0, n: scfg.financing_years ?? 0 };
+  const [capexView, setCapexView] = useState("paid");
   return (
     <Page icon={NAV_ICONS.costs} title={t("nav.costs")} help={t("res.costsHelp")}>
       {result && siteJson && <>
         <ChartPanel title={t("sum.investmentCost")}>
-          <StackedBars {...stackRows(investmentByYear(result, siteJson, labels), result, { scale: 1e6 })} prefs={prefs} unit={unit} height={340} />
+          {fin.n > 0 && (
+            <div className="ui-seg light outlined small" role="group" data-testid="capex-view" style={{ marginBottom: 8 }}>
+              {["paid", "annuity"].map((k) => (
+                <button key={k} className={capexView === k ? "on" : ""} data-view={k}
+                        onClick={() => setCapexView(k)}>{t(`res.capexView.${k}`)}</button>
+              ))}
+            </div>
+          )}
+          {fin.n > 0 && capexView === "annuity" &&
+            <p className="ui-hint" style={{ marginTop: 0 }}>{t("res.annuityHint", { r: (fin.r * 100).toFixed(2), n: fin.n })}</p>}
+          <StackedBars {...stackRows(fin.n > 0 && capexView === "annuity"
+                          ? annuityByYear(investmentByYear(result, siteJson, labels), fin.r, fin.n)
+                          : investmentByYear(result, siteJson, labels), result, { scale: 1e6 })}
+                       prefs={prefs} unit={unit} height={340} />
         </ChartPanel>
         <ChartPanel title={t("sum.opex")}>
           <StackedBars {...stackRows(opexByYear(result, siteJson, labels), result, { scale: 1e6 })} prefs={prefs} unit={unit} height={380} />

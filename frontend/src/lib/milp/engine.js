@@ -47,6 +47,8 @@ export function toConfig(cfg) {
     storage_energy_capex: cfg.storage_energy_capex ?? {},   // R2: energía propia
     storage_energy_max: cfg.storage_energy_max ?? {},
     year_factors: cfg.year_factors ?? {},                   // R3: factores por año
+    financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
+    financing_years: cfg.financing_years ?? 0,
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

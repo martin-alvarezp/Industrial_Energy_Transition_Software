@@ -140,6 +140,14 @@ export const buildAllowed = (cfg, tech, y) => {
   return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
 };
 export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+/** Anualidad prepagable por USD financiado (R4), espejo de annuity_factor. */
+export const annuityFactor = (rate, n) =>
+  !(n > 0) ? 0 : rate === 0 || !rate ? 1 / n : rate / (1 - Math.pow(1 + rate, -n)) / (1 + rate);
+/** Anualidad de cada año: cada CAPEX del año yp en n cuotas desde yp (R4). */
+export const capexAnnuity = (capex, rate, n) => {
+  const a = annuityFactor(rate, n);
+  return capex.map((_, i) => capex.reduce((s, c, j) => s + (j <= i && i - j < n ? c * a : 0), 0));
+};
 /** Factor por año en escalón (R3), espejo de year_factor en types.jl. */
 export const yearFactor = (cfg, kind, target, y) => {
   const pts = cfg.year_factors?.[kind]?.[target];

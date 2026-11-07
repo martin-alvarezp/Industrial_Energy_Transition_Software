@@ -542,6 +542,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         cand(t) || push!(problems, "fixed_capex: '$t' no es una tecnología candidata a inversión")
         c >= 0 || push!(problems, "fixed_capex['$t']: debe ser ≥ 0")
     end
+    # R4: financiamiento
+    0 <= cfg.financing_rate < 1 || push!(problems,
+        "scenario_config.yaml: financing_rate debe estar en [0,1) (valor: $(cfg.financing_rate))")
+    cfg.financing_years >= 0 || push!(problems, "scenario_config.yaml: financing_years debe ser ≥ 0")
     # R3: factores por año — tipo conocido, objetivo que existe, factor ≥ 0
     techs_all = Set(all_tech_ids(site))
     for (kind, targets) in cfg.year_factors

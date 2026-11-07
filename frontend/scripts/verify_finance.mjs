@@ -11,7 +11,8 @@ import { readFileSync } from "node:fs";
 import highsLoader from "highs";
 import { buildLP } from "../src/lib/milp/lp.js";
 import { extractPayload } from "../src/lib/milp/extract.js";
-import { lcoeByTech } from "../src/ui/results.js";
+import { lcoeByTech, annuityByYear } from "../src/ui/results.js";
+import { annuityFactor, capexAnnuity } from "../src/lib/milp/lp.js";
 import { investmentCase } from "../src/lib/finance.js";
 
 const problems = [];
@@ -40,6 +41,19 @@ const ic = investmentCase(plan, base, [1, 1, 1]);
 // flujo: −40, +60, +60 ⇒ Σ = 80 ⇒ ROI = 80/100
 check(close(ic.roi, 0.8), `ROI ${ic.roi} ≠ 0,8`);
 console.log(`✓ ROI ${(100 * ic.roi).toFixed(0)} % (oráculo 80 %)`);
+
+// anualidad de financiamiento (R4): cuota prepagable CRF/(1+i); el valor
+// presente de las n cuotas es el capital, y con i = 0 es 1/n
+const af = annuityFactor(0.1, 3);
+check(close(af, 0.1 / (1 - 1.1 ** -3) / 1.1, 1e-12), `anualidad ${af}`);
+check(close([0, 1, 2].reduce((a, k) => a + af / 1.1 ** k, 0), 1, 1e-12), "VP de las cuotas ≠ capital");
+check(annuityFactor(0, 4) === 0.25 && annuityFactor(0.1, 0) === 0, "anualidad con i = 0 o sin plazo");
+const ca = capexAnnuity([100, 0, 0, 0, 50], 0.1, 3);
+check([100 * af, 100 * af, 100 * af, 0, 50 * af].every((v, i) => close(ca[i], v, 1e-12)), `capexAnnuity ${ca}`);
+const ab = annuityByYear([{ year: 1, items: { A: 100 } }, { year: 2, items: { B: 60 } }, { year: 3, items: {} }], 0, 2);
+check(close(ab[0].items.A, 50) && close(ab[1].items.A, 50) && close(ab[1].items.B, 30) &&
+      !ab[2].items.A && close(ab[2].items.B, 30), `annuityByYear ${JSON.stringify(ab)}`);
+console.log(`✓ anualidad prepagable ${af.toFixed(6)} (10 %, 3 años) · VP = capital · reparto por ítem`);
 
 if (problems.length) { console.error("\n✗ " + problems.join("\n✗ ")); process.exit(1); }
 console.log("\nFINANZAS OK");

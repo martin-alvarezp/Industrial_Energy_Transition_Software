@@ -471,3 +471,14 @@ días tipo (k por año) con cronología.
   *Pendiente:* la eficiencia de un conversor por año (cambia razones de los
   puertos en todo el balance) y la forma del perfil de demanda por año; hoy
   se escala el perfil, no se reemplaza.
+- ✅ **R4 · Financiamiento con anualidad, como vista** (2026-11-07).
+  `financing_rate` y `financing_years` (0 = sin anualidad). La optimización
+  sigue usando la inversión pagada en su año (como la herramienta de
+  referencia); la anualidad solo se reporta: cada CAPEX del año se paga en n
+  cuotas **prepagables** desde ese año, cuota = CRF(i, n) / (1 + i), y las
+  cuotas fuera del horizonte no se muestran. `cost_breakdown.capex_annuity`
+  (Julia y espejo web, fuera del total y del VAN). Costos tiene el selector
+  "Pagada / Anualidad", que reparte cada ítem de inversión en sus cuotas.
+  Oráculos: el valor presente de las n cuotas es el capital (test_financing.jl
+  y verify:finance), i = 0 da 1/n, y el VAN con y sin financiamiento es
+  idéntico. Parámetros → tasa y plazo. E2E en `verify:capex`.

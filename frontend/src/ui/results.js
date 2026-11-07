@@ -7,7 +7,7 @@
 
 import { CATEGORICAL, SLR } from "./palette.js";
 import { techColor, carrierColor } from "../lib/twin.js";
-import { yearFactor } from "../lib/milp/lp.js";
+import { yearFactor, annuityFactor } from "../lib/milp/lp.js";
 
 const KW = 1000;
 
@@ -78,6 +78,20 @@ export function investmentByYear(result, siteJson, labels) {
     rows.push({ year: cb.year, items });
   }
   return rows;
+}
+
+/** Inversión por año como ANUALIDAD de financiamiento (R4): cada ítem de un
+ *  año se paga en n cuotas prepagables desde ese año. */
+export function annuityByYear(rows, rate, n) {
+  const a = annuityFactor(rate, n);
+  return rows.map((r, i) => {
+    const items = {};
+    rows.forEach((rp, j) => {
+      if (j <= i && i - j < n)
+        for (const [k, v] of Object.entries(rp.items)) items[k] = (items[k] ?? 0) + v * a;
+    });
+    return { year: r.year, items };
+  });
 }
 
 /**

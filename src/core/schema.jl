@@ -382,5 +382,7 @@ function load_scenario_config(path::AbstractString)
                 Symbol(tg) => Tuple{Int,Float64}[(Int(p[1]), Float64(p[2])) for p in pts]
                 for (tg, pts) in targets)
             for (kind, targets) in get(d, "year_factors", Dict())),
+        _get_num(d, "financing_rate", 0.0),
+        Int(get(d, "financing_years", 0)),
     )
 end

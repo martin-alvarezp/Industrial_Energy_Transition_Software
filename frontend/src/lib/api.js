@@ -119,6 +119,8 @@ export function toOverrides(cfg) {
     storage_energy_capex: cfg.storage_energy_capex ?? {},   // R2: energía propia
     storage_energy_max: cfg.storage_energy_max ?? {},
     year_factors: cfg.year_factors ?? {},                   // R3: factores por año
+    financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
+    financing_years: cfg.financing_years ?? 0,
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

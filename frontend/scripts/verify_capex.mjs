@@ -222,6 +222,45 @@ const ep = pf.result.cost_breakdown.map((c) => c.energy_purchases);
 step("desde el año 2 las compras de energía caen con el precio", ep[1] < 0.8 * ep[0] && ep[2] < 0.8 * ep[0],
      ep.slice(0, 3).map((x) => (x / 1e6).toFixed(2)).join(" · ") + " MUSD");
 
+// 7 · financiamiento (R4): 8 % a 10 años; el VAN no cambia y Costos muestra la anualidad
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="financing-rate"]', { timeout: 30000 });
+for (const [sel, v] of [['[data-testid="financing-rate"]', "8"], ['[data-testid="financing-years"]', "10"]]) {
+  await p.evaluate((sel, v) => {
+    const inp = document.querySelector(sel);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, sel, v);
+  await sleep(150);
+}
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Financiado");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pn = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Financiado");
+  if (r) { pn = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const cbn = pn?.result?.cost_breakdown ?? [];
+const an = 0.08 / (1 - 1.08 ** -10) / 1.08;
+const badA = cbn.filter((c, i) => Math.abs(c.capex_annuity -
+  cbn.reduce((s, x, j) => s + (j <= i && i - j < 10 ? x.capex * an : 0), 0)) > 1e-3 * Math.max(1, c.capex_annuity));
+step("la anualidad de cada año es Σ CAPEX × cuota prepagable (8 %, 10 años)",
+     pn?.source === "api" && pn.result.meta.feasible && cbn.length > 0 && badA.length === 0 &&
+     Math.abs(pn.result.kpis.npv - pf.result.kpis.npv) <= 1e-6 * Math.abs(pf.result.kpis.npv),
+     `${badA.length} años no cuadran · VAN ${(pn?.result?.kpis?.npv / 1e6).toFixed(3)} vs ${(pf.result.kpis.npv / 1e6).toFixed(3)} MUSD`);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/costs`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="capex-view"] [data-view="annuity"]', { timeout: 30000 });
+await p.click('[data-testid="capex-view"] [data-view="annuity"]');
+step("Costos cambia la inversión a anualidad", await waitText("cuotas prepagables", 10000));
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nCAPEX OK: curva de aprendizaje y trayectoria → motor real → CAPEX por año exacto.");
