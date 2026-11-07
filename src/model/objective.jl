@@ -83,7 +83,10 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     cprice(y) = isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :
                 cfg.carbon_price_by_year[y]   # trayectoria regulatoria (M7)
-    JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y])
+    # ETS (4.2): derechos sobre el alcance 1 por encima de la asignación
+    # gratuita; el excedente se vende (término negativo). Suma al costo de carbono.
+    JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y] +
+        (cfg.ets_price > 0 ? cfg.ets_price * (m[:scope1_y][y] - cfg.ets_free_allowance) : 0.0))
     JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
     # ventas :billing pagan su precio de inyección; las :net_metering (M2b)
     # ingresan el crédito neteado O_p · retail medio del período (el banco

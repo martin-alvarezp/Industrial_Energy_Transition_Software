@@ -70,6 +70,11 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
         net[y] <= params.emissions_cap_net[y])
     m[:gross_cap] = JuMP.@constraint(m, [y in years],
         gross[y] <= cfg.emissions_cap_gross)
+    # topes por alcance (4.2, "Annual Scope 1/2 emission limit")
+    cfg.scope1_cap === nothing || (m[:scope1_cap] = JuMP.@constraint(m, [y in years],
+        scope1_y[y] <= cfg.scope1_cap))
+    cfg.scope2_cap === nothing || (m[:scope2_cap] = JuMP.@constraint(m, [y in years],
+        scope2_y[y] <= cfg.scope2_cap))
 
     return m
 end

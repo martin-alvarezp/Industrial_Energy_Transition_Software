@@ -278,6 +278,20 @@ export function buildLP(site0, cfg0) {
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
 
+  // alcance 1 del año y: {var: tCO₂e por unidad} (combustibles quemados × factor)
+  const scope1Terms = (y) => {
+    const t = {};
+    for (const cv of convs)
+      for (const p of portsOf(cv).ins)
+        if (catOf[p.carrier] === "fuel") {
+          const f = efTab[`${p.carrier}|scope1`] ?? 0;
+          if (f) for (const s of steps)
+            for (const [v, k] of inputTerms(cv, s, y, curveIds))
+              t[v] = (t[v] ?? 0) + f * p.ratio * w[s - 1] * k;
+        }
+    return t;
+  };
+
   // ── objetivo ──
   const obj = {};   // var → coef
   let constant = 0;
@@ -348,6 +362,11 @@ export function buildLP(site0, cfg0) {
               addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                   p.ratio * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
+    // ETS (4.2): derechos sobre el alcance 1 sobre la asignación gratuita
+    if ((cfg.ets_price ?? 0) > 0) {
+      for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
+      constDed(-D * cfg.ets_price * (cfg.ets_free_allowance ?? 0));
+    }
     addDed(`off_${y}`, D * cfg.offset_price);
     // cargos por demanda (M2/M2b)
     for (const mk of buys) {
@@ -636,14 +655,8 @@ export function buildLP(site0, cfg0) {
     }
     // emisiones: gross = scope1 + scope2 · net = gross − off · caps
     const tg = { [`ge_${y}`]: 1 };
-    for (const cv of convs)
-      for (const p of portsOf(cv).ins)
-        if (catOf[p.carrier] === "fuel") {
-          const f = efTab[`${p.carrier}|scope1`] ?? 0;
-          for (const s of steps)
-            for (const [v, k] of inputTerms(cv, s, y, curveIds))
-              inc(tg, v, -f * p.ratio * w[s - 1] * k);
-        }
+    const s1 = scope1Terms(y);
+    for (const [v, c] of Object.entries(s1)) inc(tg, v, -c);
     for (const mk of buys) {
       const f = mktEF[mk.market_id][y - 1];
       if (f) for (const s of steps)
@@ -659,6 +672,13 @@ export function buildLP(site0, cfg0) {
     }
     row(`ncap_${y}`, { [`ne_${y}`]: 1 }, "<=", capNet(y));
     row(`gcapE_${y}`, { [`ge_${y}`]: 1 }, "<=", cfg.emissions_cap_gross);
+    // topes por alcance (4.2): alcance 1 directo; alcance 2 = bruto − alcance 1
+    if (cfg.scope1_cap != null) row(`s1cap_${y}`, { ...s1 }, "<=", cfg.scope1_cap);
+    if (cfg.scope2_cap != null) {
+      const t2 = { [`ge_${y}`]: 1 };
+      for (const [v, c] of Object.entries(s1)) inc(t2, v, -c);
+      row(`s2cap_${y}`, t2, "<=", cfg.scope2_cap);
+    }
   }
   // inversión: nc ≤ maxnew·b · a-lo-más-una compra · forzadas
   const binaries = [];

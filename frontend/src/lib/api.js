@@ -98,6 +98,10 @@ export function toOverrides(cfg) {
       ({ tech: f.tech, year: +f.year, mw: +f.mw })),
     capex_budget: cfg.capex_budget_musd == null ? null : cfg.capex_budget_musd * 1e6,
     capex_budget_annual: cfg.capex_budget_annual_musd == null ? null : cfg.capex_budget_annual_musd * 1e6,
+    scope1_cap: cfg.scope1_cap ?? null,        // 4.2: topes por alcance y ETS
+    scope2_cap: cfg.scope2_cap ?? null,
+    ets_price: cfg.ets_price ?? 0,
+    ets_free_allowance: cfg.ets_free_allowance ?? 0,
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

@@ -160,6 +160,25 @@ export default function ParametersPage({ route }) {
             <Field t={t} label={t("par.capGross")} unit="tCO₂e" overridden={over("emissions_cap_gross")} siteValue={base?.emissions_cap_gross}>{num("emissions_cap_gross")}</Field>
             <Field t={t} label={t("par.carbon")} unit={`${cur}/tCO₂e`} overridden={over("carbon_price")} siteValue={base?.carbon_price}>{num("carbon_price")}</Field>
           </div>
+          {/* carbono (4.2): topes por alcance y ETS con asignación gratuita */}
+          <div className="par-row" style={{ marginTop: 10 }}>
+            <Field t={t} label={t("par.scope1Cap")} unit="tCO₂e/año">
+              <input className="ui-input" type="number" min={0} placeholder={t("par.noBudget")} data-testid="scope1-cap"
+                     value={draft.scope1_cap ?? ""} onChange={(e) => set({ scope1_cap: e.target.value === "" ? null : +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.scope2Cap")} unit="tCO₂e/año">
+              <input className="ui-input" type="number" min={0} placeholder={t("par.noBudget")} data-testid="scope2-cap"
+                     value={draft.scope2_cap ?? ""} onChange={(e) => set({ scope2_cap: e.target.value === "" ? null : +e.target.value })} />
+            </Field>
+            <Field t={t} label={t("par.etsPrice")} unit={`${cur}/tCO₂e`}>
+              <input className="ui-input" type="number" min={0} data-testid="ets-price"
+                     value={draft.ets_price ?? 0} onChange={(e) => set({ ets_price: +e.target.value || 0 })} />
+            </Field>
+            <Field t={t} label={t("par.etsFree")} unit="tCO₂e/año">
+              <input className="ui-input" type="number" min={0} data-testid="ets-free"
+                     value={draft.ets_free_allowance ?? 0} onChange={(e) => set({ ets_free_allowance: +e.target.value || 0 })} />
+            </Field>
+          </div>
           <Toggle on={draft.allow_offsets} onChange={(x) => set({ allow_offsets: x })} label={t("par.offsets")} />
           {draft.allow_offsets && (
             <div className="par-row" style={{ marginTop: 10 }}>

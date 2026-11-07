@@ -271,5 +271,13 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   paga su carga), dividido por el valor presente de lo que produce. Lo
   existente no suma CAPEX. `verify:finance` con oráculos a mano (bomba 66,54
   USD/MWh, caldera 100; ROI 80 %) y la tabla en el E2E `verify:capex`.
-- 🔜 **Resto del bloque 4** (tarifas por horas de utilización y por bloques,
-  ETS con asignación gratuita, topes por alcance): por hacer.
+- ✅ **4.2 · Carbono: topes por alcance y ETS** (2026-11-07).
+  `scope1_cap` y `scope2_cap` (t/año) además de los topes bruto y neto;
+  `ets_price` y `ets_free_allowance`: derechos sobre el alcance 1 por encima
+  de lo asignado gratis. Si se emite menos, el excedente se vende (costo
+  negativo). Va dentro del costo de carbono. Oráculos (test_carbon.jl): un tope
+  de alcance 1 lleva el calor que no cabe a la caldera eléctrica, el ETS cobra
+  precio·(alcance 1 − gratis) en ambos sentidos, y desde ~250 USD/t conviene
+  electrificar. Goldens `carbono_alcances_n1` y `demo_ets_n5` (verify:wasm
+  24/24); Parámetros → topes por alcance y ETS; E2E `verify:carbon`.
+- 🔜 **4.3 · Tarifas por horas de utilización y por bloques**: por hacer.

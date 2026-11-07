@@ -251,7 +251,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       demTot += series.reduce((a, v, i) => a + v * w[i], 0) *
                 Math.pow(1 + cfg.demand_growth, y - 1);
 
-    const carbon = cprice(y) * ge;
+    // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita
+    const carbon = cprice(y) * ge +
+      ((cfg.ets_price ?? 0) > 0 ? cfg.ets_price * (s1 - (cfg.ets_free_allowance ?? 0)) : 0);
     const offCost = cfg.offset_price * off;
     // ajuste fiscal (M9): −t·deducibles − t·depreciación de inversiones nuevas
     let tax = 0;

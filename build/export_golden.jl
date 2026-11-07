@@ -141,4 +141,11 @@ dump("unidades_enteras_n1", discrete_case(4.0)...)
 s16, c16 = apply_scenario(site0, with_config(cfg0; horizon_years = 5,
                                              capex_budget_annual = 5e6), :least_cost)
 dump("demo_presupuesto_anual_n5", s16, c16)
+# 16 · carbono (4.2): tope de alcance 1 + ETS con asignación gratuita en el
+# sitio de prueba, y el demo con ETS sobre su gas y tope de alcance 1
+s17, c17 = carbon_site()
+dump("carbono_alcances_n1", s17, with_config(c17; scope1_cap = 5000.0, scope2_cap = 1.0e5,
+                                              ets_price = 30.0, ets_free_allowance = 2000.0))
+dump("demo_ets_n5", site0, with_config(cfg0; horizon_years = 5, ets_price = 60.0,
+                                        ets_free_allowance = 5000.0, scope1_cap = 8000.0))
 println("fixtures dorados en ", out)

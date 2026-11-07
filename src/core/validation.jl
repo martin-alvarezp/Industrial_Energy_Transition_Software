@@ -384,6 +384,12 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # carbono (4.2)
+    for (k, v) in (("scope1_cap", cfg.scope1_cap), ("scope2_cap", cfg.scope2_cap))
+        v === nothing || v >= 0 || push!(problems, "scenario_config.yaml: $k debe ser ≥ 0 (valor: $v)")
+    end
+    cfg.ets_price >= 0 || push!(problems, "scenario_config.yaml: ets_price debe ser ≥ 0")
+    cfg.ets_free_allowance >= 0 || push!(problems, "scenario_config.yaml: ets_free_allowance debe ser ≥ 0")
     cfg.capex_budget_annual === nothing || cfg.capex_budget_annual >= 0 || push!(problems,
         "scenario_config.yaml: capex_budget_annual debe ser ≥ 0 (valor: $(cfg.capex_budget_annual))")
     # CAPEX por año (3.1): tecnologías que existen, factores ≥ 0, caída < 100 %

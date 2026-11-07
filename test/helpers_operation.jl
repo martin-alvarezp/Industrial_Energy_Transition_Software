@@ -42,3 +42,20 @@ function discrete_case(unit)
     return site, cfg
 end
 
+
+# Carbono (4.2): el sitio de operación sin bomba, con una caldera a GAS
+# (alcance 1, 0,2 t/MWh de gas) y la caldera eléctrica (alcance 2, 0,4 t/MWh).
+function carbon_site()
+    site, cfg = op_site(NO_OPERATION_LIMITS; hp_existing = 0.0)   # sin bomba
+    carriers = copy(site.carriers)
+    carriers[:gas] = Carrier(:gas, "Gas", "MWh", :fuel)
+    gb = Converter(:gb, "Caldera gas", [ConverterPort(:gas, 1 / 0.9)], [ConverterPort(:heat, 1.0)],
+                   20.0, 0.0, false, TCOP, Float64[], 0)
+    convs = Dict(:gb => gb, :eb => site.converters[:eb], :hp => site.converters[:hp])
+    prices = Dict(:gas => PriceSeries(:gas, fill(40.0, 24)))
+    efs = [EmissionFactor(:gas, :scope1, 0.2), EmissionFactor(:electricity, :scope2, 0.4)]
+    s = IETO._with(site; carriers = carriers, converters = convs, prices = prices,
+                   emission_factors = efs)
+    return s, cfg
+end
+

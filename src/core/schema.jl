@@ -347,5 +347,9 @@ function load_scenario_config(path::AbstractString)
                                      for (k, v) in get(d, "capex_by_year", Dict())),
         get(d, "capex_budget_annual", nothing) === nothing ? nothing :
             Float64(d["capex_budget_annual"]),
+        get(d, "scope1_cap", nothing) === nothing ? nothing : Float64(d["scope1_cap"]),
+        get(d, "scope2_cap", nothing) === nothing ? nothing : Float64(d["scope2_cap"]),
+        _get_num(d, "ets_price", 0.0),
+        _get_num(d, "ets_free_allowance", 0.0),
     )
 end
