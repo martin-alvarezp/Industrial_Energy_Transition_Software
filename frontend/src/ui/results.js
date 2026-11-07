@@ -99,7 +99,9 @@ export function opexByYear(result, siteJson, labels) {
         const pr = priceSeries(siteJson, p.carrier);
         if (!pr) continue;
         let usd = 0;
-        for (const r of series(t.tech_id, "output", y)) usd += r.value * p.ratio * (w[r.step - 1] ?? 0) * (pr[r.step - 1] ?? 0);
+        // carga parcial (2.3): la entrada equivalente si el motor la reporta
+        const rows = series(t.tech_id, "input", y).length ? series(t.tech_id, "input", y) : series(t.tech_id, "output", y);
+        for (const r of rows) usd += r.value * p.ratio * (w[r.step - 1] ?? 0) * (pr[r.step - 1] ?? 0);
         add(labels.trade(carriers[p.carrier]?.name ?? p.carrier), usd * esc(cfg, p.carrier, y));
       }
     }

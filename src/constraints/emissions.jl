@@ -40,7 +40,7 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
                   if haskey(site.carriers, p.carrier) &&
                      site.carriers[p.carrier].category == :fuel]
     JuMP.@expression(m, scope1_y[y in years],
-        sum(ef_scope1(p[2]) * p[3] * dispatch[p[1], s, y] * w[s]
+        sum(ef_scope1(p[2]) * p[3] * input_driver(m, p[1], s, y) * w[s]
             for p in fuel_ports, s in steps; init = 0.0))
 
     # Scope 2: compras de mercado · factor del mercado (propio o heredado del

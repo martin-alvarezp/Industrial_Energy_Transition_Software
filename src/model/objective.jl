@@ -50,7 +50,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@expression(m, energy_purchases_y[y in years],
         sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
             for mk in sets.buy_markets, s in steps; init = 0.0) +
-        sum(params.price[p[2]][s, y] * p[3] * dispatch[p[1], s, y] * w[s]
+        sum(params.price[p[2]][s, y] * p[3] * input_driver(m, p[1], s, y) * w[s]
             for p in params.fuel_inputs, s in steps; init = 0.0))
 
     # DemandCharges_y (M2/M2b): por estación y mercado con cargo,

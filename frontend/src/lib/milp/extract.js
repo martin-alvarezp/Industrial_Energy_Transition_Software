@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -58,6 +58,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const allowed = (id) => !cfg.allowed_techs?.length || cfg.allowed_techs.includes(id);
   const techs = site.technologies.filter((t) => allowed(t.tech_id));
   const convs = techs.filter((t) => t.type === "converter");
+  // carga parcial (2.3): la entrada equivalente de los equipos con curva
+  const curveIds = new Set(convs.filter((t) => hasCommitment(t) && unitMw(t) > 0 &&
+    (t.part_load?.length ?? 0) > 0).map((t) => t.tech_id));
+  const drive = (t, s, y) => inputTerms(t, s, y, curveIds)
+    .reduce((a, [v, c]) => a + c * V(v), 0);
   const gens = techs.filter((t) => t.type === "generator");
   const stors = techs.filter((t) => t.type === "storage");
   const sources = site.technologies.filter((t) => t.type === "source");
@@ -98,6 +103,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     for (const t of [...convs, ...gens])
       dispatch.push({ tech: t.tech_id, flow: "output", year: y, step: s,
                       value: V(`d_${sane(t.tech_id)}_${s}_${y}`) });
+    for (const t of convs) if (curveIds.has(t.tech_id))
+      dispatch.push({ tech: t.tech_id, flow: "input", year: y, step: s, value: drive(t, s, y) });
     for (const st of stors) {
       const id = sane(st.tech_id);
       dispatch.push({ tech: st.tech_id, flow: "charge", year: y, step: s, value: V(`ch_${id}_${s}_${y}`) });
@@ -200,7 +207,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           site.prices?.[p.carrier])
         for (const s of steps)
           energy += site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
-                    p.ratio * V(`d_${sane(cv.tech_id)}_${s}_${y}`) * w[s - 1];
+                    p.ratio * drive(cv, s, y) * w[s - 1];
     for (const mk of buys) {
       const dc = mk.demand_charge ?? 0, cp = mk.contracted_power,
             pen = mk.excess_penalty ?? 0;
@@ -234,7 +241,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       if (catOf[p.carrier] === "fuel") {
         const f = efTab[`${p.carrier}|scope1`] ?? 0;
         for (const s of steps)
-          s1 += f * p.ratio * V(`d_${sane(cv.tech_id)}_${s}_${y}`) * w[s - 1];
+          s1 += f * p.ratio * drive(cv, s, y) * w[s - 1];
       }
     const ge = V(`ge_${y}`), ne = V(`ne_${y}`), off = V(`off_${y}`);
     s2 = ge - s1;

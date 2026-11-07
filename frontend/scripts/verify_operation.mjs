@@ -92,6 +92,9 @@ step("el editor del conversor muestra la operación detallada", true);
 await setNum("min_load", 30);
 await setNum("startup_cost", 1000);
 await setNum("min_up_hours", 4);
+// curva de carga parcial (2.3): el primer "+ punto" arma mínimo → 100 %
+await p.click('.drawer [data-pl="add"]');
+await sleep(200);
 await clickText(".drawer .btn-run", "Guardar cambios");
 let s = null;
 for (let i = 0; i < 30; i++) {
@@ -102,6 +105,9 @@ for (let i = 0; i < 30; i++) {
 const gb = s.technologies.find((t) => t.tech_id === "gas_boiler");
 step("en disco: min_load 0,3 · arranque 1000 · 4 h", gb.min_load === 0.3 && gb.startup_cost === 1000 && gb.min_up_hours === 4,
      JSON.stringify({ min_load: gb.min_load, startup_cost: gb.startup_cost, min_up_hours: gb.min_up_hours }));
+step("en disco: curva de carga parcial desde la carga mínima hasta 100 %",
+     gb.part_load?.length === 2 && gb.part_load[0][0] === 0.3 && gb.part_load[1][0] === 1,
+     JSON.stringify(gb.part_load));
 
 // 2 · planificación: el modal ofrece compromiso lineal (default) o entero
 const plan = await optimize("Plan lineal", async () => {
@@ -131,6 +137,9 @@ const dsp = await optimize("Despacho exacto", async () => {
   await select('[data-testid="run-cap-source"]', plan.run.id);
 });
 step("despacho con el parque del plan resuelto por el motor real", dsp.payload?.source === "api" && dsp.run?.feasible);
+const inRows = (dsp.payload.result.dispatch ?? []).filter((d) => d.tech === "gas_boiler" && d.flow === "input");
+step("el despacho reporta la entrada equivalente de la curva (gas_boiler · input)", inRows.length > 0,
+     `${inRows.length} pasos`);
 const sc = dsp.payload.result.assumptions.scenario_config;
 step("despacho con compromiso automático (entero)", sc.dispatch_only === true && sc.commitment === "auto");
 

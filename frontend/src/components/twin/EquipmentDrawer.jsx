@@ -26,6 +26,41 @@ function Num({ value, onChange, ...rest }) {
   );
 }
 
+/**
+ * Curva de carga parcial (2.3): puntos (carga %, η o COP). El primer punto es
+ * la carga mínima del equipo (se sincroniza con ella) y el último, 100 %.
+ */
+function PartLoadEditor({ draft, set, effLabel }) {
+  const L = useL();
+  const rows = draft.part_load ?? [];
+  // η de referencia redondeada (la que viene de los puertos trae ruido: 0,8999…)
+  const eff = +((draft.efficiency || 1).toFixed(4));
+  const write = (next) => set({ part_load: next,
+    ...(next.length ? { min_load: next[0][0] } : {}) });
+  const upd = (i, j, v) => write(rows.map((r, k) => (k === i ? (j === 0 ? [v / 100, r[1]] : [r[0], v]) : r)));
+  return (
+    <div data-testid="part-load">
+      {rows.map(([l, e], i) => (
+        <div className="range-row" key={i} style={{ marginBottom: 4 }}>
+          <Num value={+(l * 100).toFixed(2)} step={5} min={1} max={100} data-pl={`load-${i}`}
+               onChange={(v) => upd(i, 0, v)} />
+          <Num value={e} step={0.01} min={0.01} data-pl={`eff-${i}`}
+               onChange={(v) => upd(i, 1, v)} />
+          <button className="chart-toggle danger" onClick={() => write(rows.filter((_, k) => k !== i))}>×</button>
+        </div>
+      ))}
+      <div className="range-row">
+        <button className="chart-toggle" data-pl="add" onClick={() => write(rows.length
+          ? [...rows.slice(0, -1), [Math.min(0.99, (rows.at(-2)?.[0] ?? rows[0][0]) + 0.25), rows.at(-1)[1]], rows.at(-1)]
+          : [[Math.max(draft.min_load ?? 0, 0.3), +(eff * 0.9).toFixed(3)], [1, eff]])}>
+          {L("+ punto", "+ point")}
+        </button>
+        <span className="hint">{L(`carga % · ${effLabel}`, `load % · ${effLabel}`)}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Editor de una lista de puertos (entradas o salidas de un multi-vector). */
 function PortList({ label, hint, ports, options, onChange }) {
   const L = useL();
@@ -270,6 +305,11 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                 <Num value={draft.min_down_hours ?? 0} step={1} min={0} data-ops="min_down_hours"
                      onChange={(v) => set({ min_down_hours: v })} />
               </div>
+            </Field>
+            <Field label={L("Eficiencia a carga parcial", "Part-load efficiency")}
+                   hint={L("puntos crecientes de carga hasta 100 %; el primero es la carga mínima. El consumo debe ser convexo (lo normal: la eficiencia sube con la carga)",
+                           "increasing load points up to 100%; the first one is the minimum load. Consumption must be convex (the usual: efficiency rises with load)")}>
+              <PartLoadEditor draft={draft} set={set} effLabel={effLabel} />
             </Field>
             <Field label={L("Rampa máxima (% de la capacidad por hora)", "Max ramp (% of capacity per hour)")}
                    hint={L("0 = sin límite", "0 = no limit")}>

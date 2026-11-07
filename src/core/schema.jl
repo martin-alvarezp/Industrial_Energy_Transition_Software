@@ -145,17 +145,22 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
                         !isempty(strip(String(r.ports))) ? r.ports : nothing
             avail = get(profiles, id, Float64[])
             ops = operation_limits(k -> hasproperty(r, k) && !ismissing(r[k]) ? r[k] : nothing)
+            # carga parcial (2.3): JSON [[L, η], …] en la columna part_load
+            pl = hasproperty(r, :part_load) && !ismissing(r.part_load) &&
+                 !isempty(strip(String(r.part_load))) ?
+                 [(Float64(x[1]), Float64(x[2])) for x in JSON3.read(String(r.part_load))] :
+                 Tuple{Float64,Float64}[]
             if ports_raw !== nothing
                 pj = JSON3.read(String(ports_raw))
                 mk(list) = [ConverterPort(_sym(p.carrier), Float64(p.ratio)) for p in list]
                 converters[id] = Converter(id, name, mk(pj.inputs), mk(pj.outputs),
                                            Float64(ex), Float64(mx), inv, c,
-                                           avail, rlife, ops)
+                                           avail, rlife, ops, pl)
             else
                 base = Converter(id, name, inc, outc, eff, ex, mx, inv, c)
                 converters[id] = Converter(id, name, base.inputs, base.outputs,
                                            Float64(ex), Float64(mx), inv, c,
-                                           avail, rlife, ops)
+                                           avail, rlife, ops, pl)
             end
         elseif kind == :generator
             prof = get(profiles, id, Float64[])

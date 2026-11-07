@@ -145,9 +145,12 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
       if (!(e > MIN_MWH)) continue;
       const tn = techNode(t);
       const p = converterPorts(t);
+      // con curva de carga parcial (2.3) el motor reporta la entrada
+      // equivalente: el consumo real no es ratio·salida
+      const ei = E(t.tech_id, "input") || e;
       let ein = 0, eout = 0;
       for (const port of p.inputs) {
-        const v = e * port.ratio;
+        const v = ei * port.ratio;
         ein += v;
         link(carrierNode(n, port.carrier), tn, v);
         // combustibles: la compra entra al carrier desde su mercado

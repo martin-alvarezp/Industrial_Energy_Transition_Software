@@ -125,7 +125,29 @@ export function fixInfrastructure(site, cfg) {
 /** ¿Unit commitment? (carga mínima, arranques o tiempos mínimos) */
 export const hasCommitment = (t) =>
   (t.min_load ?? 0) > 0 || (t.startup_cost ?? 0) > 0 ||
-  (t.min_up_hours ?? 0) > 0 || (t.min_down_hours ?? 0) > 0;
+  (t.min_up_hours ?? 0) > 0 || (t.min_down_hours ?? 0) > 0 ||
+  (t.part_load?.length ?? 0) > 0;   // la curva de carga parcial (2.3) también
+/** Curva de carga parcial (2.3): puntos (L, I = L·η_ref/η) por MW de unidad. */
+export function partLoadPoints(t) {
+  const p = portsOf(t);
+  const etaRef = p.ins.length ? p.outs[0].ratio / p.ins[0].ratio : 1;
+  return (t.part_load ?? []).map(([L, eta]) => [L, (L * etaRef) / eta]);
+}
+/**
+ * Términos [variable, coef] de lo que multiplica a los ratios de ENTRADA de un
+ * conversor (espejo de input_driver): el despacho, o con curva de carga
+ * parcial I₁·u·on + Σ pendiente_k·tramo_k. `curveIds` = equipos con curva y
+ * unit commitment efectivo.
+ */
+export function inputTerms(t, s, y, curveIds) {
+  const id = sane(t.tech_id);
+  if (!curveIds.has(t.tech_id)) return [[`d_${id}_${s}_${y}`, 1]];
+  const P = partLoadPoints(t), u = unitMw(t);
+  const terms = [[`on_${id}_${s}_${y}`, P[0][1] * u]];
+  for (let k = 0; k < P.length - 1; k++)
+    terms.push([`pls_${id}_${k + 1}_${s}_${y}`, (P[k + 1][1] - P[k][1]) / (P[k + 1][0] - P[k][0])]);
+  return terms;
+}
 /** MW por unidad: unit_size, o el parque fijo como una unidad; 0 = indefinido */
 /** ¿Commitment entero? auto ⇒ solo en despacho (espejo de commitment_integer) */
 export const commitmentInteger = (cfg) => cfg?.commitment === "integer" ||
@@ -170,6 +192,8 @@ export function buildLP(site0, cfg0) {
   const convs = techs.filter((t) => t.type === "converter");
   const commitIds = new Set(convs.filter((t) => hasCommitment(t) && unitMw(t) > 0)
     .map((t) => t.tech_id));
+  const curveIds = new Set(convs.filter((t) => commitIds.has(t.tech_id) &&
+    (t.part_load?.length ?? 0) > 0).map((t) => t.tech_id));
   const gens = techs.filter((t) => t.type === "generator");
   const stors = techs.filter((t) => t.type === "storage");
   const sources = site.technologies.filter((t) => t.type === "source");
@@ -311,9 +335,9 @@ export function buildLP(site0, cfg0) {
         if (catOf[p.carrier] === "fuel" && !fuelWithMkt.has(p.carrier) &&
             site.prices?.[p.carrier])
           for (const s of steps)
-            addDed(`d_${sane(t.tech_id)}_${s}_${y}`,
-                D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
-                p.ratio * w[s - 1]);
+            for (const [v, c] of inputTerms(t, s, y, curveIds))
+              addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
+                  p.ratio * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
     addDed(`off_${y}`, D * cfg.offset_price);
     // cargos por demanda (M2/M2b)
@@ -378,7 +402,7 @@ export function buildLP(site0, cfg0) {
             for (const o of p.outs) if (o.carrier === c)
               inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, o.ratio);
             for (const i of p.ins) if (i.carrier === c)
-              inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, -i.ratio);
+              for (const [v, k] of inputTerms(cv, s, y, curveIds)) inc(t, v, -i.ratio * k);
           }
           for (const g of gens) if (g.output_carrier === c && nodeOf(g.tech_id) === n)
             inc(t, `d_${sane(g.tech_id)}_${s}_${y}`, 1);
@@ -444,6 +468,17 @@ export function buildLP(site0, cfg0) {
           row(`sud_${id}_${s}_${y}`, tS, ">=", 0);
           const tD = { [sd]: 1 }; inc(tD, onp, -1); inc(tD, on, 1);
           row(`sdd_${id}_${s}_${y}`, tD, ">=", 0);
+          // carga parcial (2.3): d = L₁·u·on + Σ tramo_k, tramo_k ≤ ΔL_k·u·on
+          if (curveIds.has(cv.tech_id)) {
+            const P = partLoadPoints(cv);
+            const tP = { [d]: 1, [on]: -P[0][0] * u };
+            for (let k = 0; k < P.length - 1; k++) {
+              const sg = `pls_${id}_${k + 1}_${s}_${y}`;
+              inc(tP, sg, -1);
+              row(`plw_${id}_${k + 1}_${s}_${y}`, { [sg]: 1, [on]: -(P[k + 1][0] - P[k][0]) * u }, "<=", 0);
+            }
+            row(`pld_${id}_${s}_${y}`, tP, "=", 0);
+          }
           const UT = nst(cv.min_up_hours ?? 0, s), DT = nst(cv.min_down_hours ?? 0, s);
           if (UT > 1) {
             const t2 = { [on]: 1 };
@@ -597,7 +632,8 @@ export function buildLP(site0, cfg0) {
         if (catOf[p.carrier] === "fuel") {
           const f = efTab[`${p.carrier}|scope1`] ?? 0;
           for (const s of steps)
-            inc(tg, `d_${sane(cv.tech_id)}_${s}_${y}`, -f * p.ratio * w[s - 1]);
+            for (const [v, k] of inputTerms(cv, s, y, curveIds))
+              inc(tg, v, -f * p.ratio * w[s - 1] * k);
         }
     for (const mk of buys) {
       const f = mktEF[mk.market_id][y - 1];

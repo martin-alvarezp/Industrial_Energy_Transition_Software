@@ -214,6 +214,8 @@ struct Converter
     remaining_life::Int           # años de vida útil del activo EXISTENTE (M5);
                                   # 0 = no retira en el horizonte (legacy)
     ops::OperationLimits          # operación detallada (2.1); default: ideal
+    part_load::Vector{Tuple{Float64,Float64}}  # eficiencia a carga parcial (2.3):
+                                  # (fracción de carga, η) crecientes; vacío = η fija
 end
 
 # retro-compatibilidad: 10 campos (pre-2.1) → operación ideal
@@ -221,6 +223,12 @@ Converter(id::Symbol, name::String, ins::Vector{ConverterPort},
           outs::Vector{ConverterPort}, ex::Float64, mx::Float64, inv::Bool,
           costs::TechCosts, avail::Vector{Float64}, rl::Integer) =
     Converter(id, name, ins, outs, ex, mx, inv, costs, avail, Int(rl), NO_OPERATION_LIMITS)
+# retro-compatibilidad: 11 campos (pre-2.3) → eficiencia fija
+Converter(id::Symbol, name::String, ins::Vector{ConverterPort},
+          outs::Vector{ConverterPort}, ex::Float64, mx::Float64, inv::Bool,
+          costs::TechCosts, avail::Vector{Float64}, rl::Int, ops::OperationLimits) =
+    Converter(id, name, ins, outs, ex, mx, inv, costs, avail, rl, ops,
+              Tuple{Float64,Float64}[])
 
 """
 MW por unidad del unit commitment (2.1): `unit_size` si está, o el parque
@@ -229,6 +237,20 @@ saber (invertible sin unit_size — la validación lo reporta).
 """
 unit_mw(c::Converter) = c.ops.unit_size > 0 ? c.ops.unit_size :
                         (c.investable ? 0.0 : c.existing_capacity)
+
+"¿Unit commitment? Límites de operación (2.1) o curva de carga parcial (2.3)."
+uses_commitment(c::Converter) = has_commitment(c.ops) || !isempty(c.part_load)
+
+"""
+Curva de entrada de la carga parcial (2.3), por MW de unidad: los puntos
+(L_k, I_k) con I_k = L_k · η_ref / η_k — la entrada "equivalente" (en
+unidades de la salida de referencia) que, multiplicada por el ratio de cada
+puerto de entrada, da el consumo. A plena carga con η = η_ref, I = 1.
+"""
+function part_load_points(c::Converter)
+    ηref = reference_efficiency(c)
+    return [(L, L * ηref / η) for (L, η) in c.part_load]
+end
 
 # retro-compatibilidad: 9 campos (M4) y 8 campos (pre-M4)
 Converter(id::Symbol, name::AbstractString, ins::Vector{ConverterPort},

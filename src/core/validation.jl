@@ -90,7 +90,28 @@ function validate_site(site::Site)
         end
         c.ops.min_load <= 1 || push!(problems,
             "technologies.csv[$(c.id)].min_load: es una fracción de la carga (≤ 1), valor $(c.ops.min_load)")
-        has_commitment(c.ops) && c.investable && c.ops.unit_size == 0 && push!(problems,
+        # carga parcial (2.3): cargas crecientes en (0,1] que terminan en 1,
+        # η > 0, primer punto = carga mínima, curva de entrada CONVEXA (sin
+        # convexidad el LP usaría los tramos "baratos" fuera de orden)
+        if !isempty(c.part_load)
+            Ls = first.(c.part_load); ηs = last.(c.part_load)
+            all(0 .< Ls .<= 1) && issorted(Ls; lt = <=) && isapprox(Ls[end], 1.0) ||
+                push!(problems, "technologies.csv[$(c.id)].part_load: las cargas deben " *
+                                "crecer estrictamente dentro de (0,1] y terminar en 1")
+            all(ηs .> 0) || push!(problems,
+                "technologies.csv[$(c.id)].part_load: las eficiencias deben ser > 0")
+            isapprox(Ls[1], c.ops.min_load; atol = 1e-9) || push!(problems,
+                "technologies.csv[$(c.id)].part_load: el primer punto ($(Ls[1])) debe " *
+                "coincidir con la carga mínima (min_load = $(c.ops.min_load))")
+            if length(Ls) >= 3 && all(ηs .> 0)
+                P = part_load_points(c)
+                sl = [(P[k+1][2] - P[k][2]) / (P[k+1][1] - P[k][1]) for k in 1:length(P)-1]
+                issorted(sl; lt = (a, b) -> a < b - 1e-9) || push!(problems,
+                    "technologies.csv[$(c.id)].part_load: la curva de consumo debe ser " *
+                    "convexa (el consumo marginal no puede bajar al subir la carga)")
+            end
+        end
+        uses_commitment(c) && c.investable && c.ops.unit_size == 0 && push!(problems,
             "technologies.csv[$(c.id)]: con carga mínima, arranques o tiempos mínimos un equipo " *
             "invertible necesita unit_size (MW por unidad) — sin él no se sabe cuántas unidades hay")
         isempty(c.inputs) && push!(problems,

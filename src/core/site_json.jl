@@ -132,6 +132,8 @@ function site_json(site::Site)
             v = getfield(c.ops, k)
             v == 0.0 || (nt = merge(nt, NamedTuple{(k,)}((v,))))
         end
+        isempty(c.part_load) ||
+            (nt = merge(nt, (part_load = [[L, η] for (L, η) in c.part_load],)))
         push!(techs, nt)
     end
     for id in keys(site.generators)
@@ -335,6 +337,9 @@ function site_from_json(obj; default_name::AbstractString = "twin")
             ops = operation_limits(k -> begin
                 v = _twin_get(t, k); v === nothing ? nothing : _twin_num(v, k, ctx)
             end)
+            pl_raw = _twin_get(t, :part_load)
+            pl = pl_raw === nothing ? Tuple{Float64,Float64}[] :
+                 [(_twin_num(x[1], :part_load, ctx), _twin_num(x[2], :part_load, ctx)) for x in pl_raw]
             ports = _twin_get(t, :ports)
             if ports !== nothing   # multi-puerto (CHP, electrolizador, …)
                 mkports(list, side) = [ConverterPort(
@@ -345,12 +350,12 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 outs = mkports(_twin_req(ports, :outputs, "$ctx.ports"), "outputs")
                 converters[id] = Converter(id, tname, ins, outs, Float64(ex),
                                            Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]), rlife, ops)
+                                           get(profiles, id, Float64[]), rlife, ops, pl)
             else
                 base = Converter(id, tname, inc, outc, eff, ex, mx, inv, costs)
                 converters[id] = Converter(id, tname, base.inputs, base.outputs,
                                            Float64(ex), Float64(mx), inv, costs,
-                                           get(profiles, id, Float64[]), rlife, ops)
+                                           get(profiles, id, Float64[]), rlife, ops, pl)
             end
         elseif kind == :generator
             haskey(profiles, id) || throw(SchemaError(

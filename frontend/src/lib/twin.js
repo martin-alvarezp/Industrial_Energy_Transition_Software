@@ -509,8 +509,24 @@ export function techProblems(tech, siteJson) {
   // operación detallada (2.1): espejo de validation.jl
   if (tech.type === "converter") {
     const commit = (tech.min_load ?? 0) > 0 || (tech.startup_cost ?? 0) > 0 ||
-      (tech.min_up_hours ?? 0) > 0 || (tech.min_down_hours ?? 0) > 0;
+      (tech.min_up_hours ?? 0) > 0 || (tech.min_down_hours ?? 0) > 0 ||
+      (tech.part_load?.length ?? 0) > 0;
     if ((tech.min_load ?? 0) > 1) p.push("la carga mínima no puede superar el 100 %");
+    // carga parcial (2.3): cargas crecientes que terminan en 100 % y empiezan
+    // en la carga mínima; consumo convexo (espejo de validation.jl)
+    const pl = tech.part_load ?? [];
+    if (pl.length) {
+      const Ls = pl.map((x) => x[0]);
+      if (!Ls.every((l, i) => l > 0 && l <= 1 && (i === 0 || l > Ls[i - 1])) || Math.abs(Ls.at(-1) - 1) > 1e-9)
+        p.push("la curva de carga parcial debe tener cargas crecientes que terminen en 100 %");
+      if (Math.abs(Ls[0] - (tech.min_load ?? 0)) > 1e-9)
+        p.push("el primer punto de la curva debe ser la carga mínima");
+      const ref = tech.efficiency || 1;
+      const P = pl.map(([l, e]) => [l, (l * ref) / e]);
+      const sl = P.slice(1).map((q, k) => (q[1] - P[k][1]) / (q[0] - P[k][0]));
+      if (sl.some((x, k) => k > 0 && x < sl[k - 1] - 1e-9))
+        p.push("la curva de carga parcial no es convexa: el consumo marginal no puede bajar al subir la carga");
+    }
     if (commit && tech.investable && !((tech.unit_size ?? 0) > 0))
       p.push("con carga mínima, arranques o tiempos mínimos, un equipo invertible necesita tamaño de unidad");
   }

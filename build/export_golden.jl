@@ -98,6 +98,22 @@ convs[:gas_boiler] = IETO._with(convs[:gas_boiler]; ops = OperationLimits(0.0, 0
 convs[:heat_pump] = IETO._with(convs[:heat_pump]; ops = OperationLimits(2.5, 0.3, 200.0, 0.0, 0.0, 0.5))
 dump("demo_operacion_lineal_n3", IETO._with(site0; converters = convs),
      with_config(cfg0; horizon_years = 3))
+# 11b · carga parcial (2.3): la bomba de calor con curva de COP (balance
+# eléctrico) y la caldera a gas del demo con curva de η en despacho entero
+# (compra implícita de gas y emisiones de alcance 1 con la entrada de la curva)
+s15, c15 = op_site(ops(min_load = 0.4); demand = [fill(5.0, 12); fill(8.0, 12)])
+s15 = IETO._with(s15; converters = Dict(
+    :hp => IETO._with(s15.converters[:hp]; part_load = [(0.4, 2.0), (0.7, 2.7), (1.0, 3.0)]),
+    :eb => s15.converters[:eb]))
+dump("op_carga_parcial_n1", s15, c15)
+convs2 = copy(site0.converters)
+convs2[:gas_boiler] = IETO._with(convs2[:gas_boiler];
+    ops = OperationLimits(0.0, 0.3, 0.0, 0.0, 0.0, 0.0),
+    part_load = [(0.3, 0.80), (0.65, 0.87), (1.0, 0.90)])
+dump("demo_carga_parcial_despacho_n1", IETO._with(site0; converters = convs2),
+     with_config(cfg0; horizon_years = 1, dispatch_only = true,
+                 fixed_capacity = Dict(:heat_pump => 6.0, :pv => 15.0, :battery => 4.0)))
+
 # 12 · física del almacenamiento (2.2): η de carga/descarga propias,
 # autodescarga, banda de SOC, ciclos por año y degradación por cohorte — la
 # batería existente y una invertible (la degradación cuenta desde su compra).

@@ -16,6 +16,19 @@
 # weight/Δt veces por año: el costo de arranque anual lo escala así.
 
 """
+    input_driver(m, t, s, y)
+
+Lo que multiplica a los ratios de ENTRADA de un conversor: el despacho, o —
+con curva de carga parcial (2.3)— la entrada equivalente `F` de la curva.
+Lo usan el balance, la compra de combustibles y las emisiones de alcance 1.
+"""
+function input_driver(m::JuMP.Model, t::Symbol, s::Int, y::Int)
+    F = get(JuMP.object_dictionary(m), :part_load_input, nothing)
+    F !== nothing && haskey(F, (t, s, y)) && return F[(t, s, y)]
+    return m[:dispatch][t, s, y]
+end
+
+"""
     period_chronology(site) -> (prev, periods)
 
 `periods`: los pasos de cada período en orden cronológico (hour, step_id);
@@ -102,6 +115,32 @@ function add_operation_constraints!(m::JuMP.Model, sets::ModelSets,
                 units_avail[t, y] - on[t, s, y] >=
                 sum(sd[t, k, y] for k in _lookback(prev, s, nsteps(conv[t].ops.min_down_hours, s), plen[s])))
             for t in U for s in steps for y in years if nsteps(conv[t].ops.min_down_hours, s) > 1]
+        # carga parcial (2.3): la carga de lo encendido se arma con tramos
+        #   d = L₁·u·on + Σ seg_k,  0 ≤ seg_k ≤ (L_{k+1} − L_k)·u·on
+        #   F = I₁·u·on + Σ pendiente_k·seg_k   (entrada equivalente)
+        # convexa (validada) ⇒ el LP llena los tramos en orden
+        C = [t for t in U if !isempty(conv[t].part_load)]
+        segs = [(t, k) for t in C for k in 1:length(conv[t].part_load)-1]
+        JuMP.@variable(m, part_load_seg[segs, steps, years] >= 0)
+        F = Dict{Tuple{Symbol,Int,Int},JuMP.AffExpr}()
+        for t in C
+            P = part_load_points(conv[t])
+            K = length(P)
+            for s in steps, y in years
+                for k in 1:K-1
+                    JuMP.@constraint(m, part_load_seg[(t, k), s, y] <=
+                                        (P[k+1][1] - P[k][1]) * u[t] * on[t, s, y])
+                end
+                JuMP.@constraint(m, dispatch[t, s, y] ==
+                    P[1][1] * u[t] * on[t, s, y] +
+                    sum(part_load_seg[(t, k), s, y] for k in 1:K-1; init = 0.0))
+                F[(t, s, y)] = P[1][2] * u[t] * on[t, s, y] +
+                    sum((P[k+1][2] - P[k][2]) / (P[k+1][1] - P[k][1]) *
+                        part_load_seg[(t, k), s, y] for k in 1:K-1; init = 0.0)
+            end
+        end
+        m[:part_load_input] = F
+
         # arranques: costo × veces que el paso ocurre en el año (weight/Δt)
         JuMP.@expression(m, startup_cost_y[y in years],
             sum(conv[t].ops.startup_cost * su[t, s, y] * (w[s] / Δt[s])

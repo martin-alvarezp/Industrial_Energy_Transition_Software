@@ -59,6 +59,10 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
     for k in (OPERATION_KEYS..., STORAGE_KEYS...)   # 2.1 y 2.2
         any(t -> haskey(t, k), techs) && (techdf[!, k] = [optnum(t, k) for t in techs])
     end
+    # carga parcial (2.3): JSON compacto, solo si algún equipo la usa
+    any(t -> haskey(t, :part_load), techs) &&
+        (techdf[!, :part_load] = [haskey(t, :part_load) ? JSON3.write(t.part_load) : missing
+                                  for t in techs])
     CSV.write(joinpath(dir, "technologies.csv"), techdf)
 
     CSV.write(joinpath(dir, "technology_costs.csv"), DataFrame(

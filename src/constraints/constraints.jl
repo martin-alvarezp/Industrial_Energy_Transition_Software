@@ -11,12 +11,14 @@ puerto escala con `ratio·dispatch` (multi-puerto, roadmap M1).
 """
 function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                           site::Site, cfg::ScenarioConfig)
+    # operación detallada primero (2.1/2.3): define la entrada de los equipos
+    # con curva de carga parcial, que el balance y las emisiones usan
+    add_operation_constraints!(m, sets, params, site;
+                               integer = commitment_integer(cfg))
     add_carrier_balance!(m, sets, params, site)
     add_capacity_constraints!(m, sets, params)
     add_generator_constraints!(m, sets, params)
     add_storage_constraints!(m, sets, params, site)
-    add_operation_constraints!(m, sets, params, site;   # 2.1 (opt-in por equipo)
-                               integer = commitment_integer(cfg))
     add_grid_constraints!(m, sets, params)
     add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)

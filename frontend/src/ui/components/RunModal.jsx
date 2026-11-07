@@ -35,7 +35,7 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   // equipos con operación detallada (2.1): misma regla que el motor
   const nCommit = (twin?.siteJson?.technologies ?? []).filter((x) => x.type === "converter" &&
     ((x.min_load ?? 0) > 0 || (x.startup_cost ?? 0) > 0 || (x.min_up_hours ?? 0) > 0 ||
-     (x.min_down_hours ?? 0) > 0)).length;
+     (x.min_down_hours ?? 0) > 0 || (x.part_load?.length ?? 0) > 0)).length;
   const [commitment, setCommitment] = useState("linear");
   const srcRun = runs.find((r) => r.id === capSource);
   const dispatch = mode === "dispatch";

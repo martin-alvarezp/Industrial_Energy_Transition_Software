@@ -145,3 +145,50 @@ end
     @test any(x -> x.category == :operation && occursin("carga mínima de 'HP'", x.message) &&
                    occursin("12 paso(s)", x.message), f)
 end
+
+# ── carga parcial (2.3) ──────────────────────────────────────────────────────
+with_curve(site, pl) = IETO._with(site; converters = Dict(
+    :hp => IETO._with(site.converters[:hp]; part_load = pl), :eb => site.converters[:eb]))
+
+@testset "carga parcial: consumo por tramos (oráculo exacto)" begin
+    # COP 2,0 al 40 % (= carga mínima), 2,7 al 70 % y 3,0 a plena carga: a 8 MW
+    # (carga 0,8) la entrada equivalente es 10·23/27 ⇒ 230/81 MW eléctricos
+    # (vs 8/3 con COP fijo); de noche (3 MW < 4) la bomba no opera
+    site, cfg = op_site(ops(min_load = 0.4))
+    s2 = with_curve(site, [(0.4, 2.0), (0.7, 2.7), (1.0, 3.0)])
+    @test validate_site(s2) === true
+    im, hp, eb = solve_op(s2, cfg)
+    @test im.sets.part_load_techs == [:hp]
+    @test all(abs.(hp[13:24] .- 8) .< 1e-6)
+    @test JuMP.objective_value(im.model) ≈ 365 * (12 * 3 * 100 + 12 * 100 * 230 / 81) rtol = 1e-9
+    @test JuMP.num_variables(im.model) == expected_variable_count(im.sets)
+    # el despacho reporta la entrada equivalente
+    r = extract_results(im; shadow_prices = false)
+    inp = r.dispatch[(r.dispatch.tech .== :hp) .& (r.dispatch.flow .== :input), :value]
+    @test maximum(inp) ≈ 230 / 27 rtol = 1e-9
+    # a plena carga la curva da el COP nominal: 10 MW cuestan lo mismo que sin curva
+    s3, c3 = op_site(ops(min_load = 0.4); demand = fill(10.0, 24))
+    _, v_curve = solve_op(with_curve(s3, [(0.4, 2.0), (0.7, 2.7), (1.0, 3.0)]), c3)
+    _, v_flat = solve_op(s3, c3)
+    @test v_curve ≈ v_flat rtol = 1e-9
+end
+
+@testset "carga parcial: validación y round-trip" begin
+    site, cfg = op_site(ops(min_load = 0.4))
+    probs(s) = try validate_site(s); String[] catch e; e.problems end
+    # curva no convexa (consumo marginal que baja): rechazada
+    @test any(occursin("convexa", p) for p in
+              probs(with_curve(site, [(0.4, 2.5), (0.7, 2.6), (1.0, 3.6)])))
+    # el primer punto debe ser la carga mínima
+    @test any(occursin("carga mínima", p) for p in
+              probs(with_curve(site, [(0.5, 2.0), (1.0, 3.0)])))
+    # cargas que no terminan en 1
+    @test any(occursin("terminar en 1", p) for p in
+              probs(with_curve(site, [(0.4, 2.0), (0.8, 3.0)])))
+    s2 = with_curve(site, [(0.4, 2.0), (0.7, 2.7), (1.0, 3.0)])
+    @test isempty(probs(s2))
+    j = site_from_json(JSON3.read(JSON3.write(site_json(s2))))
+    @test j.converters[:hp].part_load == s2.converters[:hp].part_load
+    dir = mktempdir(); save_site(dir, s2)
+    @test load_site(dir).converters[:hp].part_load == s2.converters[:hp].part_load
+end

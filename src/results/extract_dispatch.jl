@@ -44,6 +44,11 @@ function extract_dispatch(im::IETOModel)
         for t in sets.dispatch_techs
             record!(t, :output, y, s, JuMP.value(m[:dispatch][t, s, y]))
         end
+        # curva de carga parcial (2.3): la entrada equivalente (× ratio de
+        # cada puerto = consumo) — sin ella el consumo sería ratio·output
+        for t in sets.part_load_techs
+            record!(t, :input, y, s, JuMP.value(input_driver(m, t, s, y)))
+        end
         for st in sets.storages
             record!(st, :charge, y, s, JuMP.value(m[:charge][st, s, y]))
             record!(st, :discharge, y, s, JuMP.value(m[:discharge][st, s, y]))

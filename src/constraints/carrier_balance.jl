@@ -91,7 +91,8 @@ function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParam
         demand   = (haskey(params.demand, c) &&
                     get(params.demand_node, c, DEFAULT_NODE) == n) ?
                    params.demand[c][s, y] : 0.0
-        consumed = sum(k[2] * dispatch[k[1], s, y] for k in get(consumers, (n, c), NOPT); init = 0.0)
+        consumed = sum(k[2] * input_driver(m, k[1], s, y)   # curva de carga parcial (2.3)
+                       for k in get(consumers, (n, c), NOPT); init = 0.0)
         charged  = sum(charge[st, s, y] for st in get(stores, (n, c), NOSY); init = 0.0)
         exported = sum(market_flow[mk, s, y] for mk in get(sells, (n, c), NOSY); init = 0.0)
         arc_out  = sum(arc_flow[k, s, y] for k in get(arcs_out, (n, c), NOSY); init = 0.0)

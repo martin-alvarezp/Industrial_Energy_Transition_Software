@@ -20,6 +20,8 @@ struct ModelSets
     arc_flows::Vector{Symbol}        # claves de arc_flow (un enlace dirigido por vector)
     commit_techs::Vector{Symbol}     # conversores con unit commitment (2.1): on/su/sd
     ramp_techs::Vector{Symbol}       # conversores con límite de rampa (2.1)
+    part_load_techs::Vector{Symbol}  # conversores con curva de carga parcial (2.3)
+    part_load_segs::Int              # Σ tramos de esas curvas (variables por paso·año)
 end
 
 """
@@ -48,6 +50,9 @@ function build_sets(site::Site, cfg::ScenarioConfig)
 
     mkts = effective_markets(site)
     mkt_ids = sort!(collect(keys(mkts)))
+    # curva de carga parcial: solo equipos con unit commitment efectivo
+    plt = [id for id in convs if !isempty(site.converters[id].part_load) &&
+               unit_mw(site.converters[id]) > 0]
 
     return ModelSets(
         1:n_steps(site),
@@ -66,8 +71,10 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         [l[1] for l in arc_links(site)],
         # operación detallada (2.1): con tamaño de unidad conocido (propio, o
         # el parque fijo como una sola unidad)
-        [id for id in convs if has_commitment(site.converters[id].ops) &&
+        [id for id in convs if uses_commitment(site.converters[id]) &&
              unit_mw(site.converters[id]) > 0],
         [id for id in convs if has_ramp(site.converters[id].ops)],
+        plt,
+        sum(length(site.converters[id].part_load) - 1 for id in plt; init = 0),
     )
 end

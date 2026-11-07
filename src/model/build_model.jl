@@ -51,5 +51,6 @@ function expected_variable_count(sets::ModelSets)
            length(sets.markets) * S * Y +          # market_flow
            length(sets.arc_flows) * S * Y +        # arc_flow (M14; 0 sin arcos)
            length(sets.commit_techs) * S * Y * 3 + # on, su, sd (2.1)
+           sets.part_load_segs * S * Y +           # tramos de carga parcial (2.3)
            Y * 3                                   # offset_buy, gross, net
 end

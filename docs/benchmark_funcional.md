@@ -218,3 +218,19 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   `verify:storage`: el SOC despachado queda dentro de la banda. Hallazgo de
   producto: con η 95/90 % y banda 10-90 % la batería del demo deja de
   convenir y no se construye.
+- ✅ **2.3 · Eficiencia a carga parcial** (2026-11-07). Curva opcional por
+  conversor: puntos (fracción de carga, η o COP) crecientes desde la carga
+  mínima hasta 100 %. Con unit commitment, la carga de lo encendido se arma
+  con tramos y la entrada pasa a ser la **entrada equivalente** F = I₁·u·on +
+  Σ pendiente_k·tramo_k (con I = L·η_ref/η), que multiplica los ratios de
+  entrada en el balance, en la compra de combustibles y en las emisiones de
+  alcance 1. La curva tiene que ser convexa (consumo marginal creciente, lo
+  normal cuando la η sube con la carga); si no, la validación la rechaza en
+  lugar de dejar que el LP use tramos fuera de orden. El despacho reporta la
+  entrada (`flow = input`), y el Sankey y los costos por ítem la usan.
+  Oráculo: COP 2,0/2,7/3,0 al 40/70/100 % ⇒ a 8 MW la bomba consume
+  230/81 MW (contra 8/3 con COP fijo), y a plena carga cuesta lo mismo que sin
+  curva. Goldens `op_carga_parcial_n1` y `demo_carga_parcial_despacho_n1`
+  (gas con alcance 1); verify:wasm 19/19. Editor: "Eficiencia a carga
+  parcial" (el primer punto se sincroniza con la carga mínima).
+  **Bloque 2 completo.**
