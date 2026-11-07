@@ -395,3 +395,15 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   `afrr_bomba_n1` y `demo_afrr_n5` (verify:wasm 37/37); Parámetros →
   "Servicios de balance (aFRR)"; E2E en `verify:measures` (ingresos de 1,45
   a 3,03 MUSD, VAN de 71,62 a 70,58).
+- ⏸️ **5.7 · Física de salas o zonas: postergada a propósito.** Modelar
+  zonas (capacidad térmica, coeficiente de pérdidas, ganancias internas,
+  renovaciones de aire, banda de confort) necesita una serie de
+  **temperatura ambiente** por paso que el contrato de datos del sitio todavía
+  no tiene, más su editor y su paso por las plantillas temporales (1.2). Para
+  un cliente industrial el valor es bajo: es climatización de edificios, y la
+  "demanda que se puede mover" ya la cubre la flexibilidad de carga (5.4).
+  Si un piloto lo pide, el diseño es: la zona como un almacenamiento virtual
+  de calor o frío, T[s] = T[prev] + Δt/C·(Q − UA·(T − T_amb) + ganancias),
+  con Tmín ≤ T ≤ Tmáx, donde Q sale del balance del vector de calor.
+
+**Bloque 5: 5.1 a 5.6 completos; 5.7 postergada (ver arriba).**
