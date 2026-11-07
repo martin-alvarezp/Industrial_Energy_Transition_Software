@@ -142,10 +142,16 @@ function site_json(site::Site)
     end
     for id in keys(site.storages)
         st = site.storages[id]
-        push!(techs, rlife(_tech_nt(id, st.name, "storage", st.carrier, st.carrier,
-                              st.existing_capacity, st.max_new_capacity,
-                              st.efficiency, st.investable, st.costs,
-                              st.hours_ratio), st))
+        nt = rlife(_tech_nt(id, st.name, "storage", st.carrier, st.carrier,
+                            st.existing_capacity, st.max_new_capacity,
+                            st.efficiency, st.investable, st.costs,
+                            st.hours_ratio), st)
+        # física detallada (2.2): solo lo que se aparta del ideal
+        for k in STORAGE_KEYS
+            v = getfield(st.phys, k)
+            v == 0.0 || (nt = merge(nt, NamedTuple{(k,)}((v,))))
+        end
+        push!(techs, nt)
     end
     sort!(techs; by = t -> t.tech_id)
 
@@ -354,9 +360,12 @@ function site_from_json(obj; default_name::AbstractString = "twin")
         elseif kind == :storage
             hours = _twin_num(something(_twin_get(t, :storage_hours),
                                         DEFAULT_STORAGE_HOURS), :storage_hours, ctx)
+            phys = storage_physics(k -> begin
+                v = _twin_get(t, k); v === nothing ? nothing : _twin_num(v, k, ctx)
+            end)
             storages[id] = Storage(id, tname, outc == Symbol("") ? inc : outc,
                                    Float64(eff), Float64(ex), Float64(mx),
-                                   hours, inv, costs, rlife)
+                                   hours, inv, costs, rlife, phys)
         else
             throw(SchemaError("site_payload: type desconocido '$kind' en $ctx " *
                               "(esperado: source|converter|generator|storage)"))

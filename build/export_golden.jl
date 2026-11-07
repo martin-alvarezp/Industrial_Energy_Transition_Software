@@ -98,4 +98,14 @@ convs[:gas_boiler] = IETO._with(convs[:gas_boiler]; ops = OperationLimits(0.0, 0
 convs[:heat_pump] = IETO._with(convs[:heat_pump]; ops = OperationLimits(2.5, 0.3, 200.0, 0.0, 0.0, 0.5))
 dump("demo_operacion_lineal_n3", IETO._with(site0; converters = convs),
      with_config(cfg0; horizon_years = 3))
+# 12 · física del almacenamiento (2.2): η de carga/descarga propias,
+# autodescarga, banda de SOC, ciclos por año y degradación por cohorte — la
+# batería existente y una invertible (la degradación cuenta desde su compra).
+include(joinpath(root, "test", "helpers_storage.jl"))
+fis = phys(charge_efficiency = 0.95, discharge_efficiency = 0.9, self_discharge = 0.002,
+           soc_min = 0.1, soc_max = 0.9, cycle_limit = 200, degradation = 0.05)
+s13, c13 = st_site(fis; N = 3)
+dump("alm_fisica_n3", s13, c13)
+s14, c14 = st_site(fis; N = 4, existing = 0.0, investable = true, max_new = 10.0)
+dump("alm_inversion_n4", s14, with_config(c14; repeat_investments = true))
 println("fixtures dorados en ", out)

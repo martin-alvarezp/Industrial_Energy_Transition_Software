@@ -276,7 +276,37 @@ Generator(id::Symbol, name::AbstractString, outc::Symbol, ex::Real, mx::Real,
           inv::Bool, costs::TechCosts, cf::Vector{Float64}) =
     Generator(id, String(name), outc, Float64(ex), Float64(mx), inv, costs, cf, 0)
 
-"Almacenamiento con eficiencia de ida (η aplica a carga y descarga, SPEC §7.4)."
+"""
+Física del almacenamiento (benchmark 2.2). Todos en 0 ⇒ el comportamiento de
+siempre (η simétrica, sin pérdidas en reposo, SOC de 0 a 100 %, sin límite de
+ciclos ni degradación).
+
+- `charge_efficiency` / `discharge_efficiency`: η de carga y de descarga por
+  separado (0 ⇒ la `efficiency` simétrica del equipo).
+- `self_discharge`: fracción del SOC que se pierde por hora en reposo.
+- `soc_min` / `soc_max`: banda de operación como fracción de la energía
+  (0 en soc_max ⇒ 100 %).
+- `cycle_limit`: ciclos equivalentes completos por año (descarga anual ≤
+  ciclos × energía útil); 0 ⇒ sin límite.
+- `degradation`: fracción de la energía que se pierde por año de antigüedad,
+  por cohorte de compra.
+"""
+struct StoragePhysics
+    charge_efficiency::Float64
+    discharge_efficiency::Float64
+    self_discharge::Float64
+    soc_min::Float64
+    soc_max::Float64
+    cycle_limit::Float64
+    degradation::Float64
+end
+const IDEAL_STORAGE = StoragePhysics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+const STORAGE_KEYS = fieldnames(StoragePhysics)
+"StoragePhysics desde un lector `get(k) -> número | nothing` (CSV o JSON)."
+storage_physics(get) = StoragePhysics(
+    (Float64(something(get(k), 0.0)) for k in STORAGE_KEYS)...)
+
+"Almacenamiento con eficiencia de ida (η aplica a carga y descarga, SPEC §7.4; física detallada en `phys`, 2.2)."
 struct Storage
     id::Symbol
     name::String
@@ -288,12 +318,23 @@ struct Storage
     investable::Bool
     costs::TechCosts
     remaining_life::Int           # vida útil restante del existente (M5); 0 = no retira
+    phys::StoragePhysics          # física detallada (2.2); default: ideal
 end
 
+# retro-compatibilidad: 10 campos (pre-2.2) → física ideal
+Storage(id::Symbol, name::String, c::Symbol, eff::Float64, ex::Float64,
+        mx::Float64, hr::Float64, inv::Bool, costs::TechCosts, rl::Integer) =
+    Storage(id, name, c, eff, ex, mx, hr, inv, costs, Int(rl), IDEAL_STORAGE)
 Storage(id::Symbol, name::AbstractString, c::Symbol, eff::Real, ex::Real,
         mx::Real, hr::Real, inv::Bool, costs::TechCosts) =
     Storage(id, String(name), c, Float64(eff), Float64(ex), Float64(mx),
             Float64(hr), inv, costs, 0)
+
+"η de carga / descarga efectivas (las propias, o la simétrica)."
+eta_charge(st::Storage) = st.phys.charge_efficiency > 0 ? st.phys.charge_efficiency : st.efficiency
+eta_discharge(st::Storage) = st.phys.discharge_efficiency > 0 ? st.phys.discharge_efficiency : st.efficiency
+"Banda del SOC como fracción de la energía."
+soc_band(st::Storage) = (st.phys.soc_min, st.phys.soc_max > 0 ? st.phys.soc_max : 1.0)
 
 "Demanda base del año-plantilla para un carrier (se escala por año, SPEC §4)."
 struct Demand

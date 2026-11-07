@@ -56,7 +56,7 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
         # vida útil restante del existente (M5): clave opcional
         remaining_life = [optnum(t, :remaining_life) for t in techs])
     # operación detallada (2.1): columnas solo si algún equipo las usa
-    for k in OPERATION_KEYS
+    for k in (OPERATION_KEYS..., STORAGE_KEYS...)   # 2.1 y 2.2
         any(t -> haskey(t, k), techs) && (techdf[!, k] = [optnum(t, k) for t in techs])
     end
     CSV.write(joinpath(dir, "technologies.csv"), techdf)

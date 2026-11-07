@@ -203,3 +203,18 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   `demo_operacion_lineal_n3`, verify:wasm 15/15. La tolerancia del payload
   pasa a 1e-5 porque highs-js entrega las variables con ~6 cifras
   (el VAN se compara con precisión completa). E2E `verify:operation`.
+- ✅ **2.2 · Física del almacenamiento** (2026-11-07). `StoragePhysics`
+  opcional por equipo: η de carga y de descarga propias, autodescarga (% del
+  SOC por hora, aplicada como (1−a)^Δt), banda de SOC mínima y máxima, límite
+  de ciclos equivalentes por año (descarga anual ≤ ciclos × energía útil) y
+  degradación anual de la energía por cohorte de compra (el existente desde el
+  año 1, cada compra desde su año). En 0 el comportamiento es el de siempre:
+  los 15 goldens previos no cambian. Oráculos de arbitraje
+  (test_storage_physics.jl, 22 tests): la misma η de ida y vuelta da costos
+  distintos según de qué lado del SOC caiga la pérdida, banda 10-90 %, 100
+  ciclos/año, degradación 40 → 36 → 32,4 MWh. Goldens `alm_fisica_n3` y
+  `alm_inversion_n4` (degradación de una batería comprada); verify:wasm
+  17/17. Editor de almacenamiento: sección "Física del almacenamiento". E2E
+  `verify:storage`: el SOC despachado queda dentro de la banda. Hallazgo de
+  producto: con η 95/90 % y banda 10-90 % la batería del demo deja de
+  convenir y no se construye.

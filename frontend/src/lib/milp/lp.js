@@ -483,26 +483,53 @@ export function buildLP(site0, cfg0) {
     // storage: SOC cíclico por estación (hora anterior con wrap), límites
     for (const st of stors) {
       const id = sane(st.tech_id);
-      const eta = st.efficiency, hrs = st.storage_hours ?? 4;
+      const hrs = st.storage_hours ?? 4;
+      // física detallada (2.2) — espejo de storage.jl: η de carga/descarga
+      // propias, autodescarga (1−a)^Δt, banda de SOC, ciclos y degradación
+      const etaC = (st.charge_efficiency ?? 0) > 0 ? st.charge_efficiency : st.efficiency;
+      const etaD = (st.discharge_efficiency ?? 0) > 0 ? st.discharge_efficiency : st.efficiency;
+      const selfD = st.self_discharge ?? 0;
+      const lo = st.soc_min ?? 0, hi = (st.soc_max ?? 0) > 0 ? st.soc_max : 1;
       for (const grp of seasonSteps) {
         // orden cronológico: hour y, a igual hour, step_id (sort estable)
         const ordered = [...grp].sort((a, b) => ts[a - 1].hour - ts[b - 1].hour);
         ordered.forEach((s, k) => {
           const prev = ordered[k === 0 ? ordered.length - 1 : k - 1];
           const d = dt[s - 1];   // Δt: MW × Δt = MWh del paso
-          row(`soc_${id}_${s}_${y}`, {
-            [`soc_${id}_${s}_${y}`]: 1, [`soc_${id}_${prev}_${y}`]: -1,
-            [`ch_${id}_${s}_${y}`]: -eta * d, [`dc_${id}_${s}_${y}`]: d / eta,
-          }, "=", 0);
+          const t = { [`soc_${id}_${s}_${y}`]: 1 };
+          inc(t, `soc_${id}_${prev}_${y}`, -Math.pow(1 - selfD, d));
+          inc(t, `ch_${id}_${s}_${y}`, -etaC * d);
+          inc(t, `dc_${id}_${s}_${y}`, d / etaD);
+          row(`soc_${id}_${s}_${y}`, t, "=", 0);
         });
       }
+      // energía (MWh) del año: horas × potencia, con degradación por cohorte
+      const a = avail(st, y);
+      const f = 1 - (st.degradation ?? 0);
+      const eK = hrs * a.k * Math.pow(f, y - 1);
+      const eV = a.ncs.map((v) => [v, hrs * Math.pow(f, y - +v.split("_").pop())]);
       for (const s of steps) {
-        const a = avail(st, y);
-        for (const [pref, mult] of [["soc", hrs], ["ch", 1], ["dc", 1]]) {
-          const t = { [`${pref}_${id}_${s}_${y}`]: 1 };
-          for (const v of a.ncs) inc(t, v, -mult);
-          row(`${pref}cap_${id}_${s}_${y}`, t, "<=", mult * a.k);
+        const tS = { [`soc_${id}_${s}_${y}`]: 1 };
+        for (const [v, c] of eV) inc(tS, v, -hi * c);
+        row(`soccap_${id}_${s}_${y}`, tS, "<=", hi * eK);
+        if (lo > 0) {
+          const tL = { [`soc_${id}_${s}_${y}`]: 1 };
+          for (const [v, c] of eV) inc(tL, v, -lo * c);
+          row(`socmin_${id}_${s}_${y}`, tL, ">=", lo * eK);
         }
+        for (const pref of ["ch", "dc"]) {
+          const t = { [`${pref}_${id}_${s}_${y}`]: 1 };
+          for (const v of a.ncs) inc(t, v, -1);
+          row(`${pref}cap_${id}_${s}_${y}`, t, "<=", a.k);
+        }
+      }
+      // ciclos equivalentes por año: descarga anual ≤ ciclos × energía útil
+      const cl = st.cycle_limit ?? 0;
+      if (cl > 0) {
+        const tC = T();
+        for (const s of steps) inc(tC, `dc_${id}_${s}_${y}`, w[s - 1]);
+        for (const [v, c] of eV) inc(tC, v, -cl * (hi - lo) * c);
+        row(`cyc_${id}_${y}`, tC, "<=", cl * (hi - lo) * eK);
       }
     }
     // conexiones: Σ compras ≤ import, Σ ventas ≤ export (0 si excluida)

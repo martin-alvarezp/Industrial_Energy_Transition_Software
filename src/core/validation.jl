@@ -122,6 +122,17 @@ function validate_site(site::Site)
             "generation_profiles.csv[$(g.id)]: capacity_factor fuera de [0,1]")
     end
     for st in values(site.storages)
+        # física detallada (2.2): fracciones en [0,1], banda de SOC con ancho
+        for k in STORAGE_KEYS
+            k == :cycle_limit && continue
+            v = getfield(st.phys, k)
+            0 <= v <= 1 || push!(problems,
+                "technologies.csv[$(st.id)].$k: es una fracción en [0,1] (valor: $v)")
+        end
+        _check_nonneg!(problems, st.phys.cycle_limit, "technologies.csv[$(st.id)].cycle_limit")
+        lo, hi = soc_band(st)
+        lo < hi || push!(problems,
+            "technologies.csv[$(st.id)]: soc_min ($lo) debe ser menor que soc_max ($hi)")
         _check_carrier!(problems, site.carriers, st.carrier,
                         "technologies.csv[$(st.id)].carrier")
         _check_nonneg!(problems, st.existing_capacity, "technologies.csv[$(st.id)].existing_capacity")

@@ -37,17 +37,51 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
         end
     end
 
-    η = params.efficiency
     Δt = params.duration_hours   # MW × Δt = MWh movidos en el paso
+    S = site.storages
+    # física detallada (2.2): η de carga/descarga propias y autodescarga
+    # (1−a)^Δt del SOC en reposo; en el default (η simétrica, a = 0) los
+    # coeficientes son exactamente los de siempre
+    ηc = Dict(st => eta_charge(S[st]) for st in sets.storages)
+    ηd = Dict(st => eta_discharge(S[st]) for st in sets.storages)
+    keep(st, s) = (1 - S[st].phys.self_discharge)^Δt[s]
     m[:soc_balance] = JuMP.@constraint(m,
         [st in sets.storages, s in steps, y in years],
         soc[st, s, y] ==
-        soc[st, prev[s], y] + Δt[s] * (η[st] * charge[st, s, y] - discharge[st, s, y] / η[st]))
+        keep(st, s) * soc[st, prev[s], y] +
+        Δt[s] * (ηc[st] * charge[st, s, y] - discharge[st, s, y] / ηd[st]))
 
-    hours = Dict(st => site.storages[st].hours_ratio for st in sets.storages)
+    # energía disponible (MWh): horas × potencia; con degradación, cada cohorte
+    # pierde `degradation` por año de antigüedad (el existente cuenta desde el
+    # año 1, cada compra desde su año)
+    hours = Dict(st => S[st].hours_ratio for st in sets.storages)
+    newcap = m[:new_capacity]
+    function energy(st, y)
+        d = S[st].phys.degradation
+        d == 0 && return hours[st] * available_capacity[st, y]
+        f = 1 - d
+        rl = get(params.remaining_life, st, 0)
+        alive = rl == 0 || params.renew_existing || y <= rl
+        ex = alive ? params.existing_capacity[st] * f^(y - 1) : 0.0
+        nw = st in sets.candidates ?
+             sum(newcap[st, yp] * f^(y - yp) for yp in 1:y
+                 if y - yp < params.costs[st].lifetime_years; init = 0.0) : 0.0
+        return hours[st] * (ex + nw)
+    end
+    JuMP.@expression(m, storage_energy[st in sets.storages, y in years], energy(st, y))
+    lo = Dict(st => soc_band(S[st])[1] for st in sets.storages)
+    hi = Dict(st => soc_band(S[st])[2] for st in sets.storages)
     m[:soc_capacity] = JuMP.@constraint(m,
         [st in sets.storages, s in steps, y in years],
-        soc[st, s, y] <= hours[st] * available_capacity[st, y])
+        soc[st, s, y] <= hi[st] * storage_energy[st, y])
+    m[:soc_floor] = [JuMP.@constraint(m, soc[st, s, y] >= lo[st] * storage_energy[st, y])
+                     for st in sets.storages for s in steps for y in years if lo[st] > 0]
+    # ciclos equivalentes por año: descarga anual ≤ ciclos × energía útil
+    w = params.weight_hours
+    m[:cycle_limit] = [JuMP.@constraint(m,
+            sum(discharge[st, s, y] * w[s] for s in steps) <=
+            S[st].phys.cycle_limit * (hi[st] - lo[st]) * storage_energy[st, y])
+        for st in sets.storages for y in years if S[st].phys.cycle_limit > 0]
 
     m[:charge_capacity] = JuMP.@constraint(m,
         [st in sets.storages, s in steps, y in years],

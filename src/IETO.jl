@@ -65,7 +65,8 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
+export StoragePhysics, IDEAL_STORAGE, eta_charge, eta_discharge, soc_band,
+       OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
        Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,
        PriceSeries, EmissionFactor, ScenarioConfig, Site, TimeStep, TechCosts,
        primary_input, primary_output, reference_efficiency, is_multiport,

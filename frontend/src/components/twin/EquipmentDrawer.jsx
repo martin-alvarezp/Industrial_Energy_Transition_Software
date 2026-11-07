@@ -284,6 +284,47 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                  onChange={(v) => set({ storage_hours: v })} />
           </Field>
         )}
+        {draft.type === "storage" && (
+          <>
+            <p className="drawer-section" data-testid="storage-physics">
+              {L("Física del almacenamiento (opcional)", "Storage physics (optional)")}
+            </p>
+            <p className="hint" style={{ marginTop: -4 }}>
+              {L("En 0: η simétrica (la de arriba), sin pérdidas en reposo, SOC de 0 a 100 %, sin límite de ciclos ni degradación.",
+                 "At 0: symmetric η (above), no standing losses, SOC from 0 to 100%, no cycle limit or degradation.")}
+            </p>
+            <Field label={L("η de carga / η de descarga (%)", "Charge η / discharge η (%)")}>
+              <div className="range-row">
+                <Num value={+((draft.charge_efficiency ?? 0) * 100).toFixed(2)} step={1} min={0} max={100} data-phys="charge_efficiency"
+                     onChange={(v) => set({ charge_efficiency: v / 100 })} />
+                <Num value={+((draft.discharge_efficiency ?? 0) * 100).toFixed(2)} step={1} min={0} max={100} data-phys="discharge_efficiency"
+                     onChange={(v) => set({ discharge_efficiency: v / 100 })} />
+              </div>
+            </Field>
+            <Field label={L("Autodescarga (% del SOC por hora)", "Self-discharge (% of SOC per hour)")}>
+              <Num value={+((draft.self_discharge ?? 0) * 100).toFixed(3)} step={0.01} min={0} data-phys="self_discharge"
+                   onChange={(v) => set({ self_discharge: v / 100 })} />
+            </Field>
+            <Field label={L("SOC mínimo / máximo (%)", "Minimum / maximum SOC (%)")}
+                   hint={L("banda de operación; 0 en el máximo = 100 %", "operating band; 0 in the maximum = 100%")}>
+              <div className="range-row">
+                <Num value={+((draft.soc_min ?? 0) * 100).toFixed(2)} step={5} min={0} max={100} data-phys="soc_min"
+                     onChange={(v) => set({ soc_min: v / 100 })} />
+                <Num value={+((draft.soc_max ?? 0) * 100).toFixed(2)} step={5} min={0} max={100} data-phys="soc_max"
+                     onChange={(v) => set({ soc_max: v / 100 })} />
+              </div>
+            </Field>
+            <Field label={L("Límite de ciclos por año", "Cycle limit per year")}
+                   hint={L("ciclos equivalentes completos sobre la energía útil; 0 = sin límite", "full equivalent cycles over usable energy; 0 = no limit")}>
+              <Num value={draft.cycle_limit ?? 0} step={10} min={0} data-phys="cycle_limit"
+                   onChange={(v) => set({ cycle_limit: v })} />
+            </Field>
+            <Field label={L("Degradación (% de la energía por año)", "Degradation (% of energy per year)")}>
+              <Num value={+((draft.degradation ?? 0) * 100).toFixed(2)} step={0.5} min={0} max={100} data-phys="degradation"
+                   onChange={(v) => set({ degradation: v / 100 })} />
+            </Field>
+          </>
+        )}
         {draft.type === "generator" && (
           <Field label={L("Perfil solar por ubicación (PVGIS)", "Solar profile by location (PVGIS)")}
                  hint={center

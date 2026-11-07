@@ -167,9 +167,10 @@ function load_technologies(dir::AbstractString, profiles::Dict{Symbol,Vector{Flo
             # columna opcional storage_hours (MWh por MW); default 4 h
             hours = hasproperty(r, :storage_hours) && !ismissing(r.storage_hours) ?
                     Float64(r.storage_hours) : DEFAULT_STORAGE_HOURS
+            phys = storage_physics(k -> hasproperty(r, k) && !ismissing(r[k]) ? r[k] : nothing)
             storages[id] = Storage(id, name, outc == Symbol("") ? inc : outc,
                                    Float64(eff), Float64(ex), Float64(mx),
-                                   hours, inv, c, rlife)
+                                   hours, inv, c, rlife, phys)
         else
             throw(SchemaError("technologies.csv: type desconocido '$kind' para '$id' " *
                               "(esperado: source|converter|generator|storage)"))

@@ -499,6 +499,13 @@ export function techProblems(tech, siteJson) {
     p.push("las capacidades deben ser ≥ 0");
   if (tech.investable && !(tech.max_new_capacity > 0))
     p.push("una candidata a inversión necesita capacidad máxima nueva > 0");
+  // física del almacenamiento (2.2): espejo de validation.jl
+  if (tech.type === "storage") {
+    const fr = ["charge_efficiency", "discharge_efficiency", "self_discharge", "soc_min", "soc_max", "degradation"];
+    if (fr.some((k) => (tech[k] ?? 0) < 0 || (tech[k] ?? 0) > 1)) p.push("las fracciones del almacenamiento deben estar entre 0 y 100 %");
+    const hi = (tech.soc_max ?? 0) > 0 ? tech.soc_max : 1;
+    if ((tech.soc_min ?? 0) >= hi) p.push("el SOC mínimo debe ser menor que el máximo");
+  }
   // operación detallada (2.1): espejo de validation.jl
   if (tech.type === "converter") {
     const commit = (tech.min_load ?? 0) > 0 || (tech.startup_cost ?? 0) > 0 ||
