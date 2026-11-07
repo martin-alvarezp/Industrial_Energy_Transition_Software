@@ -34,8 +34,12 @@ export function payback(cashflows, discount = null) {
     const prev = cum;
     cum += cf;
     if (cum >= 0 && cf !== 0) {
-      const frac = -prev / cf; // dentro del año i
-      return { year: cashflows[i].year, fractional: i + Math.max(0, Math.min(1, frac)) };
+      // fracción dentro del tramo (año anterior, año]: con años hito (R6) el
+      // tramo puede durar varios años; sin hitos es i + frac, como siempre
+      const frac = Math.max(0, Math.min(1, -prev / cf));
+      const y0 = i === 0 ? (cashflows[i].year ?? 1) - 1 : (cashflows[i - 1].year ?? i);
+      const y1 = cashflows[i].year ?? i + 1;
+      return { year: cashflows[i].year, fractional: y0 + frac * (y1 - y0) };
     }
   }
   return null;
@@ -47,7 +51,9 @@ export function payback(cashflows, discount = null) {
  */
 export function irr(cashflows, { lo = -0.95, hi = 10, iters = 200 } = {}) {
   const cf = cashflows.map((c) => c.cashflow);
-  const npv = (r) => cf.reduce((s, v, i) => s + v / Math.pow(1 + r, i + 1), 0);
+  // cada flujo en su año real (R6: con hitos los años no son consecutivos)
+  const yrs = cashflows.map((c, i) => c.year ?? i + 1);
+  const npv = (r) => cf.reduce((s, v, i) => s + v / Math.pow(1 + r, yrs[i]), 0);
   let flo = npv(lo), fhi = npv(hi);
   if (!(isFinite(flo) && isFinite(fhi)) || flo * fhi > 0) return null;
   let a = lo, b = hi;

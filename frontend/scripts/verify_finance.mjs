@@ -55,5 +55,19 @@ check(close(ab[0].items.A, 50) && close(ab[1].items.A, 50) && close(ab[1].items.
       !ab[2].items.A && close(ab[2].items.B, 30), `annuityByYear ${JSON.stringify(ab)}`);
 console.log(`✓ anualidad prepagable ${af.toFixed(6)} (10 %, 3 años) · VP = capital · reparto por ítem`);
 
+// TIR y payback con años hito (R6): −100 en el año 1 y +121 en el año 3
+// ⇒ TIR 10 % (100·1,1² = 121 descontado desde el año 1: 100/1,1 = 121/1,1³);
+// payback a mitad de camino entre el año 1 y el 3 cuando el tramo recupera el doble
+{
+  const { irr: irrF, payback: pbF } = await import("../src/lib/finance.js");
+  const r = irrF([{ year: 1, cashflow: -100e6 }, { year: 3, cashflow: 121e6 }]);
+  check(r != null && Math.abs(r - 0.1) < 1e-4, `TIR con hitos ${r}`);
+  const pb = pbF([{ year: 1, cashflow: -100 }, { year: 3, cashflow: 200 }]);
+  check(pb && Math.abs(pb.fractional - 2) < 1e-9 && pb.year === 3, `payback con hitos ${JSON.stringify(pb)}`);
+  const pb1 = pbF([{ year: 1, cashflow: -100 }, { year: 2, cashflow: 200 }]);
+  check(pb1 && Math.abs(pb1.fractional - 1.5) < 1e-9, `payback consecutivo ${JSON.stringify(pb1)}`);
+  console.log(`✓ TIR con hitos ${(100 * r).toFixed(2)} % (oráculo 10 %) · payback ${pb?.fractional} años (oráculo 2)`);
+}
+
 if (problems.length) { console.error("\n✗ " + problems.join("\n✗ ")); process.exit(1); }
 console.log("\nFINANZAS OK");

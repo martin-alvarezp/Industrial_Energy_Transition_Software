@@ -495,8 +495,9 @@ días tipo (k por año) con cronología.
   completa descontados en su año, vida útil en años reales, compras
   forzadas al hito siguiente. Goldens `hitos_n5`, `hitos_vida_forzada_n6` y
   `demo_hitos_n10` (verify:wasm 48/48). Julia 1697/1697. Parámetros → "Años
-  hito". *Limitación:* TIR y payback del caso de inversión suponen años
-  consecutivos.
+  hito". La TIR descuenta cada flujo en su año real y el payback interpola
+  dentro del tramo entre hitos (verify:finance: −100 en el año 1 y +121 en el
+  3 ⇒ 10 %).
 - ✅ **R7 · Días tipo** (2026-11-07). Nueva plantilla temporal "Días tipo"
   (Series de tiempo → Resolución temporal, k configurable; 30 por defecto,
   como en las corridas de referencia). Los 365 días se agrupan con k-means
