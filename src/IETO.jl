@@ -43,6 +43,7 @@ include("constraints/arcs.jl")
 include("constraints/emissions.jl")
 include("constraints/budget.jl")
 include("constraints/operation.jl")
+include("constraints/measures.jl")
 include("constraints/constraints.jl")
 
 # results: extracción de resultados y resumen (SPEC §10)

@@ -17,6 +17,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
                                integer = commitment_integer(cfg))
     add_carrier_balance!(m, sets, params, site)
     add_capacity_constraints!(m, sets, params)
+    add_measure_relations!(m, sets, params, cfg)          # 5.2
     add_generator_constraints!(m, sets, params)
     add_storage_constraints!(m, sets, params, site)
     add_grid_constraints!(m, sets, params)

@@ -331,3 +331,12 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   tiene etiqueta es/en, sus salidas son físicamente plausibles y el motor web
   lo resuelve (detectó un compresor con recuperación que creaba energía, ya
   corregido).
+- ✅ **5.2 · Medidas excluyentes y dependientes** (2026-11-07).
+  `exclusive_groups` (de cada grupo se construye a lo sumo una tecnología en
+  todo el horizonte) y `requires` (a solo si b ya está construida ese año o
+  antes; si b es un equipo existente, su parque la cumple; si no existe ni se
+  puede comprar, a queda fuera). Tests sobre el demo a 10 años, que sin
+  relaciones compra FV y batería: con FV y batería excluyentes compra una
+  sola; si además la batería requiere la FV, no compra batería. Golden
+  `medidas_relaciones_n10` (verify:wasm 28/28); Parámetros → "Relaciones
+  entre medidas"; E2E `verify:measures`.

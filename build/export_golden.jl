@@ -156,4 +156,10 @@ dump("tarifa_horas_bajo_bloques_n1", tariff_site([10.0; fill(1.0, 23)],
      GridTariff(2500.0, 20.0, 60.0, 100.0, 10.0, [(5000.0, 8.0), (Inf, 5.0)]))...)
 dump("tarifa_bloques_crecientes_n1", tariff_site(fill(10.0, 24),
      blocks_tariff([(50_000.0, 5.0), (Inf, 8.0)]))...)
+# 18 · relaciones entre medidas (5.2): FV y batería excluyentes, y la batería
+# requiere la bomba de calor (comprada ese año o antes)
+s18, c18 = apply_scenario(site0, with_config(cfg0; horizon_years = 10,
+                                             exclusive_groups = [[:pv, :battery]],
+                                             requires = [(:battery, :heat_pump)]), :least_cost)
+dump("medidas_relaciones_n10", s18, c18)
 println("fixtures dorados en ", out)

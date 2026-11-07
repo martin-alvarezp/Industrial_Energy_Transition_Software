@@ -766,6 +766,31 @@ export function buildLP(site0, cfg0) {
       row(`forced_${sane(tech)}_${yrel}`,
           { [`nc_${sane(tech)}_${yrel}`]: 1 }, ">=", mw);
   }
+  // relaciones entre medidas (5.2) — espejo de measures.jl
+  const candIds = new Set(cands.map((t) => t.tech_id));
+  const exIds = [...new Set((cfg.exclusive_groups ?? []).flat().filter((t) => candIds.has(t)))].sort();
+  for (const t of exIds) {
+    binaries.push(`ever_${sane(t)}`);
+    for (const y of years) row(`everd_${sane(t)}_${y}`, { [`b_${sane(t)}_${y}`]: 1, [`ever_${sane(t)}`]: -1 }, "<=", 0);
+  }
+  (cfg.exclusive_groups ?? []).forEach((g, gi) => {
+    const inG = g.filter((t) => candIds.has(t));
+    if (inG.length >= 2)
+      row(`excl_${gi}`, Object.fromEntries(inG.map((t) => [`ever_${sane(t)}`, 1])), "<=", 1);
+  });
+  (cfg.requires ?? []).map((r) => (Array.isArray(r) ? r : [r.tech, r.needs])).forEach(([a, b], ri) => {
+    if (!candIds.has(a)) return;
+    const bTech = site.technologies.find((t) => t.tech_id === b);
+    for (const y of years) {
+      if (candIds.has(b)) {
+        const t = { [`b_${sane(a)}_${y}`]: 1 };
+        for (let yp = 1; yp <= y; yp++) inc(t, `b_${sane(b)}_${yp}`, -1);
+        row(`req_${ri}_${y}`, t, "<=", 0);
+      } else if (!((bTech?.existing_capacity ?? 0) > 0)) {
+        row(`req_${ri}_${y}`, { [`b_${sane(a)}_${y}`]: 1 }, "<=", 0);
+      }
+    }
+  });
   // presupuesto CAPEX (§7.8, espejo de add_budget_constraint!): el mismo
   // CAPEX bruto y sin descontar — inversiones nuevas + renovaciones (éstas son
   // constantes y pasan restando al lado derecho)

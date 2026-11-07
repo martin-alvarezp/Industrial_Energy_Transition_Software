@@ -356,5 +356,8 @@ function load_scenario_config(path::AbstractString)
         get(d, "scope2_cap", nothing) === nothing ? nothing : Float64(d["scope2_cap"]),
         _get_num(d, "ets_price", 0.0),
         _get_num(d, "ets_free_allowance", 0.0),
+        Vector{Symbol}[Symbol[Symbol(x) for x in g] for g in get(d, "exclusive_groups", [])],
+        Tuple{Symbol,Symbol}[(Symbol(r["tech"]), Symbol(r["needs"]))
+                             for r in get(d, "requires", [])],
     )
 end

@@ -30,6 +30,8 @@ export function toConfig(cfg) {
     scope2_cap: cfg.scope2_cap ?? null,
     ets_price: cfg.ets_price ?? 0,
     ets_free_allowance: cfg.ets_free_allowance ?? 0,
+    exclusive_groups: cfg.exclusive_groups ?? [],
+    requires: cfg.requires ?? [],
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

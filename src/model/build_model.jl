@@ -53,5 +53,6 @@ function expected_variable_count(sets::ModelSets)
            length(sets.commit_techs) * S * Y * 3 + # on, su, sd (2.1)
            sets.part_load_segs * S * Y +           # tramos de carga parcial (2.3)
            length(sets.discrete_techs) * Y +       # unidades compradas (3.2)
+           length(sets.exclusive_techs) +          # ever_built (5.2)
            Y * 3                                   # offset_buy, gross, net
 end

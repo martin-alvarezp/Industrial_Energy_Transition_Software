@@ -23,6 +23,7 @@ struct ModelSets
     part_load_techs::Vector{Symbol}  # conversores con curva de carga parcial (2.3)
     part_load_segs::Int              # Σ tramos de esas curvas (variables por paso·año)
     discrete_techs::Vector{Symbol}   # candidatas que se compran en unidades enteras (3.2)
+    exclusive_techs::Vector{Symbol}  # candidatas en algún grupo excluyente (5.2): ever_built
 end
 
 """
@@ -80,5 +81,6 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         # unidades enteras (3.2): conversores invertibles con tamaño de unidad
         [id for id in convs if site.converters[id].investable &&
              site.converters[id].ops.unit_size > 0],
+        sort!(unique([t for g in cfg.exclusive_groups for t in g if t in candidates])),
     )
 end

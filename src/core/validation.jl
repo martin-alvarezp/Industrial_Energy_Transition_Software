@@ -399,6 +399,19 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # relaciones entre medidas (5.2): tecnologías que existen; grupos de ≥ 2
+    known5 = Set(all_tech_ids(site))
+    for g in cfg.exclusive_groups
+        length(g) >= 2 || push!(problems, "scenario_config.yaml: un grupo excluyente necesita ≥ 2 tecnologías")
+        for id in g
+            id in known5 || push!(problems, "scenario_config.yaml: exclusive_groups nombra '$id', que no es una tecnología del sitio")
+        end
+    end
+    for (a, b) in cfg.requires
+        a in known5 && b in known5 || push!(problems,
+            "scenario_config.yaml: requires ($a necesita $b) nombra una tecnología que no está en el sitio")
+        a == b && push!(problems, "scenario_config.yaml: requires: '$a' no puede requerirse a sí misma")
+    end
     # carbono (4.2)
     for (k, v) in (("scope1_cap", cfg.scope1_cap), ("scope2_cap", cfg.scope2_cap))
         v === nothing || v >= 0 || push!(problems, "scenario_config.yaml: $k debe ser ≥ 0 (valor: $v)")

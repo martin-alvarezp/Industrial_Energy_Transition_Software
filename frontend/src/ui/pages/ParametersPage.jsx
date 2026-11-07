@@ -219,6 +219,45 @@ export default function ParametersPage({ route }) {
               </button>
             </>
           )}
+          {/* relaciones entre medidas (5.2): excluyentes y dependientes */}
+          <h4 className="par-sub">{t("par.relations")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.relationsHint")}</p>
+          {(() => {
+            const techs = twin.siteJson.technologies.filter((x) => x.type !== "source");
+            const rels = [
+              ...(draft.exclusive_groups ?? []).map((g, i) => ({ kind: "excl", a: g[0], b: g[1], i })),
+              ...(draft.requires ?? []).map((r, i) => ({ kind: "req", a: r.tech ?? r[0], b: r.needs ?? r[1], i })),
+            ];
+            const write = (list) => set({
+              exclusive_groups: list.filter((r) => r.kind === "excl").map((r) => [r.a, r.b]),
+              requires: list.filter((r) => r.kind === "req").map((r) => ({ tech: r.a, needs: r.b })),
+            });
+            const upd = (k, patch) => write(rels.map((r, j) => (j === k ? { ...r, ...patch } : r)));
+            const sel = (val, on) => (
+              <select className="ui-select" value={val} onChange={(e) => on(e.target.value)}>
+                {techs.map((x) => <option key={x.tech_id} value={x.tech_id}>{x.name}</option>)}
+              </select>);
+            return <>
+              {rels.map((r, k) => (
+                <div key={k} className="par-forced par-capex" data-relation={k}>
+                  {sel(r.a, (v) => upd(k, { a: v }))}
+                  <select className="ui-select par-capex-num" value={r.kind} onChange={(e) => upd(k, { kind: e.target.value })}>
+                    <option value="excl">{t("par.relExcl")}</option>
+                    <option value="req">{t("par.relReq")}</option>
+                  </select>
+                  {sel(r.b, (v) => upd(k, { b: v }))}
+                  <button className="ui-dots" onClick={() => write(rels.filter((_, j) => j !== k))}><MdDelete /></button>
+                </div>
+              ))}
+              {candidates.length > 0 && techs.length > 1 && (
+                <button className="ui-btn outline sm" data-testid="add-relation"
+                        onClick={() => write([...rels, { kind: "excl", a: candidates[0].tech_id,
+                          b: techs.find((x) => x.tech_id !== candidates[0].tech_id).tech_id }])}>
+                  <MdAdd /> {t("par.addRelation")}
+                </button>
+              )}
+            </>;
+          })()}
           {/* CAPEX por año (3.1): curva de aprendizaje o trayectoria explícita */}
           <h4 className="par-sub">{t("par.capexYears")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.capexYearsHint")}</p>
