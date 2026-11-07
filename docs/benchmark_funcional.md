@@ -340,3 +340,13 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   sola; si además la batería requiere la FV, no compra batería. Golden
   `medidas_relaciones_n10` (verify:wasm 28/28); Parámetros → "Relaciones
   entre medidas"; E2E `verify:measures`.
+- ✅ **5.3 · Medidas de eficiencia** (2026-11-07). `efficiency_measures`:
+  cada medida tiene vector, % de reducción de su demanda y CAPEX. Una binaria
+  por año, a lo más una compra; desde ese año la demanda del balance baja
+  r·demanda, y el CAPEX (con su factor por año) va al CAPEX del año. El
+  resultado reporta qué medidas se compraron y cuándo
+  (`efficiency_measures`); el resumen las muestra en la hoja de ruta y en la
+  inversión por ítem. Oráculo: una medida gratuita de −10 % eléctrico da
+  exactamente el VAN del demo con la demanda eléctrica × 0,9. Golden
+  `medidas_eficiencia_n5` (verify:wasm 29/29); Parámetros → "Medidas de
+  eficiencia"; E2E en `verify:measures`.

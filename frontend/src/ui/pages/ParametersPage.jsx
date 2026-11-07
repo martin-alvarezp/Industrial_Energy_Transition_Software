@@ -258,6 +258,43 @@ export default function ParametersPage({ route }) {
               )}
             </>;
           })()}
+          {/* medidas de eficiencia (5.3): reducen la demanda de un vector */}
+          <h4 className="par-sub">{t("par.effMeasures")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.effMeasuresHint")}</p>
+          {(() => {
+            const dc = Object.keys(twin.siteJson.demands ?? {});
+            const list = draft.efficiency_measures ?? [];
+            const write = (l) => set({ efficiency_measures: l });
+            const upd = (k, patch) => write(list.map((e, j) => (j === k ? { ...e, ...patch } : e)));
+            const slug = (x) => (x || "medida").toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+            return <>
+              {list.map((e, k) => (
+                <div key={k} className="par-forced par-capex" data-effm={k}>
+                  <input className="ui-input par-capex-traj" value={e.name}
+                         onChange={(ev) => upd(k, { name: ev.target.value, id: `em_${slug(ev.target.value)}_${k}` })} />
+                  <select className="ui-select par-capex-num" value={e.carrier} onChange={(ev) => upd(k, { carrier: ev.target.value })}>
+                    {dc.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input className="ui-input par-capex-num" type="number" min={0} max={100} step={0.5}
+                         value={+(e.reduction * 100).toFixed(2)} data-effm-red={k}
+                         onChange={(ev) => upd(k, { reduction: (+ev.target.value || 0) / 100 })} />
+                  <span className="unit">%</span>
+                  <input className="ui-input par-capex-num" type="number" min={0} step={10}
+                         value={e.capex / 1000} data-effm-capex={k}
+                         onChange={(ev) => upd(k, { capex: (+ev.target.value || 0) * 1000 })} />
+                  <span className="unit">k{cur}</span>
+                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><MdDelete /></button>
+                </div>
+              ))}
+              {dc.length > 0 && (
+                <button className="ui-btn outline sm" data-testid="add-effm"
+                        onClick={() => write([...list, { id: `em_medida_${list.length}`, name: t("par.effNew"),
+                          carrier: dc.includes("electricity") ? "electricity" : dc[0], reduction: 0.05, capex: 500_000 }])}>
+                  <MdAdd /> {t("par.addEffMeasure")}
+                </button>
+              )}
+            </>;
+          })()}
           {/* CAPEX por año (3.1): curva de aprendizaje o trayectoria explícita */}
           <h4 className="par-sub">{t("par.capexYears")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.capexYearsHint")}</p>

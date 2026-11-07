@@ -15,6 +15,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     # con curva de carga parcial, que el balance y las emisiones usan
     add_operation_constraints!(m, sets, params, site;
                                integer = commitment_integer(cfg))
+    add_demand_side!(m, sets, params, cfg)                # 5.3 (antes del balance)
     add_carrier_balance!(m, sets, params, site)
     add_capacity_constraints!(m, sets, params)
     add_measure_relations!(m, sets, params, cfg)          # 5.2

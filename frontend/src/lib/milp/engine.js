@@ -32,6 +32,7 @@ export function toConfig(cfg) {
     ets_free_allowance: cfg.ets_free_allowance ?? 0,
     exclusive_groups: cfg.exclusive_groups ?? [],
     requires: cfg.requires ?? [],
+    efficiency_measures: cfg.efficiency_measures ?? [],
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

@@ -96,6 +96,39 @@ const boughtT = (t) => pl.result.capacity.filter((c) => c.tech === t).reduce((a,
 const n = ["pv", "battery"].filter((t) => boughtT(t) > 1e-6).length;
 step("se compra a lo sumo una de FV y batería", n <= 1, `FV ${boughtT("pv").toFixed(1)} MW · batería ${boughtT("battery").toFixed(1)} MW`);
 
+// medidas de eficiencia (5.3): −8 % eléctrico por 100 kUSD ⇒ se compra
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="add-effm"]', { timeout: 30000 });
+await p.click('[data-testid="add-effm"]');
+await p.waitForSelector('[data-effm-red="0"]', { timeout: 10000 });
+for (const [sel, v] of [['[data-effm-red="0"]', "8"], ['[data-effm-capex="0"]', "100"]])
+  await p.evaluate((sel, v) => {
+    const inp = document.querySelector(sel);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, sel, v);
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Eficiencia");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pe = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Eficiencia");
+  if (r) { pe = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const em = pe?.result?.efficiency_measures ?? [];
+step("la medida de eficiencia se compra (motor real)", pe?.source === "api" && em.length === 1 &&
+     em[0].reduction === 0.08, JSON.stringify(em));
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+step("el resumen muestra la medida", await waitText("Nueva medida", 30000));
+step("y no inventa «Renovaciones» por su CAPEX", !(await text()).includes("Renovaciones"));
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");

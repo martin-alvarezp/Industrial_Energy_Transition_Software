@@ -60,6 +60,9 @@ export function investmentByYear(result, siteJson, labels) {
       const k = t.name ?? c.tech;
       items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, c.tech, cb.year);
     }
+    // medidas de eficiencia (5.3): su CAPEX por nombre (si no, sería "Renovaciones")
+    for (const em of result.efficiency_measures ?? [])
+      if (em.year === cb.year) items[em.name] = (items[em.name] ?? 0) + em.capex;
     const sum = Object.values(items).reduce((a, b) => a + b, 0);
     const rest = cb.capex - sum;
     if (Math.abs(rest) > 1) items[labels.renewals] = rest;
@@ -204,6 +207,10 @@ export function measures(result, siteJson) {
                     ? Math.round(c.new_mw / t.unit_size) : null, unit: t?.unit_size ?? null });
     }
   }
+  // medidas de eficiencia (5.3): en la hoja de ruta, sin MW
+  for (const em of result?.efficiency_measures ?? [])
+    rows.push({ tech: em.id, name: em.name, year: calYear(result, em.year), mw: null,
+                capex: em.capex, measure: true, reduction: em.reduction, units: null });
   return rows.sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));
 }
 

@@ -60,7 +60,8 @@ function MeasuresTimeline({ rows, years, t }) {
             <th className="num">{t("sum.mw")}</th><th className="num">{t("sum.col.capex")} ({currency()})</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}><td>{r.name}</td><td>{r.year}</td>
-              <td className="num">{r.units != null ? `${r.units} × ${num(r.unit, 2)} = ` : ""}{num(r.mw, 2)}</td>
+              <td className="num">{r.measure ? `−${num(100 * r.reduction, 1)} %`
+                : `${r.units != null ? `${r.units} × ${num(r.unit, 2)} = ` : ""}${num(r.mw, 2)}`}</td>
               <td className="num">{num(r.capex, 0)}</td></tr>))}</tbody>
         </table>
       ) : (
@@ -75,7 +76,8 @@ function MeasuresTimeline({ rows, years, t }) {
                 {rows.filter((r) => r.name === n).map((r, i) => {
                   const I = componentIcon(r.t);
                   return <span key={i} className="mt-dot" style={{ left: `${x(r.year)}%` }}
-                               title={`${r.name} · ${r.year} · ${r.units != null ? `${r.units} × ${num(r.unit, 2)} MW = ` : ""}${num(r.mw, 2)} MW`}><I size={16} /></span>;
+                               title={r.measure ? `${r.name} · ${r.year} · −${num(100 * r.reduction, 1)} %`
+                                 : `${r.name} · ${r.year} · ${r.units != null ? `${r.units} × ${num(r.unit, 2)} MW = ` : ""}${num(r.mw, 2)} MW`}><I size={16} /></span>;
                 })}
               </div>
             </div>

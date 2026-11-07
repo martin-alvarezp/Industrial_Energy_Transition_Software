@@ -44,6 +44,7 @@ include("constraints/emissions.jl")
 include("constraints/budget.jl")
 include("constraints/operation.jl")
 include("constraints/measures.jl")
+include("constraints/demand_side.jl")
 include("constraints/constraints.jl")
 
 # results: extracción de resultados y resumen (SPEC §10)
@@ -66,7 +67,7 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export GridTariff, NO_TARIFF, has_tariff, capex_factor, uses_commitment, part_load_points, input_driver,
+export EfficiencyMeasure, GridTariff, NO_TARIFF, has_tariff, capex_factor, uses_commitment, part_load_points, input_driver,
        StoragePhysics, IDEAL_STORAGE, eta_charge, eta_discharge, soc_band,
        OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
        Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,

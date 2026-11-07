@@ -23,6 +23,7 @@ struct Results
     emissions::DataFrame                # year, gross, net, caps, offsets, macc
     res_share::Vector{Float64}          # participación renovable por año
     diagnostics::Vector{String}         # causas de infactibilidad (vacío si factible)
+    measures::DataFrame                 # medidas de eficiencia compradas (5.3): id, name, year
 end
 
 """
@@ -51,7 +52,22 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         extract_emissions_summary(im; shadow_prices),
         res_share_by_year(im),
         String[],
+        _measures_bought(im),
     )
+end
+
+# medidas de eficiencia compradas (5.3): id, nombre, año (relativo), reducción
+function _measures_bought(im::IETOModel)
+    df = DataFrame(id = Symbol[], name = String[], carrier = Symbol[],
+                   year = Int[], reduction = Float64[], capex = Float64[])
+    haskey(JuMP.object_dictionary(im.model), :em_buy) || return df
+    for em in im.config.efficiency_measures, y in im.sets.years
+        em.id in JuMP.axes(im.model[:em_buy], 1) || continue
+        JuMP.value(im.model[:em_buy][em.id, y]) > 0.5 &&
+            push!(df, (em.id, em.name, em.carrier, y, em.reduction,
+                       em.capex * capex_factor(im.config, em.id, y)))
+    end
+    return df
 end
 
 "Results vacío para un escenario no resuelto (infactible, time limit, ...)."
@@ -59,7 +75,7 @@ function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
                             status::Symbol, diagnostics::Vector{String} = String[])
     return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
-                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics)
+                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame())
 end
 
 _fmt(x; d = 1) = isnan(x) ? "—" : string(round(x; digits = d))

@@ -239,6 +239,8 @@ export function buildLP(site0, cfg0) {
   // operación detallada (2.1): equipos con unit commitment (tamaño conocido)
   const integers = [];
   const commitInt = commitmentInteger(cfg);
+  // medidas de eficiencia (5.3) sobre vectores con demanda
+  const EMs = (cfg.efficiency_measures ?? []).filter((em) => site.demands?.[em.carrier]);
   const { prev, plen } = chronology(ts);
 
   // combustible con mercado de compra ⇒ lleva balance
@@ -372,6 +374,8 @@ export function buildLP(site0, cfg0) {
               addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                   p.ratio * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
+    // CAPEX de las medidas de eficiencia del año (5.3; no deducible, como el CAPEX)
+    for (const em of EMs) add(`em_${sane(em.id)}_${y}`, D * em.capex * capexFactor(cfg, em.id, y));
     // ETS (4.2): derechos sobre el alcance 1 sobre la asignación gratuita
     if ((cfg.ets_price ?? 0) > 0) {
       for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
@@ -461,6 +465,9 @@ export function buildLP(site0, cfg0) {
           }
           const dem = demandNode(c) === n
             ? (site.demands?.[c]?.[s - 1] ?? 0) * growth(y) : 0;
+          // medidas activas reducen la demanda: r·dem·Σ_{y'≤y} em (al lado izquierdo)
+          if (dem) for (const em of EMs) if (em.carrier === c)
+            for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, em.reduction * dem);
           row(`bal_${sane(n)}_${sane(c)}_${s}_${y}`, t, "=", dem);
         }
       }
@@ -765,6 +772,16 @@ export function buildLP(site0, cfg0) {
     if (yrel >= 1 && yrel <= N && cands.some((t) => t.tech_id === tech))
       row(`forced_${sane(tech)}_${yrel}`,
           { [`nc_${sane(tech)}_${yrel}`]: 1 }, ">=", mw);
+  }
+  // medidas de eficiencia (5.3): binarias, a lo más una compra en el horizonte
+  for (const em of EMs) {
+    const id = sane(em.id), once = {};
+    for (const y of years) {
+      integers.push(`em_${id}_${y}`);
+      row(`emub_${id}_${y}`, { [`em_${id}_${y}`]: 1 }, "<=", 1);
+      once[`em_${id}_${y}`] = 1;
+    }
+    row(`emonce_${id}`, once, "<=", 1);
   }
   // relaciones entre medidas (5.2) — espejo de measures.jl
   const candIds = new Set(cands.map((t) => t.tech_id));

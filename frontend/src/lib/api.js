@@ -104,6 +104,7 @@ export function toOverrides(cfg) {
     ets_free_allowance: cfg.ets_free_allowance ?? 0,
     exclusive_groups: cfg.exclusive_groups ?? [],   // 5.2: relaciones entre medidas
     requires: (cfg.requires ?? []).map((r) => (Array.isArray(r) ? { tech: r[0], needs: r[1] } : r)),
+    efficiency_measures: cfg.efficiency_measures ?? [],   // 5.3
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

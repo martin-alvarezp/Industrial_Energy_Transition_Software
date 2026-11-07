@@ -181,11 +181,20 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const cost_breakdown = [];
   const emissions = [];
   const res_share = [];
+  const EMs = (cfg.efficiency_measures ?? []).filter((em) => site.demands?.[em.carrier]);
+  const efficiency_measures = [];
   for (const y of years) {
     let capex = renewalCapex[y - 1], fixed = fixedCharges, varop = 0,
         energy = 0, dcharges = 0, exportRev = 0, s1 = 0, s2 = 0,
         resGen = 0, demTot = 0;
     for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`);
+    // medidas de eficiencia (5.3)
+    for (const em of EMs) {
+      const on = V(`em_${sane(em.id)}_${y}`);
+      capex += em.capex * capexFactor(cfg, em.id, y) * on;
+      if (on > 0.5) efficiency_measures.push({ id: em.id, name: em.name ?? em.id, carrier: em.carrier,
+        year: y, reduction: em.reduction, capex: em.capex * capexFactor(cfg, em.id, y) });
+    }
     for (const t of [...convs, ...gens, ...stors]) {
       fixed += t.fixed_opex * availOf(t, y);
       for (const s of steps) {
@@ -318,7 +327,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       total_offsets: emissions.reduce((a, e) => a + e.offsets, 0),
       res_share_final: res_share[N - 1],
     },
-    investments, capacity, cost_breakdown, emissions, res_share, dispatch,
+    investments, capacity, cost_breakdown, emissions, res_share, dispatch, efficiency_measures,
     infeasibility: null,
   };
 }

@@ -256,6 +256,7 @@ function results_payload(r::Results;
         cost_breakdown = feas ? _json_rows(r.cost_breakdown) : [],
         emissions = feas ? _json_rows(r.emissions) : [],
         res_share = r.res_share,
+        efficiency_measures = feas ? _json_rows(r.measures) : [],   # 5.3
         scenarios = scenarios === nothing ? nothing : _json_rows(scenarios),
         pareto = pareto === nothing ? nothing : _json_rows(pareto),
         dispatch = (feas && include_dispatch) ? _json_rows(r.dispatch) : nothing,

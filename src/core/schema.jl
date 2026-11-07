@@ -359,5 +359,9 @@ function load_scenario_config(path::AbstractString)
         Vector{Symbol}[Symbol[Symbol(x) for x in g] for g in get(d, "exclusive_groups", [])],
         Tuple{Symbol,Symbol}[(Symbol(r["tech"]), Symbol(r["needs"]))
                              for r in get(d, "requires", [])],
+        EfficiencyMeasure[EfficiencyMeasure(Symbol(e["id"]), String(get(e, "name", e["id"])),
+                                            Symbol(e["carrier"]), Float64(e["reduction"]),
+                                            Float64(e["capex"]))
+                          for e in get(d, "efficiency_measures", [])],
     )
 end

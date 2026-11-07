@@ -399,6 +399,23 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # medidas de eficiencia (5.3): vector con demanda, reducción en (0,1], CAPEX ≥ 0
+    let ids = Symbol[]
+        for em in cfg.efficiency_measures
+            haskey(site.demands, em.carrier) || push!(problems,
+                "scenario_config.yaml: la medida '$(em.id)' reduce '$(em.carrier)', que no tiene demanda")
+            0 < em.reduction <= 1 || push!(problems,
+                "scenario_config.yaml: la reducción de '$(em.id)' debe estar en (0,1] (valor: $(em.reduction))")
+            em.capex >= 0 || push!(problems, "scenario_config.yaml: el CAPEX de '$(em.id)' debe ser ≥ 0")
+            em.id in ids && push!(problems, "scenario_config.yaml: medida '$(em.id)' repetida")
+            push!(ids, em.id)
+        end
+        for c in keys(site.demands)
+            tot = sum(em.reduction for em in cfg.efficiency_measures if em.carrier == c; init = 0.0)
+            tot <= 1 || push!(problems,
+                "scenario_config.yaml: las medidas sobre '$c' reducen en total $(tot) (> 100 %)")
+        end
+    end
     # relaciones entre medidas (5.2): tecnologías que existen; grupos de ≥ 2
     known5 = Set(all_tech_ids(site))
     for g in cfg.exclusive_groups

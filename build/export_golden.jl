@@ -162,4 +162,10 @@ s18, c18 = apply_scenario(site0, with_config(cfg0; horizon_years = 10,
                                              exclusive_groups = [[:pv, :battery]],
                                              requires = [(:battery, :heat_pump)]), :least_cost)
 dump("medidas_relaciones_n10", s18, c18)
+# 19 · medidas de eficiencia (5.3): motores (−8 % eléctrico) y aislación
+# (−12 % de agua caliente) con CAPEX; el motor decide si y cuándo
+s19, c19 = apply_scenario(site0, with_config(cfg0; horizon_years = 5,
+    efficiency_measures = [EfficiencyMeasure(:motores, "Motores IE4", :electricity, 0.08, 1.5e6),
+                           EfficiencyMeasure(:aislacion, "Aislación", :hot_water, 0.12, 0.8e6)]), :least_cost)
+dump("medidas_eficiencia_n5", s19, c19)
 println("fixtures dorados en ", out)
