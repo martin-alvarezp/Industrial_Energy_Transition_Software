@@ -132,4 +132,7 @@ dump("demo_capex_por_anio_n5", site0,
                  capex_budget = 40e6,
                  capex_learning = Dict(:battery => 0.12, :heat_pump => 0.05),
                  capex_by_year = Dict(:pv => [1.3, 1.1, 0.9, 0.8])))
+# 14 · unidades enteras (3.2): la bomba de calor en unidades de 4 MW compra
+# 8 MW (2 unidades) donde en continuo compraría 9
+dump("unidades_enteras_n1", discrete_case(4.0)...)
 println("fixtures dorados en ", out)

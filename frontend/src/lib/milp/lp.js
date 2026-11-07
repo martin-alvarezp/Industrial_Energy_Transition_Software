@@ -664,7 +664,13 @@ export function buildLP(site0, cfg0) {
   const binaries = [];
   for (const t of cands) {
     const id = sane(t.tech_id);
+    // unidades enteras (3.2): conversor con tamaño de unidad ⇒ nc = u·n, n ∈ ℤ
+    const uSz = t.type === "converter" ? (t.unit_size ?? 0) : 0;
     for (const y of years) {
+      if (uSz > 0) {
+        integers.push(`nu_${id}_${y}`);
+        row(`units_${id}_${y}`, { [`nc_${id}_${y}`]: 1, [`nu_${id}_${y}`]: -uSz }, "=", 0);
+      }
       binaries.push(`b_${id}_${y}`);
       row(`link_${id}_${y}`,
           { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);

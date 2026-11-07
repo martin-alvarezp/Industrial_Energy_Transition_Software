@@ -198,7 +198,10 @@ export function measures(result, siteJson) {
     if (c.new_mw > 1e-6) {
       const t = T[c.tech];
       rows.push({ tech: c.tech, name: t?.name ?? c.tech, year: calYear(result, c.year), mw: c.new_mw,
-                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0) * capexFactor(result, c.tech, c.year), t });
+                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0) * capexFactor(result, c.tech, c.year), t,
+                  // unidades enteras (3.2): cuántas unidades del tamaño fijado
+                  units: t?.type === "converter" && (t.unit_size ?? 0) > 0
+                    ? Math.round(c.new_mw / t.unit_size) : null, unit: t?.unit_size ?? null });
     }
   }
   return rows.sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));

@@ -246,3 +246,13 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   del resumen usan el mismo factor (antes la diferencia habría aparecido como
   "Renovaciones"). E2E `verify:capex`. verify:ui detectó que las filas nuevas
   se salían de la pantalla en celular; quedó corregido.
+- ✅ **3.2 · Expansión en unidades enteras** (2026-11-07). Un conversor
+  invertible con `unit_size` se compra en unidades enteras (nueva capacidad =
+  u·n, n ∈ ℤ). Oráculo: con unidades de 4 MW la bomba compra 8 MW
+  (2 unidades) donde en continuo compraría 9. Golden `unidades_enteras_n1`
+  (verify:wasm 21/21; `demo_operacion_lineal_n3` cambió su VAN porque su
+  bomba usa unidades de 2,5 MW). Las medidas muestran «N × u MW». Julia
+  1470/1470. **Pendiente:** el E2E `scripts/verify_units.mjs` quedó sin
+  commitear porque tiene un error de sintaxis por corregir.
+- 🔜 **3.3 · Presupuesto CAPEX anual** y **bloque 4** (tarifas por horas de
+  utilización y por bloques, ETS, topes por alcance, ROI, LCOE): por hacer.

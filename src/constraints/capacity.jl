@@ -27,6 +27,14 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
 
     m[:new_capacity_link] = JuMP.@constraint(m, [t in sets.candidates, y in years],
         new_capacity[t, y] <= params.max_new_capacity[t] * build[t, y])
+    # unidades enteras (3.2): con tamaño de unidad la compra es u·n, n ∈ ℤ≥0
+    # ("Size of a single unit"): no se compran 3,7 calderas
+    D = sets.discrete_techs
+    if !isempty(D)
+        JuMP.@variable(m, units_bought[t in D, y in years] >= 0, Int)
+        m[:discrete_units] = JuMP.@constraint(m, [t in D, y in years],
+            new_capacity[t, y] == params.unit_size[t] * units_bought[t, y])
+    end
 
     # M5: con inversiones repetibles (reemplazo endógeno al vencer la vida
     # útil, módulos incrementales) no se limita el número de compras

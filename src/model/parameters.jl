@@ -44,6 +44,7 @@ struct ModelParameters
                                                      # por mes si todos los pasos traen
                                                      # month, si no por estación
     duration_hours::Vector{Float64}                  # [step] Δt del paso (SOC)
+    unit_size::Dict{Symbol,Float64}                  # MW por unidad (3.2; solo > 0)
     # ── M2b: potencia contratada y net metering ──
     market_contracted::Dict{Symbol,Float64}          # MW contratados (Inf = por peak)
     market_excess_penalty::Dict{Symbol,Float64}      # USD/kW·mes sobre el exceso
@@ -333,6 +334,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            conn_export_limit, balanced, grid_carrier,
                            fixed_charges, market_demand_charge, season_steps,
                            billing_steps, duration,
+                           Dict{Symbol,Float64}(id => c.ops.unit_size
+                                                for (id, c) in site.converters
+                                                if c.ops.unit_size > 0),
                            market_contracted, market_excess_penalty,
                            remaining_life, cfg.renew_existing,
                            cfg.repeat_investments, renewal_capex, forced,

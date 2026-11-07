@@ -285,7 +285,7 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                  "At 0 the unit operates ideally (any load, no start-up cost). With minimum load, start-ups or minimum times, each unit is modeled on or off (integer variables: slower).")}
             </p>
             <Field label={L("Tamaño de unidad (MW)", "Unit size (MW)")}
-                   hint={L("el parque son capacidad ÷ tamaño unidades; si el equipo no es invertible puede quedar en 0 (una sola unidad)", "the fleet is capacity ÷ size units; if not investable it can stay at 0 (a single unit)")}>
+                   hint={L("si es invertible, se compra en unidades ENTERAS de este tamaño; el parque son capacidad ÷ tamaño unidades. Sin inversión puede quedar en 0 (una sola unidad)", "if investable, it is bought in WHOLE units of this size; the fleet is capacity ÷ size units. Without investment it can stay at 0 (a single unit)")}>
               <Num value={draft.unit_size ?? 0} step={0.5} min={0} data-ops="unit_size"
                    onChange={(v) => set({ unit_size: v })} />
             </Field>

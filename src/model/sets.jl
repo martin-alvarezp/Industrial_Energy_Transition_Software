@@ -22,6 +22,7 @@ struct ModelSets
     ramp_techs::Vector{Symbol}       # conversores con límite de rampa (2.1)
     part_load_techs::Vector{Symbol}  # conversores con curva de carga parcial (2.3)
     part_load_segs::Int              # Σ tramos de esas curvas (variables por paso·año)
+    discrete_techs::Vector{Symbol}   # candidatas que se compran en unidades enteras (3.2)
 end
 
 """
@@ -76,5 +77,8 @@ function build_sets(site::Site, cfg::ScenarioConfig)
         [id for id in convs if has_ramp(site.converters[id].ops)],
         plt,
         sum(length(site.converters[id].part_load) - 1 for id in plt; init = 0),
+        # unidades enteras (3.2): conversores invertibles con tamaño de unidad
+        [id for id in convs if site.converters[id].investable &&
+             site.converters[id].ops.unit_size > 0],
     )
 end

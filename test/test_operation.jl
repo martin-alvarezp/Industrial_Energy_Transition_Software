@@ -8,7 +8,7 @@
 # Demanda de calor: 3 MW de 0 a 11 h y 8 MW de 12 a 23 h; el balance es
 # igualdad, así que la bomba no puede "tirar" calor para respetar su mínimo.
 
-include("helpers_operation.jl")
+@isdefined(op_site) || include("helpers_operation.jl")
 
 function solve_op(site, cfg)
     im = build_model(site, cfg)

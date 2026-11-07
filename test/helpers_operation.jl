@@ -31,3 +31,14 @@ end
 
 ops(; kw...) = OperationLimits((Float64(get(kw, k, 0.0)) for k in fieldnames(OperationLimits))...)
 
+
+# Expansión en unidades enteras (3.2): la bomba invertible a 200 USD/kW con
+# demanda 3 MW de noche y 9 MW de día; `unit` = MW por unidad (0 = continuo).
+function discrete_case(unit)
+    site, cfg = op_site(ops(unit_size = unit); demand = [fill(3.0, 12); fill(9.0, 12)],
+                        hp_existing = 0.0, hp_investable = true, hp_max_new = 12.0)
+    hp = IETO._with(site.converters[:hp]; costs = TechCosts(200.0, 0.0, 0.0, 30))
+    site = IETO._with(site; converters = Dict(:hp => hp, :eb => site.converters[:eb]))
+    return site, cfg
+end
+
