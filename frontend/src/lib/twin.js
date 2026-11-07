@@ -17,7 +17,7 @@ export const TECH_TYPE_META = {
 // equipos nuevos heredan el color de su tipo
 const KNOWN_COLORS = {
   pv: SLOT[0], gas_boiler: SLOT[6], grid_import: SLOT[3],
-  heat_pump: SLOT[1], battery: SLOT[5], electric_boiler: SLOT[1],
+  heat_pump: SLOT[1], battery: SLOT[5], electric_boiler: SLOT[7],
 };
 
 export const techColor = (t) =>

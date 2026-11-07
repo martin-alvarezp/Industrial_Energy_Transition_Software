@@ -62,10 +62,15 @@ export function ChartPanel({ title, unit, menu = [], children, toolbar }) {
   );
 }
 
-export function StackedBars({ data, keys, unit, height = 440, digits = 2 }) {
+/**
+ * `prefs`: colores de entidad (entityColors). `domain`: todas las series que el
+ * gráfico PODRÍA mostrar, si la página filtra `keys` por fuera (así filtrar no
+ * repinta a las que quedan).
+ */
+export function StackedBars({ data, keys, unit, height = 440, digits = 2, prefs, domain }) {
   const [hidden, setHidden] = useState({});
   const shown = keys.filter((k) => !hidden[k]);
-  const colors = useMemo(() => seriesColors(keys), [keys]);
+  const colors = useMemo(() => seriesColors(domain ?? keys, prefs), [domain, keys, prefs]);
   return (
     <>
       <ChartLegend keys={keys} colors={colors} hidden={hidden}

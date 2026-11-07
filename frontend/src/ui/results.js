@@ -6,6 +6,7 @@
 // sea siempre el del motor.
 
 import { CATEGORICAL, SLR } from "./palette.js";
+import { techColor, carrierColor } from "../lib/twin.js";
 
 const KW = 1000;
 
@@ -193,22 +194,64 @@ export function measures(result, siteJson) {
 }
 
 // ── color de serie ─────────────────────────────────────────────────────────
-// Los 8 slots validados de palette.js, asignados DENTRO DEL DOMINIO de cada
-// gráfico (todas sus series, ocultas incluidas) por orden alfabético:
+// Dos capas:
 //
-//  · "nunca ciclar": pasado el slot 8 la serie NO recibe un tono generado, se
-//    va al gris de "otros" (16 slots no pasan los gates: lo verificamos).
-//  · "el color sigue a la entidad, no a su rango": el dominio no cambia al
-//    ocultar una serie en la leyenda, así que nadie se repinta; y dos gráficos
-//    con las mismas series las pintan igual.
+//  1. COLOR DE ENTIDAD (entityColors): cada tecnología lleva su techColor —el
+//     mismo del mapa y del Sankey— y cada compra el color de su vector. Así
+//     "Heat pump" es del mismo color en inversión, OPEX, capacidades, despacho
+//     y Sankey.
+//  2. RESOLUCIÓN POR GRÁFICO (seriesColors): dentro de un gráfico dos series
+//     no pueden compartir color (p. ej. "Compra de Natural gas" y "Gas boiler"
+//     piden los dos el ocre). Gana la primera en orden alfabético; la otra, y
+//     toda serie sin preferencia, toma un slot LIBRE del gráfico. Pasado el
+//     slot 8 va al gris de "otros": nunca se cicla ni se genera un tono (16
+//     slots no pasan los gates: lo verificamos).
 //
-// Por qué no un registro global: temporadas, tecnologías y "Demanda" compartían
-// los mismos 8 slots, el orden dependía de qué páginas se visitaron antes y al
-// pasar de 8 nombres en la sesión las series empezaban a caer en gris.
+// El dominio es el del gráfico completo (series ocultas incluidas), así que
+// ocultar una serie en la leyenda no repinta a ninguna otra.
 const byName = (a, b) => String(a).localeCompare(String(b));
-export function seriesColors(keys) {
+// colores que no son identidad: pueden repetirse sin "gastar" un slot
+const shared = (c) => c === SLR.grayText || c.startsWith("var(");
+
+export function seriesColors(keys, prefs = new Map()) {
   const sorted = [...new Set(keys)].sort(byName);
-  return new Map(sorted.map((k, i) => [k, CATEGORICAL[i] ?? SLR.grayText]));
+  const out = new Map(), used = new Set();
+  // primero las preferencias fuertes (equipos), después las débiles (compras
+  // de un vector): ante un choque el equipo conserva el color del mapa
+  const weak = prefs.weak ?? new Set();
+  for (const pass of [false, true]) for (const k of sorted) {
+    if (out.has(k) || weak.has(k) !== pass) continue;
+    const c = prefs.get(k);
+    if (c && (shared(c) || !used.has(c))) { out.set(k, c); used.add(c); }
+  }
+  const free = CATEGORICAL.filter((c) => !used.has(c));
+  for (const k of sorted) if (!out.has(k)) out.set(k, free.shift() ?? SLR.grayText);
+  return out;
+}
+
+/**
+ * Color preferido de cada entidad, por su NOMBRE VISIBLE (las series de los
+ * gráficos se llaman así). `labels` son los textos de results.js: trade(c),
+ * other, import, discharge, consumption; los que falten se ignoran.
+ */
+export function entityColors(siteJson, labels = {}) {
+  const m = new Map();
+  m.weak = new Set(); // compras: ceden su color ante un equipo (ver seriesColors)
+  const put = (k, c) => { if (k && c && c !== SLR.grayText) m.set(k, c); };
+  if (labels.trade) for (const c of siteJson?.carriers ?? []) {
+    const k = labels.trade(c.name ?? c.carrier_id);
+    put(k, carrierColor(c)); m.weak.add(k);
+  }
+  for (const t of siteJson?.technologies ?? []) {
+    const name = t.name ?? t.tech_id, col = techColor(t);
+    put(name, col);
+    // en el despacho la descarga y el consumo son la misma máquina; la carga
+    // queda sin preferencia para que no choque con la descarga
+    for (const suf of [labels.discharge, labels.consumption]) if (suf) put(`${name} (${suf})`, col);
+    if (t.tech_id === "grid_import") put(labels.import, col);
+  }
+  if (labels.other) m.set(labels.other, SLR.grayText);
+  return m;
 }
 
 function outPorts(t) {

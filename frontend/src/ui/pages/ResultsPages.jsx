@@ -13,7 +13,7 @@ import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { ChartPanel, StackedBars, ChartLegend } from "../charts.jsx";
 import NeedsRun, { RunPicker } from "../components/NeedsRun.jsx";
 import {
-  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors,
+  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors,
   horizonKpis,
 } from "../results.js";
 import { techKind } from "../techkind.js";
@@ -69,11 +69,12 @@ export function CapacitiesPage() {
     items: Object.fromEntries((result.capacity ?? []).filter((r) => r.year === c.year && r[key] > 1e-6)
       .map((r) => [names[r.tech] ?? r.tech, r[key]])),
   }));
+  const prefs = useMemo(() => entityColors(siteJson), [siteJson]);
   return (
     <Page icon={NAV_ICONS.capacities} title={t("nav.capacities")} help={t("res.capHelp")}>
       {result && <>
-        <ChartPanel title={t("res.capAvail")}><StackedBars {...stackRows(rows("available_mw"), result)} unit="MW" /></ChartPanel>
-        <ChartPanel title={t("res.capNew")}><StackedBars {...stackRows(rows("new_mw"), result)} unit="MW" height={320} /></ChartPanel>
+        <ChartPanel title={t("res.capAvail")}><StackedBars {...stackRows(rows("available_mw"), result)} prefs={prefs} unit="MW" /></ChartPanel>
+        <ChartPanel title={t("res.capNew")}><StackedBars {...stackRows(rows("new_mw"), result)} prefs={prefs} unit="MW" height={320} /></ChartPanel>
       </>}
     </Page>
   );
@@ -88,14 +89,15 @@ export function CostsPage() {
     tax: t("sum.tax"), other: t("sum.other"),
   }), [t]);
   const unit = `mn ${currency() === "USD" ? "$" : currency()} (real)`;
+  const prefs = useMemo(() => entityColors(siteJson, labels), [siteJson, labels]);
   return (
     <Page icon={NAV_ICONS.costs} title={t("nav.costs")} help={t("res.costsHelp")}>
       {result && siteJson && <>
         <ChartPanel title={t("sum.investmentCost")}>
-          <StackedBars {...stackRows(investmentByYear(result, siteJson, labels), result, { scale: 1e6 })} unit={unit} height={340} />
+          <StackedBars {...stackRows(investmentByYear(result, siteJson, labels), result, { scale: 1e6 })} prefs={prefs} unit={unit} height={340} />
         </ChartPanel>
         <ChartPanel title={t("sum.opex")}>
-          <StackedBars {...stackRows(opexByYear(result, siteJson, labels), result, { scale: 1e6 })} unit={unit} height={380} />
+          <StackedBars {...stackRows(opexByYear(result, siteJson, labels), result, { scale: 1e6 })} prefs={prefs} unit={unit} height={380} />
         </ChartPanel>
         <section className="rc-panel ui-legacy">
           <InvestmentCase plan={result} bau={data.bau} referenceLabel={refLabel(data.referenceLabel, t)} />
@@ -124,10 +126,12 @@ export function OperationPage() {
   const cname = carriers.find((x) => x.carrier_id === c)?.name ?? c;
   // la demanda NO ocupa slot: es la línea punteada en color de texto
   const dayColors = useMemo(() => {
-    const m = seriesColors(day?.keys ?? []);
+    const prefs = entityColors(siteJson, { import: t("res.import"), discharge: t("res.discharge"),
+                                           consumption: t("res.consumption") });
+    const m = seriesColors(day?.keys ?? [], prefs);
     m.set(t("res.demand"), "var(--ui-text)");
     return m;
-  }, [day, t]);
+  }, [day, siteJson, t]);
   return (
     <Page icon={NAV_ICONS.operation} title={t("nav.operation")} help={t("res.opHelp")}>
       {result && day && <>

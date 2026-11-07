@@ -15,7 +15,7 @@ import { ChartPanel, StackedBars, Waterfall, SankeyFlow } from "../charts.jsx";
 import RunModal from "../components/RunModal.jsx";
 import {
   investmentByYear, opexByYear, totalCostByYear, stackRows, emissionsWaterfall, horizonKpis,
-  measures, nominalFactor, calYear,
+  measures, nominalFactor, calYear, entityColors,
 } from "../results.js";
 import { locationOf } from "../layout.js";
 import { buildFlows } from "../../lib/flows.js";
@@ -116,6 +116,7 @@ export default function SummaryPage() {
   }, [result, feasible, siteJson, labels]);
   const filterKeys = (s) => ({ ...s, keys: s.keys.filter((k) => !hiddenTech[k]) });
   const st = (rows) => filterKeys(stackRows(rows, result, { factor, scale: prefs.scale }));
+  const entPrefs = useMemo(() => entityColors(siteJson, labels), [siteJson, labels]);
   const allKeys = calc ? [...new Set([...calc.inv, ...calc.opex].flatMap((r) => Object.keys(r.items)))] : [];
   const k = result && feasible ? horizonKpis(result, factor) : null;
 
@@ -226,13 +227,13 @@ export default function SummaryPage() {
           <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} /></section>
 
           <ChartPanel title={t("sum.investmentCost")} menu={exportMenu}>
-            <StackedBars {...st(calc.inv)} unit={scaleLbl} />
+            <StackedBars {...st(calc.inv)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />
           </ChartPanel>
           <ChartPanel title={t("sum.opex")} menu={exportMenu}>
-            <StackedBars {...st(calc.opex)} unit={scaleLbl} />
+            <StackedBars {...st(calc.opex)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />
           </ChartPanel>
           <ChartPanel title={`${t("sum.totalAnnual")} ${prefs.impact === "nominal" ? "nominal" : "real"}`} menu={exportMenu}>
-            <StackedBars {...st(calc.total)} unit={scaleLbl} />
+            <StackedBars {...st(calc.total)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />
           </ChartPanel>
           <ChartPanel title={t("sum.saved")} menu={exportMenu}>
             <Waterfall rows={calc.wf.map((r) => ({ ...r, base: r.base / 1000, value: r.value / 1000 }))}
