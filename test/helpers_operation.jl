@@ -59,3 +59,20 @@ function carbon_site()
     return s, cfg
 end
 
+
+# Servicios de balance (5.6)
+# batería de 10 MW / 40 MWh con precio plano (sin arbitraje) y demanda de 10 MW
+function afrr_battery_site()
+    steps = [TimeStep(i, "day", i - 1, 365.0) for i in 1:24]
+    carriers = Dict(:electricity => Carrier(:electricity, "Electricity", "MWh", :energy))
+    tc = TechCosts(0.0, 0.0, 0.0, 30)
+    sources = Dict(:grid_import => Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, tc, 0.0, 0.0))
+    bat = Storage(:bat, "Bat", :electricity, 1.0, 10.0, 0.0, 4.0, false, tc)
+    mk = Dict(:buy => Market(:buy, "Compra", :electricity, :buy, fill(80.0, 24), Inf, Inf, nothing, :grid_import))
+    site = Site("afrr", steps, carriers, sources, Dict{Symbol,Converter}(), Dict{Symbol,Generator}(),
+                Dict(:bat => bat), Dict(:electricity => Demand(:electricity, fill(10.0, 24))),
+                Dict{Symbol,PriceSeries}(), [EmissionFactor(:electricity, :scope2, 0.0)], mk)
+    cfg = ScenarioConfig(1, 0.0, Dict{Symbol,Float64}(), 0.0, 1e9, 1e9, 1e9,
+                         false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    return site, cfg
+end

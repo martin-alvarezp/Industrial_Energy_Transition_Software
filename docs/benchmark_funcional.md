@@ -375,3 +375,23 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   Lo que no cubre: fallas estocásticas con duración (el benchmark habla de
   cantidad y duración de fallas por año); el N-1 es la exigencia
   determinística equivalente para dimensionar el respaldo.
+- ✅ **5.6 · Servicios de balance (aFRR)** (2026-11-07). `afrr_participants`,
+  `afrr_price_up` y `afrr_price_down` (USD/MW·h de reserva) y
+  `afrr_max_share`. Los participantes reservan potencia en cada paso dentro
+  de su margen físico, todo en MW eléctricos (el ratio del puerto eléctrico
+  convierte el despacho de referencia):
+  - un **generador** sube hasta su capacidad y baja hasta su piso (carga
+    mínima con unit commitment);
+  - una **carga flexible** (bomba de calor, caldera eléctrica) sube bajando
+    su consumo y baja consumiendo más;
+  - una **batería** usa su rango de potencia y tiene que sostener una hora
+    de activación con el SOC.
+
+  El ingreso por reserva va con las ventas (tributa). Simplificación
+  declarada: se modela la reserva; la energía activada no se despacha paso a
+  paso. Oráculos: batería de 10 MW a precio plano, 50 % ofertable ⇒
+  8760·(20·5 + 15·5) USD; bomba de calor COP 3 ⇒ su reserva para subir queda
+  acotada por su consumo eléctrico (365·30·32 USD). Goldens `afrr_bateria_n1`,
+  `afrr_bomba_n1` y `demo_afrr_n5` (verify:wasm 37/37); Parámetros →
+  "Servicios de balance (aFRR)"; E2E en `verify:measures` (ingresos de 1,45
+  a 3,03 MUSD, VAN de 71,62 a 70,58).

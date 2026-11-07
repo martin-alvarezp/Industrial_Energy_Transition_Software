@@ -109,6 +109,10 @@ export function toOverrides(cfg) {
     flex_cost: cfg.flex_cost ?? 0,
     backup_share: cfg.backup_share ?? {},                 // 5.5: respaldo N-1
     backup_without_grid: !!cfg.backup_without_grid,
+    afrr_participants: cfg.afrr_participants ?? [],      // 5.6: reserva aFRR
+    afrr_price_up: cfg.afrr_price_up ?? 0,
+    afrr_price_down: cfg.afrr_price_down ?? 0,
+    afrr_max_share: cfg.afrr_max_share ?? 0.5,
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

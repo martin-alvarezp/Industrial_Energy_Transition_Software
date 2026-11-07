@@ -183,4 +183,14 @@ s22, c22 = discrete_case(4.0)
 dump("respaldo_n1_unidades_n1", s22, with_config(c22; backup_share = Dict(:heat => 1.2)))
 dump("demo_respaldo_n5", site0, with_config(cfg0; horizon_years = 5,
      backup_share = Dict(:hot_water => 1.0, :electricity => 0.3)))
+# 22 · servicios de balance (5.6): reserva aFRR de una batería (margen y SOC),
+# de una bomba de calor como carga flexible, y el demo con ambas ofertando
+s23, c23 = afrr_battery_site()
+dump("afrr_bateria_n1", s23, with_config(c23; afrr_participants = [:bat], afrr_price_up = 20.0,
+                                          afrr_price_down = 15.0, afrr_max_share = 0.5))
+s24, c24 = op_site(ops(min_load = 0.3); demand = [fill(4.0, 12); fill(8.0, 12)])
+dump("afrr_bomba_n1", s24, with_config(c24; afrr_participants = [:hp], afrr_price_up = 30.0,
+                                        afrr_price_down = 10.0))
+dump("demo_afrr_n5", site0, with_config(cfg0; horizon_years = 5, afrr_participants = [:battery, :heat_pump],
+                                         afrr_price_up = 8.0, afrr_price_down = 5.0, afrr_max_share = 0.4))
 println("fixtures dorados en ", out)

@@ -399,6 +399,15 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # servicios de balance (5.6): participantes que existen, precios ≥ 0
+    for t in cfg.afrr_participants
+        (haskey(site.converters, t) || haskey(site.storages, t)) || push!(problems,
+            "scenario_config.yaml: afrr_participants nombra '$t', que no es un conversor ni un almacenamiento")
+    end
+    cfg.afrr_price_up >= 0 && cfg.afrr_price_down >= 0 ||
+        push!(problems, "scenario_config.yaml: los precios aFRR deben ser ≥ 0")
+    0 < cfg.afrr_max_share <= 1 || push!(problems,
+        "scenario_config.yaml: afrr_max_share debe estar en (0,1] (valor: $(cfg.afrr_max_share))")
     # resiliencia (5.5): vectores con demanda, fracción en [0, 2]
     for (c, b) in cfg.backup_share
         haskey(site.demands, c) || push!(problems,

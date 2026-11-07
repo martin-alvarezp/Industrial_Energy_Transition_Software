@@ -200,6 +200,45 @@ for (const cb of pr.result.cost_breakdown) {
 }
 step("capacidad firme − equipo más grande ≥ punta, cada año", badY.length === 0, badY.slice(0, 2).join(" · "));
 
+// servicios de balance (5.6): batería y bomba de calor ofertan reserva aFRR ⇒
+// mismo plan con un ingreso más: el VAN no empeora y los ingresos suben
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="afrr-up"]', { timeout: 30000 });
+for (const name of ["Battery storage", "Heat pump"])
+  await p.evaluate((name) => {
+    const lbl = [...document.querySelectorAll(".par-toggle")].find((x) => x.textContent.trim() === name);
+    lbl?.querySelector("input")?.click();
+  }, name);
+for (const [id, v] of [["afrr-up", "8"], ["afrr-down", "5"]])
+  await p.evaluate((id, v) => {
+    const inp = document.querySelector(`[data-testid="${id}"]`);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, id, v);
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Balance");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pb = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Balance");
+  if (r) { pb = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const scB = pb?.result?.assumptions?.scenario_config ?? {};
+step("corrida con aFRR resuelta por el motor real", pb?.source === "api" && pb.result.meta.feasible &&
+     [...(scB.afrr_participants ?? [])].sort().join(",") === "battery,heat_pump" && scB.afrr_price_up === 8,
+     JSON.stringify(scB.afrr_participants));
+const rev = (pl) => pl.result.cost_breakdown.reduce((a, c) => a + c.export_revenue, 0);
+step("la reserva suma ingresos y no empeora el VAN",
+     rev(pb) > rev(pr) + 1 && pb.result.kpis.npv <= pr.result.kpis.npv + 1,
+     `ingresos ${(rev(pr) / 1e6).toFixed(2)} → ${(rev(pb) / 1e6).toFixed(2)} MUSD · VAN ${(pr.result.kpis.npv / 1e6).toFixed(2)} → ${(pb.result.kpis.npv / 1e6).toFixed(2)}`);
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");

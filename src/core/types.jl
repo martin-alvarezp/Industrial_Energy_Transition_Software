@@ -524,6 +524,11 @@ struct ScenarioConfig
     backup_share::Dict{Symbol,Float64}       # fracción de la punta de cada vector que
                                              # se cubre aun con el equipo más grande caído
     backup_without_grid::Bool                # la red no cuenta como respaldo (falla de red)
+    # ── servicios de balance (benchmark 5.6) ──
+    afrr_participants::Vector{Symbol}        # equipos que ofertan reserva aFRR
+    afrr_price_up::Float64                   # USD/MW·h por reserva para subir
+    afrr_price_down::Float64                 # USD/MW·h por reserva para bajar
+    afrr_max_share::Float64                  # fracción de la capacidad ofertable
 end
 
 """
@@ -535,6 +540,26 @@ function capex_factor(cfg::ScenarioConfig, tech::Symbol, y::Integer)
     v !== nothing && !isempty(v) && return v[min(y, length(v))]
     return (1 - get(cfg.capex_learning, tech, 0.0))^(y - 1)
 end
+
+# retro-compatibilidad: 42 campos → sin servicios de balance
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
+               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
+               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
+               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
+               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real,
+               exg::Vector, req::Vector, em::Vector, dfx::AbstractDict, fxc::Real,
+               bks::AbstractDict, bng::Bool) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
+                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
+                   Dict{Symbol,Vector{Float64}}(cby),
+                   cba === nothing ? nothing : Float64(cba),
+                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
+                   Float64(ep), Float64(ef), Vector{Symbol}[exg...],
+                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
+                   Dict{Symbol,Float64}(dfx), Float64(fxc), Dict{Symbol,Float64}(bks), bng,
+                   Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 40 campos → sin exigencias de respaldo
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -552,7 +577,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
                    Float64(ep), Float64(ef), Vector{Symbol}[exg...],
                    Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
-                   Dict{Symbol,Float64}(dfx), Float64(fxc), Dict{Symbol,Float64}(), false)
+                   Dict{Symbol,Float64}(dfx), Float64(fxc), Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 38 campos → sin flexibilidad de carga
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -570,7 +595,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
                    Float64(ep), Float64(ef), Vector{Symbol}[exg...],
                    Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
-                   Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 37 campos → sin medidas de eficiencia
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -587,7 +612,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    cba === nothing ? nothing : Float64(cba),
                    s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
                    Float64(ep), Float64(ef), Vector{Symbol}[exg...],
-                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 35 campos → sin relaciones entre medidas
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -602,7 +627,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    Dict{Symbol,Vector{Float64}}(cby),
                    cba === nothing ? nothing : Float64(cba),
                    s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   Float64(ep), Float64(ef), Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 31 campos → sin topes por alcance ni ETS
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -614,7 +639,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
                    dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
                    Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba), nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   cba === nothing ? nothing : Float64(cba), nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 30 campos → sin tope anual de CAPEX
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -625,7 +650,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
     ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
                    dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby), nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   Dict{Symbol,Vector{Float64}}(cby), nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 28 campos → CAPEX constante en el tiempo
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -636,7 +661,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
                    dso, Dict{Symbol,Float64}(fc), cm,
                    Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 "¿El unit commitment va con variables enteras? (:auto ⇒ solo en despacho)"
 commitment_integer(cfg::ScenarioConfig) =
@@ -651,7 +676,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
                    dso, Dict{Symbol,Float64}(fc), :auto,
                    Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 25 campos → sin modo despacho
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
@@ -662,7 +687,7 @@ ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
                    sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
                    false, Dict{Symbol,Float64}(), :auto,
                    Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false)
+                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 # retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =

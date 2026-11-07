@@ -189,6 +189,23 @@ const lookback = (prev, s, n, plen) => {
   return out;
 };
 
+/** aFRR (5.6): [ratio del puerto eléctrico, "out" | "in"] de un conversor, o null. */
+export function elecPort(t) {
+  const p = portsOf(t);
+  const o = p.outs.find((x) => x.carrier === "electricity");
+  if (o) return [o.ratio, "out"];
+  const i = p.ins.find((x) => x.carrier === "electricity");
+  return i ? [i.ratio, "in"] : null;
+}
+/** Participantes aFRR efectivos (espejo de balancing.jl). */
+export function afrrParticipants(cfg, convs, stors) {
+  if (!((cfg.afrr_price_up ?? 0) > 0 || (cfg.afrr_price_down ?? 0) > 0)) return [];
+  return (cfg.afrr_participants ?? []).map((id) =>
+    convs.find((t) => t.tech_id === id && elecPort(t)) ??
+    stors.find((t) => t.tech_id === id && (t.output_carrier ?? t.input_carrier) === "electricity"))
+    .filter(Boolean);
+}
+
 export function buildLP(site0, cfg0) {
   const { site, cfg } = fixInfrastructure(site0, cfg0);
   const ts = site.timesteps;
@@ -377,6 +394,12 @@ export function buildLP(site0, cfg0) {
               addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                   p.ratio * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
+    // reserva aFRR (5.6): ingreso, como las ventas (tributa)
+    for (const t of afrrParticipants(cfg, convs, stors))
+      for (const s of steps) {
+        addDed(`aup_${sane(t.tech_id)}_${s}_${y}`, -D * (cfg.afrr_price_up ?? 0) * w[s - 1]);
+        addDed(`adn_${sane(t.tech_id)}_${s}_${y}`, -D * (cfg.afrr_price_down ?? 0) * w[s - 1]);
+      }
     // carga desplazada (5.4): costo por MWh movido, dentro del OPEX variable
     if ((cfg.flex_cost ?? 0) > 0)
       for (const c of FX) for (const s of steps)
@@ -622,6 +645,54 @@ export function buildLP(site0, cfg0) {
         for (const s of steps) inc(tC, `dc_${id}_${s}_${y}`, w[s - 1]);
         for (const [v, c] of eV) inc(tC, v, -cl * (hi - lo) * c);
         row(`cyc_${id}_${y}`, tC, "<=", cl * (hi - lo) * eK);
+      }
+    }
+    // ── reserva aFRR (5.6) — espejo de balancing.jl (en MW eléctricos) ──
+    for (const t of afrrParticipants(cfg, convs, stors)) {
+      const id = sane(t.tech_id), a = avail(t, y), ms = cfg.afrr_max_share ?? 0.5;
+      const isSt = t.type === "storage";
+      const [re, dir] = isSt ? [1, "st"] : elecPort(t);
+      const av = site.generation_profiles?.[t.tech_id];
+      const f = 1 - (t.degradation ?? 0), hrs = t.storage_hours ?? 4;
+      for (const s of steps) {
+        const up = `aup_${id}_${s}_${y}`, dn = `adn_${id}_${s}_${y}`;
+        for (const v of [up, dn]) {
+          const tt = { [v]: 1 }; for (const n of a.ncs) inc(tt, n, -ms * re);
+          row(`acap_${v}`, tt, "<=", ms * re * a.k);
+        }
+        // CAPEX del piso: carga mínima con unit commitment (2.1)
+        const low = {};
+        if (commitIds.has(t.tech_id)) low[`on_${id}_${s}_${y}`] = (t.min_load ?? 0) * unitMw(t);
+        if (isSt) {
+          const c1 = { [`dc_${id}_${s}_${y}`]: 1, [`ch_${id}_${s}_${y}`]: -1, [up]: 1 };
+          for (const n of a.ncs) inc(c1, n, -1);
+          row(`asu_${id}_${s}_${y}`, c1, "<=", a.k);
+          const c2 = { [`ch_${id}_${s}_${y}`]: 1, [`dc_${id}_${s}_${y}`]: -1, [dn]: 1 };
+          for (const n of a.ncs) inc(c2, n, -1);
+          row(`asd_${id}_${s}_${y}`, c2, "<=", a.k);
+          row(`asoc1_${id}_${s}_${y}`, { [`soc_${id}_${s}_${y}`]: 1, [up]: -1 }, ">=", 0);
+          const c3 = { [`soc_${id}_${s}_${y}`]: 1, [dn]: 1 };
+          for (const n of a.ncs) inc(c3, n, -hrs * Math.pow(f, y - +n.split("_").pop()));
+          row(`asoc2_${id}_${s}_${y}`, c3, "<=", hrs * a.k * Math.pow(f, y - 1));
+        } else {
+          const fa = av ? av[s - 1] : 1, d = `d_${id}_${s}_${y}`;
+          const rowHi = (v) => {             // re·d ± v ≤ re·disp·cap
+            const tt = { [d]: re, [v]: 1 }; for (const n of a.ncs) inc(tt, n, -re * fa);
+            return tt;
+          };
+          const rowLo = (v) => {             // re·d − v ≥ re·piso
+            const tt = { [d]: re, [v]: -1 };
+            for (const [k, c] of Object.entries(low)) inc(tt, k, -re * c);
+            return tt;
+          };
+          if (dir === "out") {
+            row(`ahi_${id}_${s}_${y}`, rowHi(up), "<=", re * fa * a.k);
+            row(`alo_${id}_${s}_${y}`, rowLo(dn), ">=", 0);
+          } else {
+            row(`alo_${id}_${s}_${y}`, rowLo(up), ">=", 0);
+            row(`ahi_${id}_${s}_${y}`, rowHi(dn), "<=", re * fa * a.k);
+          }
+        }
       }
     }
     // conexiones: Σ compras ≤ import, Σ ventas ≤ export (0 si excluida)

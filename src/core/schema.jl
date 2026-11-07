@@ -367,5 +367,9 @@ function load_scenario_config(path::AbstractString)
         _get_num(d, "flex_cost", 0.0),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "backup_share", Dict())),
         Bool(get(d, "backup_without_grid", false)),
+        Symbol[Symbol(x) for x in get(d, "afrr_participants", [])],
+        _get_num(d, "afrr_price_up", 0.0),
+        _get_num(d, "afrr_price_down", 0.0),
+        _get_num(d, "afrr_max_share", 0.5),
     )
 end

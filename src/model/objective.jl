@@ -101,7 +101,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             for mk in billing_sells, s in steps; init = 0.0) +
         sum(params.nm_retail[mk][pi, y] * m[:nm_offset][mk][pi, y]
             for (mk, periods) in params.nm_periods
-            for pi in eachindex(periods); init = 0.0))
+            for pi in eachindex(periods); init = 0.0) +
+        m[:afrr_revenue_y][y])   # reserva aFRR (5.6): ingreso, como las ventas
 
     # Impuestos (M9, cfg.tax_rate > 0): costo after-tax = CAPEX + (1−t)·OPEX
     # − t·depreciación. Deducibles: OPEX fijo/variable, energía, cargos,

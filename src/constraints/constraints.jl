@@ -22,6 +22,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_resilience!(m, sets, params, site, cfg)           # 5.5
     add_generator_constraints!(m, sets, params)
     add_storage_constraints!(m, sets, params, site)
+    add_balancing!(m, sets, params, site, cfg)            # 5.6 (usa storage_energy)
     add_grid_constraints!(m, sets, params)
     add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)

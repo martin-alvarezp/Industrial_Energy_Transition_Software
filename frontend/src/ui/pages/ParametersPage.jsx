@@ -278,6 +278,41 @@ export default function ParametersPage({ route }) {
                      value={draft.flex_cost ?? 0} onChange={(e) => set({ flex_cost: +e.target.value || 0 })} />
             </Field>
           </div>
+          {/* servicios de balance (5.6): reserva aFRR */}
+          <h4 className="par-sub">{t("par.afrr")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.afrrHint")}</p>
+          {(() => {
+            const elecIn = (x) => x.input_carrier === "electricity" || x.ports?.inputs?.some((p) => p.carrier === "electricity");
+            const elecOut = (x) => x.output_carrier === "electricity" || x.ports?.outputs?.some((p) => p.carrier === "electricity");
+            const cands = twin.siteJson.technologies.filter((x) =>
+              (x.type === "converter" && (elecIn(x) || elecOut(x))) ||
+              (x.type === "storage" && (x.output_carrier ?? x.input_carrier) === "electricity"));
+            const parts = new Set(draft.afrr_participants ?? []);
+            return <>
+              <div className="par-row" style={{ flexWrap: "wrap" }}>
+                {cands.map((x) => (
+                  <Toggle key={x.tech_id} on={parts.has(x.tech_id)} label={x.name}
+                          onChange={(on) => { const n = new Set(parts); on ? n.add(x.tech_id) : n.delete(x.tech_id);
+                                              set({ afrr_participants: [...n] }); }} />
+                ))}
+              </div>
+              <div className="par-row">
+                <Field t={t} label={t("par.afrrUp")} unit={`${cur}/MW·h`}>
+                  <input className="ui-input" type="number" min={0} data-testid="afrr-up"
+                         value={draft.afrr_price_up ?? 0} onChange={(e) => set({ afrr_price_up: +e.target.value || 0 })} />
+                </Field>
+                <Field t={t} label={t("par.afrrDown")} unit={`${cur}/MW·h`}>
+                  <input className="ui-input" type="number" min={0} data-testid="afrr-down"
+                         value={draft.afrr_price_down ?? 0} onChange={(e) => set({ afrr_price_down: +e.target.value || 0 })} />
+                </Field>
+                <Field t={t} label={t("par.afrrShare")} unit="%">
+                  <input className="ui-input" type="number" min={1} max={100} data-testid="afrr-share"
+                         value={+((draft.afrr_max_share ?? 0.5) * 100).toFixed(1)}
+                         onChange={(e) => set({ afrr_max_share: Math.min(1, Math.max(0.01, (+e.target.value || 50) / 100)) })} />
+                </Field>
+              </div>
+            </>;
+          })()}
           {/* resiliencia (5.5): respaldo N-1 por vector */}
           <h4 className="par-sub">{t("par.backup")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.backupHint")}</p>

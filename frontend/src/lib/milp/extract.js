@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -209,6 +209,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           varop += t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
                    w[s - 1] / (ts[s - 1].duration_hours ?? 1);
     }
+    // reserva aFRR (5.6): ingreso, junto a las ventas
+    for (const t of afrrParticipants(cfg, convs, stors))
+      for (const s of steps)
+        exportRev += w[s - 1] * ((cfg.afrr_price_up ?? 0) * V(`aup_${sane(t.tech_id)}_${s}_${y}`) +
+                                 (cfg.afrr_price_down ?? 0) * V(`adn_${sane(t.tech_id)}_${s}_${y}`));
     // carga desplazada (5.4): costo por MWh movido, en el OPEX variable
     if ((cfg.flex_cost ?? 0) > 0)
       for (const [c, f] of Object.entries(cfg.demand_flexibility ?? {}))
