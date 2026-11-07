@@ -371,5 +371,9 @@ function load_scenario_config(path::AbstractString)
         _get_num(d, "afrr_price_up", 0.0),
         _get_num(d, "afrr_price_down", 0.0),
         _get_num(d, "afrr_max_share", 0.5),
+        Dict{Symbol,Vector{Int}}(Symbol(k) => Int[Int(x) for x in v]
+                                 for (k, v) in get(d, "build_window", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "min_build", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_capex", Dict())),
     )
 end

@@ -113,6 +113,9 @@ export function toOverrides(cfg) {
     afrr_price_up: cfg.afrr_price_up ?? 0,
     afrr_price_down: cfg.afrr_price_down ?? 0,
     afrr_max_share: cfg.afrr_max_share ?? 0.5,
+    build_window: cfg.build_window ?? {},                // R1: reglas de construcción
+    min_build: cfg.min_build ?? {},
+    fixed_capex: cfg.fixed_capex ?? {},
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

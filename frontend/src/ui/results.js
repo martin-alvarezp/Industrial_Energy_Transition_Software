@@ -58,7 +58,8 @@ export function investmentByYear(result, siteJson, labels) {
       const t = T[c.tech];
       if (!t) continue;
       const k = t.name ?? c.tech;
-      items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, c.tech, cb.year);
+      items[k] = (items[k] ?? 0) + c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, c.tech, cb.year) +
+        (result?.assumptions?.scenario_config?.fixed_capex?.[c.tech] ?? 0);   // CAPEX fijo por compra (R1)
     }
     // medidas de eficiencia (5.3): su CAPEX por nombre (si no, sería "Renovaciones")
     for (const em of result.efficiency_measures ?? [])

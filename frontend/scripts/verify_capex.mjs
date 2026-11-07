@@ -141,6 +141,54 @@ step("tope anual de 3 MUSD: infactible y explicado con el menor tope factible",
      pa.result.assumptions.scenario_config.capex_budget_annual === 3e6 &&
      hint.includes("menor tope anual"), hint.slice(0, 200));
 
+// 5 · reglas de construcción (R1): sin tope anual, la bomba de calor con
+// ventana 2–4, mínimo 1,5 MW y 250 kUSD fijos por compra
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-fixed-capex="heat_pump"]', { timeout: 30000 });
+step("Parámetros muestra las reglas de construcción", true);
+for (const [sel, v] of [['[data-testid="budget-annual"]', ""], ['[data-bw-from="heat_pump"]', "2"],
+                        ['[data-bw-to="heat_pump"]', "4"], ['[data-min-build="heat_pump"]', "1.5"],
+                        ['[data-fixed-capex="heat_pump"]', "250000"]]) {
+  await p.evaluate((sel, v) => {
+    const inp = document.querySelector(sel);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, sel, v);
+  await sleep(150);
+}
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Reglas");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pr = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Reglas");
+  if (r) { pr = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const sr = pr?.result?.assumptions?.scenario_config ?? {};
+step("corrida con reglas resuelta por el motor real",
+     pr?.source === "api" && pr.result.meta.feasible && JSON.stringify(sr.build_window?.heat_pump) === "[2,4]" &&
+     sr.min_build?.heat_pump === 1.5 && sr.fixed_capex?.heat_pump === 250000,
+     JSON.stringify({ w: sr.build_window, m: sr.min_build, f: sr.fixed_capex }));
+const hp = pr.result.capacity.filter((c) => c.tech === "heat_pump" && c.new_mw > 1e-6);
+step("la bomba solo se compra en su ventana y con al menos 1,5 MW",
+     hp.every((c) => c.year >= 2 && c.year <= 4 && c.new_mw >= 1.5 - 1e-6), JSON.stringify(hp.map((c) => [c.year, c.new_mw])));
+const fac2 = (tech, y) => { const v = sr.capex_by_year?.[tech];
+  return v?.length ? v[Math.min(y, v.length) - 1] : Math.pow(1 - (sr.capex_learning?.[tech] ?? 0), y - 1); };
+const bad2 = pr.result.cost_breakdown.filter((cb) => {
+  const exp = pr.result.capacity.filter((c) => c.year === cb.year && c.new_mw > 1e-6)
+    .reduce((a, c) => a + c.new_mw * 1000 * techs[c.tech].capex_per_kw * fac2(c.tech, c.year) +
+                      (sr.fixed_capex?.[c.tech] ?? 0), 0);
+  return Math.abs(exp - cb.capex) > 1e-3 * Math.max(1, cb.capex);
+});
+step("el CAPEX de cada año suma el fijo de cada compra", bad2.length === 0, `${bad2.length} años no cuadran`);
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nCAPEX OK: curva de aprendizaje y trayectoria → motor real → CAPEX por año exacto.");

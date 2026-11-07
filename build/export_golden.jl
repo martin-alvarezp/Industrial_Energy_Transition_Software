@@ -193,4 +193,11 @@ dump("afrr_bomba_n1", s24, with_config(c24; afrr_participants = [:hp], afrr_pric
                                         afrr_price_down = 10.0))
 dump("demo_afrr_n5", site0, with_config(cfg0; horizon_years = 5, afrr_participants = [:battery, :heat_pump],
                                          afrr_price_up = 8.0, afrr_price_down = 5.0, afrr_max_share = 0.4))
+# 23 · reglas de construcción (R1): tamaño mínimo + CAPEX fijo en la bomba
+# de unidades enteras (continua), ventana [2, 2] a 2 años, y el demo con las tres
+s25, c25 = discrete_case(0.0)
+dump("reglas_minimo_fijo_n1", s25, with_config(c25; min_build = Dict(:hp => 10.0), fixed_capex = Dict(:hp => 1.5e6)))
+dump("reglas_ventana_n2", s25, with_config(c25; horizon_years = 2, build_window = Dict(:hp => [2, 2])))
+dump("demo_reglas_n5", site0, with_config(cfg0; horizon_years = 5, build_window = Dict(:heat_pump => [2, 4]),
+     min_build = Dict(:heat_pump => 1.5), fixed_capex = Dict(:heat_pump => 250000.0, :battery => 400000.0)))
 println("fixtures dorados en ", out)

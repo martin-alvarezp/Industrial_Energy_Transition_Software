@@ -104,6 +104,8 @@ _coerce(::Type{Symbol}, v) = v isa AbstractString ? Symbol(v) :
     throw(ArgumentError("se esperaba texto"))
 _coerce(::Type{Dict{Symbol,Vector{Float64}}}, v) =
     Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in xs] for (k, xs) in pairs(v))
+_coerce(::Type{Dict{Symbol,Vector{Int}}}, v) =
+    Dict{Symbol,Vector{Int}}(Symbol(k) => Int[Int(x) for x in xs] for (k, xs) in pairs(v))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{EfficiencyMeasure}}, v) =

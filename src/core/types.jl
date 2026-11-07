@@ -529,6 +529,25 @@ struct ScenarioConfig
     afrr_price_up::Float64                   # USD/MW·h por reserva para subir
     afrr_price_down::Float64                 # USD/MW·h por reserva para bajar
     afrr_max_share::Float64                  # fracción de la capacidad ofertable
+    # ── reglas de construcción por tecnología (benchmark R1) ──
+    build_window::Dict{Symbol,Vector{Int}}   # [desde, hasta]: años (calendario si hay
+                                             # base_year) en que se PUEDE construir
+    min_build::Dict{Symbol,Float64}          # MW mínimos de cada compra
+    fixed_capex::Dict{Symbol,Float64}        # USD por compra, además del USD/kW
+end
+
+# retro-compatibilidad: 46 campos → sin reglas de construcción por tecnología
+ScenarioConfig(a::Vararg{Any,46}) =
+    ScenarioConfig(a..., Dict{Symbol,Vector{Int}}(), Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
+
+"Año relativo (1..N) de un año de configuración: calendario si hay base_year."
+rel_year(cfg::ScenarioConfig, yr::Integer) = cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : Int(yr)
+
+"¿Se puede construir `tech` en el año relativo `y`? (ventana de construcción, R1)"
+function build_allowed(cfg::ScenarioConfig, tech::Symbol, y::Integer)
+    w = get(cfg.build_window, tech, nothing)
+    w === nothing && return true
+    return rel_year(cfg, w[1]) <= y <= rel_year(cfg, w[2])
 end
 
 """

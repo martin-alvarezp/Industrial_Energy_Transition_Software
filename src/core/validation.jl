@@ -523,6 +523,30 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "($(tech.max_new_capacity) MW)")
         end
     end
+    # R1: reglas de construcción por tecnología
+    cand(t) = (tech = find_tech(site, t); tech !== nothing && !(tech isa Source) && tech.investable)
+    for (t, w) in cfg.build_window
+        cand(t) || push!(problems, "build_window: '$t' no es una tecnología candidata a inversión")
+        if length(w) != 2 || rel_year(cfg, w[1]) > rel_year(cfg, w[2])
+            push!(problems, "build_window['$t']: debe ser [desde, hasta] con desde ≤ hasta (valor: $w)")
+        end
+    end
+    for (t, mw) in cfg.min_build
+        cand(t) || push!(problems, "min_build: '$t' no es una tecnología candidata a inversión")
+        tech = find_tech(site, t)
+        mw >= 0 || push!(problems, "min_build['$t']: los MW deben ser ≥ 0")
+        cand(t) && mw > tech.max_new_capacity && push!(problems,
+            "min_build['$t']: $mw MW supera max_new_capacity ($(tech.max_new_capacity) MW): nunca se podría construir")
+    end
+    for (t, c) in cfg.fixed_capex
+        cand(t) || push!(problems, "fixed_capex: '$t' no es una tecnología candidata a inversión")
+        c >= 0 || push!(problems, "fixed_capex['$t']: debe ser ≥ 0")
+    end
+    for (t, yr, mw) in cfg.forced_builds
+        y = rel_year(cfg, yr)
+        build_allowed(cfg, t, y) || push!(problems,
+            "forced_builds['$t']: el año $yr queda fuera de su build_window $(cfg.build_window[t])")
+    end
 
     isempty(problems) || throw(ValidationError(problems))
     return true

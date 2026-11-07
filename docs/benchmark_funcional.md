@@ -407,3 +407,30 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   con Tmín ≤ T ≤ Tmáx, donde Q sale del balance del vector de calor.
 
 **Bloque 5: 5.1 a 5.6 completos; 5.7 postergada (ver arriba).**
+
+### Bloque R · Paridad con corridas reales de la herramienta de referencia
+
+Revisamos 16 paquetes de resultados de la herramienta de referencia (tres
+sitios industriales y sus sensibilidades). Los datos quedan **fuera del repo**:
+aquí solo van las capacidades que hacen falta, implementadas con casos
+sintéticos. Orden: reglas de construcción → almacenamiento con energía propia →
+parámetros por año → financiamiento con anualidad (como vista: el objetivo usa
+la inversión pagada) → demanda por año → años hito elegidos por el usuario →
+días tipo (k por año) con cronología.
+
+- ✅ **R1 · Reglas de construcción por tecnología** (2026-11-07).
+  `build_window` ([desde, hasta]: años calendario si hay año base),
+  `min_build` (MW mínimos de cada compra) y `fixed_capex` (USD por compra,
+  además del USD/kW). Usan la binaria de construcción que ya existía: fuera de
+  la ventana vale 0, y si se compra son al menos los MW mínimos. El CAPEX fijo
+  entra a `capex_y` (y por eso al presupuesto) pero no a la depreciación ni al
+  valor residual. Una compra forzada fuera de su ventana es un error de
+  validación. Oráculos (test_build_rules.jl, sobre la bomba de 3.2):
+  - con 10 MW mínimos compra 10 en vez de 9;
+  - 1,5 MUSD fijos: sigue comprando 9 y el VAN sube exacto 1,5 MUSD;
+    1,8 MUSD (más que el beneficio neto de 1,704): no compra;
+  - ventana [2, 2] a dos años: compra en el año 2 (o [2031, 2031] con año base 2030).
+
+  Goldens `reglas_minimo_fijo_n1`, `reglas_ventana_n2` y `demo_reglas_n5`
+  (verify:wasm 40/40). Parámetros → "Reglas de construcción"; el resumen suma
+  el fijo al ítem de la compra. E2E en `verify:capex`. Julia 1604/1604.

@@ -9,11 +9,12 @@
 # storage sus límites de SOC/potencia (§7.4, storage.jl).
 
 """
-    add_capacity_constraints!(m, sets, params) -> m
+    add_capacity_constraints!(m, sets, params, cfg) -> m
 
 Registra `m[:converter_capacity]`, `m[:new_capacity_link]` y `m[:build_once]`.
 """
-function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
+function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
+                                   cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
     dispatch = m[:dispatch]
     new_capacity, build = m[:new_capacity], m[:build]
@@ -27,6 +28,12 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
 
     m[:new_capacity_link] = JuMP.@constraint(m, [t in sets.candidates, y in years],
         new_capacity[t, y] <= params.max_new_capacity[t] * build[t, y])
+    # reglas de construcción (R1): fuera de la ventana no se compra; si se
+    # compra, al menos min_build MW (la binaria build ya marca la compra)
+    m[:build_window] = [JuMP.@constraint(m, build[t, y] == 0)
+                        for t in sets.candidates, y in years if !build_allowed(cfg, t, y)]
+    m[:min_build] = [JuMP.@constraint(m, new_capacity[t, y] >= cfg.min_build[t] * build[t, y])
+                     for t in sets.candidates, y in years if get(cfg.min_build, t, 0.0) > 0]
     # unidades enteras (3.2): con tamaño de unidad la compra es u·n, n ∈ ℤ≥0
     # ("Size of a single unit"): no se compran 3,7 calderas
     D = sets.discrete_techs

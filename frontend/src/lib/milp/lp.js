@@ -133,6 +133,14 @@ export function tariffBigM(mk, site) {
   return Number.isFinite(cap) && cap > 0 ? cap : 1e4;
 }
 
+/** Reglas de construcción (R1), espejo de build_allowed en types.jl. */
+export const relYear = (cfg, yr) => (cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : yr);
+export const buildAllowed = (cfg, tech, y) => {
+  const w = cfg.build_window?.[tech];
+  return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
+};
+export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+
 export const capexFactor = (cfg, tech, y) => {
   const v = cfg?.capex_by_year?.[tech];
   if (v?.length) return v[Math.min(y, v.length) - 1];
@@ -349,6 +357,8 @@ export function buildLP(site0, cfg0) {
     for (const tc of cands) {
       const cpk = tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y);   // CAPEX del año de compra (3.1)
       add(`nc_${sane(tc.tech_id)}_${y}`, D * cpk * 1000);
+      if (fixedCapex(cfg, tc.tech_id) > 0)                               // CAPEX fijo por compra (R1)
+        add(`b_${sane(tc.tech_id)}_${y}`, D * fixedCapex(cfg, tc.tech_id));
       if (cfg.salvage_value) {
         const frac = Math.max(0, (tc.lifetime_years - (N - y + 1)) / tc.lifetime_years);
         add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * cpk * 1000 * frac);
@@ -884,6 +894,10 @@ export function buildLP(site0, cfg0) {
       binaries.push(`b_${id}_${y}`);
       row(`link_${id}_${y}`,
           { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);
+      // reglas de construcción (R1): ventana y tamaño mínimo
+      if (!buildAllowed(cfg, t.tech_id, y)) row(`bwin_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
+      const mb = cfg.min_build?.[t.tech_id] ?? 0;
+      if (mb > 0) row(`bmin_${id}_${y}`, { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -mb }, ">=", 0);
     }
     if (!cfg.repeat_investments) {
       const tr = T();
@@ -956,7 +970,10 @@ export function buildLP(site0, cfg0) {
     const tb = T();
     for (const tc of cands)
       for (const y of years)
+      {
         inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
+        if (fixedCapex(cfg, tc.tech_id) > 0) inc(tb, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
+      }
     row("budget", tb, "<=",
         cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
   }
@@ -964,8 +981,10 @@ export function buildLP(site0, cfg0) {
   if (cfg.capex_budget_annual != null)
     for (const y of years) {
       const ta = T();
-      for (const tc of cands)
+      for (const tc of cands) {
         inc(ta, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
+        if (fixedCapex(cfg, tc.tech_id) > 0) inc(ta, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
+      }
       row(`budget_y${y}`, ta, "<=", cfg.capex_budget_annual - renewalCapex[y - 1]);
     }
 

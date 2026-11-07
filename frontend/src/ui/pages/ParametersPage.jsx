@@ -394,6 +394,41 @@ export default function ParametersPage({ route }) {
               </div>
             );
           })}
+          {/* reglas de construcción (R1): ventana de años, tamaño mínimo y CAPEX fijo */}
+          <h4 className="par-sub">{t("par.buildRules")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.buildRulesHint")}</p>
+          {candidates.map((c) => {
+            const win = draft.build_window?.[c.tech_id];
+            const setKey = (field, val) => {
+              const { [c.tech_id]: _, ...rest } = draft[field] ?? {};
+              set({ [field]: val == null ? rest : { ...rest, [c.tech_id]: val } });
+            };
+            const setWin = (i, v) => {
+              const w = [...(win ?? [1, draft.horizon_years ?? 1])];
+              w[i] = v;
+              setKey("build_window", Number.isFinite(w[0]) && Number.isFinite(w[1]) && w[0] > 0 ? w : null);
+            };
+            return (
+              <div key={c.tech_id} className="par-forced par-capex" data-buildrule={c.tech_id}>
+                <span className="par-capex-name">{c.name}</span>
+                <input className="ui-input par-capex-num" type="number" min={1} step={1} placeholder={t("par.from")}
+                       value={win?.[0] ?? ""} aria-label={t("par.from")} data-bw-from={c.tech_id}
+                       onChange={(e) => e.target.value === "" ? setKey("build_window", null) : setWin(0, Math.round(+e.target.value))} />
+                <input className="ui-input par-capex-num" type="number" min={1} step={1} placeholder={t("par.to")}
+                       value={win?.[1] ?? ""} aria-label={t("par.to")} data-bw-to={c.tech_id}
+                       onChange={(e) => e.target.value === "" ? setKey("build_window", null) : setWin(1, Math.round(+e.target.value))} />
+                <span className="unit">{t("par.buildYears")}</span>
+                <input className="ui-input par-capex-num" type="number" min={0} step={0.1}
+                       value={draft.min_build?.[c.tech_id] ?? ""} aria-label={t("par.minBuild")} data-min-build={c.tech_id}
+                       onChange={(e) => { const v = +e.target.value; setKey("min_build", v > 0 ? v : null); }} />
+                <span className="unit">{t("par.minBuild")}</span>
+                <input className="ui-input par-capex-num" type="number" min={0} step={1000}
+                       value={draft.fixed_capex?.[c.tech_id] ?? ""} aria-label={t("par.fixedCapex")} data-fixed-capex={c.tech_id}
+                       onChange={(e) => { const v = +e.target.value; setKey("fixed_capex", v > 0 ? v : null); }} />
+                <span className="unit">{t("par.fixedCapex")}</span>
+              </div>
+            );
+          })}
           </>}
         </section>
       </div>

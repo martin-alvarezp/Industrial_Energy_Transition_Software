@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -187,7 +187,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     let capex = renewalCapex[y - 1], fixed = fixedCharges, varop = 0,
         energy = 0, dcharges = 0, exportRev = 0, s1 = 0, s2 = 0,
         resGen = 0, demTot = 0;
-    for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`);
+    for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, y) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) +
+                                    fixedCapex(cfg, t.tech_id) * Math.round(V(`b_${sane(t.tech_id)}_${y}`));   // R1
     // medidas de eficiencia (5.3)
     for (const em of EMs) {
       const on = V(`em_${sane(em.id)}_${y}`);

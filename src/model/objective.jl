@@ -28,6 +28,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@expression(m, capex_y[y in years],
         sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW *
             new_capacity[t, y] for t in sets.candidates; init = 0.0) +
+        sum(get(cfg.fixed_capex, t, 0.0) * m[:build][t, y]   # CAPEX fijo por compra (R1)
+            for t in sets.candidates; init = 0.0) +
         params.renewal_capex[y] +  # CAPEX del año de compra (3.1)
         m[:measures_capex_y][y])   # medidas de eficiencia (5.3)
 
