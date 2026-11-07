@@ -13,7 +13,7 @@ import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { ChartPanel, StackedBars, ChartLegend } from "../charts.jsx";
 import NeedsRun, { RunPicker } from "../components/NeedsRun.jsx";
 import {
-  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColor,
+  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors,
   horizonKpis,
 } from "../results.js";
 import { techKind } from "../techkind.js";
@@ -122,6 +122,12 @@ export function OperationPage() {
         discharge: t("res.discharge"), consumption: t("res.consumption") })
     : null), [result, siteJson, year, s, c, N, t]);
   const cname = carriers.find((x) => x.carrier_id === c)?.name ?? c;
+  // la demanda NO ocupa slot: es la línea punteada en color de texto
+  const dayColors = useMemo(() => {
+    const m = seriesColors(day?.keys ?? []);
+    m.set(t("res.demand"), "var(--ui-text)");
+    return m;
+  }, [day, t]);
   return (
     <Page icon={NAV_ICONS.operation} title={t("nav.operation")} help={t("res.opHelp")}>
       {result && day && <>
@@ -139,20 +145,20 @@ export function OperationPage() {
           </select>
         </div>
         <ChartPanel title={t("res.dayTitle", { c: cname })}>
-          <ChartLegend keys={[...day.keys, t("res.demand")]} />
+          <ChartLegend keys={[...day.keys, t("res.demand")]} colors={dayColors} />
           <div className="rc-unit-label">MW</div>
           <ResponsiveContainer width="100%" height={420}>
             <ComposedChart data={day.rows} margin={{ top: 6, right: 8, left: 0, bottom: 4 }} stackOffset="sign">
-              <CartesianGrid stroke="#e1e1e1" vertical={false} />
+              <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
               <XAxis dataKey="hour" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} width={48} />
               <Tooltip formatter={(v) => num(v, 2)} />
-              <ReferenceLine y={0} stroke="#999" />
+              <ReferenceLine y={0} stroke="var(--ui-border)" />
               {day.keys.map((k) => (
-                <Area key={k} type="stepAfter" dataKey={k} stackId="op" stroke={seriesColor(k)} fill={seriesColor(k)}
+                <Area key={k} type="stepAfter" dataKey={k} stackId="op" stroke={dayColors.get(k)} fill={dayColors.get(k)}
                       fillOpacity={0.75} isAnimationActive={false} />
               ))}
-              <Line dataKey="__demand" name={t("res.demand")} stroke="#111" strokeWidth={2} strokeDasharray="5 4"
+              <Line dataKey="__demand" name={t("res.demand")} stroke="var(--ui-text)" strokeWidth={2} strokeDasharray="5 4"
                     dot={false} type="stepAfter" isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>

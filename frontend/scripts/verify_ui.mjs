@@ -43,11 +43,21 @@ for (const lang of ["es", "en"]) {
     ...LIBRARY.map((v) => [`lib/${v}`, `#/library/${v}`]),
     ...SYSTEM.map((v) => [v, `#/sys/${SITE}/${v}`])];
   await p.goto(`${URL}/?r=${Date.now()}${views[0][1]}`, { waitUntil: "networkidle2" });
+  // La app TIENE que estar montada antes de buscar claves crudas. Sin esto el
+  // `?.` de abajo devuelve "" cuando no hay app (p. ej. el server corriendo sin
+  // static_dir, que sirve sólo la API) y el recorrido pasa en verde sin haber
+  // mirado nada: el chequeo mentía justo cuando más importaba.
+  if (!(await p.evaluate(() => !!document.querySelector("main")))) {
+    problems.push(`${lang}: la interfaz no se montó en ${URL} — ¿el server corre con static_dir ` +
+                  `(launcher/server.jl) y hay un frontend/dist compilado?`);
+    break;
+  }
   for (const [name, hash] of views) {
     where = `${lang}/${name}`;
     await p.evaluate((h) => { window.location.hash = h; }, hash);
     await sleep(1200);
     const txt = await p.evaluate(() => document.querySelector("main")?.innerText ?? "");
+    if (!txt) { problems.push(`${where}: la vista quedó vacía (sin <main> o sin texto)`); continue; }
     const raw = [...new Set(txt.match(RAW) ?? [])];
     if (raw.length) problems.push(`${where}: claves crudas en pantalla — ${raw.join(", ")}`);
   }
@@ -70,6 +80,7 @@ for (const [name, hash] of phoneViews) {
   await sleep(1200);
   const out = await p.evaluate(() => {
     const m = document.querySelector("main");
+    if (!m) return { missing: true, mainW: 0, bad: 0, first: "" };
     const ownScroll = (el) => {
       for (let a = el.parentElement; a && a !== m; a = a.parentElement)
         if (["auto", "scroll", "hidden"].includes(getComputedStyle(a).overflowX)) return true;
@@ -82,6 +93,7 @@ for (const [name, hash] of phoneViews) {
     return { mainW: m.getBoundingClientRect().width, bad: bad.length,
              first: bad[0] ? `${bad[0].tagName.toLowerCase()}.${String(bad[0].className).split(" ")[0]}` : "" };
   });
+  if (out.missing) { problems.push(`${where}: la interfaz no se montó`); continue; }
   if (out.mainW < 300) problems.push(`${where}: el contenido mide ${Math.round(out.mainW)} px`);
   if (out.bad) problems.push(`${where}: ${out.bad} elemento(s) se salen de la pantalla (${out.first})`);
 }

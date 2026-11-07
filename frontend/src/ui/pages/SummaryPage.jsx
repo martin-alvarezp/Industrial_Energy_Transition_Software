@@ -1,3 +1,4 @@
+import { CATEGORICAL as SLOT, STATUS } from "../palette.js";
 import { useMemo, useState } from "react";
 import {
   MdAdd, MdFilterAlt, MdAccountBalance, MdOutlineCurrencyExchange, MdEco, MdFunctions,
@@ -182,11 +183,11 @@ export default function SummaryPage() {
       {k && calc && (
         <>
           <div className="sum-kpis">
-            <KpiCard icon={MdAccountBalance} color="#5787fe" value={num(k.investment / prefs.scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
-            <KpiCard icon={MdOutlineCurrencyExchange} color="#9878f8" value={num(k.opex / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
-            <KpiCard icon={MdEco} color="#24a148" value={k.reduction == null ? "—" : pct(k.reduction)}
+            <KpiCard icon={MdAccountBalance} color={SLOT[3]} value={num(k.investment / prefs.scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
+            <KpiCard icon={MdOutlineCurrencyExchange} color={SLOT[5]} value={num(k.opex / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
+            <KpiCard icon={MdEco} color={STATUS.ok} value={k.reduction == null ? "—" : pct(k.reduction)}
                      unit={t("sum.comparedTo", { a: k.lastYear, b: k.firstYear })} label={t("sum.reduction")} />
-            <KpiCard icon={MdFunctions} color="#5787fe" value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
+            <KpiCard icon={MdFunctions} color={SLOT[3]} value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
           </div>
 
           <div className="sum-annual">

@@ -5,6 +5,8 @@
 // que no se puede asignar a un ítem queda en "Otros" para que el total del año
 // sea siempre el del motor.
 
+import { CATEGORICAL, SLR } from "./palette.js";
+
 const KW = 1000;
 
 export const calYear = (result, y) => {
@@ -190,14 +192,23 @@ export function measures(result, siteJson) {
   return rows.sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));
 }
 
-// paleta de series (estable por nombre): azules, rosas, amarillos, morados, verdes
-const PALETTE = ["#ff7eb6", "#0043ce", "#f1c21b", "#8a3ffc", "#08bdba", "#a2191f", "#6929c4",
-                 "#9ef0b0", "#005d5d", "#8d8678", "#1192e8", "#fa4d56", "#198038", "#b28600",
-                 "#d12771", "#002d9c", "#a56eff", "#009d9a", "#ee538b", "#570408"];
-const colorMemo = new Map();
-export function seriesColor(name) {
-  if (!colorMemo.has(name)) colorMemo.set(name, PALETTE[colorMemo.size % PALETTE.length]);
-  return colorMemo.get(name);
+// ── color de serie ─────────────────────────────────────────────────────────
+// Los 8 slots validados de palette.js, asignados DENTRO DEL DOMINIO de cada
+// gráfico (todas sus series, ocultas incluidas) por orden alfabético:
+//
+//  · "nunca ciclar": pasado el slot 8 la serie NO recibe un tono generado, se
+//    va al gris de "otros" (16 slots no pasan los gates: lo verificamos).
+//  · "el color sigue a la entidad, no a su rango": el dominio no cambia al
+//    ocultar una serie en la leyenda, así que nadie se repinta; y dos gráficos
+//    con las mismas series las pintan igual.
+//
+// Por qué no un registro global: temporadas, tecnologías y "Demanda" compartían
+// los mismos 8 slots, el orden dependía de qué páginas se visitaron antes y al
+// pasar de 8 nombres en la sesión las series empezaban a caer en gris.
+const byName = (a, b) => String(a).localeCompare(String(b));
+export function seriesColors(keys) {
+  const sorted = [...new Set(keys)].sort(byName);
+  return new Map(sorted.map((k, i) => [k, CATEGORICAL[i] ?? SLR.grayText]));
 }
 
 function outPorts(t) {

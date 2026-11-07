@@ -7,16 +7,19 @@ import {
   Cell, LabelList, Sankey, Layer, Rectangle,
 } from "recharts";
 import { MdMoreVert } from "react-icons/md";
-import { seriesColor } from "./results.js";
+import { seriesColors } from "./results.js";
+import { SLR, STATUS } from "./palette.js";
 import { num } from "../lib/format.js";
 import { Menu } from "./kit.jsx";
 
-export function ChartLegend({ keys, hidden = {}, onToggle }) {
+/** `colors`: el Map de seriesColors del gráfico (si falta, se arma con `keys`). */
+export function ChartLegend({ keys, colors, hidden = {}, onToggle }) {
+  const col = colors ?? seriesColors(keys);
   return (
     <div className="rc-legend">
       {keys.map((k) => (
         <button key={k} className={hidden[k] ? "off" : ""} onClick={() => onToggle?.(k)}>
-          <span style={{ background: seriesColor(k) }} />{k}
+          <span style={{ background: col.get(k) ?? SLR.grayText }} />{k}
         </button>
       ))}
     </div>
@@ -62,20 +65,21 @@ export function ChartPanel({ title, unit, menu = [], children, toolbar }) {
 export function StackedBars({ data, keys, unit, height = 440, digits = 2 }) {
   const [hidden, setHidden] = useState({});
   const shown = keys.filter((k) => !hidden[k]);
+  const colors = useMemo(() => seriesColors(keys), [keys]);
   return (
     <>
-      <ChartLegend keys={keys} hidden={hidden}
+      <ChartLegend keys={keys} colors={colors} hidden={hidden}
                    onToggle={(k) => setHidden((h) => ({ ...h, [k]: !h[k] }))} />
       <div className="rc-unit-label">{unit}</div>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 4 }} barCategoryGap="22%">
-          <CartesianGrid stroke="#e1e1e1" vertical={false} />
-          <XAxis dataKey="year" tick={{ fontSize: 12, fill: "#555" }} axisLine={{ stroke: "#bbb" }} tickLine={false} />
-          <YAxis tick={{ fontSize: 12, fill: "#555" }} axisLine={false} tickLine={false} width={48}
+          <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
+          <XAxis dataKey="year" tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={{ stroke: "var(--ui-border)" }} tickLine={false} />
+          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false} width={48}
                  tickFormatter={(v) => num(v, Math.abs(v) < 10 ? 1 : 0)} />
           <Tooltip content={<TipBox unit={unit} digits={digits} />} cursor={{ fill: "rgba(0,0,255,0.04)" }} />
           {shown.map((k) => (
-            <Bar key={k} dataKey={k} name={k} stackId="s" fill={seriesColor(k)} isAnimationActive={false} />
+            <Bar key={k} dataKey={k} name={k} stackId="s" fill={colors.get(k)} isAnimationActive={false} />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -85,21 +89,21 @@ export function StackedBars({ data, keys, unit, height = 440, digits = 2 }) {
 
 export function Waterfall({ rows, unit, labels, height = 440 }) {
   const data = rows.map((r) => ({ ...r, top: r.value }));
-  const color = (k) => (k === "start" ? "#a2134f" : k === "reduction" ? "#0e6027" : k === "increase" ? "#da1e28" : "transparent");
+  const color = (k) => (k === "start" ? SLR.grayText : k === "reduction" ? STATUS.ok : k === "increase" ? STATUS.critical : "transparent");
   const keys = [labels.start, labels.reduction, ...(rows.some((r) => r.kind === "increase") ? [labels.increase] : [])];
   return (
     <>
       <div className="rc-legend">
         {keys.map((k, i) => (
-          <button key={k}><span style={{ background: ["#a2134f", "#f1c21b", "#da1e28"][i] }} />{k}</button>
+          <button key={k}><span style={{ background: [SLR.grayText, STATUS.ok, STATUS.critical][i] }} />{k}</button>
         ))}
       </div>
       <div className="rc-unit-label">{unit}</div>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 4 }} barCategoryGap="30%">
-          <CartesianGrid stroke="#e1e1e1" vertical={false} />
-          <XAxis dataKey="year" tick={{ fontSize: 12, fill: "#555" }} axisLine={{ stroke: "#bbb" }} tickLine={false} />
-          <YAxis tick={{ fontSize: 12, fill: "#555" }} axisLine={false} tickLine={false} width={48}
+          <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
+          <XAxis dataKey="year" tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={{ stroke: "var(--ui-border)" }} tickLine={false} />
+          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false} width={48}
                  tickFormatter={(v) => num(v, 1)} />
           <Tooltip cursor={{ fill: "rgba(0,0,255,0.04)" }}
                    content={({ active, payload, label }) => {
@@ -116,7 +120,7 @@ export function Waterfall({ rows, unit, labels, height = 440 }) {
           <Bar dataKey="top" stackId="w" isAnimationActive={false}>
             {data.map((d, i) => <Cell key={i} fill={color(d.kind)} />)}
             <LabelList dataKey="top" position="top"
-                       formatter={(v) => (v > 1e-9 ? num(v, 2) : "")} style={{ fontSize: 11, fill: "#333" }} />
+                       formatter={(v) => (v > 1e-9 ? num(v, 2) : "")} style={{ fontSize: 11, fill: "var(--ui-text-2)" }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -128,7 +132,7 @@ export function Waterfall({ rows, unit, labels, height = 440 }) {
 function SLink({ sourceX, targetX, sourceY, targetY, sourceControlX, targetControlX, linkWidth,
                  index, payload, hovered, setHovered }) {
   const id = `sg-${index}`;
-  const c1 = payload?.source?.color ?? "#9aa", c2 = payload?.target?.color ?? "#9aa";
+  const c1 = payload?.source?.color ?? SLR.grayText, c2 = payload?.target?.color ?? SLR.grayText;
   const dim = hovered != null && hovered !== index;
   return (
     <g>
@@ -149,9 +153,9 @@ function SNode({ x, y, width, height, payload, containerWidth }) {
   const right = x + width / 2 > (containerWidth ?? 900) * 0.8;
   return (
     <Layer>
-      <Rectangle x={x} y={y} width={width} height={height} fill={payload.color ?? "#888"} fillOpacity={1} />
+      <Rectangle x={x} y={y} width={width} height={height} fill={payload.color ?? SLR.grayText} fillOpacity={1} />
       <text x={right ? x + width + 6 : x + width + 6} y={y + height / 2} dominantBaseline="middle"
-            fontSize={11} fill="#333">{payload.name}</text>
+            fontSize={11} fill="var(--ui-text-2)">{payload.name}</text>
     </Layer>
   );
 }

@@ -2,49 +2,57 @@
 // del site_json (el mismo esquema de GET /sites/{name} y site_payload),
 // validación ligera de cliente y geometría del polígono límite.
 
+// Colores de dato: SIEMPRE desde los slots validados de ui/palette.js. Cambiar
+// un slot obliga a re-correr el validador (ver el encabezado de ese archivo).
+import { CATEGORICAL as SLOT, SLR } from "../ui/palette.js";
+
 export const TECH_TYPE_META = {
-  source:    { label: "Conexión externa",        glyph: "⚡", color: "#2b62c4" },
-  converter: { label: "Transformador de energía", glyph: "🔥", color: "#b97e14" },
-  generator: { label: "Generador con perfil",     glyph: "☀", color: "#008165" },
-  storage:   { label: "Almacenamiento",           glyph: "🔋", color: "#5f3f9c" },
+  source:    { label: "Conexión externa",        glyph: "⚡", color: SLOT[3] },
+  converter: { label: "Transformador de energía", glyph: "🔥", color: SLOT[6] },
+  generator: { label: "Generador con perfil",     glyph: "☀", color: SLOT[0] },
+  storage:   { label: "Almacenamiento",           glyph: "🔋", color: SLOT[5] },
 };
 
 // color fijo por entidad conocida (consistencia con el resto del producto);
 // equipos nuevos heredan el color de su tipo
 const KNOWN_COLORS = {
-  pv: "#008165", gas_boiler: "#b97e14", grid_import: "#2b62c4",
-  heat_pump: "#c86f95", battery: "#5f3f9c", electric_boiler: "#c86f95",
+  pv: SLOT[0], gas_boiler: SLOT[6], grid_import: SLOT[3],
+  heat_pump: SLOT[1], battery: SLOT[5], electric_boiler: SLOT[1],
 };
 
 export const techColor = (t) =>
-  KNOWN_COLORS[t.tech_id] ?? TECH_TYPE_META[t.type]?.color ?? "#86938f";
+  KNOWN_COLORS[t.tech_id] ?? TECH_TYPE_META[t.type]?.color ?? SLR.grayText;
 export const techGlyph = (t) => TECH_TYPE_META[t.type]?.glyph ?? "•";
 
 // ── Vectores energéticos (roadmap M10) ─────────────────────────────────────
 // Semántica de cada categoría en el motor (types.jl: CARRIER_CATEGORIES).
+// Mapeo semántico sobre los slots: electricidad azul y frío teal (la convención
+// que el ingeniero espera), calor en el apricot DE MARCA y offsets en el verde
+// de marca. Lima, violeta y magenta quedan libres para los vectores que cree el
+// usuario. Emisiones va en gris a propósito: es contabilidad, no una serie.
 export const CARRIER_CATEGORY_META = {
-  energy:    { label: "Energía",     label_en: "Energy", color: "#2b62c4",
+  energy:    { label: "Energía",     label_en: "Energy", color: SLOT[3],
                hint: "lleva balance nodal por paso (electricidad, H₂…)",
                hint_en: "nodal balance per step (electricity, H₂…)" },
-  heat:      { label: "Calor",       label_en: "Heat", color: "#b3305f",
+  heat:      { label: "Calor",       label_en: "Heat", color: SLOT[1],
                hint: "balance nodal; cada nivel de temperatura/presión es un vector aparte",
                hint_en: "nodal balance; each temperature/pressure level is a separate carrier" },
-  cooling:   { label: "Frío",        label_en: "Cooling", color: "#2a9dab",
+  cooling:   { label: "Frío",        label_en: "Cooling", color: SLOT[4],
                hint: "balance nodal; lo producen chillers/bombas de calor",
                hint_en: "nodal balance; produced by chillers/heat pumps" },
-  fuel:      { label: "Combustible", label_en: "Fuel", color: "#7a6120",
+  fuel:      { label: "Combustible", label_en: "Fuel", color: SLOT[6],
                hint: "se compra fuera del sistema al precio de su serie (necesita precio y factor scope 1)",
                hint_en: "bought outside the system at its series price (needs a price and a scope 1 factor)" },
-  emissions: { label: "Emisiones",   label_en: "Emissions", color: "#5a5f63",
+  emissions: { label: "Emisiones",   label_en: "Emissions", color: SLR.grayText,
                hint: "contabilidad climática — no lleva balance",
                hint_en: "climate accounting — no balance" },
-  offset:    { label: "Offsets",     label_en: "Offsets", color: "#3c7a44",
+  offset:    { label: "Offsets",     label_en: "Offsets", color: SLOT[0],
                hint: "compensaciones compradas — motor de emisiones",
                hint_en: "purchased offsets — emissions engine" },
 };
 
 export const carrierColor = (c) =>
-  c?.color || CARRIER_CATEGORY_META[c?.category]?.color || "#86938f";
+  c?.color || CARRIER_CATEGORY_META[c?.category]?.color || SLR.grayText;
 
 /** Etiqueta legible de un vector: nombre · nivel (fallback: id). */
 export const carrierLabel = (c) =>
@@ -532,8 +540,8 @@ export function techProblems(tech, siteJson) {
 // volúmenes) que fluye por ella. N mercados por conexión.
 
 export const MARKET_DIR_META = {
-  buy:  { label: "Compra", glyph: "↓", color: "#2b62c4" },
-  sell: { label: "Venta",  glyph: "↑", color: "#3c7a44" },
+  buy:  { label: "Compra", glyph: "↓", color: SLOT[3] },
+  sell: { label: "Venta",  glyph: "↑", color: SLOT[0] },
 };
 
 const BALANCED_CATS = ["energy", "heat", "cooling"];

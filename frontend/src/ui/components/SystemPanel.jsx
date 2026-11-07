@@ -1,6 +1,7 @@
 // Panel flotante de la vista de infraestructura: el sistema (info,
 // ubicaciones, componentes) o, con una ubicación elegida, esa ubicación
 // (info, componentes, perfil climático).
+import { CATEGORICAL as SLOT } from "../palette.js";
 import { useMemo, useState } from "react";
 import {
   MdArrowBack, MdExpandLess, MdExpandMore, MdOutlineInfo, MdOutlineViewInAr,
@@ -121,22 +122,22 @@ function WeatherTab({ loc, techs }) {
             <div style={{ height: 180 }}>
               <ResponsiveContainer>
                 <AreaChart data={state.monthly} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="#eee" vertical={false} />
+                  <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
                   <XAxis dataKey="m" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toFixed(2)} />
                   <Tooltip formatter={(v) => v.toFixed(3)} />
-                  <Area dataKey="cf" stroke="#f0a400" fill="#f9c74f" fillOpacity={0.35} name="cf" />
+                  <Area dataKey="cf" stroke={SLOT[6]} fill={SLOT[6]} fillOpacity={0.35} name="cf" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
             <div style={{ height: 180 }}>
               <ResponsiveContainer>
                 <AreaChart data={state.daily} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="#eee" vertical={false} />
+                  <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
                   <XAxis dataKey="h" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toFixed(2)} />
                   <Tooltip formatter={(v) => v.toFixed(3)} labelFormatter={(h) => `${t("wx.hour")} ${h}`} />
-                  <Area dataKey="cf" stroke="#936bff" fill="#936bff" fillOpacity={0.2} name="cf" />
+                  <Area dataKey="cf" stroke={SLOT[3]} fill={SLOT[3]} fillOpacity={0.2} name="cf" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

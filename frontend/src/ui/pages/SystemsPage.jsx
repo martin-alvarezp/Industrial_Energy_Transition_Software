@@ -1,3 +1,4 @@
+import { SLR } from "../palette.js";
 import { useEffect, useRef, useState } from "react";
 import { MdAdd, MdOpenInNew, MdContentCopy, MdEdit, MdImage, MdDelete } from "react-icons/md";
 import { useI18n } from "../i18n.jsx";
@@ -37,7 +38,7 @@ function SystemCard({ name, onChanged, unsaved = false }) {
   }, [name, unsaved, twin]);
   const cover = meta?.cover ? `url(${meta.cover})`
     : meta?.center ? `url(${satelliteTile(meta.center)})`
-    : "linear-gradient(135deg, #c9d1f6, #e6e9fb)";
+    : `linear-gradient(135deg, ${SLR.limeDark}, ${SLR.green100})`;
   const open = () => navigate(hrefFor({ site: name, page: "infrastructure" }));
   const canWrite = apiUp && !unsaved;
   const doDuplicate = async () => {

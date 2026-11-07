@@ -3,6 +3,7 @@
 // (líneas por vector con flecha de sentido). Los controles (capas, zoom,
 // ubicar) son botones propios superpuestos; el mapa expone su instancia por
 // `mapRef` para que la página los maneje.
+import { SLR } from "../palette.js";
 import { Fragment, useEffect, useMemo } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -122,16 +123,16 @@ export default function SystemMap({
 
       {filters.boundary !== false && layout.boundary?.length >= 3 && (
         <Polygon positions={layout.boundary} interactive={false}
-                 pathOptions={{ color: "#f0c419", weight: 2.2, fillOpacity: 0 }} />
+                 pathOptions={{ color: SLR.limeDark, weight: 2.2, fillOpacity: 0 }} />
       )}
 
       {filters.locations !== false && (layout.locations ?? []).map((loc) => loc.polygon?.length >= 3 && (
         <Polygon key={loc.id} positions={loc.polygon}
                  eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); if (!drawing && !connecting && !mode) onSelectLocation?.(loc.id); } }}
                  pathOptions={{
-                   color: loc.id === selectedLocation ? "#936bff" : "#8a8f9c",
+                   color: loc.id === selectedLocation ? SLR.darkGreen : SLR.grayText,
                    weight: loc.id === selectedLocation ? 2.6 : 2,
-                   fillColor: loc.id === selectedLocation ? "#936bff" : "#8a8f9c",
+                   fillColor: loc.id === selectedLocation ? SLR.darkGreen : SLR.grayText,
                    fillOpacity: loc.id === selectedLocation ? 0.08 : 0.02,
                    opacity: focusLocation && focusLocation !== loc.id ? 0.45 : 1,
                  }}>
@@ -164,14 +165,14 @@ export default function SystemMap({
       {drawing && draft.length > 0 && (
         <>
           <Polyline positions={cursor ? [...draft, cursor] : draft}
-                    pathOptions={{ color: mode === "draw-boundary" ? "#f0c419" : "#936bff",
+                    pathOptions={{ color: mode === "draw-boundary" ? SLR.limeDark : SLR.darkGreen,
                                    weight: 2, dashArray: "6 5" }} />
           {draft.map((p, i) => <Marker key={i} position={p} icon={vertexIcon} interactive={false} />)}
         </>
       )}
       {connecting && draftArc?.from && layout.equipment?.[draftArc.from] && (
         <Polyline positions={[layout.equipment[draftArc.from], ...draftArc.waypoints, ...(cursor ? [cursor] : [])]}
-                  pathOptions={{ color: "#936bff", weight: 2.5, dashArray: "5 5" }} />
+                  pathOptions={{ color: SLR.darkGreen, weight: 2.5, dashArray: "5 5" }} />
       )}
 
       {Object.entries(layout.equipment ?? {}).map(([techId, pos]) => {

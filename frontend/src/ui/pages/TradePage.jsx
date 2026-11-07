@@ -10,7 +10,7 @@ import MarketDrawer from "../../components/twin/MarketDrawer.jsx";
 import EquipmentDrawer from "../../components/twin/EquipmentDrawer.jsx";
 import { blankMarket, upsertMarket, removeMarket, legacyMarkets, upsertTech, isMultiport } from "../../lib/twin.js";
 import { num } from "../../lib/format.js";
-import { seriesColor } from "../results.js";
+import { seriesColors } from "../results.js";
 
 
 export default function TradePage() {
@@ -30,8 +30,10 @@ export default function TradePage() {
     const seasons = [...new Set(sj.timesteps.map((s) => s.season))];
     const rows = Array.from({ length: 24 }, (_, h) => ({ h }));
     sj.timesteps.forEach((s, i) => { const r = rows[s.hour]; if (r) r[s.season] = shown.price[i]; });
-    return { rows, seasons };
-  }, [shown, sj.timesteps]);
+    const label = (x) => (t("season." + x) === "season." + x ? x : t("season." + x));
+    const labels = seasons.map(label);
+    return { rows, seasons, label, labels, colors: seriesColors(labels) };
+  }, [shown, sj.timesteps, t]);
 
   return (
     <div className="ui-page">
@@ -98,16 +100,16 @@ export default function TradePage() {
       {profile && (
         <section className="rc-panel" style={{ marginTop: 24, borderTop: 0 }}>
           <div className="rc-head"><h3>{t("trade.profile", { name: shown.name })}</h3></div>
-          <ChartLegend keys={profile.seasons.map((x) => (t("season." + x) === "season." + x ? x : t("season." + x)))} />
+          <ChartLegend keys={profile.labels} colors={profile.colors} />
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={profile.rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#e1e1e1" vertical={false} />
+              <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
               <XAxis dataKey="h" tick={{ fontSize: 12 }} label={{ value: t("trade.hour"), position: "insideBottomRight", offset: -2, fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} width={48} />
               <Tooltip />
               {profile.seasons.map((s) => {
-                const lbl = t("season." + s) === "season." + s ? s : t("season." + s);
-                return <Line key={s} dataKey={s} name={lbl} stroke={seriesColor(lbl)} dot={false} strokeWidth={2} isAnimationActive={false} />;
+                const lbl = profile.label(s);
+                return <Line key={s} dataKey={s} name={lbl} stroke={profile.colors.get(lbl)} dot={false} strokeWidth={2} isAnimationActive={false} />;
               })}
             </LineChart>
           </ResponsiveContainer>
