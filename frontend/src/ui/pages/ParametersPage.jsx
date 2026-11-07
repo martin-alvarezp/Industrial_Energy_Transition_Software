@@ -278,6 +278,23 @@ export default function ParametersPage({ route }) {
                      value={draft.flex_cost ?? 0} onChange={(e) => set({ flex_cost: +e.target.value || 0 })} />
             </Field>
           </div>
+          {/* resiliencia (5.5): respaldo N-1 por vector */}
+          <h4 className="par-sub">{t("par.backup")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.backupHint")}</p>
+          <div className="par-row">
+            {Object.keys(twin.siteJson.demands ?? {}).map((c) => (
+              <Field key={c} t={t} label={c} unit={t("par.ofPeak")}>
+                <input className="ui-input" type="number" min={0} max={200} step={5} data-backup={c}
+                       value={+(((draft.backup_share ?? {})[c] ?? 0) * 100).toFixed(2)}
+                       onChange={(e) => {
+                         const v = (+e.target.value || 0) / 100;
+                         const { [c]: _, ...rest } = draft.backup_share ?? {};
+                         set({ backup_share: v > 0 ? { ...rest, [c]: v } : rest });
+                       }} />
+              </Field>
+            ))}
+          </div>
+          <Toggle on={!!draft.backup_without_grid} onChange={(x) => set({ backup_without_grid: x })} label={t("par.backupNoGrid")} />
           {/* medidas de eficiencia (5.3): reducen la demanda de un vector */}
           <h4 className="par-sub">{t("par.effMeasures")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.effMeasuresHint")}</p>

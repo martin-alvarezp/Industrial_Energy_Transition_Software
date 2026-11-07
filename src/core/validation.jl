@@ -399,6 +399,13 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    # resiliencia (5.5): vectores con demanda, fracción en [0, 2]
+    for (c, b) in cfg.backup_share
+        haskey(site.demands, c) || push!(problems,
+            "scenario_config.yaml: backup_share nombra '$c', que no tiene demanda")
+        0 <= b <= 2 || push!(problems,
+            "scenario_config.yaml: backup_share[$c] debe estar en [0, 2] (valor: $b)")
+    end
     # flexibilidad de carga (5.4): vectores con demanda, fracción en [0,1]
     for (c, f) in cfg.demand_flexibility
         haskey(site.demands, c) || push!(problems,

@@ -365,5 +365,7 @@ function load_scenario_config(path::AbstractString)
                           for e in get(d, "efficiency_measures", [])],
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "demand_flexibility", Dict())),
         _get_num(d, "flex_cost", 0.0),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "backup_share", Dict())),
+        Bool(get(d, "backup_without_grid", false)),
     )
 end

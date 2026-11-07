@@ -107,6 +107,8 @@ export function toOverrides(cfg) {
     efficiency_measures: cfg.efficiency_measures ?? [],   // 5.3
     demand_flexibility: cfg.demand_flexibility ?? {},     // 5.4
     flex_cost: cfg.flex_cost ?? 0,
+    backup_share: cfg.backup_share ?? {},                 // 5.5: respaldo N-1
+    backup_without_grid: !!cfg.backup_without_grid,
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

@@ -175,4 +175,12 @@ s20, c20 = st_site(IDEAL_STORAGE; existing = 0.0)
 dump("flex_arbitraje_n1", s20, with_config(c20; demand_flexibility = Dict(:electricity => 0.2), flex_cost = 10.0))
 dump("demo_flex_n5", site0, with_config(cfg0; horizon_years = 5,
      demand_flexibility = Dict(:electricity => 0.15, :hot_water => 0.1), flex_cost = 2.0))
+# 21 · resiliencia (5.5): respaldo N-1 del calor en el sitio de unidades (en
+# continuo y en unidades de 4 MW) y el demo con N-1 de agua caliente sin red
+s21, c21 = discrete_case(0.0)
+dump("respaldo_n1_continuo_n1", s21, with_config(c21; backup_share = Dict(:heat => 1.2)))
+s22, c22 = discrete_case(4.0)
+dump("respaldo_n1_unidades_n1", s22, with_config(c22; backup_share = Dict(:heat => 1.2)))
+dump("demo_respaldo_n5", site0, with_config(cfg0; horizon_years = 5,
+     backup_share = Dict(:hot_water => 1.0, :electricity => 0.3)))
 println("fixtures dorados en ", out)

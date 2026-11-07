@@ -730,6 +730,48 @@ export function buildLP(site0, cfg0) {
       }
     }
 
+    // ── respaldo N-1 (5.5) — espejo de resilience.jl ──
+    for (const [c, bsh] of Object.entries(cfg.backup_share ?? {})) {
+      if (!(bsh > 0) || !site.demands?.[c]) continue;
+      const L = `bkl_${sane(c)}_${y}`;
+      const firm = T();
+      let firmK = 0;
+      for (const cv of convs) {
+        const a = avail(cv, y);
+        for (const o of portsOf(cv).outs) {
+          if (o.carrier !== c) continue;
+          firmK += o.ratio * a.k;
+          for (const v of a.ncs) inc(firm, v, o.ratio);
+          if ((cv.unit_size ?? 0) > 0) {
+            if (cv.existing_capacity > 0 || cv.investable)
+              row(`bkuu_${sane(cv.tech_id)}_${sane(c)}_${y}`, { [L]: 1 }, ">=", o.ratio * cv.unit_size);
+          } else {
+            const t = { [L]: 1 };
+            for (const v of a.ncs) inc(t, v, -o.ratio);
+            row(`bku_${sane(cv.tech_id)}_${sane(c)}_${y}`, t, ">=", o.ratio * a.k);
+          }
+        }
+      }
+      for (const st of stors) {
+        if ((st.output_carrier ?? st.input_carrier) !== c) continue;
+        const a = avail(st, y);
+        firmK += a.k;
+        for (const v of a.ncs) inc(firm, v, 1);
+        const t = { [L]: 1 };
+        for (const v of a.ncs) inc(t, v, -1);
+        row(`bks_${sane(st.tech_id)}_${sane(c)}_${y}`, t, ">=", a.k);
+      }
+      let grid = 0;
+      if (!cfg.backup_without_grid)
+        for (const src of sources)
+          if (mkts.some((m) => m.direction === "buy" && m.connection === src.tech_id && m.carrier_id === c))
+            grid += allowed(src.tech_id) ? src.existing_capacity : 0;
+      if (grid > 0) row(`bkg_${sane(c)}_${y}`, { [L]: 1 }, ">=", grid);
+      const peak = Math.max(...site.demands[c]) * growth(y);
+      inc(firm, L, -1);
+      row(`bkn1_${sane(c)}_${y}`, firm, ">=", bsh * peak - firmK - grid);
+    }
+
     // emisiones: gross = scope1 + scope2 · net = gross − off · caps
     const tg = { [`ge_${y}`]: 1 };
     const s1 = scope1Terms(y);

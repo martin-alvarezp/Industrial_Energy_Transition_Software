@@ -360,3 +360,18 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   `flex_arbitraje_n1` y `demo_flex_n5` (verify:wasm 31/31); Parámetros →
   "Flexibilidad de carga"; E2E en `verify:measures` (el VAN pasa de 72,33 a
   70,34 MUSD).
+- ✅ **5.5 · Resiliencia: respaldo N-1** (2026-11-07). `backup_share` (por
+  vector, fracción de su punta de demanda) y `backup_without_grid`. La
+  capacidad firme que produce el vector (conversores × ratio,
+  almacenamiento y, salvo falla de red, la conexión), menos la del equipo más
+  grande (o una unidad si tiene tamaño de unidad), debe cubrir esa fracción
+  de la punta de cada año. La generación con perfil no es firme. Lineal: el
+  "más grande" es una variable L ≥ cada capacidad. Diagnóstico: si ni con
+  todo lo instalable alcanza, lo dice con los MW. Oráculo: con 120 % de la
+  punta de calor y la caldera de 20 MW caída, la bomba sube de 9 a 10,8 MW (a
+  12 MW en unidades de 4). Goldens `respaldo_n1_continuo_n1`,
+  `respaldo_n1_unidades_n1` y `demo_respaldo_n5` (verify:wasm 34/34);
+  Parámetros → "Resiliencia: respaldo N-1"; E2E en `verify:measures`.
+  Lo que no cubre: fallas estocásticas con duración (el benchmark habla de
+  cantidad y duración de fallas por año); el N-1 es la exigencia
+  determinística equivalente para dimensionar el respaldo.

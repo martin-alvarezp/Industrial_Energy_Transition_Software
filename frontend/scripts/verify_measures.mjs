@@ -159,6 +159,47 @@ step("corrida flexible resuelta por el motor real con 20 % eléctrico",
 step("la flexibilidad no empeora el VAN", pf.result.kpis.npv <= pe.result.kpis.npv + 1,
      `${(pe.result.kpis.npv / 1e6).toFixed(2)} → ${(pf.result.kpis.npv / 1e6).toFixed(2)} MUSD`);
 
+// resiliencia (5.5): agua caliente 100 % de la punta con el equipo más grande caído
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-backup="hot_water"]', { timeout: 30000 });
+await p.evaluate(() => {
+  const inp = document.querySelector('[data-backup="hot_water"]');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  set.call(inp, "100"); inp.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Respaldo");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pr = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Respaldo");
+  if (r) { pr = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+step("corrida con respaldo resuelta por el motor real", pr?.source === "api" && pr.result.meta.feasible &&
+     pr.result.assumptions.scenario_config.backup_share?.hot_water === 1);
+const snap = pr.site_snapshot, cfgR = pr.result.assumptions.scenario_config;
+const ratioHW = (t) => t.type === "converter"
+  ? (t.ports?.outputs?.find((o) => o.carrier === "hot_water")?.ratio ?? (t.output_carrier === "hot_water" ? 1 : 0))
+  : (t.type === "storage" && t.output_carrier === "hot_water" ? 1 : 0);
+const badY = [];
+for (const cb of pr.result.cost_breakdown) {
+  const caps = snap.technologies.map((t) => {
+    const c = pr.result.capacity.find((x) => x.tech === t.tech_id && x.year === cb.year);
+    return ratioHW(t) * (c?.available_mw ?? 0);
+  }).filter((v) => v > 0);
+  const firm = caps.reduce((a, b) => a + b, 0) - Math.max(0, ...caps);
+  const peak = Math.max(...snap.demands.hot_water) * Math.pow(1 + (cfgR.demand_growth ?? 0), cb.year - 1);
+  if (firm < peak - 1e-3) badY.push(`${cb.year}: ${firm.toFixed(1)} < ${peak.toFixed(1)}`);
+}
+step("capacidad firme − equipo más grande ≥ punta, cada año", badY.length === 0, badY.slice(0, 2).join(" · "));
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");

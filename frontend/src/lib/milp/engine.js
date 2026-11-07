@@ -35,6 +35,8 @@ export function toConfig(cfg) {
     efficiency_measures: cfg.efficiency_measures ?? [],
     demand_flexibility: cfg.demand_flexibility ?? {},
     flex_cost: cfg.flex_cost ?? 0,
+    backup_share: cfg.backup_share ?? {},
+    backup_without_grid: !!cfg.backup_without_grid,
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

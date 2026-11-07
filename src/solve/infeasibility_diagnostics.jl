@@ -277,6 +277,33 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
             "chicas (unit_size) o agrega otro equipo para $k"))
     end
 
+    # ── 5 · respaldo N-1 (5.5): ni con todo lo instalable alcanza ──
+    for (c, bsh) in cfg.backup_share
+        (bsh > 0 && haskey(site.demands, c)) || continue
+        caps = Float64[]
+        for t in sets.converters
+            cv = site.converters[t]
+            for p in cv.outputs
+                p.carrier == c && push!(caps, p.ratio * (cv.existing_capacity +
+                                                         (cv.investable ? cv.max_new_capacity : 0.0)))
+            end
+        end
+        for st in sets.storages
+            S = site.storages[st]
+            S.carrier == c && push!(caps, S.existing_capacity + (S.investable ? S.max_new_capacity : 0.0))
+        end
+        if !cfg.backup_without_grid && grid !== nothing && grid_allowed && grid.output_carrier == c
+            push!(caps, import_limit)
+        end
+        best = isempty(caps) ? 0.0 : sum(caps) - maximum(caps)
+        need = bsh * maximum(site.demands[c].values) * grow(N)
+        best + 1e-6 < need && push!(findings, InfeasibilityFinding(:capacity,
+            "respaldo N-1: para $c se exige cubrir $(_r1(need)) MW con el equipo más grande " *
+            "caído, y con todo lo instalable quedan $(_r1(best)) MW" *
+            (cfg.backup_without_grid ? " (sin contar la red)" : "") *
+            " — agrega equipos que produzcan $c, sube su capacidad máxima o baja la exigencia"))
+    end
+
     isempty(findings) && push!(findings, InfeasibilityFinding(:unknown,
         "no se detectó una causa única con las cotas analíticas: la " *
         "infactibilidad viene de límites combinados (revisa la interacción " *
