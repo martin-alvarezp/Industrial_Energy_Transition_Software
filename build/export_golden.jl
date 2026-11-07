@@ -254,4 +254,12 @@ s30, c30 = op_site(NO_OPERATION_LIMITS)
 dump("acople_igual_n1", s30, with_config(c30; coupling = [(:eb, :hp, 1.0, :eq)]))
 dump("acople_cota_n1", s30, with_config(c30; coupling = [(:hp, :eb, 0.5, :le)]))
 dump("demo_acople_n5", site0, with_config(cfg0; horizon_years = 5, coupling = [(:heat_pump, :gas_boiler, 2.0, :le)]))
+# 29 · medidas con reducción absoluta y O&M (R10): la medida de 1 MW fijo con
+# O&M en el sitio de operación (a 3 años) y una de 5 MW que topa en la demanda
+s31, c31 = op_site(NO_OPERATION_LIMITS)
+em31 = EfficiencyMeasure(:ecm, "ECM", :heat, 0.0, 100_000.0)
+dump("medida_absoluta_n3", s31, with_config(c31; horizon_years = 3, wacc = 0.05, efficiency_measures = [em31],
+     measure_fixed_mw = Dict(:ecm => 1.0), measure_fixed_opex = Dict(:ecm => 50_000.0)))
+dump("medida_absoluta_tope_n1", s31, with_config(c31; efficiency_measures = [EfficiencyMeasure(:ecm, "ECM", :heat, 0.1, 100_000.0)],
+     measure_fixed_mw = Dict(:ecm => 5.0)))
 println("fixtures dorados en ", out)

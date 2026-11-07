@@ -428,8 +428,11 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         for em in cfg.efficiency_measures
             haskey(site.demands, em.carrier) || push!(problems,
                 "scenario_config.yaml: la medida '$(em.id)' reduce '$(em.carrier)', que no tiene demanda")
-            0 < em.reduction <= 1 || push!(problems,
-                "scenario_config.yaml: la reducción de '$(em.id)' debe estar en (0,1] (valor: $(em.reduction))")
+            # con reducción absoluta (R10) la fracción puede ser 0
+            absmw = get(cfg.measure_fixed_mw, em.id, 0.0) > 0
+            (absmw ? 0 <= em.reduction <= 1 : 0 < em.reduction <= 1) || push!(problems,
+                "scenario_config.yaml: la reducción de '$(em.id)' debe estar en " *
+                (absmw ? "[0,1]" : "(0,1] (o tener measure_fixed_mw)") * " (valor: $(em.reduction))")
             em.capex >= 0 || push!(problems, "scenario_config.yaml: el CAPEX de '$(em.id)' debe ser ≥ 0")
             em.id in ids && push!(problems, "scenario_config.yaml: medida '$(em.id)' repetida")
             push!(ids, em.id)
@@ -554,6 +557,13 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             rel_year(cfg, yr) <= last_m || push!(problems,
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
+    end
+    # R10: reducción absoluta y O&M de medidas que existen
+    em_ids = Set(em.id for em in cfg.efficiency_measures)
+    for (f, d) in (("measure_fixed_mw", cfg.measure_fixed_mw), ("measure_fixed_opex", cfg.measure_fixed_opex)),
+        (k, v) in d
+        k in em_ids || push!(problems, "$f: '$k' no es una medida de efficiency_measures")
+        v >= 0 || push!(problems, "$f['$k']: debe ser ≥ 0")
     end
     # R9: acoplamientos entre conversores o generadores del sitio
     for (a, b, k, mode) in cfg.coupling

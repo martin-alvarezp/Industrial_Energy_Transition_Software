@@ -560,7 +560,14 @@ struct ScenarioConfig
     # ── acoplamiento de generación (benchmark R9) ──
     coupling::Vector{Tuple{Symbol,Symbol,Float64,Symbol}}   # (a, b, k, modo): en cada paso,
                                              # d_a = k·d_b (:eq) o d_a ≤ k·d_b (:le)
+    # ── medidas con reducción absoluta y O&M fijo (benchmark R10) ──
+    measure_fixed_mw::Dict{Symbol,Float64}   # medida → MW que reduce en CADA paso
+                                             # (sin pasar la demanda), además de su fracción
+    measure_fixed_opex::Dict{Symbol,Float64} # medida → USD/año mientras está activa
 end
+
+# retro-compatibilidad: 57 campos → sin reducción absoluta ni O&M de medidas
+ScenarioConfig(a::Vararg{Any,57}) = ScenarioConfig(a..., Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 56 campos → sin acoplamientos
 ScenarioConfig(a::Vararg{Any,56}) = ScenarioConfig(a..., Vector{Tuple{Symbol,Symbol,Float64,Symbol}}())

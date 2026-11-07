@@ -84,6 +84,7 @@ extend({
   "par.capexYearsHint": ["Caída anual del costo de inversión (curva de aprendizaje) o factores por año sobre el CAPEX del catálogo (1 = el del catálogo; el último se repite). Los factores mandan sobre la caída.", "Annual decline of the investment cost (learning curve) or factors per year over the catalog CAPEX (1 = catalog; the last one repeats). Factors override the decline."],
   "par.learning": ["%/año de caída", "%/yr decline"],
   "par.trajectory": ["factores por año", "factors per year"],
+  "par.perYear": ["año", "yr"],
   "par.coupling": ["Acoplamiento de generación", "Generation coupling"],
   "par.couplingHint": ["En cada paso, la producción del primer equipo es igual a (=) o no supera (≤) k veces la del segundo. Sirve para repartos fijos entre calderas o un equipo que acompaña a otro.", "At every step, the output of the first unit equals (=) or does not exceed (≤) k times that of the second. For fixed splits between boilers or a unit that follows another."],
   "par.addCoupling": ["Agregar acoplamiento", "Add coupling"],

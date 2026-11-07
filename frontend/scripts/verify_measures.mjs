@@ -268,6 +268,38 @@ step("corrida con acoplamiento resuelta por el motor real: a = b en cada paso",
      pc?.source === "api" && pc.result.meta.feasible && Object.keys(da).length > 0 && offs.length === 0,
      `${JSON.stringify(cpa)} · ${offs.length} pasos fuera`);
 
+// medida con reducción absoluta y O&M (R10): 500 kW fijos y 10 k/año en la primera medida
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-effm-kw="0"]', { timeout: 30000 });
+for (const [sel, v] of [['[data-effm-kw="0"]', "500"], ['[data-effm-om="0"]', "10"]]) {
+  await p.evaluate((sel, v) => {
+    const inp = document.querySelector(sel);
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }, sel, v);
+  await sleep(150);
+}
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "MedidaKW");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pk = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "MedidaKW");
+  if (r) { pk = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+const sk = pk?.result?.assumptions?.scenario_config ?? {};
+const emId = sk.efficiency_measures?.[0]?.id;
+step("corrida con medida absoluta resuelta por el motor real",
+     pk?.source === "api" && pk.result.meta.feasible && sk.measure_fixed_mw?.[emId] === 0.5 &&
+     sk.measure_fixed_opex?.[emId] === 10000, JSON.stringify({ mw: sk.measure_fixed_mw, om: sk.measure_fixed_opex }));
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nMEDIDAS OK: relación excluyente editada → motor real → a lo sumo una de las dos.");

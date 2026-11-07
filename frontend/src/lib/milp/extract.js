@@ -198,7 +198,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     for (const t of cands) capex += t.capex_per_kw * capexFactor(cfg, t.tech_id, yr(y)) * 1000 * V(`nc_${sane(t.tech_id)}_${y}`) +
                                     fixedCapex(cfg, t.tech_id) * Math.round(V(`b_${sane(t.tech_id)}_${y}`)) +   // R1
                                     (ownEnergy(cfg, t) ? energyCapex(cfg, t, yr(y)) * V(`eng_${sane(t.tech_id)}_${y}`) : 0);  // R2
-    // medidas de eficiencia (5.3)
+    // medidas de eficiencia (5.3) y su O&M fijo mientras están activas (R10)
+    for (const em of EMs)
+      for (let yp = 1; yp <= y; yp++) fixed += (cfg.measure_fixed_opex?.[em.id] ?? 0) * V(`em_${sane(em.id)}_${yp}`);
     for (const em of EMs) {
       const on = V(`em_${sane(em.id)}_${y}`);
       capex += em.capex * capexFactor(cfg, em.id, yr(y)) * on;

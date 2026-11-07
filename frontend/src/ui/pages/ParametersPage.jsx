@@ -384,6 +384,17 @@ export default function ParametersPage({ route }) {
                          value={e.capex / 1000} data-effm-capex={k}
                          onChange={(ev) => upd(k, { capex: (+ev.target.value || 0) * 1000 })} />
                   <span className="unit">k{cur}</span>
+                  {/* R10: reducción absoluta (kW) y O&M fijo (k/año) */}
+                  <input className="ui-input par-capex-num" type="number" min={0} step={1}
+                         value={((draft.measure_fixed_mw?.[e.id] ?? 0) * 1000) || ""} placeholder="0" data-effm-kw={k}
+                         onChange={(ev) => { const { [e.id]: _, ...rest } = draft.measure_fixed_mw ?? {};
+                           const v = +ev.target.value / 1000; set({ measure_fixed_mw: v > 0 ? { ...rest, [e.id]: v } : rest }); }} />
+                  <span className="unit">kW</span>
+                  <input className="ui-input par-capex-num" type="number" min={0} step={1}
+                         value={((draft.measure_fixed_opex?.[e.id] ?? 0) / 1000) || ""} placeholder="0" data-effm-om={k}
+                         onChange={(ev) => { const { [e.id]: _, ...rest } = draft.measure_fixed_opex ?? {};
+                           const v = +ev.target.value * 1000; set({ measure_fixed_opex: v > 0 ? { ...rest, [e.id]: v } : rest }); }} />
+                  <span className="unit">k{cur}/{t("par.perYear")}</span>
                   <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><MdDelete /></button>
                 </div>
               ))}

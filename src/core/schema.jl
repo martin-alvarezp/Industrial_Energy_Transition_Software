@@ -388,5 +388,7 @@ function load_scenario_config(path::AbstractString)
         String[String(x) for x in get(d, "day_sequence", [])],
         Tuple{Symbol,Symbol,Float64,Symbol}[(Symbol(c["a"]), Symbol(c["b"]), Float64(get(c, "k", 1.0)),
                                              Symbol(get(c, "mode", "eq"))) for c in get(d, "coupling", [])],
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_mw", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_opex", Dict())),
     )
 end

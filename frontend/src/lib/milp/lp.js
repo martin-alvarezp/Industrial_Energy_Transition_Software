@@ -416,6 +416,9 @@ export function buildLP(site0, cfg0) {
     const D = disc[y - 1];
     constant += D * renewalCapex[y - 1];
     constDed(D * fixedCharges);
+    // O&M fijo de las medidas activas (R10): Σ_{y'≤y} em_y'
+    for (const em of EMs) if ((cfg.measure_fixed_opex?.[em.id] ?? 0) > 0)
+      for (let yp = 1; yp <= y; yp++) addDed(`em_${sane(em.id)}_${yp}`, D * cfg.measure_fixed_opex[em.id]);
     for (const tc of cands) {
       const cpk = tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yr(y));   // CAPEX del año de compra (3.1)
       add(`nc_${sane(tc.tech_id)}_${y}`, D * cpk * 1000);
@@ -587,7 +590,8 @@ export function buildLP(site0, cfg0) {
           }
           // medidas activas reducen la demanda: r·dem·Σ_{y'≤y} em (al lado izquierdo)
           if (dem) for (const em of EMs) if (em.carrier === c)
-            for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, em.reduction * dem);
+            for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, em.reduction * dem +   // + absoluta (R10)
+              Math.min(cfg.measure_fixed_mw?.[em.id] ?? 0, (1 - em.reduction) * dem));
           row(`bal_${sane(n)}_${sane(c)}_${s}_${y}`, t, "=", dem);
         }
       }

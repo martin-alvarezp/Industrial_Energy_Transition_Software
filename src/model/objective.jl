@@ -39,7 +39,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     #             + cargos fijos de las conexiones de red (USD/año, M11)
     JuMP.@expression(m, fixed_opex_y[y in years],
         sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, ry[y]) * available_capacity[t, y]
-            for t in all_techs; init = 0.0) + params.fixed_charges)
+            for t in all_techs; init = 0.0) + params.fixed_charges +
+        m[:measures_opex_y][y])   # O&M fijo de las medidas activas (R10)
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)

@@ -50,6 +50,7 @@ function add_demand_side!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     m[:demand_adjust_terms] = Dict{Symbol,Vector{Tuple{Float64,Symbol}}}()
     if isempty(ids)
         JuMP.@expression(m, measures_capex_y[y in years], JuMP.AffExpr(0.0))
+        JuMP.@expression(m, measures_opex_y[y in years], JuMP.AffExpr(0.0))
         return m
     end
     JuMP.@variable(m, em_buy[ids, years], Bin)
@@ -58,6 +59,10 @@ function add_demand_side!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     cap = Dict(em.id => em.capex for em in EM)
     JuMP.@expression(m, measures_capex_y[y in years],
         sum(cap[k] * capex_factor(cfg, k, ry[y]) * em_buy[k, y] for k in ids))
+    # O&M fijo de las medidas activas (R10), al OPEX fijo
+    JuMP.@expression(m, measures_opex_y[y in years],
+        sum(get(cfg.measure_fixed_opex, k, 0.0) * em_active[k, y] for k in ids))
+    m[:measure_fixed_mw] = Dict(k => get(cfg.measure_fixed_mw, k, 0.0) for k in ids)
     for em in EM   # vector → [(reducción, medida)]
         push!(get!(m[:demand_adjust_terms], em.carrier, Tuple{Float64,Symbol}[]),
               (em.reduction, em.id))
@@ -74,5 +79,7 @@ function demand_adjust(m::JuMP.Model, params::ModelParameters, c::Symbol, s::Int
     terms = get(m[:demand_adjust_terms], c, nothing)
     terms === nothing && return adj
     d = params.demand[c][s, y]
-    return adj - sum(r * d * m[:em_active][k, y] for (r, k) in terms)
+    # fracción r de la demanda + reducción absoluta (R10) sin pasar la demanda
+    fmw = m[:measure_fixed_mw]
+    return adj - sum((r * d + min(fmw[k], (1 - r) * d)) * m[:em_active][k, y] for (r, k) in terms)
 end

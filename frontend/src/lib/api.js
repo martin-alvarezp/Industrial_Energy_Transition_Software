@@ -124,6 +124,8 @@ export function toOverrides(cfg) {
     milestone_years: cfg.milestone_years ?? [],             // R6: años hito
     day_sequence: cfg.day_sequence ?? [],                   // R8: días tipo enlazados
     coupling: cfg.coupling ?? [],                           // R9: acoplamientos
+    measure_fixed_mw: cfg.measure_fixed_mw ?? {},           // R10: medidas absolutas
+    measure_fixed_opex: cfg.measure_fixed_opex ?? {},
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

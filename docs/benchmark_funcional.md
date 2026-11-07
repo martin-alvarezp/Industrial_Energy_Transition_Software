@@ -537,3 +537,12 @@ días tipo (k por año) con cronología.
   ⇒ 3 212 000 USD; bomba ≤ 0,5·caldera ⇒ 3 747 333 USD (a mano). Goldens
   `acople_igual_n1`, `acople_cota_n1`, `demo_acople_n5` (verify:wasm 54/54).
   Parámetros → "Acoplamiento de generación"; E2E en `verify:measures`.
+- ✅ **R10 · Medidas con reducción absoluta y O&M fijo** (2026-11-07).
+  `measure_fixed_mw` (MW que una medida baja en cada paso, además de su
+  fracción y sin pasar la demanda) y `measure_fixed_opex` (USD/año mientras
+  está activa, al OPEX fijo). Con reducción absoluta, la fracción puede ser 0
+  (como un ECM que baja 33,6 kW fijos). Oráculos (test_measures_abs.jl): 1 MW
+  fijo ahorra 292 000 USD/año y con O&M de 50 000 conviene, con 300 000 no;
+  5 MW topa en la demanda de cada paso. Goldens `medida_absoluta_n3` y
+  `medida_absoluta_tope_n1` (verify:wasm 56/56). Parámetros → columnas kW y
+  O&M de cada medida; E2E en `verify:measures`.
