@@ -79,6 +79,60 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
         end
     end
 
+    # ── tarifa de red (4.3) ──
+    # Horas de utilización: punta anual P ≥ flujo; E = energía anual. Con la
+    # binaria z (régimen alto) se parten P = Ph + Pl y E = Eh + El:
+    #   Ph ≤ M·z, Pl ≤ M·(1−z), Eh ≤ 8760·M·z, El ≤ 8760·M·(1−z)
+    #   Eh ≥ umbral·Ph (alto: horas ≥ umbral)   El ≤ umbral·Pl (bajo)
+    #   costo = 1000·(cap_alto·Ph + cap_bajo·Pl) + en_alto·Eh + en_bajo·El
+    # Bloques: E = Σ e_b, e_b ≤ tamaño_b; con precios decrecientes, binarias
+    # que llenan en orden (e_{b−1} ≥ tamaño_{b−1}·δ_b, e_b ≤ tamaño_b·δ_b).
+    tariff_cost = Dict{Int,JuMP.AffExpr}(y => JuMP.AffExpr(0.0) for y in years)
+    for (mk, t) in params.market_tariff
+        M = params.market_bigM[mk]
+        for y in years
+            E = sum(market_flow[mk, s, y] * w[s] for s in steps)
+            if t.uh_threshold > 0
+                P = JuMP.@variable(m, lower_bound = 0, base_name = "uh_peak_$(mk)_$y")
+                JuMP.@constraint(m, [s in steps], P >= market_flow[mk, s, y])
+                z = JuMP.@variable(m, binary = true, base_name = "uh_high_$(mk)_$y")
+                Ph = JuMP.@variable(m, lower_bound = 0, base_name = "uh_ph_$(mk)_$y")
+                Pl = JuMP.@variable(m, lower_bound = 0, base_name = "uh_pl_$(mk)_$y")
+                Eh = JuMP.@variable(m, lower_bound = 0, base_name = "uh_eh_$(mk)_$y")
+                El = JuMP.@variable(m, lower_bound = 0, base_name = "uh_el_$(mk)_$y")
+                JuMP.@constraint(m, P == Ph + Pl)
+                JuMP.@constraint(m, E == Eh + El)
+                JuMP.@constraint(m, Ph <= M * z)
+                JuMP.@constraint(m, Pl <= M * (1 - z))
+                JuMP.@constraint(m, Eh <= 8760 * M * z)
+                JuMP.@constraint(m, El <= 8760 * M * (1 - z))
+                JuMP.@constraint(m, Eh >= t.uh_threshold * Ph)
+                JuMP.@constraint(m, El <= t.uh_threshold * Pl)
+                JuMP.add_to_expression!(tariff_cost[y],
+                    KW_PER_MW * (t.uh_high_capacity * Ph + t.uh_low_capacity * Pl) +
+                    t.uh_high_energy * Eh + t.uh_low_energy * El)
+            end
+            if !isempty(t.blocks)
+                B = length(t.blocks)
+                blk_size(b) = isfinite(t.blocks[b][1]) ? t.blocks[b][1] : 8760 * M
+                e = [JuMP.@variable(m, lower_bound = 0, upper_bound = blk_size(b),
+                                    base_name = "blk_$(mk)_$(y)_$b") for b in 1:B]
+                JuMP.@constraint(m, E == sum(e))
+                prices = last.(t.blocks)
+                if !issorted(prices)   # descuento por volumen: llenado en orden
+                    δ = [JuMP.@variable(m, binary = true, base_name = "blkon_$(mk)_$(y)_$b") for b in 2:B]
+                    for b in 2:B
+                        JuMP.@constraint(m, e[b-1] >= blk_size(b - 1) * δ[b-1])
+                        JuMP.@constraint(m, e[b] <= blk_size(b) * δ[b-1])
+                        b > 2 && JuMP.@constraint(m, δ[b-1] <= δ[b-2])
+                    end
+                end
+                JuMP.add_to_expression!(tariff_cost[y], sum(prices[b] * e[b] for b in 1:B))
+            end
+        end
+    end
+    JuMP.@expression(m, tariff_cost_y[y in years], tariff_cost[y])
+
     # net metering (M2b): neteo volumétrico POR PERÍODO con expiración — el
     # crédito O_p ≤ min(exportado_p, importado pareado_p); el excedente del
     # período EXPIRA sin pago (semántica estándar de neteo mensual/estacional;

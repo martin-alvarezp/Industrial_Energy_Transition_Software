@@ -20,7 +20,8 @@
     "verify:capex": "node scripts/verify_capex.mjs",
     "verify:units": "node scripts/verify_units.mjs",
     "verify:finance": "node scripts/verify_finance.mjs",
-    "verify:carbon": "node scripts/verify_carbon.mjs"
+    "verify:carbon": "node scripts/verify_carbon.mjs",
+    "verify:tariff": "node scripts/verify_tariff.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

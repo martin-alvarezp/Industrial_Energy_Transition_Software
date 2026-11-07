@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor } from "./lp.js";
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -217,6 +217,16 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           ? dc * 1000 * monthsSe * cp +
             pen * 1000 * monthsSe * V(`ex_${sane(mk.market_id)}_${se}_${y}`)
           : dc * 1000 * monthsSe * V(`pk_${sane(mk.market_id)}_${se}_${y}`);
+    }
+    // tarifa de red (4.3): entra a los cargos por demanda, como en Julia
+    for (const mk of mkts.filter(hasTariff)) {
+      const id = sane(mk.market_id);
+      if ((mk.uh_threshold ?? 0) > 0)
+        dcharges += 1000 * ((mk.uh_high_capacity ?? 0) * V(`uhph_${id}_${y}`) +
+                            (mk.uh_low_capacity ?? 0) * V(`uhpl_${id}_${y}`)) +
+                    (mk.uh_high_energy ?? 0) * V(`uheh_${id}_${y}`) +
+                    (mk.uh_low_energy ?? 0) * V(`uhel_${id}_${y}`);
+      (mk.blocks ?? []).forEach(([, pr], b) => { dcharges += pr * V(`blk_${id}_${y}_${b + 1}`); });
     }
     for (const mk of sells) {
       if (mk.scheme === "net_metering") {

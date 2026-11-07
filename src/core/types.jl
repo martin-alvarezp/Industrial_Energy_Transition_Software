@@ -102,6 +102,43 @@ Source(id::Symbol, name::AbstractString, outc::Symbol, ex::Real, mx::Real,
            Float64(ex), 0.0)
 
 """
+Tarifa de red de un contrato de compra (benchmark 4.3). Todo en 0 / vacío ⇒
+sin tarifa adicional.
+
+- Régimen por **horas de utilización**: horas de plena carga del año =
+  energía ÷ punta anual. Con `uh_threshold` > 0, si se alcanza el umbral rige
+  el par (`uh_high_capacity` USD/kW·año, `uh_high_energy` USD/MWh) y si no
+  el par `uh_low_*` (el típico: bajo consumo paga más energía y menos
+  potencia). Una binaria por año elige el régimen.
+- **Bloques de energía** (`blocks`): [(tamaño MWh/año, precio USD/MWh), …]
+  sobre la energía anual comprada, en orden; el último puede ser Inf.
+  Precios crecientes son un LP; decrecientes (descuento por volumen) llenan
+  los bloques en orden con binarias.
+"""
+struct GridTariff
+    uh_threshold::Float64
+    uh_low_capacity::Float64
+    uh_low_energy::Float64
+    uh_high_capacity::Float64
+    uh_high_energy::Float64
+    blocks::Vector{Tuple{Float64,Float64}}
+end
+const NO_TARIFF = GridTariff(0.0, 0.0, 0.0, 0.0, 0.0, Tuple{Float64,Float64}[])
+const TARIFF_KEYS = (:uh_threshold, :uh_low_capacity, :uh_low_energy,
+                     :uh_high_capacity, :uh_high_energy)
+"GridTariff desde un lector `get(k)` (CSV o JSON); `blocks` como [[MWh, USD], …]."
+function grid_tariff(get)
+    b = get(:blocks)
+    blocks = b === nothing ? Tuple{Float64,Float64}[] :
+             [(x[1] === nothing ? Inf : Float64(x[1]), Float64(x[2])) for x in b]
+    return GridTariff((Float64(something(get(k), 0.0)) for k in TARIFF_KEYS)..., blocks)
+end
+has_tariff(t::GridTariff) = t.uh_threshold > 0 || !isempty(t.blocks)
+# igualdad por valor (el `==` por defecto compara el vector de bloques por identidad)
+Base.:(==)(a::GridTariff, b::GridTariff) =
+    all(getfield(a, k) == getfield(b, k) for k in fieldnames(GridTariff))
+
+"""
 Mercado: contrato comercial de COMPRA o VENTA de un carrier (roadmap M11).
 N mercados pueden colgar de una misma conexión ([`Source`](@ref)); la suma de
 sus flujos respeta la capacidad física de la conexión. Un mercado sin conexión
@@ -135,7 +172,14 @@ struct Market
                                             # precio retail con banco de energía)
     netting::Symbol                         # período de neteo del net metering:
                                             # :season | :year
+    tariff::GridTariff                      # tarifa de red (4.3); default: ninguna
 end
+
+# retro-compatibilidad: 14 campos (pre-4.3) → sin tarifa de red
+Market(id::Symbol, name::String, c::Symbol, dir::Symbol, price::Vector{Float64},
+       mp::Float64, ma::Float64, ef::Union{Float64,Nothing}, conn::Symbol,
+       dc::Float64, cp::Float64, pen::Float64, sch::Symbol, net::Symbol) =
+    Market(id, name, c, dir, price, mp, ma, ef, conn, dc, cp, pen, sch, net, NO_TARIFF)
 
 # retro-compatibilidad: 9 campos (M11) y 10 campos (M2a)
 Market(id::Symbol, name::AbstractString, c::Symbol, dir::Symbol,

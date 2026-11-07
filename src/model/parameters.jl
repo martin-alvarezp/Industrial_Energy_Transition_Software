@@ -45,6 +45,8 @@ struct ModelParameters
                                                      # month, si no por estación
     duration_hours::Vector{Float64}                  # [step] Δt del paso (SOC)
     unit_size::Dict{Symbol,Float64}                  # MW por unidad (3.2; solo > 0)
+    market_tariff::Dict{Symbol,GridTariff}           # tarifa de red por compra (4.3; solo activas)
+    market_bigM::Dict{Symbol,Float64}                # MW: cota de la punta del contrato (4.3)
     # ── M2b: potencia contratada y net metering ──
     market_contracted::Dict{Symbol,Float64}          # MW contratados (Inf = por peak)
     market_excess_penalty::Dict{Symbol,Float64}      # USD/kW·mes sobre el exceso
@@ -189,6 +191,17 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     # conexiones respetan allowed_techs igual que el resto: excluir una
     # conexión del escenario deja sus flujos en 0 (isla para ese carrier)
     allowed(id) = isempty(cfg.allowed_techs) || id in cfg.allowed_techs
+    # tarifa de red (4.3): contratos de compra con tarifa y la cota de su punta
+    # (tope propio del contrato o de su conexión; si no hay, una cota amplia)
+    market_tariff = Dict{Symbol,GridTariff}(id => mkts[id].tariff for id in keys(mkts)
+                                            if mkts[id].direction == :buy && has_tariff(mkts[id].tariff))
+    market_bigM = Dict{Symbol,Float64}()
+    for id in keys(market_tariff)
+        mk = mkts[id]
+        conn = mk.connection == Symbol("") ? nothing : get(site.sources, mk.connection, nothing)
+        cap = min(mk.max_power, conn === nothing ? Inf : conn.existing_capacity)
+        market_bigM[id] = isfinite(cap) && cap > 0 ? cap : 1e4
+    end
     conn_import_limit = Dict{Symbol,Float64}()
     conn_export_limit = Dict{Symbol,Float64}()
     fixed_charges = 0.0
@@ -337,6 +350,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            Dict{Symbol,Float64}(id => c.ops.unit_size
                                                 for (id, c) in site.converters
                                                 if c.ops.unit_size > 0),
+                           market_tariff, market_bigM,
                            market_contracted, market_excess_penalty,
                            remaining_life, cfg.renew_existing,
                            cfg.repeat_investments, renewal_capex, forced,

@@ -167,6 +167,47 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
                     onChange={(v) => set({ demand_charge: v })} />
           </Field>
         )}
+        {draft.direction === "buy" && (
+          <>
+            <p className="drawer-section" data-testid="grid-tariff">{L("Tarifa de red (opcional)", "Grid tariff (optional)")}</p>
+            <Field label={L("Umbral de horas de utilización (h/año)", "Utilization-hours threshold (h/yr)")}
+                   hint={L("horas de plena carga = energía anual ÷ punta anual. Bajo el umbral rige el par «bajo», sobre él el «alto»", "full-load hours = annual energy ÷ annual peak. Below the threshold the 'low' pair applies, above it the 'high' one")}>
+              <OptNum value={draft.uh_threshold} step={100} min={0} placeholder={L("sin régimen", "no regime")}
+                      data-tariff="uh_threshold" onChange={(v) => set({ uh_threshold: v })} />
+            </Field>
+            {(draft.uh_threshold ?? 0) > 0 && (
+              <Field label={L("Bajo: potencia (USD/kW·año) · energía (USD/MWh)", "Low: capacity (USD/kW·yr) · energy (USD/MWh)")}>
+                <div className="range-row">
+                  <OptNum value={draft.uh_low_capacity} step={1} min={0} data-tariff="uh_low_capacity"
+                          onChange={(v) => set({ uh_low_capacity: v })} />
+                  <OptNum value={draft.uh_low_energy} step={1} min={0} data-tariff="uh_low_energy"
+                          onChange={(v) => set({ uh_low_energy: v })} />
+                </div>
+              </Field>
+            )}
+            {(draft.uh_threshold ?? 0) > 0 && (
+              <Field label={L("Alto: potencia (USD/kW·año) · energía (USD/MWh)", "High: capacity (USD/kW·yr) · energy (USD/MWh)")}>
+                <div className="range-row">
+                  <OptNum value={draft.uh_high_capacity} step={1} min={0} data-tariff="uh_high_capacity"
+                          onChange={(v) => set({ uh_high_capacity: v })} />
+                  <OptNum value={draft.uh_high_energy} step={1} min={0} data-tariff="uh_high_energy"
+                          onChange={(v) => set({ uh_high_energy: v })} />
+                </div>
+              </Field>
+            )}
+            <Field label={L("Bloques de energía (MWh/año : USD/MWh)", "Energy blocks (MWh/yr : USD/MWh)")}
+                   hint={L("p. ej. «50000:8, inf:5»: sobre la energía anual, en orden; el último puede ser «inf». Precios decrecientes = descuento por volumen", "e.g. '50000:8, inf:5': over the annual energy, in order; the last one can be 'inf'. Decreasing prices = volume discount")}>
+              <input defaultValue={(draft.blocks ?? []).map(([sz, pr]) => `${sz == null ? "inf" : sz}:${pr}`).join(", ")}
+                     placeholder={L("sin bloques", "no blocks")} data-tariff="blocks"
+                     onBlur={(e) => {
+                       const v = e.target.value.split(",").map((x) => x.trim()).filter(Boolean)
+                         .map((x) => x.split(":").map((y) => y.trim()))
+                         .map(([sz, pr]) => [/^inf/i.test(sz) ? null : +sz, +pr]);
+                       set({ blocks: v.length && v.every(([sz, pr]) => (sz == null || sz > 0) && pr >= 0) ? v : undefined });
+                     }} />
+            </Field>
+          </>
+        )}
         {draft.direction === "buy" && cat !== "fuel" && (
           <Field label={L("Factor de emisión del contrato (tCO₂e/MWh, opcional)", "Contract emission factor (tCO₂e/MWh, optional)")}
                  hint={L("p. ej. un PPA verde certificado: 0 — si se omite, hereda el factor scope 2 del vector", "e.g. a certified green PPA: 0 — if omitted, inherits the carrier's scope 2 factor")}>

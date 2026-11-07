@@ -82,6 +82,19 @@ function _converter_ports(c::Converter)
             outputs = [(carrier = String(p.carrier), ratio = p.ratio) for p in c.outputs])
 end
 
+# tarifa de red (4.3): claves solo si el contrato la usa (huellas estables);
+# un bloque infinito se escribe como null
+function _tariff_json(nt, t::GridTariff)
+    has_tariff(t) || return nt
+    for k in TARIFF_KEYS
+        v = getfield(t, k)
+        v == 0.0 || (nt = merge(nt, NamedTuple{(k,)}((v,))))
+    end
+    isempty(t.blocks) ||
+        (nt = merge(nt, (blocks = [[isfinite(s) ? s : nothing, p] for (s, p) in t.blocks],)))
+    return nt
+end
+
 # Δt y mes solo aparecen si algún paso se aparta del default (1 h, sin mes):
 # así la forma canónica —y el hash site_version— de los sitios de siempre no
 # cambia.
@@ -211,7 +224,8 @@ function site_json(site::Site)
                  contracted_power = isfinite(mk.contracted_power) ? mk.contracted_power : nothing,
                  excess_penalty = mk.excess_penalty == 0.0 ? nothing : mk.excess_penalty,
                  scheme = mk.scheme == :billing ? nothing : String(mk.scheme),
-                 netting = mk.netting == :year ? nothing : String(mk.netting))
+                 netting = mk.netting == :year ? nothing : String(mk.netting)) |>
+                (nt -> _tariff_json(nt, mk.tariff))
                 for mk in values(site.markets)]
         sort!(mkts; by = x -> x.market_id)
         result = merge(result, (markets = mkts,))
@@ -430,7 +444,11 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 (v -> v === nothing ? Inf : Float64(v))(_twin_get(mk, :contracted_power)),
                 something(_twin_get(mk, :excess_penalty), 0.0) |> Float64,
                 Symbol(something(_twin_get(mk, :scheme), "billing")),
-                Symbol(something(_twin_get(mk, :netting), "year")))
+                Symbol(something(_twin_get(mk, :netting), "year")),
+                grid_tariff(k -> begin
+                    v = _twin_get(mk, k)
+                    v === nothing || k == :blocks ? v : _twin_num(v, k, ctx)
+                end))
         end
     end
 

@@ -123,6 +123,16 @@ export function fixInfrastructure(site, cfg) {
 
 /** Multiplicador del CAPEX de `tech` comprado en el año relativo `y` (3.1,
  *  espejo de capex_factor): trayectoria explícita, curva de aprendizaje o 1. */
+/** ¿El contrato de compra tiene tarifa de red? (4.3, espejo de has_tariff) */
+export const hasTariff = (mk) => mk.direction === "buy" &&
+  ((mk.uh_threshold ?? 0) > 0 || (mk.blocks?.length ?? 0) > 0);
+/** Cota de la punta del contrato (espejo de market_bigM). */
+export function tariffBigM(mk, site) {
+  const conn = site.technologies.find((t) => t.tech_id === mk.connection && t.type === "source");
+  const cap = Math.min(mk.max_power ?? Infinity, conn ? conn.existing_capacity : Infinity);
+  return Number.isFinite(cap) && cap > 0 ? cap : 1e4;
+}
+
 export const capexFactor = (cfg, tech, y) => {
   const v = cfg?.capex_by_year?.[tech];
   if (v?.length) return v[Math.min(y, v.length) - 1];
@@ -653,6 +663,54 @@ export function buildLP(site0, cfg0) {
         });
       }
     }
+    // ── tarifa de red (4.3) — espejo de grid.jl ──
+    for (const mk of mkts.filter(hasTariff)) {
+      const id = sane(mk.market_id), M = tariffBigM(mk, site), D = disc[y - 1];
+      const Eterms = () => { const t = T(); for (const s of steps) inc(t, `mf_${id}_${s}_${y}`, w[s - 1]); return t; };
+      const thr = mk.uh_threshold ?? 0;
+      if (thr > 0) {
+        const P = `uhp_${id}_${y}`, z = `uhz_${id}_${y}`, Ph = `uhph_${id}_${y}`, Pl = `uhpl_${id}_${y}`,
+              Eh = `uheh_${id}_${y}`, El = `uhel_${id}_${y}`;
+        integers.push(z);
+        row(`uhzb_${id}_${y}`, { [z]: 1 }, "<=", 1);
+        for (const s of steps) row(`uhpk_${id}_${s}_${y}`, { [P]: 1, [`mf_${id}_${s}_${y}`]: -1 }, ">=", 0);
+        row(`uhps_${id}_${y}`, { [P]: 1, [Ph]: -1, [Pl]: -1 }, "=", 0);
+        const tE = Eterms(); inc(tE, Eh, -1); inc(tE, El, -1);
+        row(`uhes_${id}_${y}`, tE, "=", 0);
+        row(`uhph_${id}_${y}`, { [Ph]: 1, [z]: -M }, "<=", 0);
+        row(`uhpl_${id}_${y}`, { [Pl]: 1, [z]: M }, "<=", M);
+        row(`uheh_${id}_${y}`, { [Eh]: 1, [z]: -8760 * M }, "<=", 0);
+        row(`uhel_${id}_${y}`, { [El]: 1, [z]: 8760 * M }, "<=", 8760 * M);
+        row(`uhth_${id}_${y}`, { [Eh]: 1, [Ph]: -thr }, ">=", 0);
+        row(`uhtl_${id}_${y}`, { [El]: 1, [Pl]: -thr }, "<=", 0);
+        addDed(Ph, D * 1000 * (mk.uh_high_capacity ?? 0));
+        addDed(Pl, D * 1000 * (mk.uh_low_capacity ?? 0));
+        addDed(Eh, D * (mk.uh_high_energy ?? 0));
+        addDed(El, D * (mk.uh_low_energy ?? 0));
+      }
+      const blocks = (mk.blocks ?? []).map(([sz, pr]) => [sz == null ? 8760 * M : sz, pr]);
+      if (blocks.length) {
+        const tE = Eterms();
+        blocks.forEach(([sz, pr], b) => {
+          const e = `blk_${id}_${y}_${b + 1}`;
+          inc(tE, e, -1);
+          row(`blkub_${id}_${y}_${b + 1}`, { [e]: 1 }, "<=", sz);
+          addDed(e, D * pr);
+        });
+        row(`blks_${id}_${y}`, tE, "=", 0);
+        const prices = blocks.map((b) => b[1]);
+        if (prices.some((p, i) => i > 0 && p < prices[i - 1]))   // descuento: llenado en orden
+          for (let b = 1; b < blocks.length; b++) {
+            const d = `blkon_${id}_${y}_${b + 1}`;
+            integers.push(d);
+            row(`blkdb_${id}_${y}_${b + 1}`, { [d]: 1 }, "<=", 1);
+            row(`blkf_${id}_${y}_${b + 1}`, { [`blk_${id}_${y}_${b}`]: 1, [d]: -blocks[b - 1][0] }, ">=", 0);
+            row(`blkn_${id}_${y}_${b + 1}`, { [`blk_${id}_${y}_${b + 1}`]: 1, [d]: -blocks[b][0] }, "<=", 0);
+            if (b > 1) row(`blko_${id}_${y}_${b + 1}`, { [d]: 1, [`blkon_${id}_${y}_${b}`]: -1 }, "<=", 0);
+          }
+      }
+    }
+
     // emisiones: gross = scope1 + scope2 · net = gross − off · caps
     const tg = { [`ge_${y}`]: 1 };
     const s1 = scope1Terms(y);

@@ -103,7 +103,16 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
             excess_penalty = [something(get(mk, :excess_penalty, nothing), missing)
                               for mk in mkts],
             scheme = [something(get(mk, :scheme, nothing), missing) for mk in mkts],
-            netting = [something(get(mk, :netting, nothing), missing) for mk in mkts]))
+            netting = [something(get(mk, :netting, nothing), missing) for mk in mkts]) |>
+            (df -> begin   # tarifa de red (4.3): columnas solo si algún contrato la usa
+                for k in TARIFF_KEYS
+                    any(mk -> haskey(mk, k), mkts) &&
+                        (df[!, k] = [something(get(mk, k, nothing), missing) for mk in mkts])
+                end
+                any(mk -> haskey(mk, :blocks), mkts) &&
+                    (df[!, :blocks] = [haskey(mk, :blocks) ? JSON3.write(mk.blocks) : missing for mk in mkts])
+                df
+            end))
         _write_series(joinpath(dir, "market_prices.csv"), :price,
                       (; (Symbol(mk.market_id) => mk.price for mk in mkts)...);
                       keycol = :market_id)

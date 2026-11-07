@@ -222,6 +222,21 @@ function validate_site(site::Site)
 
     # --- mercados (M11): contratos coherentes con carriers y conexiones ---
     for mk in values(site.markets)
+        # tarifa de red (4.3): solo compras, valores ≥ 0, bloques con tamaño > 0
+        t = mk.tariff
+        if has_tariff(t)
+            mk.direction == :buy || push!(problems,
+                "markets.csv[$(mk.id)]: la tarifa de red (horas de utilización / bloques) es de contratos de COMPRA")
+            for k in TARIFF_KEYS
+                _check_nonneg!(problems, getfield(t, k), "markets.csv[$(mk.id)].$k")
+            end
+            for (i, (sz, pr)) in enumerate(t.blocks)
+                sz > 0 || push!(problems, "markets.csv[$(mk.id)].blocks[$i]: el tamaño debe ser > 0")
+                pr >= 0 || push!(problems, "markets.csv[$(mk.id)].blocks[$i]: el precio debe ser ≥ 0")
+                i < length(t.blocks) && !isfinite(sz) && push!(problems,
+                    "markets.csv[$(mk.id)].blocks[$i]: solo el ÚLTIMO bloque puede ser ilimitado")
+            end
+        end
         ctx = "markets.csv[$(mk.id)]"
         mk.direction in (:buy, :sell) || push!(problems,
             "$ctx: direction '$(mk.direction)' inválida (buy|sell)")

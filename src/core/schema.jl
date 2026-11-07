@@ -212,7 +212,12 @@ function load_markets(dir::AbstractString, nsteps::Int)
                              something(opt_num(:contracted_power), Inf),
                              something(opt_num(:excess_penalty), 0.0),
                              opt_sym(:scheme, :billing),
-                             opt_sym(:netting, :year))
+                             opt_sym(:netting, :year),
+                             # tarifa de red (4.3): columnas opcionales; blocks en JSON
+                             grid_tariff(k -> k == :blocks ?
+                                 (hasproperty(r, :blocks) && !ismissing(r.blocks) &&
+                                  !isempty(strip(String(r.blocks))) ? JSON3.read(String(r.blocks)) : nothing) :
+                                 opt_num(k)))
     end
     return markets
 end

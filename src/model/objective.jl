@@ -77,8 +77,9 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         end
     end
     JuMP.@expression(m, demand_charges_y[y in years],
-        isempty(charged) ? JuMP.AffExpr(0.0) :
-        sum(dc_term(mk, se, y) for mk in charged, se in 1:nse))
+        (isempty(charged) ? JuMP.AffExpr(0.0) :
+         sum(dc_term(mk, se, y) for mk in charged, se in 1:nse)) +
+        m[:tariff_cost_y][y])   # tarifa de red (4.3): horas de utilización y bloques
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
     cprice(y) = isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :

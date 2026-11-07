@@ -148,4 +148,12 @@ dump("carbono_alcances_n1", s17, with_config(c17; scope1_cap = 5000.0, scope2_ca
                                               ets_price = 30.0, ets_free_allowance = 2000.0))
 dump("demo_ets_n5", site0, with_config(cfg0; horizon_years = 5, ets_price = 60.0,
                                         ets_free_allowance = 5000.0, scope1_cap = 8000.0))
+# 17 · tarifa de red (4.3): régimen por horas de utilización (alto y bajo) y
+# bloques de energía (crecientes = LP; decrecientes = binarias de llenado)
+include(joinpath(root, "test", "helpers_tariff.jl"))
+dump("tarifa_horas_alto_n1", tariff_site(fill(10.0, 24), uh_tariff())...)
+dump("tarifa_horas_bajo_bloques_n1", tariff_site([10.0; fill(1.0, 23)],
+     GridTariff(2500.0, 20.0, 60.0, 100.0, 10.0, [(5000.0, 8.0), (Inf, 5.0)]))...)
+dump("tarifa_bloques_crecientes_n1", tariff_site(fill(10.0, 24),
+     blocks_tariff([(50_000.0, 5.0), (Inf, 8.0)]))...)
 println("fixtures dorados en ", out)

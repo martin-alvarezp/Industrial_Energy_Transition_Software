@@ -280,4 +280,29 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   precio·(alcance 1 − gratis) en ambos sentidos, y desde ~250 USD/t conviene
   electrificar. Goldens `carbono_alcances_n1` y `demo_ets_n5` (verify:wasm
   24/24); Parámetros → topes por alcance y ETS; E2E `verify:carbon`.
-- 🔜 **4.3 · Tarifas por horas de utilización y por bloques**: por hacer.
+- ✅ **4.3 · Tarifas de red: horas de utilización y bloques** (2026-11-07).
+  `GridTariff` opcional por contrato de compra:
+  - **Régimen por horas de utilización:** horas de plena carga del año =
+    energía ÷ punta anual. Una binaria por año elige el régimen (alto o bajo),
+    con la punta y la energía partidas por régimen para no tener productos no
+    lineales.
+  - **Bloques de energía anual:** los precios crecientes son un LP; con
+    precios decrecientes (descuento por volumen) los bloques se llenan en
+    orden con binarias.
+  - El costo entra a los cargos por demanda.
+
+  Oráculos (test_tariff.jl):
+  - demanda plana de 10 MW ⇒ 8760 h, régimen alto, 1 876 000 USD;
+  - punta de 10 MW y 1 MW el resto ⇒ 1204 h, régimen bajo, 922 700 USD;
+  - bloques crecientes 550 800; decrecientes 588 000 (sin binarias el LP daría
+    438 000).
+
+  Goldens `tarifa_horas_alto_n1`, `tarifa_horas_bajo_bloques_n1` y
+  `tarifa_bloques_crecientes_n1` (verify:wasm 27/27). Mercados: sección
+  "Tarifa de red". E2E `verify:tariff`: el cargo de cada año coincide con el
+  del régimen que dicen sus horas. **Bloque 4 completo: el plan del benchmark
+  (bloques 1 a 4) queda cubierto.**
+
+  Fuera de estos cuatro bloques sigue lo del bloque 5 (amplitud): catálogo,
+  medidas excluyentes, flexibilidad de carga, servicios de balance (aFRR),
+  resiliencia y física de zonas.
