@@ -2,13 +2,33 @@
 # Las tecnologías y carriers son DATOS, no código: nada aquí asume ids concretos
 # salvo los convencionales del MVP (p. ej. :electricity para la red).
 
-"Paso del año-plantilla: 4 estaciones × 24 horas = 96 pasos (SPEC §4)."
+"""
+Paso del año-plantilla (SPEC §4). El default es 4 estaciones × 24 horas = 96
+pasos, pero la plantilla es general (benchmark bloque 1):
+
+- `season` es el PERÍODO cronológico: un día representativo, un mes tipo o el
+  año entero. Dentro de un período los pasos son consecutivos y el SOC del
+  almacenamiento es cíclico.
+- `hour` es el orden del paso dentro de su período (0, 1, 2…). Con días de 24 h
+  es la hora del día; con un período de 8760 pasos llega a 8759. Los pasos con
+  la misma `hour` (punta, cuartos de hora) se ordenan por `id`.
+- `duration_hours` es Δt, la duración del paso: 1.0 horario, 0.25 en cuartos de
+  hora. Escala la dinámica del SOC.
+- `weight_hours` son las horas del año que el paso representa: Δt × las veces
+  que se repite. Σ sobre la plantilla = 8760.
+- `month` (1..12, 0 = sin mes) es el mes de facturación. Si TODOS los pasos
+  traen mes, la punta tarifaria se mide por mes; si no, por período.
+"""
 struct TimeStep
     id::Int
     season::String
     hour::Int
-    weight_hours::Float64   # Σ sobre los 96 pasos = 8760
+    weight_hours::Float64
+    duration_hours::Float64
+    month::Int
 end
+TimeStep(id::Integer, season::AbstractString, hour::Integer, w::Real) =
+    TimeStep(id, season, hour, w, 1.0, 0)
 
 """
 Vector energético o climático (electricity, natural_gas, hot_water, co2e,

@@ -82,6 +82,18 @@ function _converter_ports(c::Converter)
             outputs = [(carrier = String(p.carrier), ratio = p.ratio) for p in c.outputs])
 end
 
+# Δt y mes solo aparecen si algún paso se aparta del default (1 h, sin mes):
+# así la forma canónica —y el hash site_version— de los sitios de siempre no
+# cambia.
+function _timesteps_json(steps::Vector{TimeStep})
+    extra = any(t -> t.duration_hours != 1.0 || t.month != 0, steps)
+    return extra ?
+        [(step_id = t.id, season = t.season, hour = t.hour, weight_hours = t.weight_hours,
+          duration_hours = t.duration_hours, month = t.month) for t in steps] :
+        [(step_id = t.id, season = t.season, hour = t.hour,
+          weight_hours = t.weight_hours) for t in steps]
+end
+
 """
     site_json(site::Site) -> NamedTuple
 
@@ -157,8 +169,7 @@ function site_json(site::Site)
 
     base = (
         name = site.name,
-        timesteps = [(step_id = t.id, season = t.season, hour = t.hour,
-                      weight_hours = t.weight_hours) for t in site.timesteps],
+        timesteps = _timesteps_json(site.timesteps),
         carriers = carriers,
         technologies = techs,
         demands = _sorted_series(Dict(c => d.values for (c, d) in site.demands)),
@@ -235,7 +246,11 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                       _twin_int(_twin_req(t, :step_id, "timesteps"), :step_id, "timesteps"),
                       String(_twin_req(t, :season, "timesteps")),
                       _twin_int(_twin_req(t, :hour, "timesteps"), :hour, "timesteps"),
-                      _twin_num(_twin_req(t, :weight_hours, "timesteps"), :weight_hours, "timesteps"))
+                      _twin_num(_twin_req(t, :weight_hours, "timesteps"), :weight_hours, "timesteps"),
+                      _twin_get(t, :duration_hours) === nothing ? 1.0 :
+                          _twin_num(_twin_get(t, :duration_hours), :duration_hours, "timesteps"),
+                      _twin_get(t, :month) === nothing ? 0 :
+                          _twin_int(_twin_get(t, :month), :month, "timesteps"))
                   for t in ts_raw]
         sort!(parsed; by = t -> t.id)
         for (i, t) in enumerate(parsed)

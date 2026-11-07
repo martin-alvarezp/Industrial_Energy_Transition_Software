@@ -55,9 +55,18 @@ function validate_site(site::Site)
     for ts in site.timesteps
         ts.weight_hours > 0 || push!(problems,
             "timesteps.csv: weight_hours del paso $(ts.id) debe ser > 0 (valor: $(ts.weight_hours))")
-        0 <= ts.hour <= 23 || push!(problems,
-            "timesteps.csv: hour del paso $(ts.id) fuera de 0..23 (valor: $(ts.hour))")
+        ts.hour >= 0 || push!(problems,
+            "timesteps.csv: hour del paso $(ts.id) debe ser ≥ 0 (valor: $(ts.hour))")
+        ts.duration_hours > 0 || push!(problems,
+            "timesteps.csv: duration_hours del paso $(ts.id) debe ser > 0 (valor: $(ts.duration_hours))")
+        0 <= ts.month <= 12 || push!(problems,
+            "timesteps.csv: month del paso $(ts.id) fuera de 1..12 (valor: $(ts.month))")
     end
+    # mes de facturación: todos o ninguno (una mezcla dejaría pasos fuera de
+    # toda punta tarifaria)
+    nm = count(ts -> ts.month > 0, site.timesteps)
+    0 < nm < nsteps && push!(problems,
+        "timesteps.csv: month está en $nm de $nsteps pasos; debe estar en todos o en ninguno")
 
     # --- carriers: categoría conocida (una categoría desconocida dejaría al
     # carrier fuera del balance en silencio) ---

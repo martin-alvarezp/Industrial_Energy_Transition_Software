@@ -13,11 +13,16 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
     mkpath(dir)
     sj = site_json(site)   # forma canónica: arrays y claves ordenadas
 
-    CSV.write(joinpath(dir, "timesteps.csv"), DataFrame(
+    tdf = DataFrame(
         step_id = [t.step_id for t in sj.timesteps],
         season = [t.season for t in sj.timesteps],
         hour = [t.hour for t in sj.timesteps],
-        weight_hours = [t.weight_hours for t in sj.timesteps]))
+        weight_hours = [t.weight_hours for t in sj.timesteps])
+    if hasproperty(first(sj.timesteps), :duration_hours)   # plantilla no horaria o con mes
+        tdf.duration_hours = [t.duration_hours for t in sj.timesteps]
+        tdf.month = [t.month for t in sj.timesteps]
+    end
+    CSV.write(joinpath(dir, "timesteps.csv"), tdf)
 
     # level/color son claves opcionales de la forma canónica (site_json)
     _opt(c, k) = String(something(get(c, k, nothing), "")) |>

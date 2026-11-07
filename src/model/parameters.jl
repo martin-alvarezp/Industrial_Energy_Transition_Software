@@ -40,6 +40,10 @@ struct ModelParameters
     fixed_charges::Float64                           # USD/año, Σ cargos fijos de conexión
     market_demand_charge::Dict{Symbol,Float64}       # USD/kW·mes por mercado (M2)
     season_steps::Vector{Vector{Int}}                # pasos agrupados por estación
+    billing_steps::Vector{Vector{Int}}               # períodos de la punta tarifaria:
+                                                     # por mes si todos los pasos traen
+                                                     # month, si no por estación
+    duration_hours::Vector{Float64}                  # [step] Δt del paso (SOC)
     # ── M2b: potencia contratada y net metering ──
     market_contracted::Dict{Symbol,Float64}          # MW contratados (Inf = por peak)
     market_excess_penalty::Dict{Symbol,Float64}      # USD/kW·mes sobre el exceso
@@ -234,6 +238,21 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         end
     end
 
+    # períodos de facturación de la punta: meses (en orden de aparición) si la
+    # plantilla los trae en todos los pasos; si no, las estaciones de siempre
+    billing_steps = if all(ts -> ts.month > 0, site.timesteps)
+        months = Int[]; groups = Vector{Int}[]
+        for ts in site.timesteps
+            i = findfirst(==(ts.month), months)
+            i === nothing ? (push!(months, ts.month); push!(groups, Int[ts.id])) :
+                            push!(groups[i], ts.id)
+        end
+        groups
+    else
+        season_steps
+    end
+    duration = [ts.duration_hours for ts in site.timesteps]
+
     # ── ciclo de vida (M5) ──
     # renovación determinística: con renew_existing, el activo existente que
     # vence (remaining_life > 0) se recompra al vencer — y cada vida útil
@@ -311,6 +330,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            conn_buy, conn_sell, conv_availability, conn_import_limit,
                            conn_export_limit, balanced, grid_carrier,
                            fixed_charges, market_demand_charge, season_steps,
+                           billing_steps, duration,
                            market_contracted, market_excess_penalty,
                            remaining_life, cfg.renew_existing,
                            cfg.repeat_investments, renewal_capex, forced,

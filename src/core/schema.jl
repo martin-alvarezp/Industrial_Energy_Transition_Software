@@ -66,7 +66,10 @@ end
 
 function load_timesteps(dir::AbstractString)
     df = sort(read_site_csv(dir, "timesteps.csv"), :step_id)
-    steps = [TimeStep(Int(r.step_id), String(r.season), Int(r.hour), Float64(r.weight_hours))
+    # duration_hours y month son columnas opcionales (Δt = 1 h, sin mes)
+    optn(r, col, d) = hasproperty(r, col) && !ismissing(r[col]) ? r[col] : d
+    steps = [TimeStep(Int(r.step_id), String(r.season), Int(r.hour), Float64(r.weight_hours),
+                      Float64(optn(r, :duration_hours, 1.0)), Int(optn(r, :month, 0)))
              for r in eachrow(df)]
     for (i, ts) in enumerate(steps)
         ts.id == i || throw(SchemaError(

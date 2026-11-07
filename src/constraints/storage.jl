@@ -30,17 +30,19 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     end
     prev = Dict{Int,Int}()
     for ids in values(season_steps)
-        sort!(ids; by = i -> site.timesteps[i].hour)
+        # orden cronológico: hour y, a igual hour (punta, cuartos), step_id
+        sort!(ids; by = i -> (site.timesteps[i].hour, i))
         for k in eachindex(ids)
             prev[ids[k]] = ids[k == 1 ? lastindex(ids) : k - 1]
         end
     end
 
     η = params.efficiency
+    Δt = params.duration_hours   # MW × Δt = MWh movidos en el paso
     m[:soc_balance] = JuMP.@constraint(m,
         [st in sets.storages, s in steps, y in years],
         soc[st, s, y] ==
-        soc[st, prev[s], y] + η[st] * charge[st, s, y] - discharge[st, s, y] / η[st])
+        soc[st, prev[s], y] + Δt[s] * (η[st] * charge[st, s, y] - discharge[st, s, y] / η[st]))
 
     hours = Dict(st => site.storages[st].hours_ratio for st in sets.storages)
     m[:soc_capacity] = JuMP.@constraint(m,

@@ -1,0 +1,144 @@
+# Benchmark funcional — IETO vs. herramienta de referencia
+
+Relevamiento del 2026-11-07, hecho contra el código (motor Julia `src/` y
+frontend `frontend/src/`), no contra la documentación. Compara IETO con la ficha
+de capacidades de una herramienta comercial de gemelo digital MILP
+multi-energía que el usuario tomó como referencia de producto.
+
+Leyenda: ✅ lo tenemos · 🟡 parcial (se dice qué falta) · ❌ no existe.
+
+---
+
+## 1 · Arquitectura: gemelo multi-energía
+
+| Capacidad | Estado | En IETO |
+|---|---|---|
+| MILP acoplado; balance por paso × nodo × vector | ✅ | `carrier_balance.jl`, balance nodal M14 |
+| Varias redes por vector según su estado físico (bar, °C, kV) | 🟡 | Cada nivel es un vector aparte (M10) y `level` es solo **etiqueta**: no hay propiedades físicas ni conversión automática entre niveles |
+| Calor/vapor/frío, eléctrico AC/DC, gases, aire comprimido, agua | 🟡 | Se pueden declarar como vectores abiertos, pero faltan presets de vector y de equipo para varios (AC/DC, aire, agua) |
+| Flujos de masa o de material/producto (kg, piezas) | 🟡 | El balance funciona con cualquier unidad, pero costos y emisiones asumen MWh (USD/MWh, tCO₂e/MWh) |
+| Líneas y tuberías con capacidad, pérdidas y sentido | ✅ | `Arc`: capacidad y eficiencia por puerto, dirigido o bidireccional |
+| Transformadores, válvulas, intercambiadores | ✅ | Como conversores multi-puerto |
+| Límite de espacio por ubicación (`Required space`) | ❌ | — |
+
+## 2 · Activos y catálogo
+
+| Capacidad | Estado | En IETO |
+|---|---|---|
+| Cada equipo puede ser existente, candidato o demanda | ✅ | `existing_capacity`, `investable`, demandas por vector |
+| Tamaño del catálogo | 🟡 | **15 presets** contra ~280 de la referencia; faltan turbinas de vapor, ORC, eólica, hidro, celdas de combustible, baterías de flujo, acumulador de vapor y almacenamiento de H₂ o aire comprimido |
+| CHP y chillers con recuperación de calor residual | ✅ | Conversores multi-puerto |
+| Física de salas o zonas (capacidad térmica, ganancias, confort) | ❌ | — |
+| Medidas de eficiencia (motores, iluminación) | ❌ | — |
+| Flexibilidad y desplazamiento de carga | ❌ | — |
+| Medidas excluyentes o dependientes | ❌ | — |
+
+## 3 · Parámetros
+
+| Capacidad | Estado | En IETO |
+|---|---|---|
+| Valores escalares | ✅ | |
+| Series de tiempo de 15 min u horarias | 🟡 | **Brecha estructural:** el motor trabaja con un año-plantilla de 4 estaciones × 24 h (96 pasos, más pasos de punta opcionales). No hay 8760 ni 15 min |
+| Cualquier parámetro como serie (COP según temperatura, por ejemplo) | 🟡 | Solo disponibilidad, perfil de generación, precio y demanda; la eficiencia es constante |
+| Trayectorias por año | 🟡 | Hay escalamiento de precio (%), precio de carbono por año, factor de red por año y crecimiento de demanda. Faltan **CAPEX por año** (curvas de aprendizaje), precio absoluto por año y valores por año para cualquier parámetro |
+| Parámetros como fórmulas | ❌ | Las relaciones están fijas en el motor; el CAPEX se descuenta completo en su año, sin anualidad |
+| Escenarios como capas con herencia | 🟡 | ✅ en la interfaz (cascada, diferencias contra el escenario por defecto), pero se guardan en el navegador (localStorage), no en el backend |
+
+## 4 · Operación detallada (física de planta)
+
+| Capacidad | Estado | En IETO |
+|---|---|---|
+| Carga mínima (turndown) | ❌ | Pendiente en el roadmap (M4); necesita binarias de operación |
+| Eficiencia a carga parcial por tramos | ❌ | |
+| Rampas | ❌ | |
+| Arranque y parada: tiempos, mínimos de encendido y apagado, costos | ❌ | |
+| Límite de cambios de consigna | ❌ | |
+| Operación con un solo combustible; cotas de mezcla; acoplamientos entre equipos | ❌ | Los puertos tienen razones fijas, no hay mezcla variable |
+| Disponibilidad y mantenciones | ✅ | M4 parcial |
+| Almacenamiento: eficiencias de carga y descarga separadas | 🟡 | Un solo η que se aplica en ambos sentidos |
+| Autodescarga, SOC mínimo y máximo, límite de ciclos, degradación | ❌ | El SOC va de 0 a la capacidad y es cíclico dentro de cada estación |
+
+## 5 · Mercados y tarifas
+
+| Capacidad | Estado | En IETO |
+|---|---|---|
+| Cargo por demanda máxima | 🟡 | Se calcula sobre la punta de cada estación (4 al año), no sobre los 12 meses |
+| Potencia contratada con penalización por exceso | ✅ | M2b |
+| Tarifas según horas de utilización | ❌ | |
+| Tarifas por bloques (escalonadas) | ❌ | |
+| Compra y venta spot con precios separados | ✅ | Mercados de compra y de venta (M11) |
+| Intradiario | ❌ | Equivale a otro mercado, pero no hay modelado propio |
+| PPA con factor de emisión propio; cargos fijos de conexión | ✅ | |
+| Net metering | ✅ | Banco de energía que expira (M2b) |
+| PPA de carga base, contratos de calor, futuros y forwards | ❌ | |
+| Servicios de balance (aFRR) y comercialización de flexibilidad | ❌ | |
+| Emisiones de alcance 1 y 2 | 🟡 | Se contabilizan y hay topes sobre el bruto y el neto, pero no topes separados por alcance; el alcance 2 es solo location-based |
+| ETS con asignación gratuita | ❌ | Hay precio de carbono y offsets, pero no asignación gratuita |
+| Certificados (biometano, REC) | ❌ | |
+
+## 6 · Modos de optimización
+
+| Modo | Estado | En IETO |
+|---|---|---|
+| Validación del estado actual | 🟡 | Existe el escenario `bau`, pero no hay calibración contra mediciones |
+| Expansión estratégica multianual | ✅ | Retiro, renovación, inversiones repetidas, compras forzadas, presupuesto CAPEX |
+| Expansión en unidades enteras (`Size of a single unit`) | ❌ | Solo continua, con una binaria de construcción por año |
+| Presupuesto CAPEX **anual** | 🟡 | Es un presupuesto total del horizonte, no un límite por año |
+| Despacho de alta fidelidad (8760 h o 35 040 cuartos de hora, ventana móvil) | ❌ | Depende de la resolución temporal (§3) |
+| Resiliencia (fallas estocásticas, respaldo) | ❌ | |
+| Objetivos: costo mínimo, emisiones mínimas, costo con tope | ✅ | 7 escenarios más la frontera de Pareto |
+
+## 7 · Entregables
+
+| Entregable | Estado | En IETO |
+|---|---|---|
+| VAN, TIR, payback, flujo de caja acumulado contra el estado actual | ✅ | `lib/finance.js`, caso de inversión |
+| ROI | ❌ | Es trivial de agregar |
+| LCOE por activo | ❌ | |
+| Desglose de CAPEX, OPEX fijo y OPEX variable | ✅ | |
+| Vistas en términos nominales, descontados y de CO₂e | ✅ | Real/nominal, VAN y emisiones |
+| Hoja de ruta de medidas (año, ubicación, tecnología, capacidad, costo) | ✅ | Falta el conteo de unidades, que depende de la expansión en unidades enteras (§6) |
+| Sankey multi-vector con pérdidas | ✅ | Por barra y con pérdidas de transporte |
+| Curvas de despacho por equipo | 🟡 | Solo del día representativo; no muestra arranques, rampas ni SOC en detalle porque el motor no los modela |
+| Exportación auditable | ✅ | XLSX, JSON y trazabilidad de supuestos |
+
+---
+
+## Lectura
+
+IETO ya cubre el **esqueleto** de la referencia: el MILP multi-vector con red,
+mercados, emisiones, expansión multianual, escenarios, finanzas y Sankey. Las
+brechas se agrupan en cinco bloques, en orden de dependencia:
+
+1. **Resolución temporal** (§3, §6): pasar de 96 pasos a plantillas
+   configurables (12×24 mensual, 8760 y ventana móvil para despacho). Bloquea
+   los cargos por demanda mensuales, el despacho de alta fidelidad y le da
+   sentido a las rampas y a los tiempos mínimos de operación.
+2. **Operación detallada como opción** (§4): carga mínima, arranques con
+   costo, mínimos de encendido y apagado, rampas, eficiencia por tramos y
+   física de almacenamiento. Hay que activarla solo en el modo despacho, porque
+   multiplica las binarias (riesgo 2 del roadmap).
+3. **Parámetros por año y unidades enteras** (§3, §6): CAPEX por año, valores
+   por año para cualquier parámetro, expansión en unidades enteras y
+   presupuesto anual.
+4. **Tarifas y finanzas** (§5, §7): tarifas por horas de utilización y por
+   bloques, ETS con asignación gratuita, topes por alcance, ROI y LCOE.
+5. **Amplitud** (§2, §5, §6): catálogo, medidas excluyentes, flexibilidad,
+   aFRR, resiliencia y física de zonas. Es lo de mayor esfuerzo y menor
+   urgencia para un primer cliente industrial.
+
+---
+
+## Avance (bitácora)
+
+- ✅ **1.1 · Plantilla temporal general en el motor** (2026-11-07). Cada paso
+  lleva su Δt (`duration_hours`: 1 h, 0,25 h…) y su mes de facturación
+  (`month`), y `hour` es el orden dentro del período (llega a 8759). El SOC
+  escala con Δt. La punta tarifaria se mide por **mes** cuando todos los pasos
+  traen mes y por período cuando no. Las columnas son opcionales: un sitio sin
+  ellas da exactamente lo mismo que antes (los 8 goldens previos no cambian) y
+  su hash se mantiene. Anclas: un oráculo de facturación mensual
+  (Σ puntas × 1 mes contra punta anual × 12) y dos invariantes sobre el demo
+  (partir en cuartos de hora y partir cada estación en 3 meses dan el mismo
+  VAN). Espejo web: `timeGroups` y Δt en `lp.js`, con los goldens
+  `tarifa_mensual_n1` y `demo_cuartos_n2`; verify:wasm 10/10. 1330 tests.

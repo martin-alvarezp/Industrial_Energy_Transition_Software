@@ -62,11 +62,11 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
                if get(params.market_demand_charge, mk, 0.0) > 0 ||
                   (isfinite(get(params.market_contracted, mk, Inf)) &&
                    get(params.market_excess_penalty, mk, 0.0) > 0)]
-    nse = length(params.season_steps)
+    nse = length(params.billing_steps)   # meses o estaciones
     if !isempty(charged)
         JuMP.@variable(m, market_peak[charged, 1:nse, years] >= 0)
         m[:market_peak_def] = JuMP.@constraint(m,
-            [mk in charged, se in 1:nse, s in params.season_steps[se], y in years],
+            [mk in charged, se in 1:nse, s in params.billing_steps[se], y in years],
             market_peak[mk, se, y] >= market_flow[mk, s, y])
         # potencia contratada (M2b): el exceso sobre la contratada se penaliza
         over = [mk for mk in charged if isfinite(params.market_contracted[mk])]

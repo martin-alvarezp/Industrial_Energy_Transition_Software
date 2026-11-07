@@ -3,6 +3,8 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
+import { timeGroups } from "./lp.js";
+
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
   let h1 = 0x811c9dc5, h2 = 0x1b873593;
@@ -159,14 +161,8 @@ export function extractPayload(site, cfg, sol, constant, scenario = "web") {
     }
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
-  const seasonSteps = [];
-  { const order = [];
-    ts.forEach((t) => {
-      let i = order.indexOf(t.season);
-      if (i < 0) { order.push(t.season); seasonSteps.push([]); i = order.length - 1; }
-      seasonSteps[i].push(t.step_id);
-    }); }
-  const nse = seasonSteps.length, monthsSe = 12 / Math.max(nse, 1);
+  const { seasonSteps, billingSteps } = timeGroups(ts);
+  const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
   const cprice = (y) => cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[y - 1] : cfg.carbon_price;
   const capNet = (y) => N === 1 ? cfg.emissions_cap_net_start :

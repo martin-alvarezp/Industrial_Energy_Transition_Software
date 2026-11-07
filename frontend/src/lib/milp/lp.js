@@ -74,6 +74,27 @@ const portsOf = (t) => t.ports
  * `constant` son los términos fijos del objetivo (OPEX de existentes, cargos
  * de conexión, renovaciones, contratada): VAN = objetivo_solver + constant.
  */
+/**
+ * Grupos de pasos de la plantilla (espejo de parameters.jl): `seasonSteps` por
+ * período cronológico (SOC cíclico, neteo estacional) y `billingSteps` para la
+ * punta tarifaria — por mes si TODOS los pasos traen month, si no = estaciones.
+ */
+export function timeGroups(ts) {
+  const group = (key) => {
+    const order = [], out = [];
+    ts.forEach((t) => {
+      let i = order.indexOf(key(t));
+      if (i < 0) { order.push(key(t)); out.push([]); i = order.length - 1; }
+      out[i].push(t.step_id);
+    });
+    return out;
+  };
+  const seasonSteps = group((t) => t.season);
+  const billingSteps = ts.length && ts.every((t) => (t.month ?? 0) > 0)
+    ? group((t) => t.month) : seasonSteps;
+  return { seasonSteps, billingSteps };
+}
+
 export function buildLP(site, cfg) {
   const ts = site.timesteps;
   const S = ts.length, N = cfg.horizon_years;
@@ -111,15 +132,11 @@ export function buildLP(site, cfg) {
   const marketNode = (mk) => (mk.connection ? nodeOf(mk.connection) : DEFAULT_NODE);
   const demandNode = (c) => site.demand_nodes?.[c] ?? DEFAULT_NODE;
 
-  // estaciones en orden de primera aparición (espejo de parameters.jl)
-  const seasonOrder = [];
-  const seasonSteps = [];
-  ts.forEach((t) => {
-    let i = seasonOrder.indexOf(t.season);
-    if (i < 0) { seasonOrder.push(t.season); seasonSteps.push([]); i = seasonOrder.length - 1; }
-    seasonSteps[i].push(t.step_id);
-  });
-  const nse = seasonSteps.length, monthsSe = 12 / Math.max(nse, 1);
+  // estaciones (neteo, SOC) y períodos de facturación de la punta (meses si
+  // todos los pasos traen month) — espejo de parameters.jl
+  const { seasonSteps, billingSteps } = timeGroups(ts);
+  const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
+  const dt = ts.map((t) => t.duration_hours ?? 1);
 
   // combustible con mercado de compra ⇒ lleva balance
   const fuelWithMkt = new Set(buys.map((m) => m.carrier_id)
@@ -354,12 +371,14 @@ export function buildLP(site, cfg) {
       const id = sane(st.tech_id);
       const eta = st.efficiency, hrs = st.storage_hours ?? 4;
       for (const grp of seasonSteps) {
+        // orden cronológico: hour y, a igual hour, step_id (sort estable)
         const ordered = [...grp].sort((a, b) => ts[a - 1].hour - ts[b - 1].hour);
         ordered.forEach((s, k) => {
           const prev = ordered[k === 0 ? ordered.length - 1 : k - 1];
+          const d = dt[s - 1];   // Δt: MW × Δt = MWh del paso
           row(`soc_${id}_${s}_${y}`, {
             [`soc_${id}_${s}_${y}`]: 1, [`soc_${id}_${prev}_${y}`]: -1,
-            [`ch_${id}_${s}_${y}`]: -eta, [`dc_${id}_${s}_${y}`]: 1 / eta,
+            [`ch_${id}_${s}_${y}`]: -eta * d, [`dc_${id}_${s}_${y}`]: d / eta,
           }, "=", 0);
         });
       }
@@ -406,7 +425,7 @@ export function buildLP(site, cfg) {
       const dc = mk.demand_charge ?? 0, cp = mk.contracted_power,
             pen = mk.excess_penalty ?? 0;
       if (mk.direction === "buy" && (dc > 0 || (cp != null && pen > 0)))
-        seasonSteps.forEach((grp, sei) => {
+        billingSteps.forEach((grp, sei) => {
           const se = sei + 1;
           for (const s of grp)
             row(`pkd_${id}_${se}_${s}_${y}`,

@@ -56,7 +56,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # · sin potencia contratada: USD/kW·mes · kW de punta;
     # · con contratada: USD/kW·mes · kW contratados (constante) +
     #   excess_penalty · kW de exceso sobre la contratada.
-    nse = length(params.season_steps)
+    # cada período de facturación (mes o estación) cubre 12/nperíodos meses
+    nse = length(params.billing_steps)
     months_per_season = 12.0 / max(nse, 1)
     contracted(mk) = get(params.market_contracted, mk, Inf)
     charged = [mk for mk in sets.buy_markets

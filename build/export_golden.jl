@@ -62,4 +62,12 @@ s7, c7 = apply_scenario(site0, with_config(cfg0; horizon_years = 10,
                                            capex_budget = 20e6), :least_cost)
 dump("demo_budget_n10", s7, c7)
 
+# 8 · resolución temporal (bloque 1.1): la punta tarifaria por MES (12
+# períodos con month) y Δt de cuarto de hora (384 pasos de 0.25 h con el SOC
+# del almacenamiento escalado por Δt). Sin estos casos, billingSteps y Δt del
+# motor web no tendrían ancla.
+include(joinpath(root, "test", "helpers_temporal.jl"))
+s8, c8 = monthly_tariff_site()
+dump("tarifa_mensual_n1", s8, c8)
+dump("demo_cuartos_n2", refine_steps(site0, 4), with_config(cfg0; horizon_years = 2))
 println("fixtures dorados en ", out)
