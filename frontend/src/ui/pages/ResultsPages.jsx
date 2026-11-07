@@ -13,7 +13,7 @@ import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { ChartPanel, StackedBars, ChartLegend } from "../charts.jsx";
 import NeedsRun, { RunPicker } from "../components/NeedsRun.jsx";
 import {
-  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors,
+  calYear, stackRows, investmentByYear, opexByYear, operationDay, perComponent, seriesColors, entityColors, lcoeByTech,
   horizonKpis,
 } from "../results.js";
 import { techKind } from "../techkind.js";
@@ -102,6 +102,18 @@ export function CostsPage() {
         <section className="rc-panel ui-legacy">
           <InvestmentCase plan={result} bau={data.bau} referenceLabel={refLabel(data.referenceLabel, t)} />
         </section>
+        <ChartPanel title={t("res.lcoe")}>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("res.lcoeHint")}</p>
+          <div style={{ overflowX: "auto" }}>
+            <table className="ui-table" data-testid="lcoe-table">
+              <thead><tr><th>{t("sum.component")}</th><th className="num">{t("res.lcoeEnergy")}</th>
+                <th className="num">LCOE ({currency()}/MWh)</th></tr></thead>
+              <tbody>{lcoeByTech(result, siteJson).filter((r) => r.lcoe != null).map((r) => (
+                <tr key={r.tech}><td>{r.name}</td><td className="num">{num(r.mwh / 1000, 1)}</td>
+                  <td className="num">{num(r.lcoe, 1)}</td></tr>))}</tbody>
+            </table>
+          </div>
+        </ChartPanel>
       </>}
     </Page>
   );

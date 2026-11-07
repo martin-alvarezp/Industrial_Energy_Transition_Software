@@ -18,7 +18,8 @@
     "verify:operation": "node scripts/verify_operation.mjs",
     "verify:storage": "node scripts/verify_storage.mjs",
     "verify:capex": "node scripts/verify_capex.mjs",
-    "verify:units": "node scripts/verify_units.mjs"
+    "verify:units": "node scripts/verify_units.mjs",
+    "verify:finance": "node scripts/verify_finance.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

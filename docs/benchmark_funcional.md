@@ -263,5 +263,13 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   diagnóstico dice "el menor tope anual con el que sí lo es es 14,921 MUSD".
   Golden `demo_presupuesto_anual_n5` (verify:wasm 22/22); Parámetros →
   "Presupuesto CAPEX por año"; E2E en `verify:capex`. **Bloque 3 completo.**
-- 🔜 **Bloque 4** (tarifas por horas de utilización y por bloques, ETS con
-  asignación gratuita, topes por alcance, ROI, LCOE): por hacer.
+- ✅ **4.1 · ROI y LCOE por activo** (2026-11-07). Al caso de inversión se
+  suma el **ROI** (Σ flujo incremental del horizonte, con el CAPEX ya restado,
+  ÷ CAPEX incremental). En Costos hay una tabla de **LCOE por activo**: valor
+  presente del CAPEX nuevo (al precio de su año), OPEX fijo y variable y la
+  energía que consume (al precio de compra de su vector; el almacenamiento
+  paga su carga), dividido por el valor presente de lo que produce. Lo
+  existente no suma CAPEX. `verify:finance` con oráculos a mano (bomba 66,54
+  USD/MWh, caldera 100; ROI 80 %) y la tabla en el E2E `verify:capex`.
+- 🔜 **Resto del bloque 4** (tarifas por horas de utilización y por bloques,
+  ETS con asignación gratuita, topes por alcance): por hacer.

@@ -75,6 +75,13 @@ export function investmentCase(plan, base, discount) {
     payback_simple: payback(cf),
     payback_discounted: payback(cf, discount),
     irr: irr(cf),
+    // ROI (4.1): ganancia neta del horizonte (Σ flujo incremental, sin
+    // descontar, CAPEX ya restado) sobre el CAPEX incremental del plan
+    roi: (() => {
+      const dCapex = plan.cost_breakdown.reduce((a, r, i) =>
+        a + r.capex - (base.cost_breakdown[i]?.capex ?? 0), 0);
+      return dCapex > 1 ? cf.reduce((a, c) => a + c.cashflow, 0) / dCapex : null;
+    })(),
     all_positive: cf.every((c) => c.cashflow >= -1),
     all_negative: cf.every((c) => c.cashflow <= 1),
   };

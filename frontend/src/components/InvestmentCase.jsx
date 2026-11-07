@@ -66,7 +66,7 @@ export default function InvestmentCase({ plan, bau, referenceLabel }) {
 
   return (
     <>
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
         <KpiTile
           label={L("VAN incremental", "Incremental NPV")}
           value={musd(ic.van_incremental)}
@@ -77,6 +77,8 @@ export default function InvestmentCase({ plan, bau, referenceLabel }) {
         <KpiTile label={L("Payback simple", "Simple payback")} value={paybackLabel} note={paybackNote} />
         <KpiTile label={L("TIR del plan", "Plan IRR")} value={irrLabel}
                  note={L("del flujo incremental vs base", "of the incremental cash flow vs base")} />
+        <KpiTile label="ROI" value={ic.roi == null ? "n/d" : pct(ic.roi, 0)}
+                 note={L("ganancia neta del horizonte ÷ CAPEX incremental", "net gain over the horizon ÷ incremental CAPEX")} />
       </div>
 
       <div style={{ height: 16 }} />

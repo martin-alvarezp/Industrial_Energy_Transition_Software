@@ -322,6 +322,60 @@ export function operationDay(result, siteJson, year, season, carrier, labels, da
 }
 
 /** Por componente, en un año: capacidad, compra, energía y horas equivalentes. */
+/**
+ * LCOE por activo (4.1): costo nivelado de la energía que produce cada equipo,
+ * USD/MWh = VP(CAPEX nuevo al precio de su año + OPEX fijo + OPEX variable +
+ * energía consumida al precio de compra de su vector) ÷ VP(energía producida).
+ * Lo existente no suma CAPEX (costo hundido). Storage: la descarga, pagando la
+ * carga. Sin producción en el horizonte el LCOE es null.
+ */
+export function lcoeByTech(result, siteJson) {
+  const cfg = result?.assumptions?.scenario_config ?? {};
+  const w = weights(siteJson);
+  const disc = Object.fromEntries((result?.cost_breakdown ?? []).map((c) => [c.year, c.discount_factor]));
+  const sum = new Map();
+  for (const r of result?.dispatch ?? []) {
+    const k = `${r.tech}|${r.flow}|${r.year}`;
+    sum.set(k, (sum.get(k) ?? 0) + r.value * (w[r.step - 1] ?? 0));
+  }
+  const byStep = new Map();
+  for (const r of result?.dispatch ?? []) {
+    const k = `${r.tech}|${r.flow}|${r.year}`;
+    if (!byStep.has(k)) byStep.set(k, []);
+    byStep.get(k).push(r);
+  }
+  const E = (t, f, y) => sum.get(`${t}|${f}|${y}`) ?? 0;
+  const cost = (carrier, rows, ratio, y) => {
+    const pr = priceSeries(siteJson, carrier);
+    if (!pr) return 0;
+    let usd = 0;
+    for (const r of rows) usd += r.value * ratio * (w[r.step - 1] ?? 0) * (pr[r.step - 1] ?? 0);
+    return usd * esc(cfg, carrier, y);
+  };
+  const out = [];
+  for (const t of siteJson?.technologies ?? []) {
+    if (!["converter", "generator", "storage"].includes(t.type)) continue;
+    const outFlow = t.type === "storage" ? "discharge" : "output";
+    let num = 0, den = 0;
+    for (const c of (result?.capacity ?? []).filter((x) => x.tech === t.tech_id)) {
+      const D = disc[c.year] ?? 1, y = c.year;
+      let usd = c.new_mw * KW * (t.capex_per_kw ?? 0) * capexFactor(result, t.tech_id, y) +
+                c.available_mw * (t.fixed_opex ?? 0) + E(t.tech_id, outFlow, y) * (t.variable_opex ?? 0);
+      if (t.type === "converter") {
+        const inRows = byStep.get(`${t.tech_id}|input|${y}`) ?? byStep.get(`${t.tech_id}|output|${y}`) ?? [];
+        for (const p of inPorts(t)) usd += cost(p.carrier, inRows, p.ratio, y);
+      } else if (t.type === "storage") {
+        usd += cost(t.input_carrier ?? t.output_carrier, byStep.get(`${t.tech_id}|charge|${y}`) ?? [], 1, y);
+      }
+      num += D * usd;
+      den += D * E(t.tech_id, outFlow, y);
+    }
+    out.push({ tech: t.tech_id, name: t.name, type: t.type,
+               mwh: den, lcoe: den > 1e-6 ? num / den : null });
+  }
+  return out.sort((a, b) => (b.mwh - a.mwh));
+}
+
 export function perComponent(result, siteJson, year) {
   const w = (siteJson?.timesteps ?? []).map((s) => s.weight_hours);
   const T = siteJson?.technologies ?? [];

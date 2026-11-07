@@ -104,6 +104,12 @@ await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "netwo
 await waitText("Costo de inversión", 30000);
 step("el resumen no inventa Renovaciones", !(await text()).includes("Renovaciones"));
 
+// LCOE por activo (4.1): Costos muestra la tabla con valores
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/costs`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="lcoe-table"] tbody tr', { timeout: 30000 }).catch(() => null);
+const lcoeRows = await p.evaluate(() => document.querySelectorAll('[data-testid="lcoe-table"] tbody tr').length);
+step("Costos muestra el LCOE por activo", lcoeRows > 0, `${lcoeRows} activos`);
+
 // 4 · tope ANUAL (3.3): 3 MUSD por año desde Parámetros
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
 await p.waitForSelector('[data-testid="budget-annual"]', { timeout: 30000 });
