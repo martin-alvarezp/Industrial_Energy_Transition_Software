@@ -303,6 +303,31 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   del régimen que dicen sus horas. **Bloque 4 completo: el plan del benchmark
   (bloques 1 a 4) queda cubierto.**
 
-  Fuera de estos cuatro bloques sigue lo del bloque 5 (amplitud): catálogo,
-  medidas excluyentes, flexibilidad de carga, servicios de balance (aFRR),
-  resiliencia y física de zonas.
+
+### Bloque 5 · Amplitud
+
+- ✅ **5.1 · Catálogo ampliado** (2026-11-07). De 20 a **47 tecnologías**
+  (generación 17 · conversión 20 · almacenamiento 10) y de 11 a **16
+  vectores**. Lo nuevo:
+  - **Generación:** FV con seguidor y en techo, mini-hidro, solar de
+    concentración para vapor, celda de combustible.
+  - **Cogeneración:** turbina a gas con caldera de recuperación, motor a
+    biogás, CHP de biomasa.
+  - **Vapor:** turbinas de contrapresión y de condensación, ORC, caldera de
+    alta presión, válvula reductora, caldera de electrodos, bomba de calor de
+    alta temperatura.
+  - **Calor y frío:** bomba geotérmica, bomba de calor de doble efecto (calor
+    + frío), chiller con recuperación de calor, calderas a fuel oil y GLP.
+  - **Aire comprimido:** compresor, y compresor con recuperación de calor.
+  - **Almacenamiento:** batería de flujo, almacenamiento estacional, térmico
+    de alta temperatura, agua helada y pulmón de aire comprimido.
+  - **Vectores nuevos:** vapor de alta presión, aire comprimido, biogás, fuel
+    oil y GLP.
+
+  Los valores son referenciales (IEA, NREL ATB, DEA); hay que ajustarlos con
+  cotizaciones. El aire comprimido se mide en MWh eléctricos equivalentes,
+  porque casi todo el trabajo del compresor sale como calor recuperable.
+  `verify:catalog`: cada preset se crea sobre el demo, pasa la validación,
+  tiene etiqueta es/en, sus salidas son físicamente plausibles y el motor web
+  lo resuelve (detectó un compresor con recuperación que creaba energía, ya
+  corregido).
