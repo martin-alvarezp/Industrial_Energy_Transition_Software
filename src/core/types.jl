@@ -564,7 +564,13 @@ struct ScenarioConfig
     measure_fixed_mw::Dict{Symbol,Float64}   # medida → MW que reduce en CADA paso
                                              # (sin pasar la demanda), además de su fracción
     measure_fixed_opex::Dict{Symbol,Float64} # medida → USD/año mientras está activa
+    # ── razón de entrada variable (benchmark R11) ──
+    input_profiles::Dict{Symbol,Dict{Symbol,Vector{Float64}}}  # conversor → vector de entrada →
+                                             # factor por paso de su razón (COP horario)
 end
+
+# retro-compatibilidad: 59 campos → sin perfiles de entrada
+ScenarioConfig(a::Vararg{Any,59}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Float64}}}())
 
 # retro-compatibilidad: 57 campos → sin reducción absoluta ni O&M de medidas
 ScenarioConfig(a::Vararg{Any,57}) = ScenarioConfig(a..., Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
@@ -639,7 +645,8 @@ end
 ScenarioConfig(a::Vararg{Any,51}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}())
 
 "Tipos de factor por año (R3) y a qué apuntan."
-const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex)
+const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex,
+                           :input_ratio)   # R11: entradas de un conversor por año (eficiencia)
 
 """
     year_factor(cfg, kind, target, y) -> Float64

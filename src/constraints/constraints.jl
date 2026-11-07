@@ -15,6 +15,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     # con curva de carga parcial, que el balance y las emisiones usan
     add_operation_constraints!(m, sets, params, site;
                                integer = commitment_integer(cfg))
+    m[:input_factor] = input_factors(sets, site, cfg)    # R11: COP horario / por año
     add_demand_side!(m, sets, params, cfg)                # 5.3 (antes del balance)
     add_carrier_balance!(m, sets, params, site)
     add_capacity_constraints!(m, sets, params, cfg)       # + reglas de construcción (R1)

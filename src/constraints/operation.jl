@@ -16,6 +16,30 @@
 # weight/Δt veces por año: el costo de arranque anual lo escala así.
 
 """
+    input_factors(sets, site, cfg) -> Dict{(tech, carrier) => Matrix[step, y]}
+
+Factor de la razón de cada ENTRADA de conversor (R11): perfil por paso
+(`input_profiles`, el COP horario) × factor del año (`year_factors.input_ratio`).
+Solo los puertos con algún factor ≠ 1.
+"""
+function input_factors(sets::ModelSets, site::Site, cfg::ScenarioConfig)
+    out = Dict{Tuple{Symbol,Symbol},Matrix{Float64}}()
+    ry = sets.year_of
+    for t in sets.converters, p in site.converters[t].inputs
+        prof = get(get(cfg.input_profiles, t, Dict{Symbol,Vector{Float64}}()), p.carrier, nothing)
+        yf = [year_factor(cfg, :input_ratio, t, ry[y]) for y in sets.years]
+        prof === nothing && all(==(1.0), yf) && continue
+        M = [(prof === nothing ? 1.0 : prof[s]) * yf[y] for s in sets.steps, y in sets.years]
+        out[(t, p.carrier)] = M
+    end
+    return out
+end
+
+"Factor de la entrada `c` de `t` en (s, y) (R11); 1 sin perfil."
+input_factor(m::JuMP.Model, t::Symbol, c::Symbol, s::Int, y::Int) =
+    (F = get(m[:input_factor], (t, c), nothing); F === nothing ? 1.0 : F[s, y])
+
+"""
     input_driver(m, t, s, y)
 
 Lo que multiplica a los ratios de ENTRADA de un conversor: el despacho, o —

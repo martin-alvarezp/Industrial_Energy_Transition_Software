@@ -126,6 +126,7 @@ export function toOverrides(cfg) {
     coupling: cfg.coupling ?? [],                           // R9: acoplamientos
     measure_fixed_mw: cfg.measure_fixed_mw ?? {},           // R10: medidas absolutas
     measure_fixed_opex: cfg.measure_fixed_opex ?? {},
+    input_profiles: cfg.input_profiles ?? {},               // R11: COP horario
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

@@ -444,7 +444,8 @@ export default function ParametersPage({ route }) {
             const dem = Object.keys(sj.demands ?? {}).map((c) => [c, c]);
             const pr = Object.keys(sj.prices ?? {}).map((c) => [c, c]);
             const TARGETS = { price: [...mk, ...pr], demand: dem, emission_factor: mk, demand_charge: mk,
-                              fixed_opex: tech, variable_opex: tech };
+                              fixed_opex: tech, variable_opex: tech,
+                              input_ratio: sj.technologies.filter((x) => x.type === "converter").map((x) => [x.tech_id, x.name ?? x.tech_id]) };
             const yf = draft.year_factors ?? {};
             const rows = Object.entries(yf).flatMap(([kind, tg]) =>
               Object.entries(tg ?? {}).map(([target, pts]) => ({ kind, target, pts })));

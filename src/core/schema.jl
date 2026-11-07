@@ -390,5 +390,8 @@ function load_scenario_config(path::AbstractString)
                                              Symbol(get(c, "mode", "eq"))) for c in get(d, "coupling", [])],
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_mw", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_opex", Dict())),
+        Dict{Symbol,Dict{Symbol,Vector{Float64}}}(Symbol(t) => Dict{Symbol,Vector{Float64}}(Symbol(c) => Float64[Float64(x) for x in v]
+                                                                for (c, v) in cs)
+                                    for (t, cs) in get(d, "input_profiles", Dict())),
     )
 end

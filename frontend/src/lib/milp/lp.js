@@ -162,6 +162,10 @@ export const capexAnnuity = (capex, rate, n, years = capex.map((_, i) => i + 1))
   // con años hito (R6) el plazo se cuenta en años reales
   return capex.map((_, i) => capex.reduce((s, c, j) => s + (j <= i && years[i] - years[j] < n ? c * a : 0), 0));
 };
+/** Factor de la entrada `c` del conversor en (s, y) (R11), espejo de input_factors:
+ *  perfil por paso × factor del año (`yr` = año relativo real). */
+export const inputFactor = (cfg, tech, c, s, yr) =>
+  (cfg.input_profiles?.[tech]?.[c]?.[s - 1] ?? 1) * yearFactor(cfg, "input_ratio", tech, yr);
 /** Factor por año en escalón (R3), espejo de year_factor en types.jl. */
 export const yearFactor = (cfg, kind, target, y) => {
   const pts = cfg.year_factors?.[kind]?.[target];
@@ -388,7 +392,7 @@ export function buildLP(site0, cfg0) {
           const f = efTab[`${p.carrier}|scope1`] ?? 0;
           if (f) for (const s of steps)
             for (const [v, k] of inputTerms(cv, s, y, curveIds))
-              t[v] = (t[v] ?? 0) + f * p.ratio * w[s - 1] * k;
+              t[v] = (t[v] ?? 0) + f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * w[s - 1] * k;
         }
     return t;
   };
@@ -479,7 +483,7 @@ export function buildLP(site0, cfg0) {
           for (const s of steps)
             for (const [v, c] of inputTerms(t, s, y, curveIds))
               addDed(v, c * D * site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
-                  p.ratio * w[s - 1]);
+                  p.ratio * inputFactor(cfg, t.tech_id, p.carrier, s, yr(y)) * w[s - 1]);
     addDed(`ge_${y}`, D * cprice(y));
     // reserva aFRR (5.6): ingreso, como las ventas (tributa)
     for (const t of afrrParticipants(cfg, convs, stors))
@@ -562,7 +566,8 @@ export function buildLP(site0, cfg0) {
             for (const o of p.outs) if (o.carrier === c)
               inc(t, `d_${sane(cv.tech_id)}_${s}_${y}`, o.ratio);
             for (const i of p.ins) if (i.carrier === c)
-              for (const [v, k] of inputTerms(cv, s, y, curveIds)) inc(t, v, -i.ratio * k);
+              for (const [v, k] of inputTerms(cv, s, y, curveIds))
+                inc(t, v, -i.ratio * inputFactor(cfg, cv.tech_id, i.carrier, s, yr(y)) * k);
           }
           for (const g of gens) if (g.output_carrier === c && nodeOf(g.tech_id) === n)
             inc(t, `d_${sane(g.tech_id)}_${s}_${y}`, 1);

@@ -4,7 +4,7 @@
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
 import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity,
-  modelYears, milestoneIndex } from "./lp.js";
+  modelYears, milestoneIndex, inputFactor } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -239,7 +239,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           site.prices?.[p.carrier])
         for (const s of steps)
           energy += site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
-                    p.ratio * drive(cv, s, y) * w[s - 1];
+                    p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * w[s - 1];
     for (const mk of buys) {
       const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
       const dc = (mk.demand_charge ?? 0) * fdc, cp = mk.contracted_power,
@@ -284,7 +284,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       if (catOf[p.carrier] === "fuel") {
         const f = efTab[`${p.carrier}|scope1`] ?? 0;
         for (const s of steps)
-          s1 += f * p.ratio * drive(cv, s, y) * w[s - 1];
+          s1 += f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * w[s - 1];
       }
     const ge = V(`ge_${y}`), ne = V(`ne_${y}`), off = V(`off_${y}`);
     s2 = ge - s1;

@@ -558,6 +558,20 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    # R11: perfiles de entrada sobre puertos que existen, uno por paso, > 0
+    for (t, cs) in cfg.input_profiles
+        cv = get(site.converters, t, nothing)
+        if cv === nothing
+            push!(problems, "input_profiles: '$t' no es un conversor del sitio"); continue
+        end
+        for (c, v) in cs
+            any(p -> p.carrier == c, cv.inputs) || push!(problems,
+                "input_profiles['$t']: '$c' no es una entrada del conversor")
+            length(v) == length(site.timesteps) || push!(problems,
+                "input_profiles['$t']['$c']: $(length(v)) valores para $(length(site.timesteps)) pasos")
+            all(>(0), v) || push!(problems, "input_profiles['$t']['$c']: los factores deben ser > 0")
+        end
+    end
     # R10: reducción absoluta y O&M de medidas que existen
     em_ids = Set(em.id for em in cfg.efficiency_measures)
     for (f, d) in (("measure_fixed_mw", cfg.measure_fixed_mw), ("measure_fixed_opex", cfg.measure_fixed_opex)),
@@ -594,7 +608,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             continue
         end
         for (tg, pts) in targets
-            ok = kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
+            ok = kind == :input_ratio ? haskey(site.converters, tg) :
+                 kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
                  kind == :demand ? haskey(site.demands, tg) :
                  kind in (:emission_factor, :demand_charge) ? haskey(site.markets, tg) :
                  tg in techs_all

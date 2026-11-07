@@ -546,3 +546,16 @@ días tipo (k por año) con cronología.
   5 MW topa en la demanda de cada paso. Goldens `medida_absoluta_n3` y
   `medida_absoluta_tope_n1` (verify:wasm 56/56). Parámetros → columnas kW y
   O&M de cada medida; E2E en `verify:measures`.
+- ✅ **R11 · Razón de entrada variable: COP horario y eficiencia por año**
+  (2026-11-07). `input_profiles` (conversor → entrada → factor por paso de su
+  razón: el COP que cambia con la temperatura exterior) y el tipo
+  `input_ratio` de `year_factors` (entrada por unidad de salida por año: una
+  caldera reemplazada con mejor eficiencia). El factor entra al balance, a la
+  compra implícita de combustible y al alcance 1. Oráculos
+  (test_input_factors.jl): COP 2 de noche y 4 de día ⇒ 1 533 000 USD; con un
+  COP de noche peor que la caldera, la noche pasa a la caldera; un factor 0,8
+  desde el año 2 baja gas y alcance 1 exacto ×0,8. Goldens `cop_horario_n1`,
+  `eficiencia_anio_n3`, `demo_cop_n5` (verify:wasm 59/59). Parámetros →
+  "Factores por año" → "Consumo por unidad". *Pendiente:* el perfil por paso
+  se da en la plantilla vigente (YAML/API); no se reproyecta solo al cambiar
+  de plantilla.

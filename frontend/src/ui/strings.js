@@ -112,6 +112,7 @@ extend({
   "par.yf.demand_charge": ["Cargo por demanda", "Demand charge"],
   "par.yf.fixed_opex": ["OPEX fijo", "Fixed OPEX"],
   "par.yf.variable_opex": ["OPEX variable", "Variable OPEX"],
+  "par.yf.input_ratio": ["Consumo por unidad (1/eficiencia)", "Input per unit (1/efficiency)"],
   "par.ownEnergy": ["Almacenamiento: energía propia", "Storage: own energy"],
   "par.ownEnergyHint": ["Con un costo por kWh, la energía de las compras se dimensiona aparte de la potencia (el CAPEX del catálogo queda como el de potencia). El tope es de MWh por compra; vacío = potencia máxima × horas.", "With a cost per kWh, the energy of new purchases is sized separately from power (the catalog CAPEX becomes the power cost). The cap is MWh per purchase; empty = max power × hours."],
   "par.energyCapex": ["USD/kWh", "USD/kWh"],

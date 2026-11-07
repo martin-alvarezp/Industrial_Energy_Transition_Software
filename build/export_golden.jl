@@ -262,4 +262,14 @@ dump("medida_absoluta_n3", s31, with_config(c31; horizon_years = 3, wacc = 0.05,
      measure_fixed_mw = Dict(:ecm => 1.0), measure_fixed_opex = Dict(:ecm => 50_000.0)))
 dump("medida_absoluta_tope_n1", s31, with_config(c31; efficiency_measures = [EfficiencyMeasure(:ecm, "ECM", :heat, 0.1, 100_000.0)],
      measure_fixed_mw = Dict(:ecm => 5.0)))
+# 30 · razón de entrada variable (R11): COP horario de la bomba, eficiencia por
+# año de la caldera a gas (alcance 1) y el demo con COP estacional de la bomba
+s32, c32 = op_site(NO_OPERATION_LIMITS)
+dump("cop_horario_n1", s32, with_config(c32; input_profiles = Dict(:hp => Dict(:electricity => [fill(4.0, 12); fill(0.75, 12)]))))
+s33, c33 = carbon_site()
+dump("eficiencia_anio_n3", s33, with_config(c33; horizon_years = 3, carbon_price = 80.0,
+     year_factors = Dict(:input_ratio => Dict(:gb => [(2, 0.8)]))))
+nst = length(site0.timesteps)
+dump("demo_cop_n5", site0, with_config(cfg0; horizon_years = 5,
+     input_profiles = Dict(:heat_pump => Dict(:electricity => [i <= nst ÷ 2 ? 1.2 : 0.9 for i in 1:nst]))))
 println("fixtures dorados en ", out)
