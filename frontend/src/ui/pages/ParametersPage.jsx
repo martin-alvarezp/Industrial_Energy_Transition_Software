@@ -118,6 +118,11 @@ export default function ParametersPage({ route }) {
                      value={draft.capex_budget_musd ?? ""}
                      onChange={(e) => set({ capex_budget_musd: e.target.value === "" ? null : +e.target.value })} />
             </Field>
+            <Field t={t} label={t("par.budgetAnnual")} unit={`M${cur}`}>
+              <input className="ui-input" type="number" min={0} placeholder={t("par.noBudget")} data-testid="budget-annual"
+                     value={draft.capex_budget_annual_musd ?? ""}
+                     onChange={(e) => set({ capex_budget_annual_musd: e.target.value === "" ? null : +e.target.value })} />
+            </Field>
           </div>
           <Toggle on={draft.salvage_value} onChange={(x) => set({ salvage_value: x })} label={t("par.salvage")} />
         </section>

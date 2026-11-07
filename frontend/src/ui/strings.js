@@ -52,6 +52,7 @@ extend({
   "run.noBudget": ["sin tope", "no cap"],
   "run.mode": ["Tipo de corrida", "Run type"],
   "par.capexYears": ["CAPEX por año", "CAPEX by year"],
+  "par.budgetAnnual": ["Presupuesto CAPEX por año", "CAPEX budget per year"],
   "par.capexYearsHint": ["Caída anual del costo de inversión (curva de aprendizaje) o factores por año sobre el CAPEX del catálogo (1 = el del catálogo; el último se repite). Los factores mandan sobre la caída.", "Annual decline of the investment cost (learning curve) or factors per year over the catalog CAPEX (1 = catalog; the last one repeats). Factors override the decline."],
   "par.learning": ["%/año de caída", "%/yr decline"],
   "par.trajectory": ["factores por año", "factors per year"],

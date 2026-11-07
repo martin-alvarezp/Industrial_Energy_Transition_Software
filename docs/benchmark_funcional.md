@@ -254,5 +254,14 @@ brechas se agrupan en cinco bloques, en orden de dependencia:
   bomba usa unidades de 2,5 MW). Las medidas muestran «N × u MW». Julia
   1470/1470. E2E `verify:units`: compras en múltiplos exactos de 2,5 MW y
   medidas en unidades.
-- 🔜 **3.3 · Presupuesto CAPEX anual** y **bloque 4** (tarifas por horas de
-  utilización y por bloques, ETS, topes por alcance, ROI, LCOE): por hacer.
+- ✅ **3.3 · Presupuesto CAPEX anual** (2026-11-07). `capex_budget_annual`
+  topa el CAPEX de CADA año (el mismo `capex_y`: compras al precio del año y
+  renovaciones), además del tope acumulado que ya existía. Diagnóstico: lo
+  obligatorio de un año (renovaciones + compras forzadas) que no cabe, y si no
+  hay causa analítica, `annual_budget_floor` resuelve el menor tope anual
+  factible. En el demo con meta de emisiones, 3 MUSD/año es infactible y el
+  diagnóstico dice "el menor tope anual con el que sí lo es es 14,921 MUSD".
+  Golden `demo_presupuesto_anual_n5` (verify:wasm 22/22); Parámetros →
+  "Presupuesto CAPEX por año"; E2E en `verify:capex`. **Bloque 3 completo.**
+- 🔜 **Bloque 4** (tarifas por horas de utilización y por bloques, ETS con
+  asignación gratuita, topes por alcance, ROI, LCOE): por hacer.

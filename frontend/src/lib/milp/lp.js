@@ -699,6 +699,14 @@ export function buildLP(site0, cfg0) {
     row("budget", tb, "<=",
         cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
   }
+  // tope ANUAL (3.3): el CAPEX de cada año (renovaciones del año al lado derecho)
+  if (cfg.capex_budget_annual != null)
+    for (const y of years) {
+      const ta = T();
+      for (const tc of cands)
+        inc(ta, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, y) * 1000);
+      row(`budget_y${y}`, ta, "<=", cfg.capex_budget_annual - renewalCapex[y - 1]);
+    }
 
   const objBody = Object.entries(obj).filter(([, c]) => c !== 0)
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");

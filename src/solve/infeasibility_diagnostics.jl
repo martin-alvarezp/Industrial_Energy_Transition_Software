@@ -62,6 +62,24 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         end
     end
 
+    # ── 0b · tope ANUAL (3.3): lo obligatorio de un año ya no cabe ──
+    if cfg.capex_budget_annual !== nothing
+        params = build_parameters(site, cfg)
+        for y in 1:N
+            forced_y = sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, y) * KW_PER_MW * mw
+                           for (t, yy, mw) in params.forced_builds
+                           if t in sets.candidates && yy == y; init = 0.0)
+            need = params.renewal_capex[y] + forced_y
+            if need > cfg.capex_budget_annual + 1e-6
+                push!(findings, InfeasibilityFinding(:budget,
+                    "presupuesto anual: en el año $(calendar_year(cfg, y)) lo obligatorio " *
+                    "(renovaciones + compras forzadas = $(_musd3(need)) MUSD) supera el tope " *
+                    "anual de $(_musd3(cfg.capex_budget_annual)) MUSD — súbelo o reparte " *
+                    "las compras forzadas en más años"))
+            end
+        end
+    end
+
     # ── 1 · capacidad pico por carrier ──
     for c in sets.demand_carriers
         peak = maximum(site.demands[c].values) * grow(N)
@@ -286,14 +304,46 @@ function budget_floor(site::Site, cfg::ScenarioConfig;
 end
 
 """
+    annual_budget_floor(site, cfg; solver) -> Union{Float64,Nothing}
+
+El menor tope ANUAL de CAPEX (3.3) con el que el escenario es factible:
+minimiza Z con CAPEX_y ≤ Z en cada año, sin el tope anual y con todo lo demás
+igual. `nothing` si es infactible por otra causa.
+"""
+function annual_budget_floor(site::Site, cfg::ScenarioConfig;
+                             solver::SolverConfig = SolverConfig())
+    im = build_model(site, with_config(cfg; capex_budget_annual = nothing);
+                     silent = solver.silent)
+    m = im.model
+    JuMP.@variable(m, z_annual >= 0)
+    JuMP.@constraint(m, [y in im.sets.years], m[:capex_y][y] <= z_annual)
+    JuMP.@objective(m, Min, z_annual)
+    solve!(im; solver)
+    JuMP.is_solved_and_feasible(m) || return nothing
+    return JuMP.objective_value(m)
+end
+
+"""
     add_budget_floor!(findings, site, cfg; solver) -> findings
 
 Si el escenario tiene tope y ningún chequeo analítico culpó al presupuesto,
-calcula `budget_floor`: si supera el tope, el presupuesto es la causa y su
+calcula `budget_floor` (y `annual_budget_floor` con tope anual, 3.3): si supera el tope, el presupuesto es la causa y su
 hallazgo reemplaza al genérico de "límites combinados".
 """
 function add_budget_floor!(findings::Vector{InfeasibilityFinding}, site::Site,
                            cfg::ScenarioConfig; solver::SolverConfig = SolverConfig())
+    # tope ANUAL (3.3): ¿cuánto por año haría falta?
+    if cfg.capex_budget_annual !== nothing && !any(f -> f.category == :budget, findings)
+        fa = annual_budget_floor(site, cfg; solver)
+        if fa !== nothing && fa > cfg.capex_budget_annual + 1e-6
+            filter!(f -> f.category != :unknown, findings)
+            pushfirst!(findings, InfeasibilityFinding(:budget,
+                "presupuesto anual: con un tope de $(_musd3(cfg.capex_budget_annual)) MUSD " *
+                "por año el escenario no es factible; el menor tope anual con el que sí lo " *
+                "es es $(_musd3(fa)) MUSD — súbelo al menos a eso o relaja la meta"))
+            return findings
+        end
+    end
     cfg.capex_budget === nothing && return findings
     any(f -> f.category == :budget, findings) && return findings
     floor = budget_floor(site, cfg; solver)

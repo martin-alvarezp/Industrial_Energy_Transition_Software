@@ -135,4 +135,10 @@ dump("demo_capex_por_anio_n5", site0,
 # 14 · unidades enteras (3.2): la bomba de calor en unidades de 4 MW compra
 # 8 MW (2 unidades) donde en continuo compraría 9
 dump("unidades_enteras_n1", discrete_case(4.0)...)
+# 15 · presupuesto CAPEX anual (3.3): sin tope el demo compra 31,9 MUSD el
+# año 1; sin meta de emisiones compra menos, y con 5 MUSD por año el tope
+# muerde y reparte las compras
+s16, c16 = apply_scenario(site0, with_config(cfg0; horizon_years = 5,
+                                             capex_budget_annual = 5e6), :least_cost)
+dump("demo_presupuesto_anual_n5", s16, c16)
 println("fixtures dorados en ", out)

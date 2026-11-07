@@ -446,6 +446,8 @@ struct ScenarioConfig
                                              # relativo (1 = el del catálogo; más
                                              # allá del último, el último). Manda
                                              # sobre capex_learning.
+    capex_budget_annual::Union{Float64,Nothing}  # tope de CAPEX de CADA año (3.3);
+                                             # nothing = sin tope anual
 end
 
 """
@@ -457,6 +459,17 @@ function capex_factor(cfg::ScenarioConfig, tech::Symbol, y::Integer)
     v !== nothing && !isempty(v) && return v[min(y, length(v))]
     return (1 - get(cfg.capex_learning, tech, 0.0))^(y - 1)
 end
+
+# retro-compatibilidad: 30 campos → sin tope anual de CAPEX
+ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
+               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
+               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
+               cl::AbstractDict, cby::AbstractDict) =
+    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
+                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
+                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
+                   Dict{Symbol,Vector{Float64}}(cby), nothing)
 
 # retro-compatibilidad: 28 campos → CAPEX constante en el tiempo
 ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,

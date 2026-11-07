@@ -15,8 +15,13 @@ reutiliza `m[:capex_y]`, que se define ahí: una sola verdad para el CAPEX.
 """
 function add_budget_constraint!(m::JuMP.Model, sets::ModelSets,
                                 params::ModelParameters, cfg::ScenarioConfig)
-    cfg.capex_budget === nothing && return m
     capex_y = m[:capex_y]
+    # tope anual (3.3, "Total annual CAPEX limit"): el CAPEX de CADA año
+    if cfg.capex_budget_annual !== nothing
+        m[:capex_budget_annual] = JuMP.@constraint(m, [y in sets.years],
+            capex_y[y] <= cfg.capex_budget_annual)
+    end
+    cfg.capex_budget === nothing && return m
     m[:capex_budget] = JuMP.@constraint(m,
         sum(capex_y[y] for y in sets.years) <= cfg.capex_budget)
     return m

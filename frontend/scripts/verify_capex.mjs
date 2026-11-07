@@ -104,6 +104,37 @@ await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "netwo
 await waitText("Costo de inversión", 30000);
 step("el resumen no inventa Renovaciones", !(await text()).includes("Renovaciones"));
 
+// 4 · tope ANUAL (3.3): 3 MUSD por año desde Parámetros
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="budget-annual"]', { timeout: 30000 });
+await p.evaluate(() => {
+  const inp = document.querySelector('[data-testid="budget-annual"]');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  set.call(inp, "3"); inp.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await sleep(800);
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickText(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.type(".ui-modal input.ui-input", "Tope anual");
+await select('[data-testid="run-analysis"]', "single");
+await clickText(".ui-modal button", "Optimizar");
+let pa = null;
+for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
+  const r = (await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`))
+    .find((x) => x.name === "Tope anual");
+  if (r) { pa = await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`); break; }
+  await sleep(1000);
+}
+// con la meta de emisiones del demo, 3 MUSD por año no alcanzan: infactible,
+// y el diagnóstico tiene que decir el menor tope anual que sí sirve
+const hint = JSON.stringify(pa?.result?.infeasibility ?? "");
+step("tope anual de 3 MUSD: infactible y explicado con el menor tope factible",
+     pa?.source === "api" && pa.result.meta.feasible === false &&
+     pa.result.assumptions.scenario_config.capex_budget_annual === 3e6 &&
+     hint.includes("menor tope anual"), hint.slice(0, 200));
+
 await cleanup();
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 console.log("\nCAPEX OK: curva de aprendizaje y trayectoria → motor real → CAPEX por año exacto.");

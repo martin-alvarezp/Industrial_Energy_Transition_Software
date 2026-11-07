@@ -25,6 +25,7 @@ export function toConfig(cfg) {
     offset_availability: cfg.offset_availability ?? 5_000,
     carbon_price: cfg.carbon_price ?? 50,
     capex_budget: cfg.capex_budget_musd == null ? null : cfg.capex_budget_musd * 1e6,
+    capex_budget_annual: cfg.capex_budget_annual_musd == null ? null : cfg.capex_budget_annual_musd * 1e6,
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

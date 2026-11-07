@@ -384,6 +384,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
     end
     0 <= cfg.tax_rate < 1 || push!(problems,
         "scenario_config.yaml: tax_rate debe estar en [0,1) (valor: $(cfg.tax_rate))")
+    cfg.capex_budget_annual === nothing || cfg.capex_budget_annual >= 0 || push!(problems,
+        "scenario_config.yaml: capex_budget_annual debe ser ≥ 0 (valor: $(cfg.capex_budget_annual))")
     # CAPEX por año (3.1): tecnologías que existen, factores ≥ 0, caída < 100 %
     for (id, r) in cfg.capex_learning
         id in all_tech_ids(site) || push!(problems,

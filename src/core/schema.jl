@@ -345,5 +345,7 @@ function load_scenario_config(path::AbstractString)
                              for (k, v) in get(d, "capex_learning", Dict())),
         Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
                                      for (k, v) in get(d, "capex_by_year", Dict())),
+        get(d, "capex_budget_annual", nothing) === nothing ? nothing :
+            Float64(d["capex_budget_annual"]),
     )
 end
