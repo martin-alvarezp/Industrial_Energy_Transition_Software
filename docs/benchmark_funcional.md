@@ -497,3 +497,20 @@ días tipo (k por año) con cronología.
   `demo_hitos_n10` (verify:wasm 48/48). Julia 1697/1697. Parámetros → "Años
   hito". *Limitación:* TIR y payback del caso de inversión suponen años
   consecutivos.
+- ✅ **R7 · Días tipo** (2026-11-07). Nueva plantilla temporal "Días tipo"
+  (Series de tiempo → Resolución temporal, k configurable; 30 por defecto,
+  como en las corridas de referencia). Los 365 días se agrupan con k-means
+  determinista sobre el perfil diario de TODAS las series (cada una
+  normalizada por su máximo); cada grupo es un período de 24 h con el día
+  promedio de sus días y peso = sus horas, así que la energía anual se
+  conserva exacta. Cada día tipo lleva el mes más frecuente de sus días, de
+  modo que la punta tarifaria se sigue midiendo por mes. El mapa día → grupo
+  queda en `hourly.template.day_map` y sirve para reexpandir la plantilla a
+  8760 h (cambiar de k o de plantilla parte del año reconstruido). El motor no
+  cambia: los días tipo son períodos con SOC cíclico diario. Oráculos en
+  `verify:templates` (dos tipos de día exactos ⇒ k = 2 los separa sin error y
+  reexpandir devuelve la serie; determinismo; Σ pesos 8760; energía
+  conservada). E2E en `verify:resolution` (12 días tipo, energía conservada en
+  disco y optimización con el motor real).
+  *Pendiente:* enlazar el SOC entre días con el mapa (almacenamiento
+  estacional o de varios días, como el TES con autodescarga diaria).

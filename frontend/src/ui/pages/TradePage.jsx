@@ -37,7 +37,7 @@ export default function TradePage() {
       // plantilla mensual o año completo (bloque 1.2): día promedio por
       // estación, reconstruyendo el año — 24 períodos o 8760 h no se leen
       const hemi = sj.hourly?.template?.hemisphere ?? "south";
-      const full = expandTo8760(shown.price, sj.timesteps, hemi);
+      const full = expandTo8760(shown.price, sj.timesteps, hemi, sj.hourly?.template?.day_map);
       const qs = hemi === "north" ? ["winter", "spring", "summer", "autumn"] : ["summer", "autumn", "winter", "spring"];
       const bounds = [0, 91, 182, 273, 365];
       seasons = ["winter", "spring", "summer", "autumn"];

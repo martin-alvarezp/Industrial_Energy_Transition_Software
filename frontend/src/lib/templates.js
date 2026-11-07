@@ -11,6 +11,11 @@
 //                  punta, con `month` en cada paso ⇒ la punta tarifaria se mide
 //                  por mes y ve la punta registrada, no un promedio (riesgo 3
 //                  del roadmap: "puntas vs promedios"). 12 × 2 × 24 = 576 pasos.
+//   · "typical"  — k DÍAS TIPO (R7): los 365 días agrupados por k-means sobre
+//                  sus perfiles diarios (todas las series, normalizadas); cada
+//                  grupo es un período de 24 h con el día promedio de sus días,
+//                  así que la energía anual se conserva. Queda el mapa día → grupo
+//                  (`hourly.template.day_map`) para la cronología del año.
 //   · "full"     — el año completo cronológico: 8760 pasos de 1 h (o 35 040 de
 //                  15 min si todas las series crudas son de cuarto de hora).
 //
@@ -20,7 +25,8 @@
 // exactamente el número de horas que promedia, la energía anual de las series
 // con dato crudo se conserva EXACTA.
 
-export const TEMPLATE_METHODS = ["seasonal", "monthly", "full"];
+export const TEMPLATE_METHODS = ["seasonal", "monthly", "typical", "full"];
+export const DEFAULT_TYPICAL_DAYS = 30;
 export const HOURS = 8760;
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const MONTH_START = DAYS_IN_MONTH.reduce((a, d, i) => (a.push(a[i] + d), a), [0]);
@@ -37,9 +43,10 @@ const quarterOfDay = (d) => DAY_BOUNDS.findIndex((s, i) => d >= s && d < DAY_BOU
 const pad = (m) => String(m).padStart(2, "0");
 
 // ── qué tipo de plantilla tiene un sitio ───────────────────────────────────
-/** "full" | "monthly" | "seasonal" (cualquier otra se trata como estacional). */
+/** "full" | "monthly" | "typical" | "seasonal" (cualquier otra se trata como estacional). */
 export function templateKind(timesteps) {
   if (!timesteps?.length) return "seasonal";
+  if (timesteps.every((t) => /^D\d+$/.test(t.season))) return "typical";
   const months = timesteps.every((t) => (t.month ?? 0) > 0);
   if (months && new Set(timesteps.map((t) => t.season)).size === 1 &&
       timesteps.length >= HOURS) return "full";
@@ -66,9 +73,19 @@ export function toHourly(values) {
  * punta (estacionales duplicados, días de punta mensuales) no se usan: son un
  * día, no el perfil típico.
  */
-export function expandTo8760(values, timesteps, hemisphere = "south") {
+export function expandTo8760(values, timesteps, hemisphere = "south", dayMap = null) {
   const kind = templateKind(timesteps);
   const out = new Array(HOURS);
+  if (kind === "typical" && dayMap?.length === 365) {
+    // días tipo (R7): cada día toma el perfil de su grupo
+    const at = {};
+    timesteps.forEach((t, i) => { at[`${t.season}:${t.hour}`] = values[i]; });
+    for (let d = 0; d < 365; d++) {
+      const se = `D${String(dayMap[d] + 1).padStart(2, "0")}`;
+      for (let h = 0; h < 24; h++) out[d * 24 + h] = at[`${se}:${h}`] ?? 0;
+    }
+    return out;
+  }
   if (kind === "full") {
     if (values.length === HOURS) return [...values];
     return toHourly(values);
@@ -110,7 +127,7 @@ export function expandTo8760(values, timesteps, hemisphere = "south") {
  * mes en "monthly"; sin driver no hay día de punta. `quarter`: año completo en
  * cuartos de hora (solo "full").
  */
-export function templateSteps(method, { driver = null, quarter = false, hemisphere = "south" } = {}) {
+export function templateSteps(method, { driver = null, quarter = false, hemisphere = "south", assign = null } = {}) {
   const steps = [];
   const push = (season, hour, src, extra = {}) =>
     steps.push({ step_id: steps.length + 1, season, hour, weight_hours: src.length, src, ...extra });
@@ -150,6 +167,24 @@ export function templateSteps(method, { driver = null, quarter = false, hemisphe
     }
     return steps;
   }
+  if (method === "typical") {
+    // días tipo (R7): `assign` = grupo de cada día (0..k−1); grupos en orden
+    // de su primer día para que el resultado sea estable
+    const k = Math.max(...assign) + 1;
+    for (let g = 0; g < k; g++) {
+      const days = [];
+      assign.forEach((a, d) => { if (a === g) days.push(d); });
+      if (!days.length) continue;
+      // mes del día tipo: el más frecuente de sus días (la punta tarifaria
+      // se sigue midiendo por mes)
+      const cnt = {};
+      for (const d of days) cnt[monthOfDay(d)] = (cnt[monthOfDay(d)] ?? 0) + 1;
+      const month = +Object.entries(cnt).sort((x, y) => y[1] - x[1] || x[0] - y[0])[0][0];
+      for (let h = 0; h < 24; h++)
+        push(`D${String(g + 1).padStart(2, "0")}`, h, days.map((d) => d * 24 + h), { duration_hours: 1, month });
+    }
+    return steps;
+  }
   if (method === "full") {
     const k = quarter ? 4 : 1;
     for (let t = 0; t < HOURS * k; t++) {
@@ -161,6 +196,55 @@ export function templateSteps(method, { driver = null, quarter = false, hemisphe
     return steps;
   }
   throw new Error(`plantilla desconocida '${method}'`);
+}
+
+/**
+ * Agrupa los 365 días en k días tipo (R7). k-means determinista sobre el
+ * perfil diario de todas las series (cada una normalizada por su máximo |·|,
+ * para que pesen igual): inicio por el punto más lejano partiendo del día de
+ * mayor carga, 100 iteraciones como máximo. Devuelve el grupo de cada día,
+ * numerado por orden de aparición.
+ */
+export function clusterDays(seriesList, k) {
+  const D = 365;
+  const norm = seriesList.map((v) => {
+    const h = toHourly(v);
+    const m = Math.max(...h.map(Math.abs)) || 1;
+    return h.map((x) => x / m);
+  });
+  const vec = Array.from({ length: D }, (_, d) =>
+    norm.flatMap((h) => h.slice(d * 24, d * 24 + 24)));
+  const dist = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2; return s; };
+  k = Math.max(1, Math.min(Math.round(k), D));
+  const load = vec.map((v) => v.reduce((a, x) => a + x, 0));
+  const cent = [vec[load.indexOf(Math.max(...load))].slice()];
+  while (cent.length < k) {
+    let best = -1, bd = -1;
+    for (let d = 0; d < D; d++) {
+      const md = Math.min(...cent.map((c) => dist(vec[d], c)));
+      if (md > bd) { bd = md; best = d; }
+    }
+    cent.push(vec[best].slice());
+  }
+  let assign = new Array(D).fill(0);
+  for (let it = 0; it < 100; it++) {
+    const next = vec.map((v) => {
+      let bi = 0, bd = Infinity;
+      cent.forEach((c, i) => { const x = dist(v, c); if (x < bd) { bd = x; bi = i; } });
+      return bi;
+    });
+    const same = next.every((a, i) => a === assign[i]);
+    assign = next;
+    for (let i = 0; i < cent.length; i++) {
+      const mem = vec.filter((_, d) => assign[d] === i);
+      if (mem.length) cent[i] = mem[0].map((_, j) => mem.reduce((a, m) => a + m[j], 0) / mem.length);
+    }
+    if (same && it > 0) break;
+  }
+  // renumerar por orden de primer día (grupos vacíos desaparecen)
+  const order = [];
+  for (const a of assign) if (!order.includes(a)) order.push(a);
+  return assign.map((a) => order.indexOf(a));
 }
 
 /** Valor de una serie de 8760 h (o 35 040) en cada paso: promedio sobre `src`. */
@@ -209,13 +293,13 @@ const round = (v) => Math.round(v * 1e6) / 1e6;
  * El día de punta mensual lo elige la suma de las demandas crudas (o, sin
  * crudas, la de las demandas proyectadas).
  */
-export function applyTemplate(siteJson, method, { hemisphere = "south" } = {}) {
+export function applyTemplate(siteJson, method, { hemisphere = "south", days = DEFAULT_TYPICAL_DAYS } = {}) {
   const raw = siteJson.hourly?.series ?? {};
   const keys = seriesKeys(siteJson);
   const full8760 = {};
   for (const k of keys) {
     const cur = getSeries(siteJson, k);
-    full8760[k] = raw[k] ? raw[k] : expandTo8760(cur, siteJson.timesteps, hemisphere);
+    full8760[k] = raw[k] ? raw[k] : expandTo8760(cur, siteJson.timesteps, hemisphere, siteJson.hourly?.template?.day_map);
   }
   // año completo en cuartos de hora solo si todas las series crudas lo son
   const rawVals = Object.values(raw);
@@ -230,11 +314,13 @@ export function applyTemplate(siteJson, method, { hemisphere = "south" } = {}) {
       for (let t = 0; t < HOURS; t++) driver[t] += v[t];
     }
   }
-  const steps = templateSteps(method, { driver, quarter, hemisphere });
+  const assign = method === "typical" ? clusterDays(keys.map((k) => full8760[k]), days) : null;
+  const steps = templateSteps(method, { driver, quarter, hemisphere, assign });
   let out = {
     ...siteJson,
     timesteps: steps.map(({ src, q, ...t }) => t),
-    hourly: { ...(siteJson.hourly ?? {}), series: raw, template: { method, hemisphere } },
+    hourly: { ...(siteJson.hourly ?? {}), series: raw,
+              template: method === "typical" ? { method, hemisphere, days, day_map: assign } : { method, hemisphere } },
   };
   for (const k of keys) out = setSeries(out, k, projectSeries(full8760[k], steps).map(round));
   return out;
@@ -266,7 +352,7 @@ export function setRawSeries(siteJson, key, values, { hemisphere = "south" } = {
     });
     return setSeries(withRaw, key, vals);
   }
-  return applyTemplate(withRaw, method, { hemisphere });
+  return applyTemplate(withRaw, method, { hemisphere, days: siteJson.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS });
 }
 
 /** Resumen para la interfaz: pasos, períodos, mes, si hay crudas. */

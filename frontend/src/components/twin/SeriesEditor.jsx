@@ -11,7 +11,7 @@ import { hasPeakSteps, addPeakSteps, removePeakSteps, PEAK_HOURS }
   from "../../lib/twin.js";
 import { useL } from "../../ui/i18n.jsx";
 import {
-  applyTemplate, setRawSeries, clearRaw, templateInfo, TEMPLATE_METHODS,
+  applyTemplate, setRawSeries, clearRaw, templateInfo, TEMPLATE_METHODS, DEFAULT_TYPICAL_DAYS,
 } from "../../lib/templates.js";
 
 const SEASON_ES = { winter: "invierno", spring: "primavera", summer: "verano",
@@ -199,6 +199,7 @@ function TemplateCard({ siteJson, patchSite, info }) {
   const L = useL();
   const [method, setMethod] = useState(info.kind);
   const [hemisphere, setHemisphere] = useState(siteJson.hourly?.template?.hemisphere ?? "south");
+  const [days, setDays] = useState(siteJson.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS);
   const quarter = info.raw.length > 0 &&
     info.raw.every((k) => siteJson.hourly.series[k]?.length === 35040);
   const META = {
@@ -208,11 +209,14 @@ function TemplateCard({ siteJson, patchSite, info }) {
     monthly: { name: L("Mensual con día de punta", "Monthly with peak day"), steps: 576,
       desc: L("Por mes, el día promedio y el día REAL de punta. La punta tarifaria se mide por mes y ve la punta registrada.",
               "Per month, the average day and the REAL peak day. Peak charges are measured per month against the recorded peak.") },
+    typical: { name: L("Días tipo", "Typical days"), steps: 24 * days,
+      desc: L("Los 365 días agrupados en k días típicos (k-means sobre todas las series). Cada día tipo pesa los días que representa: la energía anual se conserva. Para modelos grandes, donde el año completo tarda demasiado.",
+              "The 365 days grouped into k typical days (k-means over all series). Each typical day weighs the days it represents: annual energy is preserved. For large models where the full year takes too long.") },
     full: { name: L("Año completo", "Full year"), steps: quarter ? 35040 : 8760,
       desc: L(`El año cronológico${quarter ? " en cuartos de hora" : " hora a hora"}. Exacto pero pesado: úsalo con horizontes cortos o en modo despacho.`,
               `The chronological year${quarter ? " in quarter hours" : " hour by hour"}. Exact but heavy: use it with short horizons or in dispatch mode.`) },
   };
-  const dirty = method !== info.kind;
+  const dirty = method !== info.kind || (method === "typical" && days !== (siteJson.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS));
   return (
     <div className="card template-card" style={{ marginBottom: 12 }}>
       <div className="card-head">
@@ -239,8 +243,15 @@ function TemplateCard({ siteJson, patchSite, info }) {
           <option value="south">{L("Hemisferio Sur", "Southern hemisphere")}</option>
           <option value="north">{L("Hemisferio Norte", "Northern hemisphere")}</option>
         </select>
+        {method === "typical" && (
+          <label className="equip-sub" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            {L("días tipo", "typical days")}
+            <input type="number" min={2} max={365} step={1} value={days} data-testid="typical-days" style={{ width: 70 }}
+                   onChange={(e) => setDays(Math.max(2, Math.min(365, Math.round(+e.target.value || DEFAULT_TYPICAL_DAYS))))} />
+          </label>
+        )}
         <button className="chart-toggle" disabled={!dirty && hemisphere === (siteJson.hourly?.template?.hemisphere ?? "south")}
-                onClick={() => patchSite((sj) => applyTemplate(sj, method, { hemisphere }))}>
+                onClick={() => patchSite((sj) => applyTemplate(sj, method, { hemisphere, days }))}>
           {L("Aplicar resolución", "Apply resolution")}
         </button>
       </div>

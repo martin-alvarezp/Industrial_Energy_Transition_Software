@@ -11,7 +11,7 @@
 // Uso: npm run verify:templates
 import { readFileSync } from "node:fs";
 import {
-  applyTemplate, setRawSeries, templateSteps, expandTo8760, getSeries, seriesKeys, HOURS,
+  applyTemplate, setRawSeries, templateSteps, expandTo8760, getSeries, seriesKeys, HOURS, clusterDays, projectSeries,
 } from "../src/lib/templates.js";
 
 const problems = [];
@@ -29,7 +29,7 @@ const raw = Array.from({ length: HOURS }, (_, t) =>
   20 + 8 * Math.sin((2 * Math.PI * (t % 24)) / 24) + 5 * Math.cos((2 * Math.PI * t) / HOURS) + 3 * rnd());
 const rawTotal = raw.reduce((a, b) => a + b, 0);
 
-for (const method of ["seasonal", "monthly", "full"]) {
+for (const method of ["seasonal", "monthly", "typical", "full"]) {
   const s = setRawSeries(applyTemplate(demo, method), "demands.electricity", raw);
   const ts = s.timesteps;
   const W = ts.reduce((a, t) => a + t.weight_hours, 0);
@@ -95,6 +95,32 @@ for (const method of ["seasonal", "monthly", "full"]) {
   const e = energy(getSeries(s, "demands.electricity"), s.timesteps);
   check(close(e, rawTotal, 1e-7), `full 15 min: energía ${e} ≠ ${rawTotal}`);
   console.log("✓ full     15 min: 35 040 pasos de Δt = 0.25, energía exacta");
+}
+
+// 6 · días tipo (R7): con dos tipos de día exactos (hábil y fin de semana),
+// k = 2 los separa sin error: cada día tipo ES su perfil, el mapa día → grupo
+// sigue la semana y reexpandir devuelve la serie cruda tal cual
+{
+  const wk = (d, h) => (d % 7 < 5 ? 30 + 10 * Math.sin((Math.PI * h) / 23) : 12 + h * 0.1);
+  const two = Array.from({ length: HOURS }, (_, t) => wk(Math.floor(t / 24), t % 24));
+  const map = clusterDays([two], 2);
+  const st = templateSteps("typical", { assign: map });
+  const ts = st.map(({ src, q, ...t }) => t);
+  check(ts.length === 48 && new Set(ts.map((t) => t.season)).size === 2, `typical k=2: ${ts.length} pasos`);
+  check(map.length === 365 && map.every((g, d) => g === map[d % 7 < 5 ? 0 : 5]) && map[0] !== map[5],
+        "typical k=2: el mapa día → grupo no sigue la semana");
+  const back = expandTo8760(projectSeries(two, st), ts, "south", map);
+  const err = Math.max(...back.map((v, t) => Math.abs(v - two[t])));
+  check(err < 1e-6, `typical k=2: reexpandir difiere en ${err}`);
+  const W = ts.reduce((a, t) => a + t.weight_hours, 0);
+  check(close(W, HOURS), `typical k=2: Σ pesos ${W}`);
+  // determinista y con k grupos (k ≤ días distintos)
+  const a1 = clusterDays([raw], 30), a2 = clusterDays([raw], 30);
+  check(JSON.stringify(a1) === JSON.stringify(a2) && Math.max(...a1) + 1 === 30, "clusterDays no es determinista o no da 30 grupos");
+  // re-aplicar con otro k parte de la serie reexpandida del día tipo, no del perfil estacional
+  const s30 = applyTemplate(setRawSeries(demo, "demands.electricity", raw), "typical", { days: 30 });
+  check(s30.timesteps.length === 720 && s30.hourly.template.days === 30, `typical k=30: ${s30.timesteps.length} pasos`);
+  console.log(`✓ typical  días tipo: k=2 exacto (error ${err.toExponential(1)}), k=30 → 720 pasos, determinista`);
 }
 
 if (problems.length) {

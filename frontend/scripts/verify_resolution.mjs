@@ -152,6 +152,25 @@ await timeseries();
 step("al recargar sigue mensual", await waitText("576 pasos"));
 step("optimización mensual resuelta por el motor real (10 años, solo esta corrida)", await optimize("Mensual"));
 
+// 2b · días tipo (R7): 12 días tipo con mes, la energía de la serie cruda se conserva
+await timeseries();
+await p.click('.template-option input[value="typical"]');
+await p.waitForSelector('[data-testid="typical-days"]', { timeout: 10000 });
+await p.evaluate(() => {
+  const inp = document.querySelector('[data-testid="typical-days"]');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  set.call(inp, "12"); inp.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await clickText(".template-card button", "Aplicar resolución");
+step("días tipo aplicados", await waitText("288 pasos · 12 períodos · punta tarifaria por mes"));
+s = await waitSite((x) => x.timesteps.length === 288, 30000);
+const rawE = s.hourly.series["demands.electricity"].reduce((a, v) => a + v, 0);
+const tplE = s.demands.electricity.reduce((a, v, i) => a + v * s.timesteps[i].weight_hours, 0);
+step("en disco: 12 días tipo, mapa de 365 días y energía conservada",
+     s.hourly?.template?.method === "typical" && s.hourly.template.day_map?.length === 365 &&
+     Math.abs(tplE - rawE) <= 1e-6 * rawE, `${tplE.toFixed(1)} vs ${rawE.toFixed(1)} MWh`);
+step("optimización con días tipo resuelta por el motor real", await optimize("Dias tipo"));
+
 // 3 · año completo, horizonte 1
 await timeseries();
 await applyResolution("full");
