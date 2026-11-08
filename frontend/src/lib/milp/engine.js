@@ -64,6 +64,7 @@ export function toConfig(cfg) {
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
+    renew_techs: cfg.renew_techs ?? [],                     // R21: renovación por tecnología
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

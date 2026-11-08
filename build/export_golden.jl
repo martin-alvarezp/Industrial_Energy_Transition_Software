@@ -319,4 +319,10 @@ s39, c39 = carbon_site()
 dump("compensacion_por_anio_n2", s39, with_config(c39; horizon_years = 2, allow_offsets = true, max_offset_share = 1.0,
      offset_availability = 1e9, offset_price = 10.0, emission_caps = [(:net, 1, 0.0)],
      year_factors = Dict(:offset_price => Dict(:offsets => [(2, 3.0)]))))
+# 40 · renovación por tecnología (R21): el demo con el existente que vence,
+# renovando solo una tecnología
+ex40 = [t for t in keys(site0.converters) if site0.converters[t].existing_capacity > 0]
+s40 = IETO._with(site0; converters = Dict(k => (k in ex40 ? IETO._with(v; remaining_life = 2) : v) for (k, v) in site0.converters))
+dump("demo_renovacion_parcial_n4", s40, with_config(cfg0; horizon_years = 4, renew_existing = true,
+     renew_techs = [first(sort(ex40))], emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9))
 println("fixtures dorados en ", out)

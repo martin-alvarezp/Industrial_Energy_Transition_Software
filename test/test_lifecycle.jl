@@ -149,3 +149,20 @@ end
     lst2 = jread(IETO.handle_list_runs(HTTP.Request("GET", "/runs?site=demo"), runs_dir))
     @test isempty(lst2.runs)
 end
+
+@testset "R21: renovación solo de las tecnologías listadas" begin
+    # el demo con dos existentes que vencen: con renew_techs = [la primera], esa
+    # se renueva (CAPEX de renovación y sigue viva) y la otra se retira
+    site, cfg = load_and_validate(DEMO_DIR)
+    ex = [t for t in keys(site.converters) if site.converters[t].existing_capacity > 0]
+    t1 = first(sort(ex))
+    s2 = IETO._with(site; converters = Dict(k => (k in ex ? IETO._with(v; remaining_life = 2) : v)
+                                            for (k, v) in site.converters))
+    c = with_config(cfg; horizon_years = 4, renew_existing = true, renew_techs = [t1])
+    im = build_model(s2, c)
+    @test im.params.remaining_life[t1] == 0                     # se renueva: vive siempre
+    @test all(im.params.remaining_life[t] == 2 for t in ex if t != t1)
+    @test !im.params.renew_existing
+    @test im.params.renewal_capex[3] ≈ site.converters[t1].costs.capex_per_kw * 1000 * site.converters[t1].existing_capacity rtol = 1e-9
+    @test renews(c, t1) && !renews(c, Symbol("nada"))
+end

@@ -404,5 +404,6 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
                                      for (k, v) in get(d, "market_availability", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_scope1_ef", Dict())),
+        Symbol[Symbol(x) for x in get(d, "renew_techs", [])],
     )
 end

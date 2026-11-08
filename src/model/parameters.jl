@@ -300,7 +300,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     renewal_capex = zeros(length(years))
     if cfg.renew_existing
         for (id, rl) in remaining_life
-            (rl > 0 && existing[id] > 0) || continue
+            (rl > 0 && existing[id] > 0 && renews(cfg, id)) || continue
             yr = rl + 1
             while yr <= N
                 # se renueva al precio de ESE año (3.1), cargado en el hito
@@ -381,7 +381,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                                                 if c.ops.unit_size > 0),
                            market_tariff, market_bigM,
                            market_contracted, market_excess_penalty,
-                           remaining_life, cfg.renew_existing,
+                           isempty(cfg.renew_techs) ? remaining_life :
+                               Dict(k => (renews(cfg, k) ? 0 : v) for (k, v) in remaining_life),
+                           cfg.renew_existing && isempty(cfg.renew_techs),
                            cfg.repeat_investments, renewal_capex, forced,
                            nm_periods, nm_retail, nm_buys,
                            node_of, demand_node, market_node,

@@ -634,3 +634,8 @@ días tipo (k por año) con cronología.
     compensación por año.
   Oráculos en test_siteb_pieces.jl; goldens `red_disponibilidad_n1` y
   `compensacion_por_anio_n2`.
+- ✅ **R21 · Renovación por tecnología** (2026-11-08). `renew_techs`: con
+  `renew_existing`, solo esas tecnologías se renuevan al vencer (vacío = todas,
+  como antes); las demás se retiran. Hace falta cuando un escenario da de baja
+  equipos (confiabilidad) y el resto se recompra al fin de su vida. Oráculo en
+  test_lifecycle.jl; golden `demo_renovacion_parcial_n4`.

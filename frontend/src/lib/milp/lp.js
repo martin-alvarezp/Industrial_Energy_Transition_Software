@@ -364,9 +364,12 @@ export function buildLP(site0, cfg0) {
   }
 
   // vida útil: existente vivo hasta remaining (0 = siempre; renew ⇒ siempre)
+  // R21: con renew_techs solo esas se renuevan (vacío = todas)
+  const renewsT = (t) => !!cfg.renew_existing &&
+    (!(cfg.renew_techs ?? []).length || cfg.renew_techs.includes(t.tech_id));
   const alive = (t, y) => {
     const rl = t.remaining_life ?? 0;
-    return rl === 0 || cfg.renew_existing || yr(y) <= rl;
+    return rl === 0 || renewsT(t) || yr(y) <= rl;
   };
   // términos de available_capacity(t,y): constante + ventana de nc
   const avail = (t, y) => ({
@@ -394,7 +397,7 @@ export function buildLP(site0, cfg0) {
   if (cfg.renew_existing)
     for (const t of [...convs, ...gens, ...stors]) {
       const rl = t.remaining_life ?? 0;
-      if (rl > 0 && t.existing_capacity > 0)
+      if (rl > 0 && t.existing_capacity > 0 && renewsT(t))
         for (let ya = rl + 1; ya <= H; ya += Math.max(t.lifetime_years, 1)) {
           const k = milestoneIndex(yo, ya);              // R6: en el hito que lo cubre
           if (!k) break;

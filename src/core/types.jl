@@ -593,7 +593,16 @@ struct ScenarioConfig
                                              # de potencia (cortes o restricciones de red)
     generator_scope1_ef::Dict{Symbol,Float64}  # generador → tCO₂e/MWh de alcance 1 (diésel
                                              # sin combustible modelado)
+    # ── renovación por tecnología (benchmark R21) ──
+    renew_techs::Vector{Symbol}              # con renew_existing: solo estas se renuevan
+                                             # (vacío = todas); las demás se retiran al vencer
 end
+
+# retro-compatibilidad: 69 campos → renovación de todas
+ScenarioConfig(a::Vararg{Any,69}) = ScenarioConfig(a..., Symbol[])
+
+"¿Se renueva el existente `t` al vencer? (M5 + R21)"
+renews(cfg::ScenarioConfig, t::Symbol) = cfg.renew_existing && (isempty(cfg.renew_techs) || t in cfg.renew_techs)
 
 # retro-compatibilidad: 67 campos → sin piezas del sitio B
 ScenarioConfig(a::Vararg{Any,67}) = ScenarioConfig(a..., Dict{Symbol,Vector{Float64}}(), Dict{Symbol,Float64}())

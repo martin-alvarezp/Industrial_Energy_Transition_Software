@@ -139,9 +139,12 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   }
 
   // ── capacidad disponible y nueva (M5: retiro + ventanas de vida) ──
+  // R21: con renew_techs solo esas se renuevan (vacío = todas)
+  const renewsT = (t) => !!cfg.renew_existing &&
+    (!(cfg.renew_techs ?? []).length || cfg.renew_techs.includes(t.tech_id));
   const alive = (t, y) => {
     const rl = t.remaining_life ?? 0;
-    return rl === 0 || cfg.renew_existing || yr(y) <= rl;
+    return rl === 0 || renewsT(t) || yr(y) <= rl;
   };
   const availOf = (t, y) => (alive(t, y) ? t.existing_capacity : 0) +
     (t.investable ? years.filter((yp) => yp <= y && yr(y) - yr(yp) < t.lifetime_years)
@@ -169,7 +172,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   if (cfg.renew_existing)
     for (const t of [...convs, ...gens, ...stors]) {
       const rl = t.remaining_life ?? 0;
-      if (rl > 0 && t.existing_capacity > 0)
+      if (rl > 0 && t.existing_capacity > 0 && renewsT(t))
         for (let ya = rl + 1; ya <= H; ya += Math.max(t.lifetime_years, 1)) {
           const k = milestoneIndex(yo, ya);              // R6
           if (!k) break;
