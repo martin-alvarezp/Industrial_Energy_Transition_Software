@@ -558,6 +558,15 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    cfg.milestone_weighting in (:none, :years) || push!(problems,
+        "milestone_weighting: '$(cfg.milestone_weighting)' desconocido (none | years)")
+    # R17: topes por año
+    for (k, yr, cap) in cfg.emission_caps
+        k in (:scope1, :scope2, :gross, :net) || push!(problems,
+            "emission_caps: tipo '$k' desconocido (scope1 | scope2 | gross | net)")
+        1 <= rel_year(cfg, yr) <= cfg.horizon_years || push!(problems,
+            "emission_caps ($k, $yr): el año cae fuera del horizonte")
+    end
     # R13: factor de alcance 2 solo en generadores, ≥ 0
     for (t, f) in cfg.generator_ef
         haskey(site.generators, t) || push!(problems, "generator_ef: '$t' no es un generador del sitio")

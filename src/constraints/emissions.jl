@@ -97,6 +97,12 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
         scope1_y[y] <= cfg.scope1_cap))
     cfg.scope2_cap === nothing || (m[:scope2_cap] = JuMP.@constraint(m, [y in years],
         scope2_y[y] <= cfg.scope2_cap))
+    # topes por año en escalón (R17): desde su año hasta el próximo del mismo tipo
+    expr = Dict(:scope1 => scope1_y, :scope2 => scope2_y, :gross => gross, :net => net)
+    ryc = sets.year_of
+    m[:emission_caps] = [JuMP.@constraint(m, expr[k][y] <= emission_cap_at(cfg, k, ryc[y]))
+                         for k in (:scope1, :scope2, :gross, :net), y in years
+                         if emission_cap_at(cfg, k, ryc[y]) !== nothing]
 
     return m
 end

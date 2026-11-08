@@ -4,7 +4,7 @@
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
 import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity,
-  modelYears, milestoneIndex, inputFactor } from "./lp.js";
+  modelYears, milestoneIndex, inputFactor, opexWeights } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -31,6 +31,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const years = Array.from({ length: N }, (_, i) => i + 1);
   const steps = Array.from({ length: S }, (_, i) => i + 1);
   const disc = years.map((y) => 1 / Math.pow(1 + cfg.wacc, yr(y)));
+  const opw = opexWeights(cfg, yo);
   // R3: factores por año sobre la escalación (espejo de lp.js)
   const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), yr(y) - 1) * yearFactor(cfg, "price", c, yr(y));
   const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, yr(y));
@@ -320,7 +321,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       energy_purchases: energy, demand_charges: dcharges, carbon_cost: carbon,
       offset_cost: offCost, export_revenue: exportRev, tax, total,
       salvage_credit: 0, discount_factor: +disc[y - 1].toFixed(4),
-      npv: total * disc[y - 1] });
+      // R18: inversión en su año; el resto con el peso del hito
+      npv: capex * disc[y - 1] + (total - capex) * opw[y - 1] });
     emissions.push({ year: y, scope1: s1, scope2: s2, gross: ge, net: ne,
       cap_net: capNet(y), cap_gross: cfg.emissions_cap_gross, offsets: off,
       macc: null });
@@ -337,7 +339,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       const last = cost_breakdown[N - 1];
       last.salvage_credit = -salv;
       last.total -= salv;
-      last.npv = last.total * disc[N - 1];
+      last.npv = (last.capex + last.salvage_credit) * disc[N - 1] +
+                 (last.total - last.capex - last.salvage_credit) * opw[N - 1];
     }
   }
 

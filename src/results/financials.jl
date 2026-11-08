@@ -41,7 +41,11 @@ function extract_financials(im::IETOModel)
     # anualidad de financiamiento (R4): vista, fuera del total y del VAN
     df.capex_annuity = capex_annuity(df.capex, im.config.financing_rate, im.config.financing_years;
                                      years = im.sets.year_of)
-    df.npv = df.total .* df.discount_factor
+    # R18: la inversión se descuenta en su año; el resto con el peso del hito
+    ow = opex_weights(im.config, im.sets.year_of)
+    df.npv = (df.capex .+ df.salvage_credit) .* df.discount_factor .+
+             (df.total .- df.capex .- df.salvage_credit) .* ow
+    df.opex_weight = ow
 
     return (breakdown = df,
             total_capex = sum(df.capex),

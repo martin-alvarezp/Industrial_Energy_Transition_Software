@@ -397,5 +397,8 @@ function load_scenario_config(path::AbstractString)
         Bool(get(d, "export_emission_credit", false)),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_ef", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_min", Dict())),
+        Tuple{Symbol,Int,Float64}[(Symbol(c["kind"]), Int(c["year"]), Float64(c["cap"]))
+                                  for c in get(d, "emission_caps", [])],
+        Symbol(get(d, "milestone_weighting", "none")),
     )
 end

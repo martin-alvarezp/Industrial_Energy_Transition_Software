@@ -577,6 +577,45 @@ struct ScenarioConfig
                                              # comprada con perfil, como un PPA)
     # ── energía mínima por compra de almacenamiento (benchmark R14) ──
     storage_energy_min::Dict{Symbol,Float64} # MWh mínimos de cada compra con energía propia
+    # ── topes de emisiones por año en escalón (benchmark R17) ──
+    emission_caps::Vector{Tuple{Symbol,Int,Float64}}  # (tipo, año, tCO₂e): rige desde su año
+                                             # hasta el próximo del mismo tipo; tipos
+                                             # scope1, scope2, gross, net
+    # ── peso de los años hito en el objetivo (benchmark R18) ──
+    milestone_weighting::Symbol              # :none = cada hito cuenta su año (default);
+                                             # :years = su OPEX vale por los años hasta el
+                                             # próximo hito (el último, hasta el fin del
+                                             # horizonte), descontados; la inversión, una vez
+end
+
+# retro-compatibilidad: 65 campos → hitos sin peso
+ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :none)
+
+"""
+    opex_weights(cfg, ry) -> Vector{Float64}
+
+Factor del OPEX de cada índice de año (R18): el descuento de su año, o con
+`milestone_weighting = :years` la suma de los descuentos de los años que el
+hito representa (desde él hasta el anterior al próximo; el último hasta el fin
+del horizonte). Sin hitos ambos dan lo mismo.
+"""
+function opex_weights(cfg::ScenarioConfig, ry::AbstractVector{<:Integer})
+    cfg.milestone_weighting == :years || return [discount_factor(cfg.wacc, r) for r in ry]
+    return [sum(discount_factor(cfg.wacc, j) for j in ry[k]:(k == length(ry) ? cfg.horizon_years : ry[k + 1] - 1))
+            for k in eachindex(ry)]
+end
+
+# retro-compatibilidad: 64 campos → sin topes por año
+ScenarioConfig(a::Vararg{Any,64}) = ScenarioConfig(a..., Vector{Tuple{Symbol,Int,Float64}}())
+
+"Tope del tipo `kind` vigente en el año relativo `y` (R17), o `nothing`."
+function emission_cap_at(cfg::ScenarioConfig, kind::Symbol, y::Integer)
+    v = nothing; best = typemin(Int)
+    for (k, yr, cap) in cfg.emission_caps
+        r = rel_year(cfg, yr)
+        k == kind && r <= y && r >= best && (best = r; v = cap)
+    end
+    return v
 end
 
 # retro-compatibilidad: 63 campos → sin energía mínima

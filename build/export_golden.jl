@@ -295,4 +295,16 @@ s36, c36 = tb_site()
 dump("punta_dias_tipo_n1", s36, with_config(c36; day_sequence = [fill("A", 31); fill("B", 334)]))
 dump("demo_punta_dias_tipo_n3", site0, with_config(cfg0; horizon_years = 3,
      day_sequence = [fill("winter", 90); fill("spring", 92); fill("summer", 92); fill("autumn", 91)]))
+# 36 · topes de emisiones por año (R17): alcance 1 en 0 solo el año 2, y el
+# demo con tope neto desde 2028 y bruto desde 2029 (calendario)
+s37, c37 = carbon_site()
+dump("topes_por_anio_n3", s37, with_config(c37; horizon_years = 3, emission_caps = [(:scope1, 2, 0.0), (:scope1, 3, 1e9)]))
+dump("demo_topes_por_anio_n5", site0, with_config(cfg0; horizon_years = 5, base_year = 2026,
+     emission_caps = [(:net, 2028, 60000.0), (:gross, 2029, 70000.0)]))
+# 37 · hitos ponderados (R18): la bomba con hitos 1, 3, 5 a 6 años (wacc 10 %,
+# con valor residual e impuestos) y el demo con hitos calendario ponderados
+dump("hitos_ponderados_n6", s28, with_config(c28; horizon_years = 6, wacc = 0.1, milestone_years = [1, 3, 5],
+     milestone_weighting = :years, salvage_value = true, tax_rate = 0.2))
+dump("demo_hitos_ponderados_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
+     milestone_years = [2026, 2028, 2031, 2035], milestone_weighting = :years))
 println("fixtures dorados en ", out)

@@ -91,3 +91,18 @@ end
            if !hasmethod(IETO._coerce, Tuple{Type{fieldtype(ScenarioConfig, f)}, Any})]
     @test isempty(sin)
 end
+
+@testset "R18: hitos ponderados por los años que representan" begin
+    # wacc 0, hitos 1, 3, 5 en 6 años: el OPEX del hito 1 vale 2 años, el del 3
+    # vale 2 y el del 5 vale 2 (hasta el fin del horizonte); la inversión, una vez
+    im = ms_case(horizon_years = 6, milestone_years = [1, 3, 5], milestone_weighting = :years)
+    @test opex_weights(im.config, im.sets.year_of) == [2.0, 2.0, 2.0]
+    r = extract_results(im; shadow_prices = false)
+    cb = r.cost_breakdown
+    @test r.npv ≈ sum(cb.capex) + 2 * sum(cb.total .- cb.capex) rtol = 1e-9
+    @test sum(cb.npv) ≈ r.npv rtol = 1e-9
+    # con descuento: el hito 1 pesa 1/1,1 + 1/1,1²
+    im = ms_case(horizon_years = 4, wacc = 0.1, milestone_years = [1, 3], milestone_weighting = :years)
+    @test opex_weights(im.config, im.sets.year_of) ≈ [1 / 1.1 + 1 / 1.1^2, 1 / 1.1^3 + 1 / 1.1^4]
+    @test_throws IETO.ValidationError validate_scenario(with_config(im.config; milestone_weighting = :nada), im.site)
+end

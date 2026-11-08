@@ -69,7 +69,7 @@ include("api/routes.jl")
 include("api/server.jl")
 
 # tipos
-export EfficiencyMeasure, GridTariff, NO_TARIFF, has_tariff, capex_factor, build_allowed, rel_year, year_factor, YEAR_FACTOR_KINDS, annuity_factor, capex_annuity, model_years, milestone_index, uses_commitment, part_load_points, input_driver, input_factor, input_factors,
+export EfficiencyMeasure, GridTariff, NO_TARIFF, has_tariff, capex_factor, build_allowed, rel_year, year_factor, YEAR_FACTOR_KINDS, annuity_factor, capex_annuity, model_years, milestone_index, emission_cap_at, opex_weights, uses_commitment, part_load_points, input_driver, input_factor, input_factors,
        StoragePhysics, IDEAL_STORAGE, eta_charge, eta_discharge, soc_band,
        OperationLimits, NO_OPERATION_LIMITS, has_commitment, has_ramp, commitment_integer,
        Carrier, Source, Converter, ConverterPort, Generator, Storage, Demand,

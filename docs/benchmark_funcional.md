@@ -599,3 +599,22 @@ días tipo (k por año) con cronología.
   380 000 USD con la secuencia contra 480 000 sin ella. Goldens
   `punta_dias_tipo_n1` y `demo_punta_dias_tipo_n3`. En la reproducción del
   horizonte de un caso real, los cargos por demanda pasaron de −10 % a −1/−3 %.
+- ✅ **R17 · Topes de emisiones por año en escalón** (2026-11-07).
+  `emission_caps`: lista de (tipo, año, tCO₂e) con tipo `scope1`, `scope2`,
+  `gross` o `net`; cada tope rige desde su año hasta el próximo del mismo tipo
+  (antes del primero, sin tope). Así se modela un tope de alcance 1 que empieza
+  en 2030 o un neto cero desde 2028, como en la referencia. Lo encontró la
+  reproducción de un caso con inversión libre: sin el tope, IETO no invertía
+  en la solar térmica. Oráculo en test_carbon.jl; goldens `topes_por_anio_n3`
+  y `demo_topes_por_anio_n5`.
+- ✅ **R18 · Hitos ponderados en el objetivo** (2026-11-07).
+  `milestone_weighting`: `none` (cada hito cuenta su año, como hasta ahora) o
+  `years`: el OPEX de cada hito vale por los años que representa (desde él
+  hasta el anterior al próximo; el último, hasta el fin del horizonte),
+  descontados; la inversión y el valor residual se pagan una vez, en su año.
+  El VAN del desglose usa los mismos pesos (`opex_weight`). Lo sugirió la
+  reproducción de un caso con inversión libre: la referencia invierte en
+  solar térmica lo que solo se paga si cada hito representa también los años
+  hasta el siguiente. Oráculos (test_milestones.jl): sin descuento, hitos 1, 3
+  y 5 a 6 años ⇒ peso 2 cada uno; con 10 %, el hito 1 pesa 1/1,1 + 1/1,1².
+  Goldens `hitos_ponderados_n6` y `demo_hitos_ponderados_n10`.

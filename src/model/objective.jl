@@ -152,11 +152,13 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                       params.costs[t].lifetime_years) : 0.0)
             for t in sets.candidates, y in years; init = 0.0))
 
+    # R18: con hitos ponderados el OPEX vale por los años que el hito representa
+    ow = opex_weights(cfg, sets.year_of)
     JuMP.@objective(m, Min,
-        sum(params.discount[y] *
-            (capex_y[y] + fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
-             demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
-             export_revenue_y[y] + tax_y[y])
+        sum(params.discount[y] * capex_y[y] +
+            ow[y] * (fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
+                     demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
+                     export_revenue_y[y] + tax_y[y])
             for y in years) - params.discount[end] * salvage_credit)
 
     return m

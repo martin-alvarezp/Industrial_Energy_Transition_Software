@@ -131,6 +131,8 @@ export function toOverrides(cfg) {
     export_emission_credit: !!cfg.export_emission_credit,   // R13: crédito por ventas
     generator_ef: cfg.generator_ef ?? {},
     storage_energy_min: cfg.storage_energy_min ?? {},       // R14: energía mínima
+    emission_caps: cfg.emission_caps ?? [],                 // R17: topes por año
+    milestone_weighting: cfg.milestone_weighting ?? "none", // R18: peso de los hitos
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

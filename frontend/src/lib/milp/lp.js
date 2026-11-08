@@ -153,6 +153,14 @@ export const buildAllowed = (cfg, tech, y) => {
   return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
 };
 export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+/** Factor del OPEX de cada hito (R18), espejo de opex_weights. */
+export const opexWeights = (cfg, yo) => yo.map((r, k) => {
+  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j);
+  if (cfg.milestone_weighting !== "years") return d(r);
+  const end = k === yo.length - 1 ? cfg.horizon_years : yo[k + 1] - 1;
+  let s = 0; for (let j = r; j <= end; j++) s += d(j);
+  return s;
+});
 /** Años relativos que optimiza el modelo (R6): hitos ordenados o 1..H (espejo de model_years). */
 export const modelYears = (cfg) => cfg.milestone_years?.length
   ? [...new Set(cfg.milestone_years.map((yr) => relYear(cfg, yr)))].sort((a, b) => a - b)
@@ -420,8 +428,11 @@ export function buildLP(site0, cfg0) {
   const depYears = (tech) =>
     (cfg.depreciation_years ?? 0) > 0 ? cfg.depreciation_years : tech.lifetime_years;
   const add = (v, c) => { if (c) obj[v] = (obj[v] ?? 0) + c; };
-  const addDed = (v, c) => add(v, c * at);          // término deducible
-  const constDed = (c) => { constant += c * at; };  // constante deducible
+  // R18: el OPEX (todo lo deducible) se pesa con el factor del hito: opf = peso/descuento
+  let opf = 1;
+  const opw = opexWeights(cfg, yo);
+  const addDed = (v, c) => add(v, c * at * opf);          // término deducible
+  const constDed = (c) => { constant += c * at * opf; };  // constante deducible
   const capNet = (y) => H === 1 ? cfg.emissions_cap_net_start :
     cfg.emissions_cap_net_start +
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
@@ -431,6 +442,7 @@ export function buildLP(site0, cfg0) {
 
   for (const y of years) {
     const D = disc[y - 1];
+    opf = opw[y - 1] / D;
     constant += D * renewalCapex[y - 1];
     constDed(D * fixedCharges);
     // O&M fijo de las medidas activas (R10): Σ_{y'≤y} em_y'
@@ -448,7 +460,7 @@ export function buildLP(site0, cfg0) {
           add(ne, -disc[N - 1] * ec * Math.max(0, (tc.lifetime_years - (NA - yr(y) + 1)) / tc.lifetime_years));
         if (t > 0) {
           const Dp = depYears(tc);
-          for (let yy = y; yy <= N && yr(yy) < yr(y) + Dp; yy++) add(ne, -disc[yy - 1] * t * ec / Dp);
+          for (let yy = y; yy <= N && yr(yy) < yr(y) + Dp; yy++) add(ne, -opw[yy - 1] * t * ec / Dp);
         }
       }
       if (cfg.salvage_value) {
@@ -460,7 +472,7 @@ export function buildLP(site0, cfg0) {
         const Dp = depYears(tc);
         for (let yy = y; yy <= N && yr(yy) < yr(y) + Dp; yy++)
           add(`nc_${sane(tc.tech_id)}_${y}`,
-              -disc[yy - 1] * t * cpk * 1000 / Dp);
+              -opw[yy - 1] * t * cpk * 1000 / Dp);
       }
     }
     for (const tc of [...convs, ...gens, ...stors]) {
@@ -1023,6 +1035,19 @@ export function buildLP(site0, cfg0) {
       const t2 = { [`ge_${y}`]: 1 };
       for (const [v, c] of Object.entries(s1)) inc(t2, v, -c);
       row(`s2cap_${y}`, t2, "<=", cfg.scope2_cap);
+    }
+    // topes por año en escalón (R17) — espejo de emission_cap_at
+    for (const k of ["scope1", "scope2", "gross", "net"]) {
+      let cap = null, best = -Infinity;
+      for (const c of cfg.emission_caps ?? []) {
+        const [kk, yy, vv] = Array.isArray(c) ? c : [c.kind, c.year, c.cap];
+        const r = relYear(cfg, yy);
+        if (kk === k && r <= yr(y) && r >= best) { best = r; cap = vv; }
+      }
+      if (cap == null) continue;
+      const tc = k === "scope1" ? { ...s1 } : k === "gross" ? { [`ge_${y}`]: 1 } : k === "net" ? { [`ne_${y}`]: 1 }
+        : (() => { const t2 = { [`ge_${y}`]: 1 }; for (const [v, c] of Object.entries(s1)) inc(t2, v, -c); return t2; })();
+      row(`ecap_${k}_${y}`, tc, "<=", cap);
     }
   }
   // inversión: nc ≤ maxnew·b · a-lo-más-una compra · forzadas

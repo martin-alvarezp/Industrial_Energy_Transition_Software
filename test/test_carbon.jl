@@ -56,3 +56,19 @@ end
     @test IETO._apply_overrides(c, JSON3.read("""{"scope2_cap": 100}""")).scope2_cap == 100
     @test_throws IETO.ValidationError validate_scenario(with_config(c; ets_price = -1.0), site)
 end
+
+@testset "R17: topes de emisiones por año en escalón" begin
+    # carbon_site: sin tope quema gas (alcance 1 > 0); un tope de alcance 1 de 0
+    # desde el año 2 lleva ese año a la caldera eléctrica, el 1 queda igual
+    site, cfg = carbon_site()
+    im = build_model(site, with_config(cfg; horizon_years = 3, emission_caps = [(:scope1, 2, 0.0), (:scope1, 3, 1e9)]))
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    s1 = [JuMP.value(im.model[:scope1_y][y]) for y in 1:3]
+    @test s1[1] > 1
+    @test s1[2] ≈ 0 atol = 1e-6
+    @test s1[3] ≈ s1[1] rtol = 1e-9
+    @test emission_cap_at(im.config, :scope1, 1) === nothing && emission_cap_at(im.config, :scope1, 2) == 0.0
+    @test IETO._coerce(Vector{Tuple{Symbol,Int,Float64}}, JSON3.read("""[{"kind": "net", "year": 2028, "cap": 0}]""")) == [(:net, 2028, 0.0)]
+    @test_throws IETO.ValidationError validate_scenario(with_config(cfg; emission_caps = [(:nada, 1, 1.0)]), site)
+end

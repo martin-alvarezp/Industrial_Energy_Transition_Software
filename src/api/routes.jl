@@ -128,8 +128,9 @@ _coerce(::Type{Vector{EfficiencyMeasure}}, v) =
 _coerce(::Type{Vector{Vector{Symbol}}}, v) = Vector{Symbol}[Symbol[Symbol(x) for x in g] for g in v]
 _coerce(::Type{Vector{Tuple{Symbol,Symbol}}}, v) =
     Tuple{Symbol,Symbol}[(Symbol(r.tech), Symbol(r.needs)) for r in v]
-_coerce(::Type{Vector{Tuple{Symbol,Int,Float64}}}, v) =
-    Tuple{Symbol,Int,Float64}[(Symbol(x.tech), Int(x.year), Float64(x.mw))
+_coerce(::Type{Vector{Tuple{Symbol,Int,Float64}}}, v) =   # forced_builds o emission_caps (R17)
+    Tuple{Symbol,Int,Float64}[haskey(x, :kind) ? (Symbol(x.kind), Int(x.year), Float64(x.cap)) :
+                                                 (Symbol(x.tech), Int(x.year), Float64(x.mw))
                               for x in v]
 
 """
