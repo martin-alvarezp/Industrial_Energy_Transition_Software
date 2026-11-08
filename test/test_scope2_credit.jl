@@ -39,3 +39,13 @@ s2(im) = JuMP.value(im.model[:scope2_y][1])
     @test JuMP.value(im.model[:gross_emissions][1]) ≈ -8760 rtol = 1e-9
     @test_throws IETO.ValidationError validate_scenario(with_config(cfg; generator_ef = Dict(:buy => 0.1)), site)
 end
+
+@testset "R15: factor de alcance 2 de un generador por año" begin
+    # FV con 0,2 t/MWh que baja a la mitad desde el año 2: 8 760 t ⇒ 4 380 t
+    site, cfg = mt_site()
+    im = build_model(site, with_config(cfg; horizon_years = 2, must_take = [:pv], generator_ef = Dict(:pv => 0.2),
+                     year_factors = Dict(:emission_factor => Dict(:pv => [(2, 0.5)]))))
+    JuMP.optimize!(im.model)
+    @test JuMP.value(im.model[:scope2_y][1]) ≈ 8760 rtol = 1e-9
+    @test JuMP.value(im.model[:scope2_y][2]) ≈ 4380 rtol = 1e-9
+end

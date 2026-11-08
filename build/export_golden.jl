@@ -287,4 +287,7 @@ dump("demo_credito_ventas_n5", site0, with_config(cfg0; horizon_years = 5, expor
 # 33 · energía mínima por compra (R14): compra forzada con 50 MWh mínimos
 dump("energia_minima_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat => 40.0),
      storage_energy_max = Dict(:bat => 200.0), storage_energy_min = Dict(:bat => 50.0), forced_builds = [(:bat, 1, 1.0)]))
+# 34 · factor de alcance 2 de un generador por año (R15)
+dump("factor_generador_anio_n2", s35, with_config(c35; horizon_years = 2, must_take = [:pv], export_emission_credit = true,
+     generator_ef = Dict(:pv => 0.2), carbon_price = 40.0, year_factors = Dict(:emission_factor => Dict(:pv => [(2, 0.5)]))))
 println("fixtures dorados en ", out)

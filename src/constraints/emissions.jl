@@ -60,7 +60,8 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
     JuMP.@expression(m, scope2_y[y in years],
         sum(params.market_ef[mk][y] * market_flow[mk, s, y] * w[s]
             for mk in sets.buy_markets, s in steps; init = 0.0) +
-        sum(cfg.generator_ef[g] * m[:dispatch][g, s, y] * w[s] for g in gef, s in steps; init = 0.0) -
+        sum(cfg.generator_ef[g] * year_factor(cfg, :emission_factor, g, ry[y]) *   # R15: por año
+            m[:dispatch][g, s, y] * w[s] for g in gef, s in steps; init = 0.0) -
         sum(sell_ef(mk, y) * market_flow[mk, s, y] * w[s] for mk in credit, s in steps; init = 0.0))
     # con crédito por ventas el bruto (y el neto) pueden quedar bajo cero
     if cfg.export_emission_credit

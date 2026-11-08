@@ -585,3 +585,9 @@ días tipo (k por año) con cronología.
   de la referencia aplicado a un almacenamiento con energía propia). Junto con
   una compra forzada fija el tamaño de un TES. Oráculo en test_storage_energy.jl;
   golden `energia_minima_n1`.
+- ✅ **R15 · Factor de alcance 2 de generadores por año** (2026-11-07). El tipo
+  `emission_factor` de `year_factors` también apunta a generadores con
+  `generator_ef`: la FV como servicio sigue el factor de la red que baja año a
+  año. Lo encontró la reproducción de un horizonte real (el CO₂ de IETO no
+  bajaba como el de la referencia). Oráculo en test_scope2_credit.jl; golden
+  `factor_generador_anio_n2`.

@@ -983,7 +983,7 @@ export function buildLP(site0, cfg0) {
     }
     // R13: generadores con factor propio y crédito de las ventas
     for (const g of gens) {
-      const f = cfg.generator_ef?.[g.tech_id] ?? 0;
+      const f = (cfg.generator_ef?.[g.tech_id] ?? 0) * yearFactor(cfg, "emission_factor", g.tech_id, yr(y));   // R15
       if (f > 0) for (const s of steps) inc(tg, `d_${sane(g.tech_id)}_${s}_${y}`, -f * w[s - 1]);
     }
     if (cfg.export_emission_credit) {

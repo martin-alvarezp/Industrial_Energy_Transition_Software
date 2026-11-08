@@ -620,7 +620,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             ok = kind == :input_ratio ? haskey(site.converters, tg) :
                  kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
                  kind == :demand ? haskey(site.demands, tg) :
-                 kind in (:emission_factor, :demand_charge) ? haskey(site.markets, tg) :
+                 kind == :emission_factor ? (haskey(site.markets, tg) || haskey(site.generators, tg)) :   # R15
+                 kind == :demand_charge ? haskey(site.markets, tg) :
                  tg in techs_all
             ok || push!(problems, "year_factors.$kind: '$tg' no existe en el sitio")
             for (yr, f) in pts
