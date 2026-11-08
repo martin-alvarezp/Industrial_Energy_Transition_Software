@@ -67,6 +67,7 @@ struct ModelParameters
     arc_to::Dict{Symbol,Symbol}                      # key → nodo destino
     arc_cap::Dict{Symbol,Float64}                    # key → MW (Inf = sin tope)
     arc_eff::Dict{Symbol,Float64}                    # key → η de transporte en (0,1]
+    renewal_capex_by::Dict{Symbol,Vector{Float64}}   # [y] renovaciones por tecnología (R27: su plazo)
 end
 
 # ry[y] = año relativo real del índice y (R6: años hito)
@@ -306,6 +307,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     # después — pagando su CAPEX; la capacidad nunca cae (BaU renovación).
     N = cfg.horizon_years
     renewal_capex = zeros(length(years))
+    renewal_capex_by = Dict{Symbol,Vector{Float64}}()
     if cfg.renew_existing
         for (id, rl) in remaining_life
             (rl > 0 && existing[id] > 0 && renews(cfg, id)) || continue
@@ -315,8 +317,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                 # que cubre ese año (R6; sin hitos, el mismo año)
                 k = milestone_index(ry, yr)
                 k === nothing && break
-                renewal_capex[k] += costs[id].capex_per_kw * capex_factor(cfg, id, yr) *
-                                    KW_PER_MW * existing[id]
+                rc = costs[id].capex_per_kw * capex_factor(cfg, id, yr) * KW_PER_MW * existing[id]
+                renewal_capex[k] += rc
+                get!(renewal_capex_by, id, zeros(length(years)))[k] += rc
                 yr += max(costs[id].lifetime_years, 1)
             end
         end
@@ -395,5 +398,5 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            cfg.repeat_investments, renewal_capex, forced,
                            nm_periods, nm_retail, nm_buys,
                            node_of, demand_node, market_node,
-                           arc_carrier, arc_from, arc_to, arc_cap, arc_eff)
+                           arc_carrier, arc_from, arc_to, arc_cap, arc_eff, renewal_capex_by)
 end

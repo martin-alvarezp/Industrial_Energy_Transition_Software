@@ -416,5 +416,9 @@ function load_scenario_config(path::AbstractString)
                            for (c, ys) in cs)
                        for (t, cs) in get(d, "input_profiles_by_year", Dict())),
         Symbol(get(d, "emission_cap_mode", "hard")),
+        Symbol(get(d, "capex_accounting", "annuity")),
+        Dict{Symbol,Int}(Symbol(k) => Int(v) for (k, v) in get(d, "financing_period_tech", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "financing_rate_tech", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "debt_share", Dict())),
     )
 end

@@ -155,14 +155,33 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                       params.costs[t].lifetime_years) : 0.0)
             for t in sets.candidates, y in years; init = 0.0))
 
+    # R27: cada CAPEX con su peso en el VAN (cuotas del financiamiento o, sin
+    # plazo / con :lump, el descuento del año de compra)
+    life(t) = params.costs[t].lifetime_years
+    cpv(t, y) = capex_pv(cfg, ry, y, t; life = life(t))
+    gpv(y) = capex_pv(cfg, ry, y, :__global__)
+    emcap = Dict(em.id => em.capex for em in cfg.efficiency_measures)
+    JuMP.@expression(m, capex_pv_y[y in years],
+        sum(cpv(t, y) * (params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW * new_capacity[t, y] +
+                         get(cfg.fixed_capex, t, 0.0) * m[:build][t, y])
+            for t in sets.candidates; init = 0.0) +
+        sum(cpv(st, y) * ecap(st, y) for st in E; init = 0.0) +
+        sum(capex_pv(cfg, ry, y, id; life = life(id)) * v[y] for (id, v) in params.renewal_capex_by; init = 0.0) +
+        (haskey(JuMP.object_dictionary(m), :em_buy) ?
+         sum(capex_pv(cfg, ry, y, k) * emcap[k] * capex_factor(cfg, k, ry[y]) * m[:em_buy][k, y]
+             for k in JuMP.axes(m[:em_buy], 1); init = 0.0) : 0.0))
+    # el valor residual solo con pago de una vez (con cuotas no hay castigo de fin de horizonte)
+    sal = cfg.capex_accounting == :lump || cfg.financing_years == 0 && isempty(cfg.financing_period_tech)
+
     # R18: con hitos ponderados el OPEX vale por los años que el hito representa
     ow = opex_weights(cfg, sets.year_of)
     JuMP.@objective(m, Min,
-        sum(params.discount[y] * capex_y[y] +
+        sum(capex_pv_y[y] +
             ow[y] * (fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
                      demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
                      export_revenue_y[y] + tax_y[y])
-            for y in years) - params.discount[end] * salvage_credit)
+            for y in years) - (sal ? params.discount[end] * salvage_credit : 0.0))
+    m[:salvage_applies] = sal
 
     return m
 end

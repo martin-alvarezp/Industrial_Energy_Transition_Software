@@ -609,6 +609,60 @@ struct ScenarioConfig
     emission_cap_mode::Symbol                # :hard (default) = tope infactible ⇒ sin solución;
                                              # :relax = si no se alcanza, el menor exceso total
                                              # posible y, con él, el menor costo (se informa)
+    # ── CAPEX anualizado en el objetivo (benchmark R27) ──
+    capex_accounting::Symbol                 # :annuity (default) = la parte con deuda se paga en
+                                             # cuotas durante el plazo de financiamiento (las que
+                                             # caen en el horizonte); :lump = todo en el año de compra
+    financing_period_tech::Dict{Symbol,Int}  # tecnología/medida → plazo (años); default financing_years
+    financing_rate_tech::Dict{Symbol,Float64}  # tecnología/medida → tasa; default financing_rate
+    debt_share::Dict{Symbol,Float64}         # tecnología/medida → fracción con deuda (default 1);
+                                             # el resto se paga entero en el año de compra
+end
+
+# retro-compatibilidad: 74 campos → CAPEX anualizado con los parámetros globales
+ScenarioConfig(a::Vararg{Any,74}) = ScenarioConfig(a..., :annuity, Dict{Symbol,Int}(),
+                                                   Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
+
+"""
+    capex_pv(cfg, ry, k, id; life=typemax(Int)) -> Float64
+
+Peso en el VAN de 1 USD de CAPEX comprado en el hito `k` (año relativo
+`ry[k]`) por `id` (R27). Con `capex_accounting = :annuity` y plazo n > 0, la
+fracción con deuda paga `annuity_factor(i, n)` cada año de la ventana
+[ry[k], ry[k]+n−1] que cae en el horizonte (todos los años calendario con
+`milestone_weighting = :years`, solo los hitos con `:none`), descontado en su
+año; la fracción propia, entera en el año de compra. El plazo no excede la
+vida útil + 1 (fórmula de la referencia: min(plazo − 1, vida) + 1). Sin plazo
+(o `:lump`) es el descuento del año de compra.
+"""
+function capex_pv(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer, id::Symbol;
+                  life::Integer = typemax(Int))
+    d0 = discount_factor(cfg.wacc, ry[k])
+    cfg.capex_accounting == :annuity || return d0
+    n = min(get(cfg.financing_period_tech, id, cfg.financing_years), life == typemax(Int) ? life : life + 1)
+    n > 0 || return d0
+    a = annuity_factor(get(cfg.financing_rate_tech, id, cfg.financing_rate), n)
+    ds = get(cfg.debt_share, id, 1.0)
+    last_y = min(ry[k] + n - 1, cfg.horizon_years)
+    yrs = cfg.milestone_weighting == :years ? (ry[k]:last_y) : [r for r in ry if ry[k] <= r <= last_y]
+    return ds * a * sum(j -> discount_factor(cfg.wacc, j), yrs; init = 0.0) + (1 - ds) * d0
+end
+
+"Cuota de CAPEX de cada hito (R27): Σ de las compras con su ventana activa en ese año (vista)."
+function capex_charge(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, capex_by::Dict{Symbol,Vector{Float64}};
+                      life = Dict{Symbol,Int}())
+    out = zeros(length(ry))
+    for (id, v) in capex_by, k in eachindex(ry), y in eachindex(ry)
+        v[k] == 0 && continue
+        L = get(life, id, typemax(Int))
+        n = cfg.capex_accounting == :annuity ?
+            min(get(cfg.financing_period_tech, id, cfg.financing_years), L == typemax(Int) ? L : L + 1) : 0
+        ds = n > 0 ? get(cfg.debt_share, id, 1.0) : 0.0
+        a = n > 0 ? annuity_factor(get(cfg.financing_rate_tech, id, cfg.financing_rate), n) : 0.0
+        ch = (n > 0 && ry[k] <= ry[y] < ry[k] + n ? ds * a * v[k] : 0.0) + (y == k ? (1 - ds) * v[k] : 0.0)
+        out[y] += ch
+    end
+    return out
 end
 
 # retro-compatibilidad: 73 campos → topes duros

@@ -61,6 +61,10 @@ export function toConfig(cfg) {
     storage_energy_min: cfg.storage_energy_min ?? {},       // R14: energía mínima
     emission_caps: cfg.emission_caps ?? [],                 // R17: topes por año
     emission_cap_mode: cfg.emission_cap_mode ?? "hard",     // R24: topes inalcanzables
+    capex_accounting: cfg.capex_accounting ?? "annuity",    // R27: CAPEX en cuotas
+    financing_period_tech: cfg.financing_period_tech ?? {},
+    financing_rate_tech: cfg.financing_rate_tech ?? {},
+    debt_share: cfg.debt_share ?? {},
     milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B

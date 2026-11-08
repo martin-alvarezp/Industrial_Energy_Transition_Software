@@ -30,7 +30,8 @@ function extract_financials(im::IETOModel)
                df.export_revenue .+ df.tax
     # valor residual: crédito único al fin del horizonte (0 si está apagado),
     # incluido en total/npv del año N para que Σ npv == VAN del objetivo
-    salvage = haskey(JuMP.object_dictionary(m), :salvage_credit) ?
+    salvage = haskey(JuMP.object_dictionary(m), :salvage_credit) &&
+              get(JuMP.object_dictionary(m), :salvage_applies, true) ?
               JuMP.value(m[:salvage_credit]) : 0.0
     df.salvage_credit = zeros(length(df.year))
     if salvage > 1e-9
@@ -41,15 +42,43 @@ function extract_financials(im::IETOModel)
     # anualidad de financiamiento (R4): vista, fuera del total y del VAN
     df.capex_annuity = capex_annuity(df.capex, im.config.financing_rate, im.config.financing_years;
                                      years = im.sets.year_of)
-    # R18: la inversión se descuenta en su año; el resto con el peso del hito
+    # R27: cuota de CAPEX de cada año (deuda en cuotas + parte propia), vista
+    df.capex_charge = capex_charge(im.config, im.sets.year_of, _capex_by(im);
+                                   life = Dict(t => c.lifetime_years for (t, c) in im.params.costs))
+    # R18/R27: cada inversión con su peso en el VAN (cuotas o descuento del año
+    # de compra), en el año de compra; el resto con el peso del hito
     ow = opex_weights(im.config, im.sets.year_of)
-    df.npv = (df.capex .+ df.salvage_credit) .* df.discount_factor .+
+    df.npv = [JuMP.value(m[:capex_pv_y][y]) for y in years] .+ df.salvage_credit .* df.discount_factor .+
              (df.total .- df.capex .- df.salvage_credit) .* ow
     df.opex_weight = ow
 
     return (breakdown = df,
             total_capex = sum(df.capex),
             npv = JuMP.objective_value(m))
+end
+
+# CAPEX de cada compra por id y año (R27): tecnologías, energía, renovaciones, medidas
+function _capex_by(im::IETOModel)
+    m, sets, cfg, ry = im.model, im.sets, im.config, im.sets.year_of
+    out = Dict{Symbol,Vector{Float64}}()
+    add(id, y, v) = (get!(out, id, zeros(length(sets.years)))[y] += v)
+    for t in sets.candidates, y in sets.years
+        add(t, y, im.params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW *
+                  JuMP.value(m[:new_capacity][t, y]) + get(cfg.fixed_capex, t, 0.0) * JuMP.value(m[:build][t, y]))
+    end
+    for st in JuMP.axes(m[:new_energy], 1), y in sets.years
+        add(st, y, cfg.storage_energy_capex[st] * KW_PER_MW * capex_factor(cfg, st, ry[y]) * JuMP.value(m[:new_energy][st, y]))
+    end
+    for (id, v) in im.params.renewal_capex_by, y in sets.years
+        add(id, y, v[y])
+    end
+    if haskey(JuMP.object_dictionary(m), :em_buy)
+        cap = Dict(em.id => em.capex for em in cfg.efficiency_measures)
+        for k in JuMP.axes(m[:em_buy], 1), y in sets.years
+            add(k, y, cap[k] * capex_factor(cfg, k, ry[y]) * JuMP.value(m[:em_buy][k, y]))
+        end
+    end
+    return out
 end
 
 """

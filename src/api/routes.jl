@@ -128,6 +128,8 @@ _coerce(::Type{Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}}, v) =
         for (k, tg) in pairs(v))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
+_coerce(::Type{Dict{Symbol,Int}}, v) =                                 # plazo por tecnología (R27)
+    Dict{Symbol,Int}(Symbol(k) => Int(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{EfficiencyMeasure}}, v) =
     EfficiencyMeasure[EfficiencyMeasure(Symbol(e.id), String(get(e, :name, string(e.id))),
                                         Symbol(e.carrier), Float64(e.reduction), Float64(e.capex))

@@ -558,6 +558,17 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    cfg.capex_accounting in (:annuity, :lump) || push!(problems,
+        "capex_accounting: '$(cfg.capex_accounting)' desconocido (annuity | lump)")
+    for (k, v) in cfg.financing_period_tech
+        v >= 0 || push!(problems, "financing_period_tech['$k']: debe ser ≥ 0 (valor: $v)")
+    end
+    for (k, v) in cfg.financing_rate_tech
+        0 <= v < 1 || push!(problems, "financing_rate_tech['$k']: debe estar en [0,1) (valor: $v)")
+    end
+    for (k, v) in cfg.debt_share
+        0 <= v <= 1 || push!(problems, "debt_share['$k']: debe estar en [0,1] (valor: $v)")
+    end
     cfg.emission_cap_mode in (:hard, :relax) || push!(problems,
         "emission_cap_mode: '$(cfg.emission_cap_mode)' desconocido (hard | relax)")
     cfg.milestone_weighting in (:none, :years) || push!(problems,

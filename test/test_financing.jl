@@ -1,6 +1,7 @@
-# Financiamiento como vista (benchmark R4): la optimización usa la inversión
-# pagada en su año; la anualidad (cuota prepagable a la tasa y el plazo del
-# crédito) solo se reporta.
+# Financiamiento como vista (benchmark R4): con `capex_accounting = :lump` la
+# optimización usa la inversión pagada en su año y la anualidad (cuota
+# prepagable a la tasa y el plazo del crédito) solo se reporta. El default
+# (:annuity, R27) la lleva al objetivo: ver test_capex_annuity.jl.
 
 @isdefined(op_site) || include("helpers_operation.jl")
 
@@ -19,8 +20,9 @@
     @test capex_annuity([100.0, 20.0], 0.0, 2) ≈ [50, 60]
 end
 
-@testset "R4: la anualidad no cambia la optimización" begin
+@testset "R4: con :lump la anualidad no cambia la optimización" begin
     site, cfg = discrete_case(0.0)
+    cfg = with_config(cfg; capex_accounting = :lump)
     go(c) = (im = build_model(site, with_config(c; horizon_years = 3, wacc = 0.05));
               JuMP.optimize!(im.model); extract_results(im; shadow_prices = false))
     r0 = go(cfg)

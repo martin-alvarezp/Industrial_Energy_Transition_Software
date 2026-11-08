@@ -341,4 +341,13 @@ s43, c43 = carbon_site()
 s43 = IETO._with(s43; prices = Dict(:gas => PriceSeries(:gas, fill(200.0, 24))))
 dump("tope_inalcanzable_n2", s43, with_config(c43; horizon_years = 2, wacc = 0.05,
      emissions_cap_gross = 5000.0, emission_cap_mode = :relax))
+# 44 · CAPEX anualizado en el objetivo (R27): cuotas sin interés a 10 años
+# (paga 3 de 10), crédito al 8 % a 2 años con mitad de capital propio, y el
+# demo con hitos ponderados y financiamiento a 15 años al 7,84 %
+s44, c44 = discrete_case(0.0)
+dump("capex_cuotas_n3", s44, with_config(c44; horizon_years = 3, wacc = 0.0, financing_years = 10))
+dump("capex_credito_deuda_n3", s44, with_config(c44; horizon_years = 3, wacc = 0.05, financing_rate = 0.08,
+     financing_years = 2, debt_share = Dict(:hp => 0.5)))
+dump("demo_capex_cuotas_hitos_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
+     milestone_years = [2026, 2028, 2031, 2035], financing_rate = 0.0784, financing_years = 15))
 println("fixtures dorados en ", out)

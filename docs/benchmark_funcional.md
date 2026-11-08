@@ -669,3 +669,21 @@ días tipo (k por año) con cronología.
   en su año. Ese es ahora el comportamiento por defecto; `none` (cada hito
   cuenta solo su año) queda como opción. Sin hitos (años consecutivos) no
   cambia nada.
+- ✅ **R27 · CAPEX anualizado en el objetivo** (2026-11-08).
+  `capex_accounting`: `annuity` (default, como la referencia) o `lump`
+  (pago de una vez, el comportamiento anterior). Con `annuity`, la fracción
+  con deuda de cada compra (`debt_share`, default 1) se paga en cuotas
+  `annuity_factor(i, n)` = CRF(i, n)/(1+i) en cada año de su plazo que cae en
+  el horizonte, descontada en su año; la fracción propia se paga entera en el
+  año de compra. El plazo es `financing_period_tech` (o `financing_years`) y no
+  excede la vida útil + 1; la tasa es `financing_rate_tech` (o
+  `financing_rate`). Sin plazo, la compra se paga de una vez, así que los
+  escenarios sin financiamiento no cambian. Con cuotas, comprar tarde no se
+  castiga al fin del horizonte, por lo que el valor residual solo aplica con
+  pago de una vez. Se aplica a tecnologías, CAPEX fijo, energía propia,
+  renovaciones y medidas. El desglose agrega `capex_charge` (cuota de cada
+  año) y el VAN por año usa los mismos pesos. La referencia lo confirmó, y los
+  datos lo cuadran: en un caso real la solar térmica paga 619 k/año sobre
+  5,77 M = 0,10728 = CRF(7,84 %, 15)/1,0784. Oráculos en
+  test_capex_annuity.jl; goldens `capex_cuotas_n3`, `capex_credito_deuda_n3`
+  y `demo_capex_cuotas_hitos_n10`.

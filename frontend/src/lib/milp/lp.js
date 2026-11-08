@@ -174,6 +174,40 @@ export const buildAllowedAt = (cfg, tech, yo, k) => {
   const lo = k === 1 ? -Infinity : yo[k - 2] + 1;
   return relYear(cfg, w[0]) <= yo[k - 1] && relYear(cfg, w[1]) >= lo;
 };
+/** Plazo, tasa y deuda de una compra (R27), espejo de capex_pv/capex_charge. */
+const finTerms = (cfg, id, life = Infinity) => {
+  if ((cfg.capex_accounting ?? "annuity") !== "annuity") return { n: 0, a: 0, ds: 0 };
+  const n = Math.min(cfg.financing_period_tech?.[id] ?? cfg.financing_years ?? 0, life + 1);
+  if (!(n > 0)) return { n: 0, a: 0, ds: 0 };
+  return { n, a: annuityFactor(cfg.financing_rate_tech?.[id] ?? cfg.financing_rate ?? 0, n),
+           ds: cfg.debt_share?.[id] ?? 1 };
+};
+/** Peso en el VAN de 1 USD de CAPEX del hito k (1-based) — espejo de capex_pv (R27). */
+export const capexPv = (cfg, yo, k, id, life = Infinity) => {
+  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j), r0 = yo[k - 1];
+  const { n, a, ds } = finTerms(cfg, id, life);
+  if (!n) return d(r0);
+  const last = Math.min(r0 + n - 1, cfg.horizon_years);
+  let s = 0;
+  if ((cfg.milestone_weighting ?? "years") === "years") { for (let j = r0; j <= last; j++) s += d(j); }
+  else for (const r of yo) if (r >= r0 && r <= last) s += d(r);
+  return ds * a * s + (1 - ds) * d(r0);
+};
+/** Cuota de CAPEX de cada hito (R27, vista): capexBy = {id: [USD por hito]}. */
+export const capexCharge = (cfg, yo, capexBy, life = {}) => yo.map((ry, y) => {
+  let out = 0;
+  for (const [id, v] of Object.entries(capexBy))
+    v.forEach((c, k) => {
+      if (!c) return;
+      const { n, a, ds } = finTerms(cfg, id, life[id] ?? Infinity);
+      if (n > 0 && yo[k] <= ry && ry < yo[k] + n) out += ds * a * c;
+      if (y === k) out += (n > 0 ? 1 - ds : 1) * c;
+    });
+  return out;
+});
+/** ¿Aplica el valor residual? Solo pagando de una vez (R27). */
+export const salvageApplies = (cfg) => (cfg.capex_accounting ?? "annuity") === "lump" ||
+  (!((cfg.financing_years ?? 0) > 0) && !Object.keys(cfg.financing_period_tech ?? {}).length);
 /** Anualidad prepagable por USD financiado (R4), espejo de annuity_factor. */
 export const annuityFactor = (rate, n) =>
   !(n > 0) ? 0 : rate === 0 || !rate ? 1 / n : rate / (1 - Math.pow(1 + rate, -n)) / (1 + rate);
@@ -425,6 +459,7 @@ export function buildLP(site0, cfg0, opts = {}) {
 
   // renovación determinística (constante del objetivo)
   const renewalCapex = years.map(() => 0);
+  const renewalPv = years.map(() => 0);   // R27: cada renovación con su plazo
   if (cfg.renew_existing)
     for (const t of [...convs, ...gens, ...stors]) {
       const rl = t.remaining_life ?? 0;
@@ -432,7 +467,9 @@ export function buildLP(site0, cfg0, opts = {}) {
         for (let ya = rl + 1; ya <= H; ya += Math.max(t.lifetime_years, 1)) {
           const k = milestoneIndex(yo, ya);              // R6: en el hito que lo cubre
           if (!k) break;
-          renewalCapex[k - 1] += t.capex_per_kw * capexFactor(cfg, t.tech_id, ya) * 1000 * t.existing_capacity;
+          const rc = t.capex_per_kw * capexFactor(cfg, t.tech_id, ya) * 1000 * t.existing_capacity;
+          renewalCapex[k - 1] += rc;
+          renewalPv[k - 1] += rc * capexPv(cfg, yo, k, t.tech_id, t.lifetime_years);
         }
     }
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
@@ -480,11 +517,12 @@ export function buildLP(site0, cfg0, opts = {}) {
   const cprice = (y) => cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[yr(y) - 1] : cfg.carbon_price;
   const NA = yr(N);   // último año optimizado (R6): el valor residual se mide ahí
+  const salvOn = salvageApplies(cfg);   // R27: con cuotas no hay castigo de fin de horizonte
 
   for (const y of years) {
     const D = disc[y - 1];
     opf = opw[y - 1] / D;
-    constant += D * renewalCapex[y - 1];
+    constant += renewalPv[y - 1];   // R27: con su plazo (o descontada en su año)
     constDed(D * fixedCharges);
     // O&M fijo por MWh de energía (R19): sobre la energía disponible del año
     for (const st of stors) {
@@ -496,20 +534,21 @@ export function buildLP(site0, cfg0, opts = {}) {
       for (let yp = 1; yp <= y; yp++) addDed(`em_${sane(em.id)}_${yp}`, D * cfg.measure_fixed_opex[em.id]);
     for (const tc of cands) {
       const cpk = tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yr(y));   // CAPEX del año de compra (3.1)
-      add(`nc_${sane(tc.tech_id)}_${y}`, D * cpk * 1000);
+      const P = capexPv(cfg, yo, y, tc.tech_id, tc.lifetime_years);       // R27: cuotas o descuento del año
+      add(`nc_${sane(tc.tech_id)}_${y}`, P * cpk * 1000);
       if (fixedCapex(cfg, tc.tech_id) > 0)                               // CAPEX fijo por compra (R1)
-        add(`b_${sane(tc.tech_id)}_${y}`, D * fixedCapex(cfg, tc.tech_id));
+        add(`b_${sane(tc.tech_id)}_${y}`, P * fixedCapex(cfg, tc.tech_id));
       if (ownEnergy(cfg, tc)) {                                          // energía propia (R2)
         const ne = `eng_${sane(tc.tech_id)}_${y}`, ec = energyCapex(cfg, tc, yr(y));
-        add(ne, D * ec);
-        if (cfg.salvage_value)
+        add(ne, P * ec);
+        if (cfg.salvage_value && salvOn)
           add(ne, -disc[N - 1] * ec * Math.max(0, (tc.lifetime_years - (NA - yr(y) + 1)) / tc.lifetime_years));
         if (t > 0) {
           const Dp = depYears(tc);
           for (let yy = y; yy <= N && yr(yy) < yr(y) + Dp; yy++) add(ne, -opw[yy - 1] * t * ec / Dp);
         }
       }
-      if (cfg.salvage_value) {
+      if (cfg.salvage_value && salvOn) {
         const frac = Math.max(0, (tc.lifetime_years - (NA - yr(y) + 1)) / tc.lifetime_years);
         add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * cpk * 1000 * frac);
       }
@@ -567,7 +606,7 @@ export function buildLP(site0, cfg0, opts = {}) {
       for (const c of FX) for (const s of steps)
         addDed(`fdn_${sane(c)}_${s}_${y}`, D * cfg.flex_cost * w[s - 1]);
     // CAPEX de las medidas de eficiencia del año (5.3; no deducible, como el CAPEX)
-    for (const em of EMs) add(`em_${sane(em.id)}_${y}`, D * em.capex * capexFactor(cfg, em.id, yr(y)));
+    for (const em of EMs) add(`em_${sane(em.id)}_${y}`, capexPv(cfg, yo, y, em.id) * em.capex * capexFactor(cfg, em.id, yr(y)));
     // ETS (4.2): derechos sobre el alcance 1 sobre la asignación gratuita
     if ((cfg.ets_price ?? 0) > 0) {
       for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
