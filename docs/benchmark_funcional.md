@@ -560,3 +560,13 @@ días tipo (k por año) con cronología.
   "Factores por año" → "Consumo por unidad". *Pendiente:* el perfil por paso
   se da en la plantilla vigente (YAML/API); no se reproyecta solo al cambiar
   de plantilla.
+- ✅ **R12 · Generación de toma obligatoria** (2026-11-07). `must_take`: los
+  generadores listados entregan TODO su perfil (dispatch = perfil × capacidad),
+  sin recorte, como un contrato take-or-pay o la FV "como servicio" de la
+  herramienta de referencia: el excedente se vende aunque pague menos que su
+  costo. Lo encontró la reproducción de un caso real: con la FV recortable,
+  IETO exportaba bastante menos que la referencia. Oráculo (test_must_take.jl):
+  FV de 10 MW a 80 USD/MWh, demanda 5, venta a 30 ⇒ libre 3 942 000 USD, toma
+  obligatoria 5 037 000. Goldens `toma_obligatoria_n1`,
+  `demo_toma_obligatoria_n5` (verify:wasm 61/61). Parámetros → "Toma
+  obligatoria" (un interruptor por generador).

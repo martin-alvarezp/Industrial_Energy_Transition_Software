@@ -686,7 +686,8 @@ export function buildLP(site0, cfg0) {
         const a = avail(g, y);
         const t = { [`d_${sane(g.tech_id)}_${s}_${y}`]: 1 };
         for (const v of a.ncs) inc(t, v, -cf[s - 1]);
-        row(`gcap_${sane(g.tech_id)}_${s}_${y}`, t, "<=", cf[s - 1] * a.k);
+        row(`gcap_${sane(g.tech_id)}_${s}_${y}`, t,
+            (cfg.must_take ?? []).includes(g.tech_id) ? "=" : "<=", cf[s - 1] * a.k);   // R12
       }
     }
     // storage: SOC cíclico por estación (hora anterior con wrap), límites

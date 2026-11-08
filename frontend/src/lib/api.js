@@ -127,6 +127,7 @@ export function toOverrides(cfg) {
     measure_fixed_mw: cfg.measure_fixed_mw ?? {},           // R10: medidas absolutas
     measure_fixed_opex: cfg.measure_fixed_opex ?? {},
     input_profiles: cfg.input_profiles ?? {},               // R11: COP horario
+    must_take: cfg.must_take ?? [],                         // R12: toma obligatoria
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

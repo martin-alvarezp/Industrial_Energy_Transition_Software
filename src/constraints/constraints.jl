@@ -21,7 +21,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_capacity_constraints!(m, sets, params, cfg)       # + reglas de construcción (R1)
     add_measure_relations!(m, sets, params, cfg)          # 5.2
     add_resilience!(m, sets, params, site, cfg)           # 5.5
-    add_generator_constraints!(m, sets, params)
+    add_generator_constraints!(m, sets, params, cfg)      # + toma obligatoria (R12)
     add_storage_constraints!(m, sets, params, site, cfg)  # + energía propia (R2)
     add_balancing!(m, sets, params, site, cfg)            # 5.6 (usa storage_energy)
     add_grid_constraints!(m, sets, params)

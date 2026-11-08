@@ -558,6 +558,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    # R12: toma obligatoria solo en generadores
+    for t in cfg.must_take
+        haskey(site.generators, t) || push!(problems, "must_take: '$t' no es un generador del sitio")
+    end
     # R11: perfiles de entrada sobre puertos que existen, uno por paso, > 0
     for (t, cs) in cfg.input_profiles
         cv = get(site.converters, t, nothing)

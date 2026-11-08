@@ -272,4 +272,8 @@ dump("eficiencia_anio_n3", s33, with_config(c33; horizon_years = 3, carbon_price
 nst = length(site0.timesteps)
 dump("demo_cop_n5", site0, with_config(cfg0; horizon_years = 5,
      input_profiles = Dict(:heat_pump => Dict(:electricity => [i <= nst ÷ 2 ? 1.2 : 0.9 for i in 1:nst]))))
+# 31 · toma obligatoria (R12): la FV EaaS libre y de toma obligatoria
+s34, c34 = mt_site()
+dump("toma_obligatoria_n1", s34, with_config(c34; must_take = [:pv]))
+dump("demo_toma_obligatoria_n5", site0, with_config(cfg0; horizon_years = 5, must_take = [:pv]))
 println("fixtures dorados en ", out)

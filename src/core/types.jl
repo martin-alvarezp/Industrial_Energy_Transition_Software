@@ -567,7 +567,13 @@ struct ScenarioConfig
     # ── razón de entrada variable (benchmark R11) ──
     input_profiles::Dict{Symbol,Dict{Symbol,Vector{Float64}}}  # conversor → vector de entrada →
                                              # factor por paso de su razón (COP horario)
+    # ── toma obligatoria (benchmark R12) ──
+    must_take::Vector{Symbol}                # generadores que entregan TODO su perfil
+                                             # (contrato take-or-pay, FV EaaS): sin recorte
 end
+
+# retro-compatibilidad: 60 campos → sin toma obligatoria
+ScenarioConfig(a::Vararg{Any,60}) = ScenarioConfig(a..., Symbol[])
 
 # retro-compatibilidad: 59 campos → sin perfiles de entrada
 ScenarioConfig(a::Vararg{Any,59}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Float64}}}())

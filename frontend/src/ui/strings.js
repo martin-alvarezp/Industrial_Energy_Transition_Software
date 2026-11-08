@@ -85,6 +85,8 @@ extend({
   "par.learning": ["%/año de caída", "%/yr decline"],
   "par.trajectory": ["factores por año", "factors per year"],
   "par.perYear": ["año", "yr"],
+  "par.mustTake": ["Toma obligatoria", "Must-take generation"],
+  "par.mustTakeHint": ["El generador entrega todo su perfil (contratos take-or-pay, FV como servicio): no se recorta aunque vender el excedente pague menos que su costo.", "The generator delivers its whole profile (take-or-pay contracts, PV as a service): no curtailment even when selling the surplus pays less than its cost."],
   "par.coupling": ["Acoplamiento de generación", "Generation coupling"],
   "par.couplingHint": ["En cada paso, la producción del primer equipo es igual a (=) o no supera (≤) k veces la del segundo. Sirve para repartos fijos entre calderas o un equipo que acompaña a otro.", "At every step, the output of the first unit equals (=) or does not exceed (≤) k times that of the second. For fixed splits between boilers or a unit that follows another."],
   "par.addCoupling": ["Agregar acoplamiento", "Add coupling"],

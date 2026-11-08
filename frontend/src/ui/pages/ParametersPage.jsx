@@ -482,6 +482,16 @@ export default function ParametersPage({ route }) {
               </button>
             </>;
           })()}
+          {/* toma obligatoria (R12): el generador entrega todo su perfil */}
+          {twin.siteJson.technologies.some((x) => x.type === "generator") && <>
+            <h4 className="par-sub">{t("par.mustTake")}</h4>
+            <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.mustTakeHint")}</p>
+            {twin.siteJson.technologies.filter((x) => x.type === "generator").map((g) => (
+              <Toggle key={g.tech_id} on={(draft.must_take ?? []).includes(g.tech_id)} label={g.name}
+                      onChange={(x) => set({ must_take: x ? [...new Set([...(draft.must_take ?? []), g.tech_id])]
+                                                          : (draft.must_take ?? []).filter((id) => id !== g.tech_id) })} />
+            ))}
+          </>}
           {/* acoplamiento de generación (R9): a = k·b o a ≤ k·b en cada paso */}
           <h4 className="par-sub">{t("par.coupling")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.couplingHint")}</p>

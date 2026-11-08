@@ -393,5 +393,6 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Dict{Symbol,Vector{Float64}}}(Symbol(t) => Dict{Symbol,Vector{Float64}}(Symbol(c) => Float64[Float64(x) for x in v]
                                                                 for (c, v) in cs)
                                     for (t, cs) in get(d, "input_profiles", Dict())),
+        Symbol[Symbol(x) for x in get(d, "must_take", [])],
     )
 end

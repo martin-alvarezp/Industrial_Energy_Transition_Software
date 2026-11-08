@@ -55,6 +55,7 @@ export function toConfig(cfg) {
     measure_fixed_mw: cfg.measure_fixed_mw ?? {},           // R10: medidas absolutas
     measure_fixed_opex: cfg.measure_fixed_opex ?? {},
     input_profiles: cfg.input_profiles ?? {},               // R11: COP horario
+    must_take: cfg.must_take ?? [],                         // R12: toma obligatoria
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

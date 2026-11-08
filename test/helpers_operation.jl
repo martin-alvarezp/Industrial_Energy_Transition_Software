@@ -76,3 +76,22 @@ function afrr_battery_site()
                          false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
     return site, cfg
 end
+
+
+# Toma obligatoria (R12): FV EaaS de 10 MW (12 h), demanda 5, compra 100, venta 30
+function mt_site()
+    steps = [TimeStep(i, "day", i - 1, 365.0) for i in 1:24]
+    carriers = Dict(:electricity => Carrier(:electricity, "Electricity", "MWh", :energy))
+    tc = TechCosts(0.0, 0.0, 0.0, 30)
+    sources = Dict(:grid_import => Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, tc, 50.0, 0.0))
+    pv = Generator(:pv, "FV EaaS", :electricity, 10.0, 0.0, false, TechCosts(0.0, 0.0, 80.0, 30),
+                   [fill(1.0, 12); fill(0.0, 12)])
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy, fill(100.0, 24), Inf, Inf, nothing, :grid_import),
+                :sell => Market(:sell, "Venta", :electricity, :sell, fill(30.0, 24), Inf, Inf, nothing, :grid_import))
+    site = Site("mt", steps, carriers, sources, Dict{Symbol,Converter}(), Dict(:pv => pv),
+                Dict{Symbol,Storage}(), Dict(:electricity => Demand(:electricity, fill(5.0, 24))),
+                Dict{Symbol,PriceSeries}(), [EmissionFactor(:electricity, :scope2, 0.0)], mkts)
+    cfg = ScenarioConfig(1, 0.0, Dict{Symbol,Float64}(), 0.0, 1e9, 1e9, 1e9,
+                         false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    return site, cfg
+end
