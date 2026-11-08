@@ -222,7 +222,12 @@ const ep = pf.result.cost_breakdown.map((c) => c.energy_purchases);
 step("desde el año 2 las compras de energía caen con el precio", ep[1] < 0.8 * ep[0] && ep[2] < 0.8 * ep[0],
      ep.slice(0, 3).map((x) => (x / 1e6).toFixed(2)).join(" · ") + " MUSD");
 
-// 7 · financiamiento (R4): 8 % a 10 años; el VAN no cambia y Costos muestra la anualidad
+// 7 · financiamiento (R4 + R27): 8 % a 10 años; Costos muestra la anualidad y,
+// con la inversión en cuotas (default, R27), las cuotas entran al VAN
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
+step("Parámetros ofrece contar la inversión en cuotas o de una vez",
+     !!(await p.waitForSelector('[data-testid="capex-accounting"]', { timeout: 30000 }).catch(() => null)) &&
+     (await p.$eval('[data-testid="capex-accounting"]', (e) => e.value)) === "annuity");
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
 await p.waitForSelector('[data-testid="financing-rate"]', { timeout: 30000 });
 for (const [sel, v] of [['[data-testid="financing-rate"]', "8"], ['[data-testid="financing-years"]', "10"]]) {
@@ -252,9 +257,10 @@ const cbn = pn?.result?.cost_breakdown ?? [];
 const an = 0.08 / (1 - 1.08 ** -10) / 1.08;
 const badA = cbn.filter((c, i) => Math.abs(c.capex_annuity -
   cbn.reduce((s, x, j) => s + (j <= i && i - j < 10 ? x.capex * an : 0), 0)) > 1e-3 * Math.max(1, c.capex_annuity));
-step("la anualidad de cada año es Σ CAPEX × cuota prepagable (8 %, 10 años)",
+step("la anualidad de cada año es Σ CAPEX × cuota prepagable (8 %, 10 años) y las cuotas entran al VAN",
      pn?.source === "api" && pn.result.meta.feasible && cbn.length > 0 && badA.length === 0 &&
-     Math.abs(pn.result.kpis.npv - pf.result.kpis.npv) <= 1e-6 * Math.abs(pf.result.kpis.npv),
+     Math.abs(pn.result.kpis.npv - pf.result.kpis.npv) > 1e-6 * Math.abs(pf.result.kpis.npv) &&
+     cbn.every((c) => c.capex_charge != null),
      `${badA.length} años no cuadran · VAN ${(pn?.result?.kpis?.npv / 1e6).toFixed(3)} vs ${(pf.result.kpis.npv / 1e6).toFixed(3)} MUSD`);
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/costs`, { waitUntil: "networkidle2" });
 await p.waitForSelector('[data-testid="capex-view"] [data-view="annuity"]', { timeout: 30000 });
