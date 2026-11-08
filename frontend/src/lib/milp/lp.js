@@ -300,7 +300,12 @@ export function afrrParticipants(cfg, convs, stors) {
     .filter(Boolean);
 }
 
-export function buildLP(site0, cfg0) {
+/**
+ * buildLP(site, cfg, opts?) — opts (R24, emission_cap_mode "relax"):
+ *   slackMax: techo de Σ holguras de los topes (0 = tope duro, default)
+ *   phase: 1 ⇒ el objetivo pasa a ser Σ holguras (menor exceso posible)
+ */
+export function buildLP(site0, cfg0, opts = {}) {
   const { site, cfg } = fixInfrastructure(site0, cfg0);
   const ts = site.timesteps;
   // años hito (R6): el índice y recorre 1..N; yr(y) es el año relativo real
@@ -606,6 +611,7 @@ export function buildLP(site0, cfg0) {
   const rows = [];
   let usesZero = false;
   const freeVars = [];   // R13: bruto y neto pueden ser < 0 con crédito por ventas
+  const relaxCaps = cfg.emission_cap_mode === "relax", slacks = [];   // R24
   const row = (name, terms, op, rhs) => {
     const body = Object.entries(terms).filter(([, c]) => c !== 0)
       .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
@@ -1069,14 +1075,19 @@ export function buildLP(site0, cfg0) {
     } else {
       row(`offz_${y}`, { [`off_${y}`]: 1 }, "=", 0);
     }
-    row(`ncap_${y}`, { [`ne_${y}`]: 1 }, "<=", capNet(y));
-    row(`gcapE_${y}`, { [`ge_${y}`]: 1 }, "<=", cfg.emissions_cap_gross);
+    // R24: en modo "relax" cada tope lleva una holgura csl_<tope>_<y> ≥ 0
+    const capRow = (name, k, terms, rhs) => {
+      if (relaxCaps) { const v = `csl_${k}_${y}`; slacks.push(v); terms = { ...terms, [v]: -1 }; }
+      row(name, terms, "<=", rhs);
+    };
+    capRow(`ncap_${y}`, "net_trajectory", { [`ne_${y}`]: 1 }, capNet(y));
+    capRow(`gcapE_${y}`, "gross_cap", { [`ge_${y}`]: 1 }, cfg.emissions_cap_gross);
     // topes por alcance (4.2): alcance 1 directo; alcance 2 = bruto − alcance 1
-    if (cfg.scope1_cap != null) row(`s1cap_${y}`, { ...s1 }, "<=", cfg.scope1_cap);
+    if (cfg.scope1_cap != null) capRow(`s1cap_${y}`, "scope1_cap", { ...s1 }, cfg.scope1_cap);
     if (cfg.scope2_cap != null) {
       const t2 = { [`ge_${y}`]: 1 };
       for (const [v, c] of Object.entries(s1)) inc(t2, v, -c);
-      row(`s2cap_${y}`, t2, "<=", cfg.scope2_cap);
+      capRow(`s2cap_${y}`, "scope2_cap", t2, cfg.scope2_cap);
     }
     // topes por año en escalón (R17) — espejo de emission_cap_at
     for (const k of ["scope1", "scope2", "gross", "net"]) {
@@ -1089,7 +1100,7 @@ export function buildLP(site0, cfg0) {
       if (cap == null) continue;
       const tc = k === "scope1" ? { ...s1 } : k === "gross" ? { [`ge_${y}`]: 1 } : k === "net" ? { [`ne_${y}`]: 1 }
         : (() => { const t2 = { [`ge_${y}`]: 1 }; for (const [v, c] of Object.entries(s1)) inc(t2, v, -c); return t2; })();
-      row(`ecap_${k}_${y}`, tc, "<=", cap);
+      capRow(`ecap_${k}_${y}`, k, tc, cap);
     }
   }
   // inversión: nc ≤ maxnew·b · a-lo-más-una compra · forzadas
@@ -1216,6 +1227,15 @@ export function buildLP(site0, cfg0) {
       row(`budget_y${y}`, ta, "<=", cfg.capex_budget_annual - renewalCapex[y - 1]);
     }
 
+  // R24: techo del exceso total (0 = tope duro) y fase 1 (minimizar el exceso)
+  if (relaxCaps && slacks.length) {
+    if (opts.phase !== 1)
+      row("cap_short_total", Object.fromEntries(slacks.map((v) => [v, 1])), "<=", opts.slackMax ?? 0);
+    else {
+      for (const k of Object.keys(obj)) delete obj[k];
+      for (const v of slacks) obj[v] = 1;
+    }
+  }
   const objBody = Object.entries(obj).filter(([, c]) => c !== 0)
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
   const lp = `Minimize\n obj: ${objBody}\nSubject To\n${rows.join("\n")}\n` +
@@ -1223,6 +1243,6 @@ export function buildLP(site0, cfg0) {
       freeVars.map((v) => ` ${v} free\n`).join("") : "") +
     (binaries.length ? `Binary\n ${binaries.join(" ")}\n` : "") +
     (integers.length ? `General\n ${integers.join(" ")}\n` : "") + "End\n";
-  return { lp, constant, meta: { S, N, binaries: binaries.length, integers: integers.length, rows: rows.length,
+  return { lp, constant: opts.phase === 1 ? 0 : constant, meta: { S, N, binaries: binaries.length, slacks, integers: integers.length, rows: rows.length,
                                  nodes: nodes.length, arc_links: links.length } };
 }

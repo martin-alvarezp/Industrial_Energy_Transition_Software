@@ -558,6 +558,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    cfg.emission_cap_mode in (:hard, :relax) || push!(problems,
+        "emission_cap_mode: '$(cfg.emission_cap_mode)' desconocido (hard | relax)")
     cfg.milestone_weighting in (:none, :years) || push!(problems,
         "milestone_weighting: '$(cfg.milestone_weighting)' desconocido (none | years)")
     # R17: topes por año

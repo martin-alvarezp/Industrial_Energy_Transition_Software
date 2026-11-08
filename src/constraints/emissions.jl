@@ -90,21 +90,29 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
         end
     end
 
+    # R24: con emission_cap_mode = :relax cada tope lleva una holgura ≥ 0 (tCO₂e
+    # sobre el tope), fija en 0 hasta que `solve!` compruebe que el tope duro es
+    # infactible; ver `solve_relaxed_caps!`
+    relax = cfg.emission_cap_mode == :relax
+    slacks = Tuple{Symbol,Int,JuMP.VariableRef}[]
+    sl(k, y) = relax ? (v = JuMP.@variable(m, lower_bound = 0, base_name = "cap_short[$k,$y]");
+                        JuMP.fix(v, 0.0; force = true); push!(slacks, (k, y, v)); v) : 0.0
     m[:net_cap] = JuMP.@constraint(m, [y in years],
-        net[y] <= params.emissions_cap_net[y])
+        net[y] <= params.emissions_cap_net[y] + sl(:net_trajectory, y))
     m[:gross_cap] = JuMP.@constraint(m, [y in years],
-        gross[y] <= cfg.emissions_cap_gross)
+        gross[y] <= cfg.emissions_cap_gross + sl(:gross_cap, y))
     # topes por alcance (4.2, "Annual Scope 1/2 emission limit")
     cfg.scope1_cap === nothing || (m[:scope1_cap] = JuMP.@constraint(m, [y in years],
-        scope1_y[y] <= cfg.scope1_cap))
+        scope1_y[y] <= cfg.scope1_cap + sl(:scope1_cap, y)))
     cfg.scope2_cap === nothing || (m[:scope2_cap] = JuMP.@constraint(m, [y in years],
-        scope2_y[y] <= cfg.scope2_cap))
+        scope2_y[y] <= cfg.scope2_cap + sl(:scope2_cap, y)))
     # topes por año en escalón (R17): desde su año hasta el próximo del mismo tipo
     expr = Dict(:scope1 => scope1_y, :scope2 => scope2_y, :gross => gross, :net => net)
     ryc = sets.year_of
-    m[:emission_caps] = [JuMP.@constraint(m, expr[k][y] <= emission_cap_at(cfg, k, ryc[y]))
+    m[:emission_caps] = [JuMP.@constraint(m, expr[k][y] <= emission_cap_at(cfg, k, ryc[y]) + sl(k, y))
                          for k in (:scope1, :scope2, :gross, :net), y in years
                          if emission_cap_at(cfg, k, ryc[y]) !== nothing]
+    relax && (m[:cap_slacks] = slacks)
 
     return m
 end

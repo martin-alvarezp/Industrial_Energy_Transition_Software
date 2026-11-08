@@ -200,6 +200,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   // ── desglose financiero (espejo de financials.jl, nominal por año) ──
   const cost_breakdown = [];
   const emissions = [];
+  const capWarn = [];   // R24
   const res_share = [];
   const EMs = (cfg.efficiency_measures ?? []).filter((em) => site.demands?.[em.carrier]);
   const efficiency_measures = [];
@@ -346,6 +347,16 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     emissions.push({ year: y, scope1: s1, scope2: s2, gross: ge, net: ne,
       cap_net: capNet(y), cap_gross: cfg.emissions_cap_gross, offsets: off,
       macc: null });
+    // R24: exceso sobre los topes del año (solo en modo "relax")
+    if (cfg.emission_cap_mode === "relax") {
+      const e = emissions[emissions.length - 1];
+      e.cap_shortfall = 0;
+      for (const [v, c] of Object.entries(sol.Columns))
+        if (v.startsWith("csl_") && v.endsWith(`_${y}`) && (c.Primal ?? 0) > 1e-6) {
+          e.cap_shortfall += c.Primal;
+          capWarn.push(`meta de emisiones no alcanzable: ${v.slice(4, -(`_${y}`).length)} en el año ${yr(y)} excede el tope en ${(+c.Primal).toFixed(1)} tCO₂e`);
+        }
+    }
     res_share.push(demTot > 0 ? resGen / demTot : 0);
   }
   // valor residual (crédito único al año N, como financials.jl)
@@ -392,6 +403,10 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       return { tech: st.tech_id, year: y, mwh, new_mwh: nw };
     })),
     infeasibility: null,
+    // R24: plan factible con la meta de emisiones fuera de alcance
+    emission_target: cfg.emission_cap_mode === "relax"
+      ? { reached: !capWarn.length, shortfall_t: emissions.reduce((a, e) => a + (e.cap_shortfall ?? 0), 0),
+          warnings: capWarn } : null,
   };
   // años hito (R6): las tablas llevan el año relativo real, no el índice
   if (yo.some((r, i) => r !== i + 1)) {

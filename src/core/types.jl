@@ -604,7 +604,14 @@ struct ScenarioConfig
     profiles_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}      # equipo → año → disponibilidad (conversor) o
                                              # perfil (generador) desde ese año, en escalón
     input_profiles_by_year::Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}  # conversor → entrada → año → COP horario
+    # ── topes de emisiones inalcanzables (benchmark R24) ──
+    emission_cap_mode::Symbol                # :hard (default) = tope infactible ⇒ sin solución;
+                                             # :relax = si no se alcanza, el menor exceso total
+                                             # posible y, con él, el menor costo (se informa)
 end
+
+# retro-compatibilidad: 73 campos → topes duros
+ScenarioConfig(a::Vararg{Any,73}) = ScenarioConfig(a..., :hard)
 
 # retro-compatibilidad: 71 campos → sin perfiles horarios por año
 ScenarioConfig(a::Vararg{Any,71}) = ScenarioConfig(a..., Dict{Symbol,Dict{Int,Vector{Float64}}}(), Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}())

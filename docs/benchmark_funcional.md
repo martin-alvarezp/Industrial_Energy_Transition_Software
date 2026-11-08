@@ -653,3 +653,13 @@ días tipo (k por año) con cronología.
   medida de eficiencia que cambia el modo de operación de los chillers o el
   free cooling desde cierto año se modela así. Oráculo en
   test_input_factors.jl; golden `perfiles_por_anio_n2`.
+- ✅ **R24 · Topes de emisiones inalcanzables** (2026-11-08).
+  `emission_cap_mode`: `hard` (default; un tope infactible deja al escenario
+  sin solución, como hasta ahora) o `relax`: si los topes no se pueden
+  cumplir, se resuelve igual en dos fases. Primero se busca el menor exceso
+  total sobre los topes (tCO₂e); después, con ese exceso como techo, el menor
+  costo. El plan sale factible y se informa: columna `cap_shortfall` en
+  emisiones, un aviso por tope y año (`diagnostics`) y `emission_target` en
+  el JSON. Así se comporta la referencia, que en un caso reporta 1 350 t con
+  un tope duro de 1 330. Oráculo en test_cap_relax.jl; golden
+  `tope_inalcanzable_n2`.

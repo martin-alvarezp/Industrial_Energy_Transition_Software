@@ -60,6 +60,7 @@ export function toConfig(cfg) {
     generator_ef: cfg.generator_ef ?? {},
     storage_energy_min: cfg.storage_energy_min ?? {},       // R14: energía mínima
     emission_caps: cfg.emission_caps ?? [],                 // R17: topes por año
+    emission_cap_mode: cfg.emission_cap_mode ?? "hard",     // R24: topes inalcanzables
     milestone_weighting: cfg.milestone_weighting ?? "none", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
@@ -125,11 +126,29 @@ export function applyScenario(site, cfg, scenario) {
   }
 }
 
+/**
+ * Construye y resuelve el LP — espejo de solve! + solve_relaxed_caps! (R24):
+ * con emission_cap_mode "relax" y el tope duro infactible, minimiza primero el
+ * exceso total sobre los topes y, con ese techo, el costo.
+ */
+export function solveLP(highs, site, cfg) {
+  let { lp, constant, meta } = buildLP(site, cfg);
+  let sol = highs.solve(lp);
+  if (cfg.emission_cap_mode === "relax" && meta.slacks.length && sol.Status !== "Optimal") {
+    const p1 = highs.solve(buildLP(site, cfg, { phase: 1 }).lp);
+    if (p1.Status === "Optimal") {
+      const smin = p1.ObjectiveValue;
+      ({ lp, constant, meta } = buildLP(site, cfg, { slackMax: smin + 1e-6 * Math.max(1, smin) }));
+      sol = highs.solve(lp);
+    }
+  }
+  return { sol, constant, meta };
+}
+
 /** Una corrida: aplica escenario, construye LP, resuelve, extrae payload. */
 export function runScenarioWeb(highs, site, cfg, scenario) {
   const [s2, c2] = applyScenario(site, cfg, scenario);
-  const { lp, constant } = buildLP(s2, c2);
-  const sol = highs.solve(lp);
+  const { sol, constant } = solveLP(highs, s2, c2);
   return extractPayload(s2, c2, sol, constant, scenario);
 }
 

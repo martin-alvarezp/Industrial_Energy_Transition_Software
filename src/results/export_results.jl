@@ -262,6 +262,10 @@ function results_payload(r::Results;
         pareto = pareto === nothing ? nothing : _json_rows(pareto),
         dispatch = (feas && include_dispatch) ? _json_rows(r.dispatch) : nothing,
         infeasibility = feas ? nothing : (hints = r.diagnostics,),
+        # R24: plan factible pero con la meta de emisiones fuera de alcance
+        emission_target = (feas && r.config.emission_cap_mode == :relax) ?
+            (reached = isempty(r.diagnostics), shortfall_t = sum(r.emissions.cap_shortfall),
+             warnings = r.diagnostics) : nothing,
     )
 end
 

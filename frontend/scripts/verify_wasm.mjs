@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import highsLoader from "highs";
-import { buildLP } from "../src/lib/milp/lp.js";
+import { solveLP } from "../src/lib/milp/engine.js";
 import { extractPayload } from "../src/lib/milp/extract.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,8 +20,7 @@ for (const f of readdirSync(goldenDir).filter((x) => x.endsWith(".json"))) {
   const t0 = Date.now();
   let ok, detail;
   try {
-    const { lp, constant, meta } = buildLP(g.site, g.config);
-    const sol = highs.solve(lp);
+    const { sol, constant, meta } = solveLP(highs, g.site, g.config);   // R24: dos fases
     const secs = ((Date.now() - t0) / 1000).toFixed(1);
     if (g.expected_status !== "OPTIMAL") {
       ok = sol.Status !== "Optimal";

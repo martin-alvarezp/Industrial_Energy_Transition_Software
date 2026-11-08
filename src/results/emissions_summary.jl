@@ -23,7 +23,7 @@ function extract_emissions_summary(im::IETOModel; shadow_prices::Bool = true)
     scope1 = [JuMP.value(m[:scope1_y][y]) for y in years]
     scope2 = [JuMP.value(m[:scope2_y][y]) for y in years]
 
-    return DataFrame(
+    df = DataFrame(
         year      = collect(years),
         scope1    = scope1,
         scope2    = scope2,
@@ -34,4 +34,13 @@ function extract_emissions_summary(im::IETOModel; shadow_prices::Bool = true)
         offsets   = [JuMP.value(m[:offset_buy][y]) for y in years],
         macc      = macc,
     )
+    # R24: exceso total sobre los topes por año (solo en modo :relax)
+    if im.config.emission_cap_mode == :relax
+        sh = zeros(length(years))
+        for (_, yr, x) in cap_shortfall(im)
+            sh[findfirst(==(yr), sets.year_of)] += x
+        end
+        df.cap_shortfall = sh
+    end
+    return df
 end

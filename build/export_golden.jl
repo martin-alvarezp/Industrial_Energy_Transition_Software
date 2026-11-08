@@ -13,7 +13,7 @@ site0, cfg0 = load_and_validate(demo)
 
 function dump(name, site, cfg)
     im = build_model(site, cfg)
-    IETO.JuMP.optimize!(im.model)
+    solve!(im)                         # R24: incluye las dos fases de topes relajados
     status = string(IETO.JuMP.termination_status(im.model))
     npv = status == "OPTIMAL" ? IETO.JuMP.objective_value(im.model) : nothing
     rec = (name = name, site = site_json(site), config = IETO._config_json(cfg),
@@ -335,4 +335,10 @@ s42, c42 = op_site(NO_OPERATION_LIMITS)
 dump("perfiles_por_anio_n2", s42, with_config(c42; horizon_years = 2, wacc = 0.05,
      profiles_by_year = Dict(:hp => Dict(2 => [fill(0.0, 12); fill(1.0, 12)])),
      input_profiles_by_year = Dict(:hp => Dict(:electricity => Dict(2 => fill(0.75, 24))))))
+# 43 · topes inalcanzables (R24): bruto de 5 000 t con el mínimo físico en
+# 10 707 t; gas caro ⇒ el menor exceso manda sobre el menor costo
+s43, c43 = carbon_site()
+s43 = IETO._with(s43; prices = Dict(:gas => PriceSeries(:gas, fill(200.0, 24))))
+dump("tope_inalcanzable_n2", s43, with_config(c43; horizon_years = 2, wacc = 0.05,
+     emissions_cap_gross = 5000.0, emission_cap_mode = :relax))
 println("fixtures dorados en ", out)

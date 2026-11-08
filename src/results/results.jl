@@ -52,7 +52,7 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         fin.breakdown,
         extract_emissions_summary(im; shadow_prices),
         res_share_by_year(im),
-        String[],
+        _shortfall_messages(im),
         _measures_bought(im),
         _storage_energy(im),
     )
@@ -69,6 +69,11 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
     end
     return r
 end
+
+# R24: aviso por cada tope que no se alcanza (el plan es factible igual)
+_shortfall_messages(im::IETOModel) =
+    ["meta de emisiones no alcanzable: $k en el año $y excede el tope en $(round(x; digits = 1)) tCO₂e"
+     for (k, y, x) in cap_shortfall(im)]
 
 # energía de cada almacenamiento por año (R2): disponible y comprada
 function _storage_energy(im::IETOModel)

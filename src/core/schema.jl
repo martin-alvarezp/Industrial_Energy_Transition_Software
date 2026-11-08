@@ -415,5 +415,6 @@ function load_scenario_config(path::AbstractString)
                            Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
                            for (c, ys) in cs)
                        for (t, cs) in get(d, "input_profiles_by_year", Dict())),
+        Symbol(get(d, "emission_cap_mode", "hard")),
     )
 end
