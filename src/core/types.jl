@@ -582,7 +582,8 @@ struct ScenarioConfig
                                              # hasta el próximo del mismo tipo; tipos
                                              # scope1, scope2, gross, net
     # ── peso de los años hito en el objetivo (benchmark R18) ──
-    milestone_weighting::Symbol              # :none = cada hito cuenta su año (default);
+    milestone_weighting::Symbol              # :years (default) = cada hito vale por los años
+                                             # que representa; :none = cada hito cuenta su año;
                                              # :years = su OPEX vale por los años hasta el
                                              # próximo hito (el último, hasta el fin del
                                              # horizonte), descontados; la inversión, una vez
@@ -652,7 +653,7 @@ renews(cfg::ScenarioConfig, t::Symbol) = cfg.renew_existing && (isempty(cfg.rene
 ScenarioConfig(a::Vararg{Any,67}) = ScenarioConfig(a..., Dict{Symbol,Vector{Float64}}(), Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 65 campos → hitos sin peso
-ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :none)
+ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :years)   # default como la referencia
 # retro-compatibilidad: 66 campos → sin O&M por MWh
 ScenarioConfig(a::Vararg{Any,66}) = ScenarioConfig(a..., Dict{Symbol,Float64}())
 

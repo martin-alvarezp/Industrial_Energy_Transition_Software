@@ -354,7 +354,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       for (const [v, c] of Object.entries(sol.Columns))
         if (v.startsWith("csl_") && v.endsWith(`_${y}`) && (c.Primal ?? 0) > 1e-6) {
           e.cap_shortfall += c.Primal;
-          capWarn.push(`meta de emisiones no alcanzable: ${v.slice(4, -(`_${y}`).length)} en el año ${yr(y)} excede el tope en ${(+c.Primal).toFixed(1)} tCO₂e`);
+          capWarn.push(`meta de emisiones no alcanzable: ${v.slice(4, -(`_${y}`).length)} en el año ${(cfg.base_year ?? 0) > 0 ? cfg.base_year + yr(y) - 1 : yr(y)} excede el tope en ${(+c.Primal).toFixed(1)} tCO₂e`);
         }
     }
     res_share.push(demTot > 0 ? resGen / demTot : 0);

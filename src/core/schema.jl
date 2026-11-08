@@ -399,7 +399,7 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_min", Dict())),
         Tuple{Symbol,Int,Float64}[(Symbol(c["kind"]), Int(c["year"]), Float64(c["cap"]))
                                   for c in get(d, "emission_caps", [])],
-        Symbol(get(d, "milestone_weighting", "none")),
+        Symbol(get(d, "milestone_weighting", "years")),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_fixed_opex", Dict())),
         Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
                                      for (k, v) in get(d, "market_availability", Dict())),

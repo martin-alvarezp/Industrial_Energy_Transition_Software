@@ -72,7 +72,7 @@ end
 
 # R24: aviso por cada tope que no se alcanza (el plan es factible igual)
 _shortfall_messages(im::IETOModel) =
-    ["meta de emisiones no alcanzable: $k en el año $y excede el tope en $(round(x; digits = 1)) tCO₂e"
+    ["meta de emisiones no alcanzable: $k en el año $(calendar_year(im.config, y)) excede el tope en $(round(x; digits = 1)) tCO₂e"
      for (k, y, x) in cap_shortfall(im)]
 
 # energía de cada almacenamiento por año (R2): disponible y comprada

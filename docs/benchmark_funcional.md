@@ -663,3 +663,9 @@ días tipo (k por año) con cronología.
   el JSON. Así se comporta la referencia, que en un caso reporta 1 350 t con
   un tope duro de 1 330. Oráculo en test_cap_relax.jl; golden
   `tope_inalcanzable_n2`.
+- ✅ **Default de `milestone_weighting` = `years`** (2026-11-08). La
+  referencia confirmó que cuenta cada año calendario del horizonte: los años
+  entre hitos repiten la operación del hito anterior y cada uno se descuenta
+  en su año. Ese es ahora el comportamiento por defecto; `none` (cada hito
+  cuenta solo su año) queda como opción. Sin hitos (años consecutivos) no
+  cambia nada.

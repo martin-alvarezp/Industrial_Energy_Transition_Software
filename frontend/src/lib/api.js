@@ -133,7 +133,7 @@ export function toOverrides(cfg) {
     storage_energy_min: cfg.storage_energy_min ?? {},       // R14: energía mínima
     emission_caps: cfg.emission_caps ?? [],
     emission_cap_mode: cfg.emission_cap_mode ?? "hard",     // R24: topes inalcanzables                 // R17: topes por año
-    milestone_weighting: cfg.milestone_weighting ?? "none", // R18: peso de los hitos
+    milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},

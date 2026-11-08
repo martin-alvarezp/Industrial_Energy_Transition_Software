@@ -19,7 +19,9 @@ end
 
 @testset "R6: el VAN suma solo los hitos, descontados en su año real" begin
     full = ms_case(horizon_years = 5, wacc = 0.1)
-    ms = ms_case(horizon_years = 5, wacc = 0.1, milestone_years = [1, 3, 5])
+    # cada hito cuenta solo su año (:none); el default es :years (R18, como la referencia)
+    ms = ms_case(horizon_years = 5, wacc = 0.1, milestone_years = [1, 3, 5], milestone_weighting = :none)
+    @test ms_case(horizon_years = 5, milestone_years = [1, 3, 5]).config.milestone_weighting == :years
     @test ms.sets.years == 1:3 && ms.sets.year_of == [1, 3, 5]
     @test ms.params.discount ≈ [1 / 1.1, 1 / 1.1^3, 1 / 1.1^5]
     rf = extract_results(full; shadow_prices = false)

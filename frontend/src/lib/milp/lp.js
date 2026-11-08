@@ -156,7 +156,7 @@ export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
 /** Factor del OPEX de cada hito (R18), espejo de opex_weights. */
 export const opexWeights = (cfg, yo) => yo.map((r, k) => {
   const d = (j) => 1 / Math.pow(1 + cfg.wacc, j);
-  if (cfg.milestone_weighting !== "years") return d(r);
+  if ((cfg.milestone_weighting ?? "years") !== "years") return d(r);   // default: años (como la referencia)
   const end = k === yo.length - 1 ? cfg.horizon_years : yo[k + 1] - 1;
   let s = 0; for (let j = r; j <= end; j++) s += d(j);
   return s;
