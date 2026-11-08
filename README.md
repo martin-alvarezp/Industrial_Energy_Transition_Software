@@ -170,6 +170,9 @@ contra fixtures dorados del motor Julia):
   uso, net metering, cortes de red, alcances 1 y 2, ETS, compensaciones con
   precio por año, topes de emisiones por año (duros, o relajados: el plan
   más cercano a la meta y aviso del exceso), MACC y curva Pareto.
+- **Optimizador**: HiGHS sin límite de tiempo por defecto y tolerancia de
+  optimalidad 0,01 % (ambos ajustables por corrida); si se fija un límite y se
+  alcanza, se entrega el mejor plan encontrado con su brecha al óptimo.
 - **Paridad funcional**: el motor se contrastó con 16 corridas reales de una
   herramienta comercial de referencia (tres sitios industriales); cada
   diferencia encontrada quedó como un ítem con oráculo propio
