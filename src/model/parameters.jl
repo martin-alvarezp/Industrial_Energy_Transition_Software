@@ -106,6 +106,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     demand = Dict(c => _scaled_matrix(d.values, cfg.demand_growth, ry)
                   for (c, d) in site.demands)
     for (c, M) in demand, y in years
+        # R22: desde su año, el perfil del año reemplaza la forma base
+        pf = demand_profile_at(cfg, c, ry[y])
+        pf === nothing || (M[:, y] .= pf .* (1.0 + cfg.demand_growth)^(ry[y] - 1))
         M[:, y] .*= year_factor(cfg, :demand, c, ry[y])
     end
 

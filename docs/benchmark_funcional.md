@@ -639,3 +639,10 @@ días tipo (k por año) con cronología.
   como antes); las demás se retiran. Hace falta cuando un escenario da de baja
   equipos (confiabilidad) y el resto se recompra al fin de su vida. Oráculo en
   test_lifecycle.jl; golden `demo_renovacion_parcial_n4`.
+- ✅ **R22 · Perfiles de demanda por año** (2026-11-08). `demand_profiles`:
+  vector → año → serie por paso; desde ese año reemplaza la FORMA de la
+  demanda (escalón) y el crecimiento y los factores por año se aplican encima.
+  Cierra el pendiente de R3: un data center que crece con carga plana sube su
+  energía mucho más que su punta, y escalar la forma del primer año
+  sobreestimaba la punta (la reproducción de un caso real quedaba infactible
+  desde 2029). Oráculo en test_year_factors.jl; golden `perfil_demanda_anio_n3`.

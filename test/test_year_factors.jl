@@ -83,3 +83,21 @@ end
     @test_throws IETO.ValidationError bad(T(:price => Dict(:electricity => [(1, -1.0)])))
     @test_throws IETO.ValidationError bad(T(:fixed_opex => Dict(:nada => [(1, 1.0)])))
 end
+
+@testset "R22: perfil de demanda por año" begin
+    # desde el año 2 la demanda de calor pasa a ser plana de 5 MW: la bomba
+    # (COP 3) la cubre entera ⇒ compra 5/3 MW las 24 h
+    im = yf_case(demand_profiles = Dict(:heat => Dict(2 => fill(5.0, 24))))
+    @test im.params.demand[:heat][:, 1] == [fill(3.0, 12); fill(8.0, 12)]
+    @test im.params.demand[:heat][:, 2] == fill(5.0, 24)
+    @test im.params.demand[:heat][:, 3] == fill(5.0, 24)              # escalón
+    @test ev(im, :energy_purchases_y, 2) ≈ 365 * 100 * 24 * 5 / 3 rtol = 1e-9
+    # el factor por año se aplica encima del perfil
+    im = yf_case(demand_profiles = Dict(:heat => Dict(2 => fill(5.0, 24))),
+                 year_factors = Dict(:demand => Dict(:heat => [(3, 2.0)])))
+    @test im.params.demand[:heat][1, 3] ≈ 10
+    site, cfg = op_site(NO_OPERATION_LIMITS)
+    @test_throws IETO.ValidationError validate_scenario(with_config(cfg; demand_profiles = Dict(:heat => Dict(2 => fill(1.0, 5)))), site)
+    T = Dict{Symbol,Dict{Int,Vector{Float64}}}
+    @test IETO._coerce(T, JSON3.read("""{"heat": {"2": [1, 2]}}""")) == T(:heat => Dict(2 => [1.0, 2.0]))
+end

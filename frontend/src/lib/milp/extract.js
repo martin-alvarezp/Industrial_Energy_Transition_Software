@@ -4,7 +4,7 @@
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
 import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity,
-  modelYears, milestoneIndex, inputFactor, opexWeights } from "./lp.js";
+  modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -311,8 +311,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     s2 = ge - s1;
     for (const g of gens) for (const s of steps)
       resGen += V(`d_${sane(g.tech_id)}_${s}_${y}`) * w[s - 1];
-    for (const [c, series] of Object.entries(site.demands ?? {}))
-      demTot += series.reduce((a, v, i) => a + v * w[i], 0) *
+    for (const [c, series0] of Object.entries(site.demands ?? {}))
+      demTot += (demandProfileAt(cfg, c, yr(y)) ?? series0).reduce((a, v, i) => a + v * w[i], 0) *
                 Math.pow(1 + cfg.demand_growth, yr(y) - 1) * yearFactor(cfg, "demand", c, yr(y));
 
     // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita

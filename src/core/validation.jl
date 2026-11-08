@@ -648,6 +648,14 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             "$f: '$t' no es un almacenamiento candidato a inversión")
         c >= 0 || push!(problems, "$f['$t']: debe ser ≥ 0")
     end
+    # R22: perfiles de demanda por año sobre vectores con demanda, uno por paso
+    for (c, ys) in cfg.demand_profiles
+        haskey(site.demands, c) || push!(problems, "demand_profiles: '$c' no tiene demanda en el sitio")
+        for (yr, v) in ys
+            length(v) == length(site.timesteps) || push!(problems,
+                "demand_profiles['$c'][$yr]: $(length(v)) valores para $(length(site.timesteps)) pasos")
+        end
+    end
     # R20: disponibilidad de mercados (un factor por paso en [0,1]) y alcance 1 de generadores
     for (mk, v) in cfg.market_availability
         haskey(site.markets, mk) || push!(problems, "market_availability: '$mk' no es un mercado del sitio")

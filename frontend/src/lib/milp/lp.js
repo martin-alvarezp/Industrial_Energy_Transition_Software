@@ -187,6 +187,17 @@ export const capexAnnuity = (capex, rate, n, years = capex.map((_, i) => i + 1))
  *  perfil por paso × factor del año (`yr` = año relativo real). */
 export const inputFactor = (cfg, tech, c, s, yr) =>
   (cfg.input_profiles?.[tech]?.[c]?.[s - 1] ?? 1) * yearFactor(cfg, "input_ratio", tech, yr);
+/** Serie base de la demanda de c en el año relativo yr (R22), o null. */
+export const demandProfileAt = (cfg, c, yr) => {
+  const d = cfg.demand_profiles?.[c];
+  if (!d) return null;
+  let best = null, by = -Infinity;
+  for (const [y, v] of Object.entries(d)) {
+    const r = relYear(cfg, +y);
+    if (r <= yr && r > by) { by = r; best = v; }
+  }
+  return best;
+};
 /** Factor por año en escalón (R3), espejo de year_factor en types.jl. */
 export const yearFactor = (cfg, kind, target, y) => {
   const pts = cfg.year_factors?.[kind]?.[target];
@@ -292,6 +303,8 @@ export function buildLP(site0, cfg0) {
   const esc0 = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), yr(y) - 1);
   // R3: factores por año sobre el crecimiento y la escalación
   const dgrow = (c, y) => growth0(y) * yearFactor(cfg, "demand", c, yr(y));
+  // R22: serie base de la demanda del año (perfil por año o la del sitio)
+  const dbase = (c, y) => demandProfileAt(cfg, c, yr(y)) ?? site.demands?.[c] ?? [];
   const esc = (c, y) => esc0(c, y) * yearFactor(cfg, "price", c, yr(y));
   const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, yr(y));
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
@@ -628,7 +641,7 @@ export function buildLP(site0, cfg0) {
             if (l.from === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, -1);
           }
           const dem = demandNode(c) === n
-            ? (site.demands?.[c]?.[s - 1] ?? 0) * dgrow(c, y) : 0;
+            ? (dbase(c, y)[s - 1] ?? 0) * dgrow(c, y) : 0;
           // carga desplazada (5.4): demanda efectiva = dem + sube − baja
           if (dem && FX.includes(c)) {
             inc(t, `fup_${sane(c)}_${s}_${y}`, -1);
@@ -1008,7 +1021,7 @@ export function buildLP(site0, cfg0) {
           if (mkts.some((m) => m.direction === "buy" && m.connection === src.tech_id && m.carrier_id === c))
             grid += allowed(src.tech_id) ? src.existing_capacity : 0;
       if (grid > 0) row(`bkg_${sane(c)}_${y}`, { [L]: 1 }, ">=", grid);
-      const peak = Math.max(...site.demands[c]) * dgrow(c, y);
+      const peak = Math.max(...dbase(c, y)) * dgrow(c, y);
       inc(firm, L, -1);
       row(`bkn1_${sane(c)}_${y}`, firm, ">=", bsh * peak - firmK - grid);
     }
@@ -1117,7 +1130,7 @@ export function buildLP(site0, cfg0) {
     const f = cfg.demand_flexibility[c], id = sane(c);
     for (const y of years) {
       for (const s of steps) {
-        const d = (site.demands[c][s - 1] ?? 0) * dgrow(c, y);
+        const d = (dbase(c, y)[s - 1] ?? 0) * dgrow(c, y);
         row(`fupc_${id}_${s}_${y}`, { [`fup_${id}_${s}_${y}`]: 1 }, "<=", f * d);
         row(`fdnc_${id}_${s}_${y}`, { [`fdn_${id}_${s}_${y}`]: 1 }, "<=", f * d);
       }

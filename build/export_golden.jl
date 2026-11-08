@@ -325,4 +325,9 @@ ex40 = [t for t in keys(site0.converters) if site0.converters[t].existing_capaci
 s40 = IETO._with(site0; converters = Dict(k => (k in ex40 ? IETO._with(v; remaining_life = 2) : v) for (k, v) in site0.converters))
 dump("demo_renovacion_parcial_n4", s40, with_config(cfg0; horizon_years = 4, renew_existing = true,
      renew_techs = [first(sort(ex40))], emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9))
+# 41 · perfiles de demanda por año (R22): el sitio de operación con perfil
+# plano desde el año 2 y factor encima en el 3
+s41, c41 = op_site(NO_OPERATION_LIMITS)
+dump("perfil_demanda_anio_n3", s41, with_config(c41; horizon_years = 3, wacc = 0.05,
+     demand_profiles = Dict(:heat => Dict(2 => fill(5.0, 24))), year_factors = Dict(:demand => Dict(:heat => [(3, 2.0)]))))
 println("fixtures dorados en ", out)

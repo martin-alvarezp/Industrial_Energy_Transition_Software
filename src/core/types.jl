@@ -596,6 +596,25 @@ struct ScenarioConfig
     # ── renovación por tecnología (benchmark R21) ──
     renew_techs::Vector{Symbol}              # con renew_existing: solo estas se renuevan
                                              # (vacío = todas); las demás se retiran al vencer
+    # ── perfiles de demanda por año (benchmark R22) ──
+    demand_profiles::Dict{Symbol,Dict{Int,Vector{Float64}}}  # vector → año → serie por paso: desde
+                                             # ese año reemplaza la forma de la demanda (escalón);
+                                             # crecimiento y factores se aplican encima
+end
+
+# retro-compatibilidad: 70 campos → sin perfiles por año
+ScenarioConfig(a::Vararg{Any,70}) = ScenarioConfig(a..., Dict{Symbol,Dict{Int,Vector{Float64}}}())
+
+"Serie base de la demanda de `c` vigente en el año relativo `y` (R22), o `nothing`."
+function demand_profile_at(cfg::ScenarioConfig, c::Symbol, y::Integer)
+    d = get(cfg.demand_profiles, c, nothing)
+    d === nothing && return nothing
+    best = nothing; by = typemin(Int)
+    for (yr, v) in d
+        r = rel_year(cfg, yr)
+        r <= y && r > by && (by = r; best = v)
+    end
+    return best
 end
 
 # retro-compatibilidad: 69 campos → renovación de todas

@@ -137,6 +137,7 @@ export function toOverrides(cfg) {
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
     renew_techs: cfg.renew_techs ?? [],                     // R21: renovación por tecnología
+    demand_profiles: cfg.demand_profiles ?? {},             // R22: perfiles de demanda por año
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

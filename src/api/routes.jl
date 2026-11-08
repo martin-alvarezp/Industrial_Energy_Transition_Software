@@ -106,6 +106,9 @@ _coerce(::Type{Dict{Symbol,Vector{Float64}}}, v) =
     Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in xs] for (k, xs) in pairs(v))
 _coerce(::Type{Vector{Int}}, v) = Int[Int(x) for x in v]   # años hito (R6)
 _coerce(::Type{Vector{String}}, v) = String[String(x) for x in v]   # días enlazados (R8)
+_coerce(::Type{Dict{Symbol,Dict{Int,Vector{Float64}}}}, v) =                                   # perfiles por año (R22)
+    Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(c) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in xs]
+                                                 for (y, xs) in pairs(ys)) for (c, ys) in pairs(v))
 _coerce(::Type{Dict{Symbol,Dict{Symbol,Vector{Float64}}}}, v) =                                    # perfiles de entrada (R11)
     Dict{Symbol,Dict{Symbol,Vector{Float64}}}(Symbol(t) => Dict{Symbol,Vector{Float64}}(Symbol(c) => Float64[Float64(x) for x in xs]
                                                       for (c, xs) in pairs(cs)) for (t, cs) in pairs(v))
