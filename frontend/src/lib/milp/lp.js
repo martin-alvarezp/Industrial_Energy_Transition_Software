@@ -1028,6 +1028,8 @@ export function buildLP(site0, cfg0) {
           { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);
       // reglas de construcción (R1): ventana y tamaño mínimo
       if (!buildAllowedAt(cfg, t.tech_id, yo, y)) row(`bwin_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
+      if (ownEnergy(cfg, t) && (cfg.storage_energy_min?.[t.tech_id] ?? 0) > 0)   // R14: eng ≥ Emín·b
+        row(`emin_${id}_${y}`, { [`eng_${id}_${y}`]: 1, [`b_${id}_${y}`]: -cfg.storage_energy_min[t.tech_id] }, ">=", 0);
       if (ownEnergy(cfg, t))                                             // R2: eng ≤ Emáx·b
         row(`elink_${id}_${y}`, { [`eng_${id}_${y}`]: 1,
           [`b_${id}_${y}`]: -(cfg.storage_energy_max?.[t.tech_id] ?? t.max_new_capacity * (t.storage_hours ?? 4)) }, "<=", 0);

@@ -637,6 +637,13 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             "$f: '$t' no es un almacenamiento candidato a inversión")
         c >= 0 || push!(problems, "$f['$t']: debe ser ≥ 0")
     end
+    for (t, e) in cfg.storage_energy_min   # R14
+        haskey(cfg.storage_energy_capex, t) || push!(problems,
+            "storage_energy_min['$t']: falta su storage_energy_capex (USD/kWh)")
+        e >= 0 || push!(problems, "storage_energy_min['$t']: debe ser ≥ 0")
+        haskey(cfg.storage_energy_max, t) && e > cfg.storage_energy_max[t] && push!(problems,
+            "storage_energy_min['$t']: supera storage_energy_max")
+    end
     for t in keys(cfg.storage_energy_max)
         haskey(cfg.storage_energy_capex, t) || push!(problems,
             "storage_energy_max['$t']: falta su storage_energy_capex (USD/kWh)")

@@ -284,4 +284,7 @@ s35 = IETO._with(s35; markets = Dict(:buy => IETO._with(s35.markets[:buy]; emiss
 dump("credito_ventas_n1", s35, with_config(c35; must_take = [:pv], export_emission_credit = true,
      generator_ef = Dict(:pv => 0.05), carbon_price = 40.0))
 dump("demo_credito_ventas_n5", site0, with_config(cfg0; horizon_years = 5, export_emission_credit = true))
+# 33 · energía mínima por compra (R14): compra forzada con 50 MWh mínimos
+dump("energia_minima_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat => 40.0),
+     storage_energy_max = Dict(:bat => 200.0), storage_energy_min = Dict(:bat => 50.0), forced_builds = [(:bat, 1, 1.0)]))
 println("fixtures dorados en ", out)

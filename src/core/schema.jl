@@ -396,5 +396,6 @@ function load_scenario_config(path::AbstractString)
         Symbol[Symbol(x) for x in get(d, "must_take", [])],
         Bool(get(d, "export_emission_credit", false)),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_ef", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_min", Dict())),
     )
 end

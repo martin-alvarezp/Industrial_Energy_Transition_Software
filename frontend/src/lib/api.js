@@ -130,6 +130,7 @@ export function toOverrides(cfg) {
     must_take: cfg.must_take ?? [],                         // R12: toma obligatoria
     export_emission_credit: !!cfg.export_emission_credit,   // R13: crédito por ventas
     generator_ef: cfg.generator_ef ?? {},
+    storage_energy_min: cfg.storage_energy_min ?? {},       // R14: energía mínima
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

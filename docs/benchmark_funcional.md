@@ -580,3 +580,8 @@ días tipo (k por año) con cronología.
   4 380 t sin crédito, 0 con crédito, 8 760 con la FV a 0,2, −8 760 sin
   demanda. Goldens `credito_ventas_n1` y `demo_credito_ventas_n5` (verify:wasm
   63/63). Parámetros → "Las ventas restan alcance 2".
+- ✅ **R14 · Energía mínima por compra de almacenamiento** (2026-11-07).
+  `storage_energy_min`: si se compra, al menos esos MWh (el `min_new_infrastructure`
+  de la referencia aplicado a un almacenamiento con energía propia). Junto con
+  una compra forzada fija el tamaño de un TES. Oráculo en test_storage_energy.jl;
+  golden `energia_minima_n1`.

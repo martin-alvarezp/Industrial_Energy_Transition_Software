@@ -74,6 +74,9 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     emax(st) = get(cfg.storage_energy_max, st, params.max_new_capacity[st] * hours[st])
     m[:new_energy_link] = JuMP.@constraint(m, [st in E, y in years],
         new_energy[st, y] <= emax(st) * m[:build][st, y])
+    # energía mínima de cada compra (R14): si se compra, al menos esos MWh
+    m[:new_energy_min] = [JuMP.@constraint(m, new_energy[st, y] >= cfg.storage_energy_min[st] * m[:build][st, y])
+                          for st in E, y in years if get(cfg.storage_energy_min, st, 0.0) > 0]
     JuMP.@expression(m, energy_capex_y[y in years],
         sum(cfg.storage_energy_capex[st] * KW_PER_MW * capex_factor(cfg, st, ry[y]) * new_energy[st, y]
             for st in E; init = 0.0))

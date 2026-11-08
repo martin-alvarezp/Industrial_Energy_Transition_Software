@@ -575,7 +575,12 @@ struct ScenarioConfig
                                              # (propio o el del vector); bruto puede ser < 0
     generator_ef::Dict{Symbol,Float64}       # generador → tCO₂e/MWh de alcance 2 (energía
                                              # comprada con perfil, como un PPA)
+    # ── energía mínima por compra de almacenamiento (benchmark R14) ──
+    storage_energy_min::Dict{Symbol,Float64} # MWh mínimos de cada compra con energía propia
 end
+
+# retro-compatibilidad: 63 campos → sin energía mínima
+ScenarioConfig(a::Vararg{Any,63}) = ScenarioConfig(a..., Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 61 campos → sin crédito por ventas ni factor de generadores
 ScenarioConfig(a::Vararg{Any,61}) = ScenarioConfig(a..., false, Dict{Symbol,Float64}())

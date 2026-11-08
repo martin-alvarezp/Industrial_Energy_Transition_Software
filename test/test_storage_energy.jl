@@ -60,3 +60,16 @@ end
     @test_throws IETO.ValidationError bad(storage_energy_capex = Dict(:battery => -1.0))
     @test_throws IETO.ValidationError bad(storage_energy_capex = Dict{Symbol,Float64}())   # max sin capex
 end
+
+@testset "R14: energía mínima por compra" begin
+    # a 40 USD/kWh no conviene comprar; forzar la compra (≥ 1 MW) con 50 MWh
+    # mínimos ⇒ compra exactamente 50 MWh (y la potencia mínima que los usa)
+    im = energy_case(storage_energy_capex = Dict(:bat => 40.0), storage_energy_max = Dict(:bat => 200.0),
+                     storage_energy_min = Dict(:bat => 50.0), forced_builds = [(:bat, 1, 1.0)])
+    @test JuMP.value(im.model[:new_energy][:bat, 1]) ≈ 50 atol = 1e-6
+    site, cfg = st_site(IDEAL_STORAGE; existing = 0.0, investable = true, max_new = 20.0)
+    bad(; kw...) = validate_scenario(with_config(cfg; kw...), site)
+    @test_throws IETO.ValidationError bad(storage_energy_min = Dict(:bat => 5.0))                 # sin USD/kWh
+    @test_throws IETO.ValidationError bad(storage_energy_capex = Dict(:bat => 1.0), storage_energy_max = Dict(:bat => 10.0),
+                                          storage_energy_min = Dict(:bat => 20.0))
+end
