@@ -591,3 +591,11 @@ días tipo (k por año) con cronología.
   año. Lo encontró la reproducción de un horizonte real (el CO₂ de IETO no
   bajaba como el de la referencia). Oráculo en test_scope2_credit.jl; golden
   `factor_generador_anio_n2`.
+- ✅ **R16 · Punta mensual con días tipo enlazados** (2026-11-07). Con
+  `day_sequence`, cada mes factura la punta de TODOS los días tipo que caen en
+  él según el calendario (un día tipo puede pesar en varios meses), en vez de
+  asignar cada día tipo a su mes más frecuente. Oráculo
+  (test_typical_billing.jl): día de 5 MW en enero y de 3 MW el resto ⇒
+  380 000 USD con la secuencia contra 480 000 sin ella. Goldens
+  `punta_dias_tipo_n1` y `demo_punta_dias_tipo_n3`. En la reproducción del
+  horizonte de un caso real, los cargos por demanda pasaron de −10 % a −1/−3 %.

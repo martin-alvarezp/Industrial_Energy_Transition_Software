@@ -177,7 +177,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     }
   const fixedCharges = sources.filter((s) => allowed(s.tech_id))
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
-  const { seasonSteps, billingSteps } = timeGroups(ts);
+  const { seasonSteps, billingSteps } = timeGroups(ts, cfg);
   const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
   const cprice = (y) => cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[yr(y) - 1] : cfg.carbon_price;

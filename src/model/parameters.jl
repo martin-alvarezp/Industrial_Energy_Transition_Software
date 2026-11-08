@@ -277,6 +277,19 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     else
         season_steps
     end
+    # días tipo enlazados (R16): cada mes factura la punta de TODOS los días tipo
+    # que caen en él según day_sequence (un día tipo puede estar en varios meses)
+    if length(cfg.day_sequence) == 365
+        mstart = cumsum([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30])
+        steps_of = Dict{String,Vector{Int}}()
+        for ts in site.timesteps
+            push!(get!(steps_of, ts.season, Int[]), ts.id)
+        end
+        billing_steps = [sort!(unique!(reduce(vcat, (get(steps_of, cfg.day_sequence[d], Int[])
+                                                      for d in (mstart[m] + 1):(m == 12 ? 365 : mstart[m + 1]));
+                                              init = Int[])))
+                         for m in 1:12]
+    end
     duration = [ts.duration_hours for ts in site.timesteps]
 
     # ── ciclo de vida (M5) ──

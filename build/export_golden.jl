@@ -290,4 +290,9 @@ dump("energia_minima_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat
 # 34 · factor de alcance 2 de un generador por año (R15)
 dump("factor_generador_anio_n2", s35, with_config(c35; horizon_years = 2, must_take = [:pv], export_emission_credit = true,
      generator_ef = Dict(:pv => 0.2), carbon_price = 40.0, year_factors = Dict(:emission_factor => Dict(:pv => [(2, 0.5)]))))
+# 35 · punta mensual con días tipo enlazados (R16)
+s36, c36 = tb_site()
+dump("punta_dias_tipo_n1", s36, with_config(c36; day_sequence = [fill("A", 31); fill("B", 334)]))
+dump("demo_punta_dias_tipo_n3", site0, with_config(cfg0; horizon_years = 3,
+     day_sequence = [fill("winter", 90); fill("spring", 92); fill("summer", 92); fill("autumn", 91)]))
 println("fixtures dorados en ", out)

@@ -79,7 +79,7 @@ const portsOf = (t) => t.ports
  * período cronológico (SOC cíclico, neteo estacional) y `billingSteps` para la
  * punta tarifaria — por mes si TODOS los pasos traen month, si no = estaciones.
  */
-export function timeGroups(ts) {
+export function timeGroups(ts, cfg = null) {
   const group = (key) => {
     const order = [], out = [];
     ts.forEach((t) => {
@@ -90,8 +90,21 @@ export function timeGroups(ts) {
     return out;
   };
   const seasonSteps = group((t) => t.season);
-  const billingSteps = ts.length && ts.every((t) => (t.month ?? 0) > 0)
+  let billingSteps = ts.length && ts.every((t) => (t.month ?? 0) > 0)
     ? group((t) => t.month) : seasonSteps;
+  // días tipo enlazados (R16): cada mes factura la punta de los días tipo que
+  // caen en él según day_sequence — espejo de parameters.jl
+  const seq = cfg?.day_sequence ?? [];
+  if (seq.length === 365) {
+    const ms = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
+    const stepsOf = {};
+    ts.forEach((t) => { (stepsOf[t.season] ??= []).push(t.step_id); });
+    billingSteps = Array.from({ length: 12 }, (_, m) => {
+      const set = new Set();
+      for (let d = ms[m]; d < ms[m + 1]; d++) for (const s of stepsOf[seq[d]] ?? []) set.add(s);
+      return [...set].sort((a, b) => a - b);
+    });
+  }
   return { seasonSteps, billingSteps };
 }
 
@@ -307,7 +320,7 @@ export function buildLP(site0, cfg0) {
 
   // estaciones (neteo, SOC) y períodos de facturación de la punta (meses si
   // todos los pasos traen month) — espejo de parameters.jl
-  const { seasonSteps, billingSteps } = timeGroups(ts);
+  const { seasonSteps, billingSteps } = timeGroups(ts, cfg);
   const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
   const dt = ts.map((t) => t.duration_hours ?? 1);
   // operación detallada (2.1): equipos con unit commitment (tamaño conocido)

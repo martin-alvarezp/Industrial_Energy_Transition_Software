@@ -95,3 +95,19 @@ function mt_site()
                          false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
     return site, cfg
 end
+
+
+# Punta mensual con días tipo (R16): día A (5 MW, enero) y B (3 MW, resto), cargo 10
+function tb_site()
+    steps = [TimeStep(24 * (g - 1) + h + 1, g == 1 ? "A" : "B", h, g == 1 ? 31.0 : 334.0) for g in 1:2 for h in 0:23]
+    carriers = Dict(:electricity => Carrier(:electricity, "Electricity", "MWh", :energy))
+    tc = TechCosts(0.0, 0.0, 0.0, 30)
+    sources = Dict(:grid_import => Source(:grid_import, "Red", :electricity, 50.0, 0.0, false, tc, 0.0, 0.0))
+    mkts = Dict(:buy => Market(:buy, "Compra", :electricity, :buy, zeros(48), Inf, Inf, nothing, :grid_import, 10.0))
+    site = Site("tb", steps, carriers, sources, Dict{Symbol,Converter}(), Dict{Symbol,Generator}(),
+                Dict{Symbol,Storage}(), Dict(:electricity => Demand(:electricity, [fill(5.0, 24); fill(3.0, 24)])),
+                Dict{Symbol,PriceSeries}(), [EmissionFactor(:electricity, :scope2, 0.0)], mkts)
+    cfg = ScenarioConfig(1, 0.0, Dict{Symbol,Float64}(), 0.0, 1e9, 1e9, 1e9,
+                         false, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    return site, cfg
+end
