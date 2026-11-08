@@ -570,3 +570,13 @@ días tipo (k por año) con cronología.
   obligatoria 5 037 000. Goldens `toma_obligatoria_n1`,
   `demo_toma_obligatoria_n5` (verify:wasm 61/61). Parámetros → "Toma
   obligatoria" (un interruptor por generador).
+- ✅ **R13 · Alcance 2: crédito por ventas y factor de generadores tipo PPA**
+  (2026-11-07). `export_emission_credit` (apagado por defecto): la energía
+  vendida RESTA alcance 2 con el factor de su mercado (o el del vector), y en
+  ese modo el bruto y el neto pueden quedar bajo cero. `generator_ef`: factor
+  de alcance 2 de un generador cuya energía se compra con perfil (FV como
+  servicio). Ambos los usa la herramienta de referencia en su contabilidad.
+  Oráculo (test_scope2_credit.jl): 21 900 MWh comprados y vendidos a 0,2 t ⇒
+  4 380 t sin crédito, 0 con crédito, 8 760 con la FV a 0,2, −8 760 sin
+  demanda. Goldens `credito_ventas_n1` y `demo_credito_ventas_n5` (verify:wasm
+  63/63). Parámetros → "Las ventas restan alcance 2".

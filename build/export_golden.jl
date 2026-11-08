@@ -276,4 +276,12 @@ dump("demo_cop_n5", site0, with_config(cfg0; horizon_years = 5,
 s34, c34 = mt_site()
 dump("toma_obligatoria_n1", s34, with_config(c34; must_take = [:pv]))
 dump("demo_toma_obligatoria_n5", site0, with_config(cfg0; horizon_years = 5, must_take = [:pv]))
+# 32 · alcance 2 (R13): crédito por ventas y factor de la FV con precio de
+# carbono, y el demo con crédito por ventas
+s35, c35 = mt_site()
+s35 = IETO._with(s35; markets = Dict(:buy => IETO._with(s35.markets[:buy]; emission_factor = 0.2),
+                                     :sell => IETO._with(s35.markets[:sell]; emission_factor = 0.2)))
+dump("credito_ventas_n1", s35, with_config(c35; must_take = [:pv], export_emission_credit = true,
+     generator_ef = Dict(:pv => 0.05), carbon_price = 40.0))
+dump("demo_credito_ventas_n5", site0, with_config(cfg0; horizon_years = 5, export_emission_credit = true))
 println("fixtures dorados en ", out)

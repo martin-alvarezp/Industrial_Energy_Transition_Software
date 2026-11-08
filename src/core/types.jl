@@ -570,7 +570,15 @@ struct ScenarioConfig
     # ── toma obligatoria (benchmark R12) ──
     must_take::Vector{Symbol}                # generadores que entregan TODO su perfil
                                              # (contrato take-or-pay, FV EaaS): sin recorte
+    # ── contabilidad de alcance 2 (benchmark R13) ──
+    export_emission_credit::Bool             # las ventas RESTAN alcance 2 con su factor
+                                             # (propio o el del vector); bruto puede ser < 0
+    generator_ef::Dict{Symbol,Float64}       # generador → tCO₂e/MWh de alcance 2 (energía
+                                             # comprada con perfil, como un PPA)
 end
+
+# retro-compatibilidad: 61 campos → sin crédito por ventas ni factor de generadores
+ScenarioConfig(a::Vararg{Any,61}) = ScenarioConfig(a..., false, Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 60 campos → sin toma obligatoria
 ScenarioConfig(a::Vararg{Any,60}) = ScenarioConfig(a..., Symbol[])

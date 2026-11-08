@@ -45,9 +45,30 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
 
     # Scope 2: compras de mercado · factor del mercado (propio o heredado del
     # carrier; 0 en combustibles — su scope 1 ya se contó al quemarlos)
+    # (R13) + energía de generadores con factor propio (PPA con perfil) y −
+    # crédito de las ventas con su factor (propio o el del vector), si se pide
+    ry = sets.year_of
+    EMK = effective_markets(site)
+    sell_ef(mk, y) = begin
+        mkt = EMK[mk]
+        f = mkt.emission_factor !== nothing ? Float64(mkt.emission_factor) :
+            get(params.emission_factor, (mkt.carrier, :scope2), 0.0)
+        f * year_factor(cfg, :emission_factor, mk, ry[y])
+    end
+    credit = cfg.export_emission_credit ? sets.sell_markets : Symbol[]
+    gef = [g for g in sets.generators if get(cfg.generator_ef, g, 0.0) > 0]
     JuMP.@expression(m, scope2_y[y in years],
         sum(params.market_ef[mk][y] * market_flow[mk, s, y] * w[s]
-            for mk in sets.buy_markets, s in steps; init = 0.0))
+            for mk in sets.buy_markets, s in steps; init = 0.0) +
+        sum(cfg.generator_ef[g] * m[:dispatch][g, s, y] * w[s] for g in gef, s in steps; init = 0.0) -
+        sum(sell_ef(mk, y) * market_flow[mk, s, y] * w[s] for mk in credit, s in steps; init = 0.0))
+    # con crédito por ventas el bruto (y el neto) pueden quedar bajo cero
+    if cfg.export_emission_credit
+        for y in years
+            JuMP.has_lower_bound(gross[y]) && JuMP.delete_lower_bound(gross[y])
+            JuMP.has_lower_bound(net[y]) && JuMP.delete_lower_bound(net[y])
+        end
+    end
 
     m[:gross_emissions_def] = JuMP.@constraint(m, [y in years],
         gross[y] == scope1_y[y] + scope2_y[y])

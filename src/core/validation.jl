@@ -558,6 +558,11 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    # R13: factor de alcance 2 solo en generadores, ≥ 0
+    for (t, f) in cfg.generator_ef
+        haskey(site.generators, t) || push!(problems, "generator_ef: '$t' no es un generador del sitio")
+        f >= 0 || push!(problems, "generator_ef['$t']: debe ser ≥ 0")
+    end
     # R12: toma obligatoria solo en generadores
     for t in cfg.must_take
         haskey(site.generators, t) || push!(problems, "must_take: '$t' no es un generador del sitio")

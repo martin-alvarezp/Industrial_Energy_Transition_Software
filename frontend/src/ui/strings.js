@@ -85,6 +85,8 @@ extend({
   "par.learning": ["%/año de caída", "%/yr decline"],
   "par.trajectory": ["factores por año", "factors per year"],
   "par.perYear": ["año", "yr"],
+  "par.exportCredit": ["Las ventas restan alcance 2", "Exports reduce scope 2"],
+  "par.exportCreditHint": ["La energía vendida descuenta emisiones de alcance 2 con el factor de su mercado (o el del vector), como hace la herramienta de referencia. Las emisiones brutas pueden quedar negativas.", "Sold energy subtracts scope 2 emissions at its market's factor (or the carrier's), as the reference tool does. Gross emissions can turn negative."],
   "par.mustTake": ["Toma obligatoria", "Must-take generation"],
   "par.mustTakeHint": ["El generador entrega todo su perfil (contratos take-or-pay, FV como servicio): no se recorta aunque vender el excedente pague menos que su costo.", "The generator delivers its whole profile (take-or-pay contracts, PV as a service): no curtailment even when selling the surplus pays less than its cost."],
   "par.coupling": ["Acoplamiento de generación", "Generation coupling"],

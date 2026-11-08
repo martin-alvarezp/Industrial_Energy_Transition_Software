@@ -539,6 +539,7 @@ export function buildLP(site0, cfg0) {
   // ── restricciones ──
   const rows = [];
   let usesZero = false;
+  const freeVars = [];   // R13: bruto y neto pueden ser < 0 con crédito por ventas
   const row = (name, terms, op, rhs) => {
     const body = Object.entries(terms).filter(([, c]) => c !== 0)
       .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
@@ -980,6 +981,19 @@ export function buildLP(site0, cfg0) {
       if (f) for (const s of steps)
         inc(tg, `mf_${sane(mk.market_id)}_${s}_${y}`, -f * w[s - 1]);
     }
+    // R13: generadores con factor propio y crédito de las ventas
+    for (const g of gens) {
+      const f = cfg.generator_ef?.[g.tech_id] ?? 0;
+      if (f > 0) for (const s of steps) inc(tg, `d_${sane(g.tech_id)}_${s}_${y}`, -f * w[s - 1]);
+    }
+    if (cfg.export_emission_credit) {
+      for (const mk of mkts.filter((m) => m.direction === "sell")) {
+        const f = (mk.emission_factor ?? efTab[`${mk.carrier_id}|scope2`] ?? 0) *
+          yearFactor(cfg, "emission_factor", mk.market_id, yr(y));
+        if (f) for (const s of steps) inc(tg, `mf_${sane(mk.market_id)}_${s}_${y}`, f * w[s - 1]);
+      }
+      freeVars.push(`ge_${y}`, `ne_${y}`);
+    }
     row(`gedef_${y}`, tg, "=", 0);
     row(`nedef_${y}`, { [`ne_${y}`]: 1, [`ge_${y}`]: -1, [`off_${y}`]: 1 }, "=", 0);
     if (cfg.allow_offsets) {
@@ -1123,7 +1137,8 @@ export function buildLP(site0, cfg0) {
   const objBody = Object.entries(obj).filter(([, c]) => c !== 0)
     .map(([v, c]) => `${c >= 0 ? "+" : "-"} ${Math.abs(c)} ${v}`).join(" ");
   const lp = `Minimize\n obj: ${objBody}\nSubject To\n${rows.join("\n")}\n` +
-    (usesZero ? "Bounds\n zero_ = 0\n" : "") +
+    (usesZero || freeVars.length ? "Bounds\n" + (usesZero ? " zero_ = 0\n" : "") +
+      freeVars.map((v) => ` ${v} free\n`).join("") : "") +
     (binaries.length ? `Binary\n ${binaries.join(" ")}\n` : "") +
     (integers.length ? `General\n ${integers.join(" ")}\n` : "") + "End\n";
   return { lp, constant, meta: { S, N, binaries: binaries.length, integers: integers.length, rows: rows.length,

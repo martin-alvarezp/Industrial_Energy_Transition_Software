@@ -56,6 +56,8 @@ export function toConfig(cfg) {
     measure_fixed_opex: cfg.measure_fixed_opex ?? {},
     input_profiles: cfg.input_profiles ?? {},               // R11: COP horario
     must_take: cfg.must_take ?? [],                         // R12: toma obligatoria
+    export_emission_credit: !!cfg.export_emission_credit,   // R13: crédito por ventas
+    generator_ef: cfg.generator_ef ?? {},
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

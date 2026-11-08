@@ -492,6 +492,10 @@ export default function ParametersPage({ route }) {
                                                           : (draft.must_take ?? []).filter((id) => id !== g.tech_id) })} />
             ))}
           </>}
+          {/* alcance 2 (R13): crédito por la energía vendida */}
+          <Toggle on={!!draft.export_emission_credit} onChange={(x) => set({ export_emission_credit: x })}
+                  label={t("par.exportCredit")} />
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.exportCreditHint")}</p>
           {/* acoplamiento de generación (R9): a = k·b o a ≤ k·b en cada paso */}
           <h4 className="par-sub">{t("par.coupling")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.couplingHint")}</p>
