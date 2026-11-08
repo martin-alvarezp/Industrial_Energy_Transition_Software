@@ -39,6 +39,9 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   const [commitment, setCommitment] = useState("linear");
   // R24: tope de emisiones inalcanzable — duro (default) o relajado
   const [capMode, setCapMode] = useState(draft.emission_cap_mode ?? "hard");
+  // optimizador: sin límite de tiempo por defecto; tolerancia 0,01 %
+  const [limitMin, setLimitMin] = useState(draft.solver_time_limit_min ?? "");
+  const [gapPct, setGapPct] = useState(draft.solver_gap_pct ?? 0.01);
   const srcRun = runs.find((r) => r.id === capSource);
   const dispatch = mode === "dispatch";
 
@@ -55,11 +58,13 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   const go = async () => {
     setCapError(null);
     try {
-      let extra = { analysis, commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode };
+      const solver = { solver_time_limit_min: +limitMin > 0 ? +limitMin : null,
+                       solver_gap_pct: +gapPct >= 0 ? +gapPct : 0.01 };
+      let extra = { analysis, commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
         extra = { analysis: "single", dispatch_only: true, fixed_capacity: fixed,
-                  horizon_years: Math.max(1, +years || 1), commitment: "auto" };
+                  horizon_years: Math.max(1, +years || 1), commitment: "auto", ...solver };
       }
       const cfg = { ...draft, price_scenario: scenario === "emissions_cap" ? "base" : scenario, ...extra };
       const b = await run({ name, notes, cfg });
@@ -154,6 +159,20 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
           <p className="ui-hint">{t("run.capModeHint")}</p>
         </div>
       )}
+      <div style={{ display: "flex", gap: 12 }}>
+        <div className="ui-field" style={{ flex: 1 }}>
+          <label>{t("run.timeLimit")}</label>
+          <input className="ui-input" type="number" min={0} step={1} data-testid="run-time-limit"
+                 placeholder={t("run.noTimeLimit")} value={limitMin}
+                 onChange={(e) => setLimitMin(e.target.value)} />
+        </div>
+        <div className="ui-field" style={{ flex: 1 }}>
+          <label>{t("run.gap")}</label>
+          <input className="ui-input" type="number" min={0} max={50} step={0.01} data-testid="run-gap"
+                 value={gapPct} onChange={(e) => setGapPct(e.target.value)} />
+        </div>
+      </div>
+      <p className="ui-hint">{t("run.limitHint")}</p>
       <div className="ui-field">
         <label>{t("run.notes")}</label>
         <textarea className="ui-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} />

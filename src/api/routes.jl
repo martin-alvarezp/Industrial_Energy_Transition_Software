@@ -333,7 +333,7 @@ function handle_portfolio(req::HTTP.Request, data_dir::AbstractString)
         cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
         validate_scenario(cfg, site)
         r = run_scenario(site, cfg; scenario, verbose = false,
-                         shadow_prices = false)
+                         shadow_prices = false, solver = _solver_from(body))
         inv = r.feasible ?
             [(tech = t, year = y,
               mw = sum(r.new_capacity.mw[r.new_capacity.tech .== t]))
@@ -498,12 +498,30 @@ function handle_scenario(req::HTTP.Request, data_dir::AbstractString)
     cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
     validate_scenario(cfg, site)   # ValidationError → 400 (middleware)
 
-    r = run_scenario(site, cfg; scenario, verbose = false, shadow_prices)
+    r = run_scenario(site, cfg; scenario, verbose = false, shadow_prices, solver = _solver_from(body))
     return _json_response(200, results_payload(r; site, include_dispatch))
 end
 
 # nota: results_payload agrega meta.site_version cuando recibe el site, así
 # las corridas del twin quedan trazables aunque no exista en disco.
+
+"""
+Opciones del optimizador de una corrida (campo `solver` del body):
+`time_limit_sec` (null o ausente = sin límite) y `mip_rel_gap` (tolerancia de
+optimalidad, default 1e-4 = 0,01 %).
+"""
+function _solver_from(body)
+    sv = get(body, :solver, nothing)
+    sv === nothing && return SolverConfig()
+    tl = get(sv, :time_limit_sec, nothing)
+    gap = get(sv, :mip_rel_gap, nothing)
+    tl === nothing || (tl isa Real && tl > 0) ||
+        throw(ApiError(400, "solver.time_limit_sec debe ser un número > 0 (o null = sin límite)"))
+    gap === nothing || (gap isa Real && 0 <= gap < 1) ||
+        throw(ApiError(400, "solver.mip_rel_gap debe estar en [0, 1)"))
+    return SolverConfig(time_limit_sec = tl === nothing ? Inf : Float64(tl),
+                        mip_rel_gap = gap === nothing ? 1e-4 : Float64(gap))
+end
 
 _bool_field(body, key::Symbol, default::Bool) = try
     Bool(get(body, key, default))
@@ -546,7 +564,7 @@ function handle_export_xlsx(req::HTTP.Request, data_dir::AbstractString)
     cfg = _apply_overrides(cfg, get(body, :config_overrides, nothing))
     validate_scenario(cfg, site)
 
-    r = run_scenario(site, cfg; scenario, verbose = false)
+    r = run_scenario(site, cfg; scenario, verbose = false, solver = _solver_from(body))
     tmp = tempname() * ".xlsx"
     export_xlsx(r, tmp; site)
     bytes = read(tmp)
@@ -588,7 +606,7 @@ function handle_pareto(req::HTTP.Request, data_dir::AbstractString)
         throw(ApiError(400, "cap_end_min ($cap_end_min) debe ser ≤ " *
                             "emissions_cap_net_start ($(cfg.emissions_cap_net_start))"))
 
-    df = pareto_sweep(site, cfg; points, cap_end_min)
+    df = pareto_sweep(site, cfg; points, cap_end_min, solver = _solver_from(body))
     return _json_response(200, (
         meta = (site = site.name, scenario = "emissions_cap",
                 horizon_years = cfg.horizon_years,

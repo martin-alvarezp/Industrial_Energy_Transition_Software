@@ -24,6 +24,8 @@ _meta(r::Results) = (
     scenario_version = scenario_version(r.config),
     status = String(r.status),
     feasible = r.feasible,
+    optimal = r.feasible && r.status == :OPTIMAL,          # false: plan entregado por límite
+    mip_gap = r.feasible && !isnan(r.mip_gap) ? r.mip_gap : nothing,
     horizon_years = r.horizon_years,
     base_year = r.config.base_year,   # 0 = horizonte relativo (M13)
     currency = r.config.currency,     # etiqueta de display (M9)
@@ -264,8 +266,13 @@ function results_payload(r::Results;
         infeasibility = feas ? nothing : (hints = r.diagnostics,),
         # R24: plan factible pero con la meta de emisiones fuera de alcance
         emission_target = (feas && r.config.emission_cap_mode == :relax) ?
-            (reached = isempty(r.diagnostics), shortfall_t = sum(r.emissions.cap_shortfall),
-             warnings = r.diagnostics) : nothing,
+            (reached = !any(startswith("meta de emisiones"), r.diagnostics),
+             shortfall_t = sum(r.emissions.cap_shortfall),
+             warnings = filter(startswith("meta de emisiones"), r.diagnostics)) : nothing,
+        # plan entregado al alcanzar el límite de tiempo (no óptimo)
+        solver_note = (r.feasible && r.status != :OPTIMAL) ?
+            something(findfirst(startswith("límite alcanzado"), r.diagnostics) |>
+                      (i -> i === nothing ? nothing : r.diagnostics[i]), "límite alcanzado") : nothing,
     )
 end
 

@@ -1,12 +1,16 @@
-# Configuración de HiGHS (SPEC §12, §14). El MVP es pequeño (§14: ~960 pasos y
-# ~40 binarias con horizon_years=10), así que los defaults son holgados.
+# Configuración de HiGHS (SPEC §12, §14). Sin límite de tiempo por defecto: un
+# sitio real (miles de pasos, varios hitos) puede tardar horas y una corrida no
+# se corta sola. Si el usuario fija un límite y se alcanza, se entrega el mejor
+# plan encontrado con su brecha al óptimo (ver run_scenario).
 
 "Opciones de resolución; se aplican como atributos del optimizador HiGHS."
 Base.@kwdef struct SolverConfig
     silent::Bool = true
-    time_limit_sec::Float64 = 300.0
-    mip_rel_gap::Float64 = 1e-6      # apretado: los tests comparan contra óptimos exactos
+    time_limit_sec::Float64 = Inf    # Inf = sin límite
+    mip_rel_gap::Float64 = 1e-4      # 0,01 % del óptimo (default de HiGHS); los
+                                     # tests de óptimos exactos piden 1e-6
     threads::Int = 0                 # 0 = decide HiGHS
+    attributes::Dict{String,Any} = Dict{String,Any}()   # otras opciones de HiGHS
 end
 
 """
@@ -16,9 +20,13 @@ Aplica la configuración al modelo JuMP (asume backend HiGHS).
 """
 function configure_solver!(m::JuMP.Model, sc::SolverConfig)
     sc.silent ? JuMP.set_silent(m) : JuMP.unset_silent(m)
-    JuMP.set_time_limit_sec(m, sc.time_limit_sec)
+    isfinite(sc.time_limit_sec) ? JuMP.set_time_limit_sec(m, sc.time_limit_sec) :
+                                  JuMP.set_time_limit_sec(m, nothing)
     JuMP.set_attribute(m, "mip_rel_gap", sc.mip_rel_gap)
     sc.threads > 0 && JuMP.set_attribute(m, "threads", sc.threads)
+    for (k, v) in sc.attributes
+        JuMP.set_attribute(m, k, v)
+    end
     return m
 end
 
@@ -55,7 +63,7 @@ function solve_relaxed_caps!(im::IETOModel)
     obj = JuMP.objective_function(m)
     JuMP.@objective(m, Min, sum(sl))
     JuMP.optimize!(m)
-    JuMP.is_solved_and_feasible(m) || (JuMP.@objective(m, Min, obj); return im)
+    has_plan(m) || (JuMP.@objective(m, Min, obj); return im)
     smin = JuMP.objective_value(m)
     m[:cap_shortfall_total] = JuMP.@constraint(m, sum(sl) <= smin + 1e-6 * max(1.0, smin))
     JuMP.@objective(m, Min, obj)
@@ -63,12 +71,30 @@ function solve_relaxed_caps!(im::IETOModel)
     return im
 end
 
+"""
+    has_plan(m) -> Bool
+
+¿Hay un plan factible para entregar? Óptimo, o detenido por un límite (tiempo,
+nodos, …) con una solución factible ya encontrada.
+"""
+has_plan(m::JuMP.Model) = JuMP.is_solved_and_feasible(m) ||
+    (JuMP.result_count(m) > 0 && JuMP.primal_status(m) == JuMP.MOI.FEASIBLE_POINT &&
+     JuMP.termination_status(m) in (JuMP.MOI.TIME_LIMIT, JuMP.MOI.NODE_LIMIT, JuMP.MOI.ITERATION_LIMIT,
+                                    JuMP.MOI.SOLUTION_LIMIT, JuMP.MOI.INTERRUPTED, JuMP.MOI.OTHER_LIMIT))
+
+"Brecha relativa al óptimo del plan entregado (0 si es óptimo; NaN si no aplica)."
+function plan_gap(m::JuMP.Model)
+    JuMP.termination_status(m) == JuMP.MOI.OPTIMAL && return 0.0
+    g = try JuMP.relative_gap(m) catch; NaN end
+    return isfinite(g) ? Float64(g) : NaN
+end
+
 "Exceso sobre los topes por (tope, año relativo) en un modelo resuelto (R24); vacío si no hubo."
 function cap_shortfall(im::IETOModel)
     m = im.model
     out = Tuple{Symbol,Int,Float64}[]
     haskey(JuMP.object_dictionary(m), :cap_slacks) || return out
-    JuMP.is_solved_and_feasible(m) || return out
+    has_plan(m) || return out
     for (k, y, v) in m[:cap_slacks]
         x = JuMP.value(v)
         x > 1e-6 && push!(out, (k, im.sets.year_of[y], x))

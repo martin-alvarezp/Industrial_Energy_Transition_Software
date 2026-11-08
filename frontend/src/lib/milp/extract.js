@@ -52,7 +52,10 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     scenario_version: fnv12(JSON.stringify(cfg)),
     site_version: fnv12(JSON.stringify({ ...site, name: undefined })),
     status: sol.Status === "Optimal" ? "OPTIMAL" : String(sol.Status).toUpperCase(),
-    feasible: sol.Status === "Optimal",
+    // detenido por un límite con un plan en la mano: se entrega (no óptimo)
+    feasible: sol.Status === "Optimal" || (/limit/i.test(String(sol.Status)) &&
+      Number.isFinite(sol.ObjectiveValue) && Object.values(sol.Columns ?? {}).some((c) => c.Primal != null)),
+    optimal: sol.Status === "Optimal",
     horizon_years: H, base_year: cfg.base_year ?? 0,
     currency: cfg.currency ?? "USD",
   };
@@ -421,6 +424,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       return { tech: st.tech_id, year: y, mwh, new_mwh: nw };
     })),
     infeasibility: null,
+    solver_note: meta.optimal ? null
+      : `límite alcanzado (${meta.status}): se entrega el mejor plan encontrado`,
     // R24: plan factible con la meta de emisiones fuera de alcance
     emission_target: cfg.emission_cap_mode === "relax"
       ? { reached: !capWarn.length, shortfall_t: emissions.reduce((a, e) => a + (e.cap_shortfall ?? 0), 0),

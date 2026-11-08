@@ -25,6 +25,7 @@ struct Results
     diagnostics::Vector{String}         # causas de infactibilidad (vacío si factible)
     measures::DataFrame                 # medidas de eficiencia compradas (5.3): id, name, year
     storage_energy::DataFrame           # almacenamiento (R2): tech, year, mwh, new_mwh
+    mip_gap::Float64                    # brecha al óptimo del plan entregado (0 = óptimo)
 end
 
 """
@@ -55,6 +56,7 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         _shortfall_messages(im),
         _measures_bought(im),
         _storage_energy(im),
+        plan_gap(im.model),
     )
     # años hito (R6): las tablas llevan el año RELATIVO real, no el índice
     ry = im.sets.year_of
@@ -71,7 +73,7 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
 end
 
 # R24: aviso por cada tope que no se alcanza (el plan es factible igual)
-_shortfall_messages(im::IETOModel) =
+_shortfall_messages(im::IETOModel) =   # R24 (empiezan con "meta de emisiones")
     ["meta de emisiones no alcanzable: $k en el año $(calendar_year(im.config, y)) excede el tope en $(round(x; digits = 1)) tCO₂e"
      for (k, y, x) in cap_shortfall(im)]
 
@@ -107,7 +109,7 @@ function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
                             status::Symbol, diagnostics::Vector{String} = String[])
     return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
-                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame(), DataFrame())
+                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame(), DataFrame(), NaN)
 end
 
 _fmt(x; d = 1) = isnan(x) ? "—" : string(round(x; digits = d))
@@ -130,7 +132,8 @@ function print_summary(r::Results; io::IO = stdout)
         println(io, "═"^64)
         return nothing
     end
-    println(io, "estado: $(r.status)")
+    println(io, "estado: $(r.status)", r.status == :OPTIMAL || isnan(r.mip_gap) ? "" :
+            " — mejor plan encontrado, a $(round(100 * r.mip_gap; digits = 2)) % del óptimo")
     println(io, "VAN total: $(_musd(r.npv))   ·   CAPEX total: $(_musd(r.total_capex))")
 
     println(io, "\n── Inversiones (cuándo y cuánto) ", "─"^30)

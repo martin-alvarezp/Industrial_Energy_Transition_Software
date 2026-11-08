@@ -709,3 +709,12 @@ días tipo (k por año) con cronología.
   matriz [paso, año] en todo el motor (objetivo, emisiones, topes anuales,
   ciclos, neteo, desglose). Oráculos en test_days_by_year.jl; goldens
   `dias_por_anio_n2` y `demo_meses_por_anio_n3`.
+- ✅ **Límites del optimizador** (2026-11-08). Sin límite de tiempo por
+  defecto (un sitio real puede tardar horas) y tolerancia de optimalidad de
+  0,01 % (antes 300 s y 1e-6). El usuario los fija en Nueva optimización y
+  viajan a la API (`solver: {time_limit_sec, mip_rel_gap}`) y al motor web. Si
+  se alcanza un límite con un plan factible, se entrega ese plan con su
+  brecha al óptimo (`meta.optimal = false`, `meta.mip_gap`, `solver_note`) y
+  el Resumen lo avisa; solo sin ningún plan la corrida queda sin solución. El
+  navegador ya no corta corridas largas. Tests en test_solver_limits.jl y
+  `verify:solver`.

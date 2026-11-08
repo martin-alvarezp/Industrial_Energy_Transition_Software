@@ -17,6 +17,7 @@
     "verify:dispatch": "node scripts/verify_dispatch.mjs",
     "verify:operation": "node scripts/verify_operation.mjs",
     "verify:storage": "node scripts/verify_storage.mjs",
+    "verify:solver": "node scripts/verify_solver.mjs",
     "verify:capex": "node scripts/verify_capex.mjs",
     "verify:units": "node scripts/verify_units.mjs",
     "verify:finance": "node scripts/verify_finance.mjs",

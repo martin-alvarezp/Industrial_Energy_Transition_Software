@@ -31,9 +31,11 @@ const BUNDLED_SITES = { planta_red: plantaRed };
 // Para desarrollo con vite dev: VITE_IETO_API=http://127.0.0.1:8080
 const API_BASE = import.meta.env.VITE_IETO_API ?? "";
 
+// timeoutMs = null ⇒ sin tope del lado del navegador (las corridas pueden durar
+// horas; el único límite es el que el usuario fija al optimizador)
 async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const timer = timeoutMs == null ? null : setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(API_BASE + path, {
       method,
@@ -49,9 +51,14 @@ async function post(path, body, { timeoutMs = 120_000, method = "POST" } = {}) {
     }
     return payload;
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
+
+/** Opciones del optimizador para la API (límite de tiempo y tolerancia). */
+const solverBody = (cfg) => ({ solver: {
+  time_limit_sec: cfg.solver_time_limit_min > 0 ? cfg.solver_time_limit_min * 60 : null,
+  mip_rel_gap: (cfg.solver_gap_pct ?? 0.01) / 100 } });
 
 /** GET /solar_profile (D2): 8760 cf horarios de PVGIS para la lat/lon. */
 export async function fetchSolarProfile(lat, lon) {
@@ -206,13 +213,12 @@ export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") 
   const overrides = toOverrides(cfg);
   const site = siteName;
   const payload = sitePayload ? { site_payload: enginePayload(sitePayload) } : {};
-  // el server resuelve en SERIE: con plantillas pesadas una consulta espera
-  // en cola detrás de las otras — 120 s abortaba corridas sanas (y la UI caía
-  // al mock sin decirlo)
-  const SOLVE_MS = 900_000;
+  // el server resuelve en SERIE y una corrida puede durar horas: sin tope del
+  // navegador (el límite lo pone el usuario en el optimizador)
+  const SOLVE_MS = null;
   const run = (scenario, extra = {}) =>
     post("/scenario", { site, scenario, config_overrides: overrides,
-                        ...payload, ...extra }, { timeoutMs: SOLVE_MS });
+                        ...payload, ...solverBody(cfg), ...extra }, { timeoutMs: SOLVE_MS });
 
   // modo despacho o "solo esta corrida": una sola optimización (con 8760
   // pasos, Pareto + 6 comparaciones eran 15 MILPs más, en serie en el server)
@@ -225,7 +231,7 @@ export async function computeViaApi(cfg, sitePayload = null, siteName = "demo") 
                         "high_gas", "high_carbon"];
   const [result, paretoResp, ...compare] = await Promise.all([
     run(scenarioName(cfg), { include_dispatch: true, shadow_prices: true }),
-    post("/pareto", { site, points: 9, config_overrides: overrides, ...payload }, { timeoutMs: SOLVE_MS }),
+    post("/pareto", { site, points: 9, config_overrides: overrides, ...payload, ...solverBody(cfg) }, { timeoutMs: SOLVE_MS }),
     ...compareNames.map((s) => run(s, { shadow_prices: false })),
   ]);
 
@@ -292,14 +298,13 @@ export function computeViaWebEngine(cfg, siteJson, onProgress) {
       _webWorker ??= new Worker(new URL("./milp/worker.js", import.meta.url),
                                 { type: "module" });
     } catch (e) { reject(e); return; }
-    const timer = setTimeout(() => reject(new Error("motor web: timeout")), 300_000);
+    // sin tope propio: el límite (si hay) lo aplica HiGHS dentro del worker
     _webWorker.onmessage = (e) => {
       if (e.data.progress) { onProgress?.(e.data.progress); return; }
-      clearTimeout(timer);
       if (e.data.error) reject(new Error(e.data.error));
       else resolve(e.data.bundle);
     };
-    _webWorker.onerror = (e) => { clearTimeout(timer); reject(new Error(e.message)); };
+    _webWorker.onerror = (e) => { reject(new Error(e.message)); };
     const wasmUrl = new URL(`${import.meta.env.BASE_URL}highs.wasm`,
                             window.location.href).href;
     _webWorker.postMessage({ cfg, siteJson: enginePayload(siteJson), wasmUrl });
@@ -367,12 +372,13 @@ export const runParetoSweep = (cfg, sitePayload, siteName, points = 9, capEndMin
     site: siteName, points, config_overrides: toOverrides(cfg),
     ...(capEndMin != null ? { cap_end_min: capEndMin } : {}),
     ...(sitePayload ? { site_payload: enginePayload(sitePayload) } : {}),
-  }, { timeoutMs: 600_000 });
+    ...solverBody(cfg),
+  }, { timeoutMs: null });
 
 /** POST /portfolio (D5): mismo escenario sobre N sitios + agregado grupo. */
 export const runPortfolio = (sites, scenario, cfg) =>
-  post("/portfolio", { sites, scenario, config_overrides: toOverrides(cfg) },
-       { timeoutMs: 600_000 });
+  post("/portfolio", { sites, scenario, config_overrides: toOverrides(cfg), ...solverBody(cfg) },
+       { timeoutMs: null });
 
 /** GET /sites: sitios guardados disponibles. Sin API van los sitios embebidos:
  * la planta con red (topología M14) y el demo de placa de cobre. */

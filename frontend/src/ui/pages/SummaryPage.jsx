@@ -183,6 +183,12 @@ export default function SummaryPage() {
         <div className="ui-banner bad">{t("sum.infeasible")}
           {(result?.infeasibility?.hints ?? []).map((h, i) => <div key={i}>• {h}</div>)}</div>
       )}
+      {data && feasible && result?.meta?.optimal === false && (
+        <div className="ui-banner warn" data-testid="not-optimal">
+          {t("sum.notOptimal", { g: result.meta.mip_gap != null
+            ? ` (${(100 * result.meta.mip_gap).toLocaleString(undefined, { maximumFractionDigits: 2 })} % ${t("sum.fromOptimum")})` : "" })}
+        </div>
+      )}
       {data && feasible && result?.emission_target && result.emission_target.reached === false && (
         <div className="ui-banner warn" data-testid="target-missed">
           {t("sum.targetMissed", { x: Math.round(result.emission_target.shortfall_t).toLocaleString() })}

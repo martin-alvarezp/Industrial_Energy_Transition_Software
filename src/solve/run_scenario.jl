@@ -102,7 +102,7 @@ function run_scenario(site::Site, cfg::ScenarioConfig;
     solve!(im; solver)
 
     status = JuMP.termination_status(im.model)
-    if !JuMP.is_solved_and_feasible(im.model)
+    if !has_plan(im.model)
         diagnostics = String[]
         if status in (JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED)
             findings = add_budget_floor!(diagnose_infeasibility(site2, cfg2),
@@ -111,10 +111,10 @@ function run_scenario(site::Site, cfg::ScenarioConfig;
             @warn "El escenario '$sname' es infactible para el sitio " *
                   "'$(site2.name)'. Diagnóstico:\n  - " * join(diagnostics, "\n  - ")
         else
-            diagnostics = ["el solver no llegó a una solución factible (estado: " *
-                           "$status) — revisa time_limit_sec/mip_rel_gap en SolverConfig"]
-            @warn "El escenario '$sname' no llegó a una solución factible " *
-                  "(estado: $status). Revisa time_limit_sec/mip_rel_gap en SolverConfig."
+            diagnostics = ["el optimizador se detuvo sin encontrar ningún plan factible (estado: " *
+                           "$status) — da más tiempo o aumenta la tolerancia de optimalidad"]
+            @warn "El escenario '$sname' no llegó a un plan factible " *
+                  "(estado: $status). Da más tiempo o aumenta la tolerancia."
         end
         r = infeasible_results(site2, cfg2, sname, Symbol(status), diagnostics)
         verbose && print_summary(r)
@@ -125,6 +125,14 @@ function run_scenario(site::Site, cfg::ScenarioConfig;
     # fijado no corresponde al incumbente exacto)
     r = extract_results(im; scenario = sname,
                         shadow_prices = shadow_prices && status == JuMP.MOI.OPTIMAL)
+    # detenido por el límite con un plan en la mano: se entrega con su brecha
+    if status != JuMP.MOI.OPTIMAL
+        g = r.mip_gap
+        push!(r.diagnostics, "límite alcanzado ($status): se entrega el mejor plan encontrado" *
+              (isnan(g) ? "" : ", a $(round(100g; digits = 2)) % del óptimo"))
+        @warn "El escenario '$sname' se detuvo por límite ($status); mejor plan encontrado" *
+              (isnan(g) ? "." : " a $(round(100g; digits = 2)) % del óptimo.")
+    end
     verbose && print_summary(r)
     return r
 end

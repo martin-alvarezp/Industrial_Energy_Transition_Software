@@ -141,37 +141,45 @@ export function applyScenario(site, cfg, scenario) {
  * con emission_cap_mode "relax" y el tope duro infactible, minimiza primero el
  * exceso total sobre los topes y, con ese techo, el costo.
  */
-export function solveLP(highs, site, cfg) {
+/** Opciones de HiGHS desde la configuración de la UI: límite de tiempo (sin
+ * límite si no se fija) y tolerancia de optimalidad (0,01 % por defecto). */
+export const solverOptions = (uiCfg = {}) => {
+  const o = { mip_rel_gap: (uiCfg.solver_gap_pct ?? 0.01) / 100 };
+  if (uiCfg.solver_time_limit_min > 0) o.time_limit = uiCfg.solver_time_limit_min * 60;
+  return o;
+};
+
+export function solveLP(highs, site, cfg, opts = {}) {
   let { lp, constant, meta } = buildLP(site, cfg);
-  let sol = highs.solve(lp);
+  let sol = highs.solve(lp, opts);
   if (cfg.emission_cap_mode === "relax" && meta.slacks.length && sol.Status !== "Optimal") {
-    const p1 = highs.solve(buildLP(site, cfg, { phase: 1 }).lp);
+    const p1 = highs.solve(buildLP(site, cfg, { phase: 1 }).lp, opts);
     if (p1.Status === "Optimal") {
       const smin = p1.ObjectiveValue;
       ({ lp, constant, meta } = buildLP(site, cfg, { slackMax: smin + 1e-6 * Math.max(1, smin) }));
-      sol = highs.solve(lp);
+      sol = highs.solve(lp, opts);
     }
   }
   return { sol, constant, meta };
 }
 
 /** Una corrida: aplica escenario, construye LP, resuelve, extrae payload. */
-export function runScenarioWeb(highs, site, cfg, scenario) {
+export function runScenarioWeb(highs, site, cfg, scenario, opts = {}) {
   const [s2, c2] = applyScenario(site, cfg, scenario);
-  const { sol, constant } = solveLP(highs, s2, c2);
+  const { sol, constant } = solveLP(highs, s2, c2, opts);
   return extractPayload(s2, c2, sol, constant, scenario);
 }
 
 /** Curva Pareto: barre la meta neta final en `points` tramos (espejo simple
  * de pareto_sweep: VAN vs reducción exigida). */
-export function paretoWeb(highs, site, cfg, points = 5) {
+export function paretoWeb(highs, site, cfg, points = 5, opts = {}) {
   const rows = [];
   const start = cfg.emissions_cap_net_start;
   for (let i = 0; i < points; i++) {
     const frac = i / (points - 1);
     const end = start * (1 - 0.8 * frac);   // 0% → 80% de reducción
     const p = runScenarioWeb(highs, site,
-      { ...cfg, emissions_cap_net_end: end }, "emissions_cap");
+      { ...cfg, emissions_cap_net_end: end }, "emissions_cap", opts);
     rows.push({ reduction: frac * 0.8,
                 cap_net_end: end,
                 npv: p.meta.feasible ? p.kpis.npv : null,
@@ -187,21 +195,22 @@ export function paretoWeb(highs, site, cfg, points = 5) {
  */
 export function computeViaWeb(highs, uiCfg, siteJson, onProgress = () => {}) {
   const cfg = toConfig(uiCfg);
+  const opts = solverOptions(uiCfg);
   const main = uiCfg.price_scenario && uiCfg.price_scenario !== "base"
     ? uiCfg.price_scenario : "emissions_cap";
   const compareNames = ["bau", "least_cost", "emissions_cap", "no_offsets",
                         "high_gas", "high_carbon"];
   onProgress(`optimizando escenario ${main}…`);
-  const result = runScenarioWeb(highs, siteJson, cfg, main);
+  const result = runScenarioWeb(highs, siteJson, cfg, main, opts);
   if (isSingleRun(uiCfg))
     return { source: "web", result, reference: null, referenceLabel: null, bau: null,
              bauFeasible: null, pareto: null, batch: [], single: true };
   const compare = compareNames.map((sc, i) => {
     onProgress(`comparando escenarios (${i + 1}/${compareNames.length})…`);
-    return runScenarioWeb(highs, siteJson, cfg, sc);
+    return runScenarioWeb(highs, siteJson, cfg, sc, opts);
   });
   onProgress("barriendo la curva Pareto…");
-  const pareto = paretoWeb(highs, siteJson, cfg, 5);
+  const pareto = paretoWeb(highs, siteJson, cfg, 5, opts);
 
   const batch = compare.map((r, i) => ({
     scenario: compareNames[i],
