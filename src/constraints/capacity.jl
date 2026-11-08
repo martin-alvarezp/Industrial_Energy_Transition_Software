@@ -31,6 +31,12 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     # compra, al menos min_build MW (la binaria build ya marca la compra)
     m[:build_window] = [JuMP.@constraint(m, build[t, y] == 0)
                         for t in sets.candidates, y in years if !build_allowed(cfg, t, sets.year_of, y)]
+    # permisos por tramos (R25): en el año de cada hito, el de la tecnología y el
+    # del sitio; una compra forzada (infraestructura fija) no los necesita
+    fk = Set((f[1], f[2]) for f in params.forced_builds)
+    m[:build_permission] = [JuMP.@constraint(m, build[t, y] == 0)
+                            for t in sets.candidates, y in years
+                            if !permitted(cfg, t, sets.year_of[y]) && !((t, y) in fk)]
     m[:min_build] = [JuMP.@constraint(m, new_capacity[t, y] >= cfg.min_build[t] * build[t, y])
                      for t in sets.candidates, y in years if get(cfg.min_build, t, 0.0) > 0]
     # unidades enteras (3.2): con tamaño de unidad la compra es u·n, n ∈ ℤ≥0

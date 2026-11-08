@@ -687,3 +687,14 @@ días tipo (k por año) con cronología.
   5,77 M = 0,10728 = CRF(7,84 %, 15)/1,0784. Oráculos en
   test_capex_annuity.jl; goldens `capex_cuotas_n3`, `capex_credito_deuda_n3`
   y `demo_capex_cuotas_hitos_n10`.
+- ✅ **R25 · Permisos de inversión por tramos** (2026-11-08).
+  `build_permission`: por tecnología, o para todo el sitio con la clave
+  `site`, una lista de tramos (año, permitido) en escalón; antes del primer
+  tramo rige lo contrario del primero ("permitido desde 2028" prohíbe antes).
+  Se evalúa en el año de cada hito: un permiso fijado en un año intermedio
+  vale desde el hito siguiente, salvo que ese hito tenga el suyo. Se combina
+  con `build_window` (las dos deben permitir). Una compra forzada
+  (infraestructura fija) no necesita permiso. Así se representan los
+  permisos de la referencia: rangos de años o años sueltos, por activo o
+  para el sitio. Oráculos en test_permissions.jl; goldens
+  `permisos_tramos_n3` y `permisos_hitos_forzada_n4`.

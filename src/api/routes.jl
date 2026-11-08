@@ -128,6 +128,9 @@ _coerce(::Type{Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}}, v) =
         for (k, tg) in pairs(v))
 _coerce(::Type{Dict{Symbol,Float64}}, v) =
     Dict{Symbol,Float64}(Symbol(k) => Float64(x) for (k, x) in pairs(v))
+_coerce(::Type{Dict{Symbol,Vector{Tuple{Int,Bool}}}}, v) =                     # permisos por tramos (R25)
+    Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in pts]
+                                        for (k, pts) in pairs(v))
 _coerce(::Type{Dict{Symbol,Int}}, v) =                                 # plazo por tecnología (R27)
     Dict{Symbol,Int}(Symbol(k) => Int(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{EfficiencyMeasure}}, v) =

@@ -350,4 +350,11 @@ dump("capex_credito_deuda_n3", s44, with_config(c44; horizon_years = 3, wacc = 0
      financing_years = 2, debt_share = Dict(:hp => 0.5)))
 dump("demo_capex_cuotas_hitos_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
      milestone_years = [2026, 2028, 2031, 2035], financing_rate = 0.0784, financing_years = 15))
+# 45 · permisos por tramos (R25): la bomba permitida desde el año 2 y el sitio
+# desde el 3; y un tramo intermedio con hitos más una compra forzada exenta
+s45, c45 = discrete_case(0.0)
+dump("permisos_tramos_n3", s45, with_config(c45; horizon_years = 3, wacc = 0.05,
+     build_permission = Dict(:hp => [(2, true)], :site => [(3, true)])))
+dump("permisos_hitos_forzada_n4", s45, with_config(c45; horizon_years = 4, wacc = 0.05, milestone_years = [1, 3, 4],
+     build_permission = Dict(:hp => [(1, false), (2, true), (3, false)]), forced_builds = [(:hp, 4, 3.0)]))
 println("fixtures dorados en ", out)

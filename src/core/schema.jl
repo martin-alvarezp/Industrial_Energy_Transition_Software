@@ -420,5 +420,7 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Int}(Symbol(k) => Int(v) for (k, v) in get(d, "financing_period_tech", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "financing_rate_tech", Dict())),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "debt_share", Dict())),
+        Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in v]
+                                            for (k, v) in get(d, "build_permission", Dict())),
     )
 end

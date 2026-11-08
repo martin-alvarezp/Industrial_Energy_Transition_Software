@@ -558,6 +558,12 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                 "forced_builds['$t']: el año $yr cae después del último hito ($(calendar_year(cfg, last_m)))")
         end
     end
+    for (k, pts) in cfg.build_permission
+        (k == :site || cand(k)) || push!(problems,
+            "build_permission: '$k' no es una tecnología candidata a inversión (ni :site)")
+        length(unique(first.(pts))) == length(pts) || push!(problems,
+            "build_permission['$k']: años repetidos")
+    end
     cfg.capex_accounting in (:annuity, :lump) || push!(problems,
         "capex_accounting: '$(cfg.capex_accounting)' desconocido (annuity | lump)")
     for (k, v) in cfg.financing_period_tech

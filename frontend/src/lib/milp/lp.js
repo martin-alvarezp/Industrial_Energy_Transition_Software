@@ -167,6 +167,19 @@ export const modelYears = (cfg) => cfg.milestone_years?.length
   : Array.from({ length: cfg.horizon_years }, (_, i) => i + 1);
 /** Índice (1-based) del hito que paga lo que pasa en el año relativo yr; 0 si cae después del último. */
 export const milestoneIndex = (yo, yr) => yo.findIndex((r) => r >= yr) + 1;
+/** Permiso de inversión en el año relativo r (R25), espejo de permission_at. */
+export const permissionAt = (cfg, key, r) => {
+  const pts = (cfg.build_permission?.[key] ?? []).map((p) => (Array.isArray(p) ? p : [p.year, p.allowed]));
+  if (!pts.length) return true;
+  let best = null, by = -Infinity, firstV = null, fy = Infinity;
+  for (const [yr, v] of pts) {
+    const ry = relYear(cfg, yr);
+    if (ry < fy) { fy = ry; firstV = !!v; }
+    if (ry <= r && ry >= by) { by = ry; best = !!v; }
+  }
+  return best === null ? !firstV : best;
+};
+export const permitted = (cfg, tech, r) => permissionAt(cfg, tech, r) && permissionAt(cfg, "site", r);
 /** Ventana de construcción por hito (R1 + R6): el hito k cubre (hito k−1, hito k]. */
 export const buildAllowedAt = (cfg, tech, yo, k) => {
   const w = cfg.build_window?.[tech];
@@ -1144,6 +1157,8 @@ export function buildLP(site0, cfg0, opts = {}) {
   }
   // inversión: nc ≤ maxnew·b · a-lo-más-una compra · forzadas
   const binaries = [];
+  const forcedAt = new Set((cfg.forced_builds ?? []).map((f) => (Array.isArray(f) ? f : [f.tech, f.year]))
+    .map(([tech, yf]) => `${tech}|${milestoneIndex(yo, relYear(cfg, yf))}`));   // R25: exentas de permisos
   for (const t of cands) {
     const id = sane(t.tech_id);
     // unidades enteras (3.2): conversor con tamaño de unidad ⇒ nc = u·n, n ∈ ℤ
@@ -1158,6 +1173,9 @@ export function buildLP(site0, cfg0, opts = {}) {
           { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);
       // reglas de construcción (R1): ventana y tamaño mínimo
       if (!buildAllowedAt(cfg, t.tech_id, yo, y)) row(`bwin_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
+      // permisos por tramos (R25), salvo la compra forzada de ese hito
+      if (!permitted(cfg, t.tech_id, yr(y)) && !forcedAt.has(`${t.tech_id}|${y}`))
+        row(`bperm_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
       if (ownEnergy(cfg, t) && (cfg.storage_energy_min?.[t.tech_id] ?? 0) > 0)   // R14: eng ≥ Emín·b
         row(`emin_${id}_${y}`, { [`eng_${id}_${y}`]: 1, [`b_${id}_${y}`]: -cfg.storage_energy_min[t.tech_id] }, ">=", 0);
       if (ownEnergy(cfg, t))                                             // R2: eng ≤ Emáx·b

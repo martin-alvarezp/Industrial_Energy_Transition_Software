@@ -617,7 +617,37 @@ struct ScenarioConfig
     financing_rate_tech::Dict{Symbol,Float64}  # tecnología/medida → tasa; default financing_rate
     debt_share::Dict{Symbol,Float64}         # tecnología/medida → fracción con deuda (default 1);
                                              # el resto se paga entero en el año de compra
+    # ── permisos de inversión por tramos (benchmark R25) ──
+    build_permission::Dict{Symbol,Vector{Tuple{Int,Bool}}}  # tecnología (o :site = todo el sitio) →
+                                             # [(año, permitido)] en escalón; antes del primero,
+                                             # lo contrario del primero. Se evalúa en el año del hito
 end
+
+# retro-compatibilidad: 78 campos → sin permisos por tramos
+ScenarioConfig(a::Vararg{Any,78}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Bool}}}())
+
+"""
+    permission_at(cfg, key, r) -> Bool
+
+Permiso de inversión de `key` (tecnología o `:site`) en el año relativo `r`
+(R25): el valor del último tramo con año ≤ r; antes del primero, lo contrario
+del primero (un "permitido desde 2028" prohíbe antes). Sin tramos, permitido.
+"""
+function permission_at(cfg::ScenarioConfig, key::Symbol, r::Integer)
+    pts = get(cfg.build_permission, key, nothing)
+    (pts === nothing || isempty(pts)) && return true
+    best = nothing; by = typemin(Int); first_v = nothing; fy = typemax(Int)
+    for (yr, v) in pts
+        ry = rel_year(cfg, yr)
+        ry < fy && (fy = ry; first_v = v)
+        ry <= r && ry >= by && (by = ry; best = v)
+    end
+    return best === nothing ? !first_v : best
+end
+
+"¿Permiten invertir en `tech` en el año relativo `r` su permiso y el del sitio? (R25)"
+permitted(cfg::ScenarioConfig, tech::Symbol, r::Integer) =
+    permission_at(cfg, tech, r) && permission_at(cfg, :site, r)
 
 # retro-compatibilidad: 74 campos → CAPEX anualizado con los parámetros globales
 ScenarioConfig(a::Vararg{Any,74}) = ScenarioConfig(a..., :annuity, Dict{Symbol,Int}(),

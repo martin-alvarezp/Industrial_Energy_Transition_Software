@@ -137,6 +137,7 @@ export function toOverrides(cfg) {
     financing_period_tech: cfg.financing_period_tech ?? {},
     financing_rate_tech: cfg.financing_rate_tech ?? {},
     debt_share: cfg.debt_share ?? {},
+    build_permission: cfg.build_permission ?? {},           // R25: permisos por tramos
     milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
