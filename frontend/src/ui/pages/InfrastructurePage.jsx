@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  MdFilterAlt, MdAdd, MdEdit, MdCheck, MdMap, MdLan, MdLayers, MdNearMe, MdRemove,
-  MdOutlineViewInAr, MdOutlineLocationOn, MdOutlineCable, MdBolt, MdOutlineHandshake,
-  MdPolyline, MdOutlineCropFree, MdPinDrop, MdClose, MdSatelliteAlt,
-} from "react-icons/md";
+  IcFilterAlt, IcAdd, IcEdit, IcCheck, IcMap, IcLan, IcLayers, IcNearMe, IcRemove,
+  IcOutlineViewInAr, IcOutlineLocationOn, IcOutlineCable, IcBolt, IcOutlineHandshake,
+  IcPolyline, IcOutlineCropFree, IcPinDrop, IcClose, IcSatelliteAlt,
+} from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { useStored } from "../storage.js";
@@ -248,20 +248,20 @@ export default function InfrastructurePage({ route }) {
       {/* barra de herramientas */}
       <div className="ip-toolbar">
         <button className={"ui-btn primary icon"} aria-label={t("common.filter")} title={t("common.filter")}
-                onClick={() => setFilterOpen((o) => !o)}><MdFilterAlt /></button>
+                onClick={() => setFilterOpen((o) => !o)}><IcFilterAlt /></button>
         <Menu align="left" label={t("common.add")}
               trigger={({ toggle }) => (
-                <button className="ui-btn primary" onClick={toggle}><MdAdd /> {t("common.add")}</button>)}
+                <button className="ui-btn primary" onClick={toggle}><IcAdd /> {t("common.add")}</button>)}
               items={[
-                { label: t("infra.addComponent"), icon: MdOutlineViewInAr, onClick: () => addComponent(selLoc) },
-                { label: t("infra.addLocation"), icon: MdOutlineLocationOn, onClick: () => { setView("map"); setMode("draw-location"); setDraft([]); } },
-                { label: t("infra.addConnection"), icon: MdOutlineCable, onClick: () => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); } },
+                { label: t("infra.addComponent"), icon: IcOutlineViewInAr, onClick: () => addComponent(selLoc) },
+                { label: t("infra.addLocation"), icon: IcOutlineLocationOn, onClick: () => { setView("map"); setMode("draw-location"); setDraft([]); } },
+                { label: t("infra.addConnection"), icon: IcOutlineCable, onClick: () => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); } },
                 "-",
-                { label: t("infra.addCarrier"), icon: MdBolt, onClick: () => setCarrierPick(true) },
-                { label: t("infra.addMarket"), icon: MdOutlineHandshake, onClick: () => setMarketDrawer({ draft: blankMarket(siteJson), isNew: true }) },
+                { label: t("infra.addCarrier"), icon: IcBolt, onClick: () => setCarrierPick(true) },
+                { label: t("infra.addMarket"), icon: IcOutlineHandshake, onClick: () => setMarketDrawer({ draft: blankMarket(siteJson), isNew: true }) },
               ]} />
         <button className={"ui-btn " + (editing ? "primary" : "outline")} onClick={() => { setEditing((e) => !e); cancelMode(); }}>
-          {editing ? <><MdCheck /> {t("infra.editDone")}</> : <><MdEdit /> {t("common.edit")}</>}
+          {editing ? <><IcCheck /> {t("infra.editDone")}</> : <><IcEdit /> {t("common.edit")}</>}
         </button>
       </div>
 
@@ -298,17 +298,17 @@ export default function InfrastructurePage({ route }) {
             mapRef.current?.flyTo(center, 17);
           }} />
           <button className="ui-menu-row" onClick={() => { setView("map"); setMode("draw-boundary"); setDraft([]); }}>
-            <MdOutlineCropFree /> {t("infra.drawBoundary")}</button>
+            <IcOutlineCropFree /> {t("infra.drawBoundary")}</button>
           <button className="ui-menu-row" onClick={() => { setView("map"); setMode("draw-location"); setDraft([]); }}>
-            <MdPolyline /> {t("infra.drawLocation")}</button>
+            <IcPolyline /> {t("infra.drawLocation")}</button>
           <button className="ui-menu-row" onClick={() => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); }}>
-            <MdOutlineCable /> {t("infra.connect")}</button>
+            <IcOutlineCable /> {t("infra.connect")}</button>
           {unplaced.length > 0 && <div className="ui-nav-sub" style={{ padding: "8px 10px 2px" }}>{t("infra.unplaced")}</div>}
           {unplaced.map((x) => {
             const I = componentIcon(x);
             return (
               <button key={x.tech_id} className="ui-menu-row" onClick={() => locateComponent(x)}>
-                <I /> {x.name} <MdPinDrop style={{ marginLeft: "auto" }} />
+                <I /> {x.name} <IcPinDrop style={{ marginLeft: "auto" }} />
               </button>
             );
           })}
@@ -319,7 +319,7 @@ export default function InfrastructurePage({ route }) {
         <div className="ip-mode" role="status">
           <span>{modeText()}</span>
           {isPoly && <button className="ui-btn primary sm" disabled={draft.length < 3} onClick={finishPolygon}>{t("infra.finish")}</button>}
-          <button className="ui-btn ghost sm" onClick={cancelMode}><MdClose /> {t("common.cancel")}</button>
+          <button className="ui-btn ghost sm" onClick={cancelMode}><IcClose /> {t("common.cancel")}</button>
         </div>
       )}
 
@@ -332,8 +332,8 @@ export default function InfrastructurePage({ route }) {
 
       <div className="ip-view-toggle">
         <div className="ui-seg">
-          <button className={view === "map" ? "on" : ""} onClick={() => setView("map")}><MdMap /> {t("infra.map")}</button>
-          <button className={view === "flow" ? "on" : ""} onClick={() => { setView("flow"); cancelMode(); }}><MdLan /> {t("infra.flow")}</button>
+          <button className={view === "map" ? "on" : ""} onClick={() => setView("map")}><IcMap /> {t("infra.map")}</button>
+          <button className={view === "flow" ? "on" : ""} onClick={() => { setView("flow"); cancelMode(); }}><IcLan /> {t("infra.flow")}</button>
         </div>
       </div>
 
@@ -341,21 +341,21 @@ export default function InfrastructurePage({ route }) {
         {view === "map" && (
           <div style={{ position: "relative" }}>
             <button className="ip-ctrl" aria-label={t("infra.layers")} title={t("infra.layers")}
-                    onClick={() => setLayersOpen((o) => !o)}><MdLayers /></button>
+                    onClick={() => setLayersOpen((o) => !o)}><IcLayers /></button>
             {layersOpen && (
               <div className="ip-layers-pop">
                 <button className={base === "standard" ? "on" : ""} onClick={() => { setBase("standard"); setLayersOpen(false); }}>
-                  <MdMap /> {t("infra.standard")}</button>
+                  <IcMap /> {t("infra.standard")}</button>
                 <button className={base === "satellite" ? "on" : ""} onClick={() => { setBase("satellite"); setLayersOpen(false); }}>
-                  <MdSatelliteAlt /> {t("infra.satellite")}</button>
+                  <IcSatelliteAlt /> {t("infra.satellite")}</button>
               </div>
             )}
           </div>
         )}
-        <button className="ip-ctrl" aria-label={t("infra.locate")} title={t("infra.locate")} onClick={fit}><MdNearMe /></button>
+        <button className="ip-ctrl" aria-label={t("infra.locate")} title={t("infra.locate")} onClick={fit}><IcNearMe /></button>
         <div className="ip-zoom">
-          <button className="ip-ctrl" aria-label={t("infra.zoomIn")} onClick={() => zoom(1)}><MdAdd /></button>
-          <button className="ip-ctrl" aria-label={t("infra.zoomOut")} onClick={() => zoom(-1)}><MdRemove /></button>
+          <button className="ip-ctrl" aria-label={t("infra.zoomIn")} onClick={() => zoom(1)}><IcAdd /></button>
+          <button className="ip-ctrl" aria-label={t("infra.zoomOut")} onClick={() => zoom(-1)}><IcRemove /></button>
         </div>
       </div>
       {view === "map" && (

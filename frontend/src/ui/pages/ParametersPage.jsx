@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MdAdd, MdDelete, MdRestartAlt, MdRocketLaunch } from "react-icons/md";
+import { IcAdd, IcDelete, IcRestartAlt, IcRocketLaunch } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead } from "../kit.jsx";
@@ -82,8 +82,8 @@ export default function ParametersPage({ route }) {
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.parameters} title={lib ? t("lib.paramsTitle") : t("nav.parameters")}
                 help={lib ? t("lib.paramsHelp") : t("par.help")}>
-        <button className="ui-btn ghost" onClick={resetAll}><MdRestartAlt /> {t("par.reset")}</button>
-        {!lib && <button className="ui-btn primary" onClick={() => setRunOpen(true)}><MdRocketLaunch /> {t("par.optimize")}</button>}
+        <button className="ui-btn ghost" onClick={resetAll}><IcRestartAlt /> {t("par.reset")}</button>
+        {!lib && <button className="ui-btn primary" onClick={() => setRunOpen(true)}><IcRocketLaunch /> {t("par.optimize")}</button>}
       </PageHead>
 
       <div className="par-grid">
@@ -110,6 +110,16 @@ export default function ParametersPage({ route }) {
                    }} />
           </Field>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.milestonesHint")}</p>
+          {(draft.milestone_years ?? []).length > 0 && <>
+            <Field t={t} label={t("par.weighting")}>
+              <select className="ui-select" data-testid="milestone-weighting" value={draft.milestone_weighting ?? "years"}
+                      onChange={(e) => set({ milestone_weighting: e.target.value })}>
+                <option value="years">{t("par.weightYears")}</option>
+                <option value="none">{t("par.weightNone")}</option>
+              </select>
+            </Field>
+            <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.weightHint")}</p>
+          </>}
           {twin.siteJson.hourly?.template?.method === "typical" && <>
             <Toggle on={draft.link_days !== false} onChange={(x) => set({ link_days: x })} label={t("par.linkDays")} />
             <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.linkDaysHint")}</p>
@@ -153,6 +163,14 @@ export default function ParametersPage({ route }) {
             </Field>
           </div>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.financingHint")}</p>
+          <Field t={t} label={t("par.capexMode")}>
+            <select className="ui-select" data-testid="capex-accounting" value={draft.capex_accounting ?? "annuity"}
+                    onChange={(e) => set({ capex_accounting: e.target.value })}>
+              <option value="annuity">{t("par.capexAnnuity")}</option>
+              <option value="lump">{t("par.capexLump")}</option>
+            </select>
+          </Field>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.capexModeHint")}</p>
           <Toggle on={draft.salvage_value} onChange={(x) => set({ salvage_value: x })} label={t("par.salvage")} />
         </section>
 
@@ -239,12 +257,12 @@ export default function ParametersPage({ route }) {
                   <input className="ui-input" type="number" value={f.mw} style={{ width: 120 }}
                          onChange={(e) => set({ forced_builds: draft.forced_builds.map((x, j) => (j === i ? { ...x, mw: +e.target.value } : x)) })} />
                   <span className="unit">MW</span>
-                  <button className="ui-dots" onClick={() => set({ forced_builds: draft.forced_builds.filter((_, j) => j !== i) })}><MdDelete /></button>
+                  <button className="ui-dots" onClick={() => set({ forced_builds: draft.forced_builds.filter((_, j) => j !== i) })}><IcDelete /></button>
                 </div>
               ))}
               <button className="ui-btn outline sm" onClick={() => set({ forced_builds: [...(draft.forced_builds ?? []),
                 { tech: candidates[0].tech_id, year: draft.base_year + 1, mw: Math.min(1, candidates[0].max_new_capacity) }] })}>
-                <MdAdd /> {t("par.addForced")}
+                <IcAdd /> {t("par.addForced")}
               </button>
             </>
           )}
@@ -275,14 +293,14 @@ export default function ParametersPage({ route }) {
                     <option value="req">{t("par.relReq")}</option>
                   </select>
                   {sel(r.b, (v) => upd(k, { b: v }))}
-                  <button className="ui-dots" onClick={() => write(rels.filter((_, j) => j !== k))}><MdDelete /></button>
+                  <button className="ui-dots" onClick={() => write(rels.filter((_, j) => j !== k))}><IcDelete /></button>
                 </div>
               ))}
               {candidates.length > 0 && techs.length > 1 && (
                 <button className="ui-btn outline sm" data-testid="add-relation"
                         onClick={() => write([...rels, { kind: "excl", a: candidates[0].tech_id,
                           b: techs.find((x) => x.tech_id !== candidates[0].tech_id).tech_id }])}>
-                  <MdAdd /> {t("par.addRelation")}
+                  <IcAdd /> {t("par.addRelation")}
                 </button>
               )}
             </>;
@@ -395,14 +413,14 @@ export default function ParametersPage({ route }) {
                          onChange={(ev) => { const { [e.id]: _, ...rest } = draft.measure_fixed_opex ?? {};
                            const v = +ev.target.value * 1000; set({ measure_fixed_opex: v > 0 ? { ...rest, [e.id]: v } : rest }); }} />
                   <span className="unit">k{cur}/{t("par.perYear")}</span>
-                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><MdDelete /></button>
+                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><IcDelete /></button>
                 </div>
               ))}
               {dc.length > 0 && (
                 <button className="ui-btn outline sm" data-testid="add-effm"
                         onClick={() => write([...list, { id: `em_medida_${list.length}`, name: t("par.effNew"),
                           carrier: dc.includes("electricity") ? "electricity" : dc[0], reduction: 0.05, capex: 500_000 }])}>
-                  <MdAdd /> {t("par.addEffMeasure")}
+                  <IcAdd /> {t("par.addEffMeasure")}
                 </button>
               )}
             </>;
@@ -473,12 +491,12 @@ export default function ParametersPage({ route }) {
                   <input className="ui-input par-capex-traj" placeholder="2028:0.9, 2030:0.85" aria-label={t("par.yfPoints")}
                          defaultValue={r.pts.map(([yr, f]) => `${yr}:${f}`).join(", ")} data-yf-points={`${r.kind}:${r.target}`}
                          onBlur={(e) => write(rows.map((x, j) => j === k ? { ...x, pts: parse(e.target.value) } : x))} />
-                  <button className="ui-dots" onClick={() => write(rows.filter((_, j) => j !== k))}><MdDelete /></button>
+                  <button className="ui-dots" onClick={() => write(rows.filter((_, j) => j !== k))}><IcDelete /></button>
                 </div>
               ))}
               <button className="ui-btn outline sm" data-testid="add-yf"
                       onClick={() => write([...rows, { kind: "price", target: TARGETS.price[0]?.[0] ?? "electricity", pts: [] }])}>
-                <MdAdd /> {t("par.addYearFactor")}
+                <IcAdd /> {t("par.addYearFactor")}
               </button>
             </>;
           })()}
@@ -519,13 +537,13 @@ export default function ParametersPage({ route }) {
                   <select className="ui-select par-capex-traj" value={c.b} onChange={(e) => upd(k, { b: e.target.value })}>
                     {gen.map((x) => <option key={x.tech_id} value={x.tech_id}>{x.name}</option>)}
                   </select>
-                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><MdDelete /></button>
+                  <button className="ui-dots" onClick={() => write(list.filter((_, j) => j !== k))}><IcDelete /></button>
                 </div>
               ))}
               {gen.length >= 2 && (
                 <button className="ui-btn outline sm" data-testid="add-coupling"
                         onClick={() => write([...list, { a: gen[0].tech_id, b: gen[1].tech_id, k: 1, mode: "eq" }])}>
-                  <MdAdd /> {t("par.addCoupling")}
+                  <IcAdd /> {t("par.addCoupling")}
                 </button>
               )}
             </>;

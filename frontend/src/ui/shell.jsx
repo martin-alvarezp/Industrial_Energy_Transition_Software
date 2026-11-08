@@ -1,9 +1,9 @@
 // Armazón de la aplicación: barra superior, barra lateral y área de contenido.
 import { useEffect, useMemo, useState } from "react";
 import {
-  MdSearch, MdLink, MdHelpOutline, MdAdd, MdClose, MdChevronLeft, MdChevronRight,
-  MdExpandLess, MdExpandMore, MdCheck, MdMenu,
-} from "react-icons/md";
+  IcSearch, IcLink, IcHelpOutline, IcAdd, IcClose, IcChevronLeft, IcChevronRight,
+  IcExpandLess, IcExpandMore, IcCheck, IcMenu,
+} from "./iconset.jsx";
 import { useI18n } from "./i18n.jsx";
 import { useStudio } from "./studio.jsx";
 import { hrefFor, navigate } from "./router.js";
@@ -61,7 +61,7 @@ function KpiBadges() {
             {k.label}: <span className="v">{k.value}</span>
             <button aria-label={t("kpi.remove")}
                     onClick={() => setPinned((p) => p.filter((x) => x !== id))}>
-              <MdClose size={16} />
+              <IcClose size={16} />
             </button>
           </span>
         );
@@ -69,13 +69,13 @@ function KpiBadges() {
       <Menu align="left" label={t("top.kpiBadge")}
             trigger={({ toggle }) => (
               <button className="ui-pill-btn" onClick={toggle}>
-                <MdAdd size={20} /> {t("top.kpiBadge")}
+                <IcAdd size={20} /> {t("top.kpiBadge")}
               </button>)}
             items={[
               { header: data ? t("kpi.pick") : t("kpi.noRun") },
               ...cat.map((k) => ({
                 label: `${k.label} · ${k.value}`,
-                icon: pinned.includes(k.id) ? MdCheck : undefined,
+                icon: pinned.includes(k.id) ? IcCheck : undefined,
                 onClick: () => setPinned((p) => p.includes(k.id)
                   ? p.filter((x) => x !== k.id) : [...p, k.id]),
               })),
@@ -106,8 +106,8 @@ function UserMenu() {
                          onChange={(e) => setUser({ ...user, name: e.target.value })} />
                 </div>) },
             { header: t("user.language") },
-            { label: "Español", icon: lang === "es" ? MdCheck : undefined, onClick: () => setLang("es") },
-            { label: "English", icon: lang === "en" ? MdCheck : undefined, onClick: () => setLang("en") },
+            { label: "Español", icon: lang === "es" ? IcCheck : undefined, onClick: () => setLang("es") },
+            { label: "English", icon: lang === "en" ? IcCheck : undefined, onClick: () => setLang("en") },
             "-",
             { render: () => (
                 <div style={{ padding: "4px 12px", fontSize: 13, color: "var(--ui-muted)" }}>
@@ -192,36 +192,36 @@ export function TopBar({ route, onMenu }) {
     <header className="ui-topbar">
       {/* sólo en pantalla angosta (ui.css): abre la barra lateral como cajón */}
       <button className="ui-icon-btn ui-menu-btn" aria-label={t("nav.menu")} onClick={onMenu}>
-        <MdMenu size={24} />
+        <IcMenu size={24} />
       </button>
       <Logo />
       <nav className="ui-crumbs" aria-label="breadcrumb">
         {route.scope === "system" && siteName && (
           <>
-            <span className="sep"><MdChevronRight size={20} /></span>
+            <span className="sep"><IcChevronRight size={20} /></span>
             <a href={hrefFor({ site: siteName, page: "infrastructure" })}>{twin?.layout?.title || twin?.siteJson?.name || siteName}</a>
             {loc && <><span className="sep">/</span><span className="here">{loc.name}</span></>}
           </>
         )}
         {libItem && (
-          <><span className="sep"><MdChevronRight size={20} /></span><span>{t(libItem.key)}</span></>
+          <><span className="sep"><IcChevronRight size={20} /></span><span>{t(libItem.key)}</span></>
         )}
       </nav>
       {route.scope === "system" && <KpiBadges />}
       <div className="ui-top-right">
         <button className="ui-search" onClick={() => setCmd(true)} aria-label={t("top.search")}>
-          <MdSearch size={20} /> <span className="ui-kbd">Ctrl K</span>
+          <IcSearch size={20} /> <span className="ui-kbd">Ctrl K</span>
         </button>
         <button className="ui-icon-btn ui-hide-sm" title={t("top.copyLink")} aria-label={t("top.copyLink")}
                 onClick={() => {
                   navigator.clipboard?.writeText(window.location.href)
                     .then(() => setFlash(t("top.linkCopied")), () => setFlash(window.location.href));
                 }}>
-          <MdLink size={24} style={{ transform: "rotate(-45deg)" }} />
+          <IcLink size={24} style={{ transform: "rotate(-45deg)" }} />
         </button>
         <button className="ui-icon-btn" title={t("top.help")} aria-label={t("top.help")}
                 onClick={() => setHelp(true)}>
-          <MdHelpOutline size={24} />
+          <IcHelpOutline size={24} />
         </button>
         <UserMenu />
       </div>
@@ -264,7 +264,7 @@ export function Sidebar({ route, collapsed, setCollapsed, onNavigate }) {
                       onClick={() => setClosed((c) => ({ ...c, [sec.id]: !c[sec.id] }))}
                       aria-expanded={!isClosed}>
                 {SecIcon && <SecIcon />}<span>{t(sec.key)}</span>
-                {!isClosed && <MdExpandLess className="chev" />}
+                {!isClosed && <IcExpandLess className="chev" />}
               </button>
               {!isClosed && sec.items.map((n, i) => n.sub
                 ? <div key={"sub" + i} className="ui-nav-sub">{t(n.sub)}</div>
@@ -276,7 +276,7 @@ export function Sidebar({ route, collapsed, setCollapsed, onNavigate }) {
       </nav>
       <div className="ui-sidebar-foot">
         <button className="ui-nav-item" onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? <MdChevronRight /> : <MdChevronLeft />}
+          {collapsed ? <IcChevronRight /> : <IcChevronLeft />}
           <span>{collapsed ? t("nav.expand") : t("nav.minimize")}</span>
         </button>
       </div>

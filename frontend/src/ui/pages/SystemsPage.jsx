@@ -1,6 +1,6 @@
 import { SLR } from "../palette.js";
 import { useEffect, useRef, useState } from "react";
-import { MdAdd, MdOpenInNew, MdContentCopy, MdEdit, MdImage, MdDelete } from "react-icons/md";
+import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { NAV_ICONS } from "../icons.jsx";
@@ -89,14 +89,14 @@ function SystemCard({ name, onChanged, unsaved = false }) {
           )}
         </div>
         <Menu items={[
-          { label: t("common.open"), icon: MdOpenInNew, onClick: open },
-          { label: t("common.duplicate"), icon: MdContentCopy, onClick: doDuplicate, hidden: !canWrite },
-          { label: t("common.rename"), icon: MdEdit, onClick: () => setRename(meta?.title ?? name),
+          { label: t("common.open"), icon: IcOpenInNew, onClick: open },
+          { label: t("common.duplicate"), icon: IcContentCopy, onClick: doDuplicate, hidden: !canWrite },
+          { label: t("common.rename"), icon: IcEdit, onClick: () => setRename(meta?.title ?? name),
             hidden: !canWrite || name === "demo" },
-          { label: t("systems.cover"), icon: MdImage, onClick: () => fileRef.current?.click(),
+          { label: t("systems.cover"), icon: IcImage, onClick: () => fileRef.current?.click(),
             hidden: !canWrite || name === "demo" },
           "-",
-          { label: t("common.delete"), icon: MdDelete, danger: true, onClick: doDelete,
+          { label: t("common.delete"), icon: IcDelete, danger: true, onClick: doDelete,
             hidden: !canWrite || name === "demo" },
         ]} />
       </div>
@@ -190,7 +190,7 @@ export default function SystemsPage() {
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.systems} title={t("systems.title")} help={t("systems.help")}>
         <button className="ui-btn primary" onClick={() => setCreating(true)}>
-          <MdAdd /> {t("common.add")}
+          <IcAdd /> {t("common.add")}
         </button>
       </PageHead>
       {sites == null ? <p className="ui-hint">{t("common.loading")}</p>

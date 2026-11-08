@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MdAdd, MdOpenInNew, MdDelete, MdRefresh } from "react-icons/md";
+import { IcAdd, IcOpenInNew, IcDelete, IcRefresh } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead, Empty, Menu } from "../kit.jsx";
@@ -18,16 +18,16 @@ export default function OptimizationsPage() {
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.optimizations} title={t("nav.optimizations")} help={t("opt.help")}>
-        <button className="ui-btn ghost icon" title="↻" onClick={() => refreshRuns()}><MdRefresh /></button>
+        <button className="ui-btn ghost icon" title="↻" onClick={() => refreshRuns()}><IcRefresh /></button>
         <button className="ui-btn primary" onClick={() => setNewRun(true)} disabled={running}>
-          <MdAdd /> {t("sum.optimization")}
+          <IcAdd /> {t("sum.optimization")}
         </button>
       </PageHead>
-      {running && <div className="ui-banner"><MdRefresh className="spin" /> {t("opt.running")}</div>}
+      {running && <div className="ui-banner"><IcRefresh className="spin" /> {t("opt.running")}</div>}
       {(!apiUp || !twin.saved) && <div className="ui-banner warn">{t("opt.localOnly")}</div>}
       {runs.length === 0 ? (
         <Empty icon={NAV_ICONS.optimizations} title={t("opt.empty")}
-               action={<button className="ui-btn primary" onClick={() => setNewRun(true)}><MdAdd /> {t("sum.optimization")}</button>} />
+               action={<button className="ui-btn primary" onClick={() => setNewRun(true)}><IcAdd /> {t("sum.optimization")}</button>} />
       ) : (
         <div className="ui-card" style={{ overflow: "auto" }}>
           <table className="ui-table">
@@ -47,9 +47,9 @@ export default function OptimizationsPage() {
                   <td style={{ color: "var(--ui-muted)", maxWidth: 320 }}>{r.notes}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <Menu items={[
-                      { label: t("opt.open"), icon: MdOpenInNew, onClick: () => open(r.id) },
+                      { label: t("opt.open"), icon: IcOpenInNew, onClick: () => open(r.id) },
                       "-",
-                      { label: t("common.delete"), icon: MdDelete, danger: true,
+                      { label: t("common.delete"), icon: IcDelete, danger: true,
                         onClick: () => window.confirm(t("opt.deleteConfirm", { name: r.name })) && removeRun(r.id) },
                     ]} />
                   </td>

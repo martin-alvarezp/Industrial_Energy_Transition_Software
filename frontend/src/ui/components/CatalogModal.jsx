@@ -2,7 +2,7 @@
 // agrupados (generación, conversión, almacenamiento) y los tipos genéricos
 // "desde cero". Elegir uno devuelve el borrador listo para editar.
 import { useState } from "react";
-import { MdSearch } from "react-icons/md";
+import { IcSearch } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Modal } from "../kit.jsx";
 import { componentIcon } from "../icons.jsx";
@@ -22,7 +22,7 @@ export default function CatalogModal({ siteJson, onPick, onClose }) {
   return (
     <Modal title={t("cat.title")} onClose={onClose} wide>
       <div style={{ position: "relative", marginBottom: 14 }}>
-        <MdSearch style={{ position: "absolute", left: 12, top: 11, color: "var(--ui-muted)" }} size={20} />
+        <IcSearch style={{ position: "absolute", left: 12, top: 11, color: "var(--ui-muted)" }} size={20} />
         <input className="ui-input" autoFocus style={{ paddingLeft: 40 }} placeholder={t("cat.search")}
                value={q} onChange={(e) => setQ(e.target.value)} />
       </div>

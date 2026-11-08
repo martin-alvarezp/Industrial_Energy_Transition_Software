@@ -119,7 +119,7 @@ export function toOverrides(cfg) {
     storage_energy_capex: cfg.storage_energy_capex ?? {},   // R2: energía propia
     storage_energy_max: cfg.storage_energy_max ?? {},
     year_factors: cfg.year_factors ?? {},                   // R3: factores por año
-    financing_rate: cfg.financing_rate ?? 0,                // R4: anualidad (vista)
+    financing_rate: cfg.financing_rate ?? 0,                // R4/R27: financiamiento
     financing_years: cfg.financing_years ?? 0,
     milestone_years: cfg.milestone_years ?? [],             // R6: años hito
     day_sequence: cfg.day_sequence ?? [],                   // R8: días tipo enlazados
@@ -136,7 +136,7 @@ export function toOverrides(cfg) {
     capex_accounting: cfg.capex_accounting ?? "annuity",    // R27: CAPEX en cuotas
     financing_period_tech: cfg.financing_period_tech ?? {},
     financing_rate_tech: cfg.financing_rate_tech ?? {},
-    debt_share: cfg.debt_share ?? {},                 // R17: topes por año
+    debt_share: cfg.debt_share ?? {},
     milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B

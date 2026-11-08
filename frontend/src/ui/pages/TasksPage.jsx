@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MdAdd, MdDelete, MdEdit, MdCheckCircle, MdRadioButtonUnchecked } from "react-icons/md";
+import { IcAdd, IcDelete, IcEdit, IcCheckCircle, IcRadioButtonUnchecked } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { useStored, uid } from "../storage.js";
@@ -63,7 +63,7 @@ export default function TasksPage() {
   const row = (x) => (
     <div key={x.id} className={"task-row" + (x.status === "done" ? " done" : "")}>
       <button className="task-check" onClick={() => toggle(x)} aria-label="toggle">
-        {x.status === "done" ? <MdCheckCircle /> : <MdRadioButtonUnchecked />}
+        {x.status === "done" ? <IcCheckCircle /> : <IcRadioButtonUnchecked />}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="task-title">{x.title}</div>
@@ -76,8 +76,8 @@ export default function TasksPage() {
         </div>
       </div>
       <Menu items={[
-        { label: t("common.edit"), icon: MdEdit, onClick: () => setEdit(x) },
-        { label: t("common.delete"), icon: MdDelete, danger: true, onClick: () => setTasks((l) => l.filter((y) => y.id !== x.id)) },
+        { label: t("common.edit"), icon: IcEdit, onClick: () => setEdit(x) },
+        { label: t("common.delete"), icon: IcDelete, danger: true, onClick: () => setTasks((l) => l.filter((y) => y.id !== x.id)) },
       ]} />
     </div>
   );
@@ -85,7 +85,7 @@ export default function TasksPage() {
     <div className="ui-page" style={{ maxWidth: 1100 }}>
       <PageHead icon={NAV_ICONS.tasks} title={t("nav.tasks")} help={t("task.help")}>
         <button className="ui-btn primary" onClick={() => setEdit({ title: "", due: "", owner: "", link: null, notes: "" })}>
-          <MdAdd /> {t("common.add")}</button>
+          <IcAdd /> {t("common.add")}</button>
       </PageHead>
       {tasks.length === 0 ? <Empty icon={NAV_ICONS.tasks} title={t("task.empty")} /> : (
         <>

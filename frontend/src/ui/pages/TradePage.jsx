@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MdAdd, MdElectricBolt } from "react-icons/md";
+import { IcAdd, IcElectricBolt } from "../iconset.jsx";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -59,7 +59,7 @@ export default function TradePage() {
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.trade} title={t("nav.trade")} help={t("trade.help")}>
         <button className="ui-btn primary" onClick={() => setDrawer({ draft: blankMarket(sj), isNew: true })}>
-          <MdAdd /> {t("common.add")}
+          <IcAdd /> {t("common.add")}
         </button>
       </PageHead>
 
@@ -67,7 +67,7 @@ export default function TradePage() {
       <div className="trade-conns">
         {sources.map((s) => (
           <button key={s.tech_id} className="ui-card trade-conn" onClick={() => setConn({ ...s, ports_mode: isMultiport(s) })}>
-            <span className="ui-comp-icon" style={{ width: 44, height: 44, fontSize: 24, background: "var(--ui-card-top)" }}><MdElectricBolt /></span>
+            <span className="ui-comp-icon" style={{ width: 44, height: 44, fontSize: 24, background: "var(--ui-card-top)" }}><IcElectricBolt /></span>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontWeight: 600 }}>{s.name}</div>
               <div className="ui-hint" style={{ margin: 0 }}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MdAdd, MdSearch } from "react-icons/md";
+import { IcAdd, IcSearch } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { useStored } from "../storage.js";
@@ -38,10 +38,10 @@ export default function ComponentsPage({ route }) {
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.components} title={t("nav.components")} help={t("comp.help")}>
-        <button className="ui-btn primary" onClick={ed.add}><MdAdd /> {t("common.add")}</button>
+        <button className="ui-btn primary" onClick={ed.add}><IcAdd /> {t("common.add")}</button>
       </PageHead>
       <div className="pg-toolbar">
-        <div className="pg-search"><MdSearch size={20} />
+        <div className="pg-search"><IcSearch size={20} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("comp.search")} /></div>
         <select className="ui-select" style={{ width: 220 }} value={loc} onChange={(e) => setLoc(e.target.value)}>
           <option value="">{t("comp.allLocations")}</option>

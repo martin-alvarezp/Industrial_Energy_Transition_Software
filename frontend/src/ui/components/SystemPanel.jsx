@@ -4,10 +4,10 @@
 import { CATEGORICAL as SLOT } from "../palette.js";
 import { useMemo, useState } from "react";
 import {
-  MdArrowBack, MdExpandLess, MdExpandMore, MdOutlineInfo, MdOutlineViewInAr,
-  MdOutlineWbSunny, MdLocationOn, MdAdd, MdHistory, MdEdit, MdDelete, MdPolyline,
-  MdOutlineLocationOn,
-} from "react-icons/md";
+  IcArrowBack, IcExpandLess, IcExpandMore, IcOutlineInfo, IcOutlineViewInAr,
+  IcOutlineWbSunny, IcLocationOn, IcAdd, IcHistory, IcEdit, IcDelete, IcPolyline,
+  IcOutlineLocationOn,
+} from "../iconset.jsx";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -109,7 +109,7 @@ function WeatherTab({ loc, techs }) {
           <div className="ui-hint">{center[0].toFixed(4)}, {center[1].toFixed(4)}</div>
         </div>
         <button className="ui-btn primary sm" onClick={load} disabled={state?.loading}>
-          <MdOutlineWbSunny /> {state?.loading ? t("wx.loading") : t("wx.load")}
+          <IcOutlineWbSunny /> {state?.loading ? t("wx.loading") : t("wx.load")}
         </button>
       </div>
       {state?.error && <p className="ui-error">{state.error}</p>}
@@ -174,10 +174,10 @@ export default function SystemPanel({
     () => (loc ? techs.filter((x) => locationOf(layout, x.tech_id) === loc.id) : techs),
     [loc, techs, layout]);
   const tabs = loc
-    ? [["info", MdOutlineInfo, "panel.info"], ["components", MdOutlineViewInAr, "panel.components"],
-       ["weather", MdOutlineWbSunny, "panel.weather"]]
-    : [["info", MdOutlineInfo, "panel.info"], ["locations", MdOutlineLocationOn, "panel.locations"],
-       ["components", MdOutlineViewInAr, "panel.components"]];
+    ? [["info", IcOutlineInfo, "panel.info"], ["components", IcOutlineViewInAr, "panel.components"],
+       ["weather", IcOutlineWbSunny, "panel.weather"]]
+    : [["info", IcOutlineInfo, "panel.info"], ["locations", IcOutlineLocationOn, "panel.locations"],
+       ["components", IcOutlineViewInAr, "panel.components"]];
   const curTab = tabs.some(([k]) => k === (route.query?.tab ?? tab)) ? (route.query?.tab ?? tab) : "components";
   const pickTab = (k) => { setTab(k); setLoc(locId, { tab: k }); };
   const area = polygonAreaM2(loc ? loc.polygon : layout.boundary);
@@ -200,19 +200,19 @@ export default function SystemPanel({
     <div className={"ip-panel" + (collapsed ? " collapsed" : "")} data-testid="system-panel">
       <div className="ip-panel-head">
         <button className="ui-dots" aria-label={t("common.back")}
-                onClick={() => (loc ? setLoc(null) : navigate("#/systems"))}><MdArrowBack /></button>
-        <h2>{loc ? <MdLocationOn /> : <SysIcon />}{loc ? loc.name : layout.title || siteJson.name || siteName}</h2>
+                onClick={() => (loc ? setLoc(null) : navigate("#/systems"))}><IcArrowBack /></button>
+        <h2>{loc ? <IcLocationOn /> : <SysIcon />}{loc ? loc.name : layout.title || siteJson.name || siteName}</h2>
         <SaveStatus />
         {readonly && <SaveCopy />}
         {loc && (
           <Menu items={[
-            { label: t("panel.redraw"), icon: MdPolyline, onClick: () => onRedrawLocation(loc.id) },
+            { label: t("panel.redraw"), icon: IcPolyline, onClick: () => onRedrawLocation(loc.id) },
             "-",
-            { label: t("panel.deleteLoc"), icon: MdDelete, danger: true, onClick: deleteLoc },
+            { label: t("panel.deleteLoc"), icon: IcDelete, danger: true, onClick: deleteLoc },
           ]} />
         )}
         <button className="ui-dots" aria-label="toggle" onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? <MdExpandMore /> : <MdExpandLess />}
+          {collapsed ? <IcExpandMore /> : <IcExpandLess />}
         </button>
       </div>
       {!collapsed && (
@@ -261,7 +261,7 @@ export default function SystemPanel({
               <>
                 <div className="ip-panel-bar">
                   <button className="ui-btn primary" onClick={onDrawLocation}>
-                    <MdAdd /> {t("common.add")}
+                    <IcAdd /> {t("common.add")}
                   </button>
                   <span className="count">{(layout.locations ?? []).length} {t("panel.locations").toLowerCase()}</span>
                 </div>
@@ -271,7 +271,7 @@ export default function SystemPanel({
                     const n = techs.filter((x) => locationOf(layout, x.tech_id) === l.id).length;
                     return (
                       <button key={l.id} className="ip-loc-row" onClick={() => setLoc(l.id, { tab: "components" })}>
-                        <MdLocationOn size={22} /> {l.name} <small>{countLabel(t, n)}</small>
+                        <IcLocationOn size={22} /> {l.name} <small>{countLabel(t, n)}</small>
                       </button>
                     );
                   })}
@@ -282,11 +282,11 @@ export default function SystemPanel({
               <>
                 <div className="ip-panel-bar">
                   <button className="ui-btn primary" onClick={() => onAddComponent(loc?.id ?? null)}>
-                    <MdAdd /> {t("common.add")}
+                    <IcAdd /> {t("common.add")}
                   </button>
                   <button className="ui-btn ghost icon" title={t("panel.history")}
                           onClick={() => navigate(hrefFor({ site: siteName, page: "changelog" }))}>
-                    <MdHistory />
+                    <IcHistory />
                   </button>
                   <span className="count">{countLabel(t, inLoc.length)}</span>
                   <span style={{ marginLeft: "auto" }}><ViewToggle view={compView} setView={setCompView} /></span>

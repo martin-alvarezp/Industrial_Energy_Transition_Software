@@ -37,6 +37,8 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
     ((x.min_load ?? 0) > 0 || (x.startup_cost ?? 0) > 0 || (x.min_up_hours ?? 0) > 0 ||
      (x.min_down_hours ?? 0) > 0 || (x.part_load?.length ?? 0) > 0)).length;
   const [commitment, setCommitment] = useState("linear");
+  // R24: tope de emisiones inalcanzable — duro (default) o relajado
+  const [capMode, setCapMode] = useState(draft.emission_cap_mode ?? "hard");
   const srcRun = runs.find((r) => r.id === capSource);
   const dispatch = mode === "dispatch";
 
@@ -53,7 +55,7 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
   const go = async () => {
     setCapError(null);
     try {
-      let extra = { analysis, commitment: nCommit > 0 ? commitment : "auto" };
+      let extra = { analysis, commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
         extra = { analysis: "single", dispatch_only: true, fixed_capacity: fixed,
@@ -140,6 +142,16 @@ export default function RunModal({ onClose, onDone, initialScenario }) {
             <option value="integer">{t("run.commitInteger")}</option>
           </select>
           <p className="ui-hint">{t("run.commitHint")}</p>
+        </div>
+      )}
+      {!dispatch && (
+        <div className="ui-field">
+          <label>{t("run.capMode")}</label>
+          <select className="ui-select" value={capMode} onChange={(e) => setCapMode(e.target.value)} data-testid="run-cap-mode">
+            <option value="hard">{t("run.capHard")}</option>
+            <option value="relax">{t("run.capRelax")}</option>
+          </select>
+          <p className="ui-hint">{t("run.capModeHint")}</p>
         </div>
       )}
       <div className="ui-field">

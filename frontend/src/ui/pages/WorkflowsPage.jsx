@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MdPlayArrow, MdTrendingDown, MdTune, MdBusinessCenter, MdFileDownload, MdDescription, MdRefresh } from "react-icons/md";
+import { IcPlayArrow, IcTrendingDown, IcTune, IcBusinessCenter, IcFileDownload, IcDescription, IcRefresh } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead } from "../kit.jsx";
@@ -34,7 +34,7 @@ export default function WorkflowsPage() {
       <PageHead icon={NAV_ICONS.workflows} title={t("nav.workflows")} help={t("wf.help")} />
       <div className="wf-grid">
         <section className="ui-card ui-card-pad wf-wide">
-          <div className="wf-head"><MdTrendingDown /><h3 className="ui-card-title">{t("wf.pareto")}</h3></div>
+          <div className="wf-head"><IcTrendingDown /><h3 className="ui-card-title">{t("wf.pareto")}</h3></div>
           <p className="ui-card-sub">{t("wf.paretoDesc")}</p>
           <div className="pg-toolbar" style={{ marginTop: 12 }}>
             <label className="ui-hint" style={{ margin: 0 }}>{t("wf.points")}</label>
@@ -44,7 +44,7 @@ export default function WorkflowsPage() {
             <input className="ui-input" type="number" min={0} value={minCap} style={{ width: 140 }}
                    onChange={(e) => setMinCap(+e.target.value)} />
             <button className="ui-btn primary" onClick={sweep} disabled={busy || !apiUp}>
-              {busy ? <><MdRefresh className="spin" /> {t("wf.running")}</> : <><MdPlayArrow /> {t("wf.run")}</>}
+              {busy ? <><IcRefresh className="spin" /> {t("wf.running")}</> : <><IcPlayArrow /> {t("wf.run")}</>}
             </button>
             {!apiUp && <span className="ui-hint">{t("wf.needApi")}</span>}
           </div>
@@ -53,7 +53,7 @@ export default function WorkflowsPage() {
         </section>
 
         <section className="ui-card ui-card-pad wf-wide">
-          <div className="wf-head"><MdTune /><h3 className="ui-card-title">{t("wf.tornado")}</h3></div>
+          <div className="wf-head"><IcTune /><h3 className="ui-card-title">{t("wf.tornado")}</h3></div>
           <p className="ui-card-sub">{t("wf.tornadoDesc")}</p>
           {feasible ? (
             <div className="ui-legacy" style={{ marginTop: 12 }}>
@@ -64,20 +64,20 @@ export default function WorkflowsPage() {
         </section>
 
         <section className="ui-card ui-card-pad">
-          <div className="wf-head"><MdBusinessCenter /><h3 className="ui-card-title">{t("wf.portfolio")}</h3></div>
+          <div className="wf-head"><IcBusinessCenter /><h3 className="ui-card-title">{t("wf.portfolio")}</h3></div>
           <p className="ui-card-sub">{t("wf.portfolioDesc")}</p>
           <button className="ui-btn outline sm" style={{ marginTop: 12 }}
                   onClick={() => navigate(hrefFor({ site: siteName, page: "portfolio" }))}>{t("common.open")}</button>
         </section>
 
         <section className="ui-card ui-card-pad">
-          <div className="wf-head"><MdFileDownload /><h3 className="ui-card-title">{t("wf.exports")}</h3></div>
+          <div className="wf-head"><IcFileDownload /><h3 className="ui-card-title">{t("wf.exports")}</h3></div>
           <p className="ui-card-sub">{t("wf.exportsDesc")}</p>
           <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
             <button className="ui-btn outline sm" disabled={!data || !apiUp}
-                    onClick={() => downloadXlsx(applied, appliedPayload, appliedSite)}><MdFileDownload /> Excel</button>
+                    onClick={() => downloadXlsx(applied, appliedPayload, appliedSite)}><IcFileDownload /> Excel</button>
             <button className="ui-btn outline sm" disabled={!data}
-                    onClick={() => openMemo(data, twin.layout.title || siteName, viewing?.name)}><MdDescription /> Memo</button>
+                    onClick={() => openMemo(data, twin.layout.title || siteName, viewing?.name)}><IcDescription /> Memo</button>
           </div>
         </section>
       </div>

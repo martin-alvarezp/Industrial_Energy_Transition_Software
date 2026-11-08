@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Cell, LabelList, Sankey, Layer, Rectangle,
 } from "recharts";
-import { MdMoreVert } from "react-icons/md";
+import { IcMoreVert } from "./iconset.jsx";
 import { seriesColors } from "./results.js";
 import { SLR, STATUS } from "./palette.js";
 import { num } from "../lib/format.js";
@@ -52,7 +52,7 @@ export function ChartPanel({ title, unit, menu = [], children, toolbar }) {
         <h3>{title}</h3>
         {toolbar}
         {menu.length > 0 && (
-          <Menu trigger={({ toggle }) => <button className="ui-dots" onClick={toggle}><MdMoreVert /></button>}
+          <Menu trigger={({ toggle }) => <button className="ui-dots" onClick={toggle}><IcMoreVert /></button>}
                 items={menu} />
         )}
       </div>

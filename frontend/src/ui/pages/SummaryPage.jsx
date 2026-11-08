@@ -1,10 +1,10 @@
 import { CATEGORICAL as SLOT, STATUS } from "../palette.js";
 import { useMemo, useState } from "react";
 import {
-  MdAdd, MdFilterAlt, MdAccountBalance, MdOutlineCurrencyExchange, MdEco, MdFunctions,
-  MdExpandMore, MdExpandLess, MdBarChart, MdTableChart, MdOutlineViewInAr, MdAccountTree,
-  MdFileDownload, MdDescription,
-} from "react-icons/md";
+  IcAdd, IcFilterAlt, IcAccountBalance, IcOutlineCurrencyExchange, IcEco, IcFunctions,
+  IcExpandMore, IcExpandLess, IcBarChart, IcTableChart, IcOutlineViewInAr, IcAccountTree,
+  IcFileDownload, IcDescription,
+} from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { useStored, readJSON } from "../storage.js";
@@ -50,8 +50,8 @@ function MeasuresTimeline({ rows, years, t }) {
       <div className="sum-sec-head">
         <h3>{t("sum.measures")}</h3>
         <div className="ui-seg light outlined small">
-          <button className={view === "chart" ? "on" : ""} onClick={() => setView("chart")} title={t("sum.chart")}><MdBarChart /></button>
-          <button className={view === "table" ? "on" : ""} onClick={() => setView("table")} title={t("sum.table")}><MdTableChart /></button>
+          <button className={view === "chart" ? "on" : ""} onClick={() => setView("chart")} title={t("sum.chart")}><IcBarChart /></button>
+          <button className={view === "table" ? "on" : ""} onClick={() => setView("table")} title={t("sum.table")}><IcTableChart /></button>
         </div>
       </div>
       {view === "table" ? (
@@ -139,9 +139,9 @@ export default function SummaryPage() {
     ...runs,
   ];
   const exportMenu = [
-    { label: t("sum.xlsx"), icon: MdFileDownload, hidden: !apiUp,
+    { label: t("sum.xlsx"), icon: IcFileDownload, hidden: !apiUp,
       onClick: () => downloadXlsx(applied, appliedPayload, appliedSite) },
-    { label: t("sum.memo"), icon: MdDescription,
+    { label: t("sum.memo"), icon: IcDescription,
       onClick: () => openMemo({ ...data, site_snapshot: siteJson }, twin?.layout?.title || siteName, viewing?.name) },
   ];
 
@@ -157,8 +157,8 @@ export default function SummaryPage() {
                        options={[{ value: "1", label: "1" }, { value: "1000", label: "1 k" }, { value: "1000000", label: "1 mn" }]} />
         <Menu align="left" trigger={({ toggle }) => (
                 <button className={"ui-chip" + (Object.values(hiddenTech).some(Boolean) ? " on" : "")} onClick={toggle}>
-                  <MdFilterAlt /> {t("sum.technologies")}</button>)}
-              items={allKeys.map((key) => ({ label: key, icon: hiddenTech[key] ? undefined : MdExpandMore,
+                  <IcFilterAlt /> {t("sum.technologies")}</button>)}
+              items={allKeys.map((key) => ({ label: key, icon: hiddenTech[key] ? undefined : IcExpandMore,
                                              onClick: () => setHiddenTech((h) => ({ ...h, [key]: !h[key] })) }))} />
         <span style={{ marginLeft: "auto" }} />
         <Menu items={exportMenu} />
@@ -170,12 +170,12 @@ export default function SummaryPage() {
           {!data && <option value="">{t("sum.pickRun")}</option>}
           {runOptions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
-        <button className="ui-btn primary" onClick={() => setNewRun(true)}><MdAdd /> {t("sum.optimization")}</button>
+        <button className="ui-btn primary" onClick={() => setNewRun(true)}><IcAdd /> {t("sum.optimization")}</button>
       </div>
 
       {!data && (
         <Empty icon={NAV_ICONS.optimizations} title={t("sum.noRuns")}
-               action={<button className="ui-btn primary" onClick={() => setNewRun(true)}><MdAdd /> {t("sum.optimization")}</button>}>
+               action={<button className="ui-btn primary" onClick={() => setNewRun(true)}><IcAdd /> {t("sum.optimization")}</button>}>
           {t("sum.noRunsText")}
         </Empty>
       )}
@@ -183,20 +183,25 @@ export default function SummaryPage() {
         <div className="ui-banner bad">{t("sum.infeasible")}
           {(result?.infeasibility?.hints ?? []).map((h, i) => <div key={i}>• {h}</div>)}</div>
       )}
+      {data && feasible && result?.emission_target && result.emission_target.reached === false && (
+        <div className="ui-banner warn" data-testid="target-missed">
+          {t("sum.targetMissed", { x: Math.round(result.emission_target.shortfall_t).toLocaleString() })}
+          {(result.emission_target.warnings ?? []).map((h, i) => <div key={i}>• {h}</div>)}</div>
+      )}
 
       {k && calc && (
         <>
           <div className="sum-kpis">
-            <KpiCard icon={MdAccountBalance} color={SLOT[3]} value={num(k.investment / prefs.scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
-            <KpiCard icon={MdOutlineCurrencyExchange} color={SLOT[5]} value={num(k.opex / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
-            <KpiCard icon={MdEco} color={STATUS.ok} value={k.reduction == null ? "—" : pct(k.reduction)}
+            <KpiCard icon={IcAccountBalance} color={SLOT[3]} value={num(k.investment / prefs.scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
+            <KpiCard icon={IcOutlineCurrencyExchange} color={SLOT[5]} value={num(k.opex / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
+            <KpiCard icon={IcEco} color={STATUS.ok} value={k.reduction == null ? "—" : pct(k.reduction)}
                      unit={t("sum.comparedTo", { a: k.lastYear, b: k.firstYear })} label={t("sum.reduction")} />
-            <KpiCard icon={MdFunctions} color={SLOT[3]} value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
+            <KpiCard icon={IcFunctions} color={SLOT[3]} value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
           </div>
 
           <div className="sum-annual">
             <button className="sum-annual-head" onClick={() => setAnnualOpen((o) => !o)}>
-              {t("sum.annual")} {annualOpen ? <MdExpandLess /> : <MdExpandMore />}
+              {t("sum.annual")} {annualOpen ? <IcExpandLess /> : <IcExpandMore />}
             </button>
             {annualOpen && (
               <div style={{ overflow: "auto", padding: "0 16px 16px" }}>
@@ -247,9 +252,9 @@ export default function SummaryPage() {
                         <div className="sum-flow-tools">
                           <div className="ui-seg light outlined small">
                             <button className={flowMode === "component" ? "on" : ""} onClick={() => setFlowMode("component")}>
-                              <MdOutlineViewInAr /> {t("sum.component")}</button>
+                              <IcOutlineViewInAr /> {t("sum.component")}</button>
                             <button className={flowMode === "technology" ? "on" : ""} onClick={() => setFlowMode("technology")}>
-                              <MdAccountTree /> {t("sum.technology")}</button>
+                              <IcAccountTree /> {t("sum.technology")}</button>
                           </div>
                           <select className="ui-select" style={{ width: 110, height: 34 }} value={flowYear}
                                   onChange={(e) => setFlowYear(+e.target.value)}>

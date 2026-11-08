@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { MdSearch, MdEdit, MdAddCircleOutline, MdSave, MdDelete, MdRocketLaunch, MdTaskAlt,
-         MdInsertDriveFile } from "react-icons/md";
+import { IcSearch, IcEdit, IcAddCircleOutline, IcSave, IcDelete, IcRocketLaunch, IcTaskAlt,
+         IcInsertDriveFile } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { readJSON, writeJSON } from "../storage.js";
@@ -9,8 +9,8 @@ import { NAV_ICONS } from "../icons.jsx";
 import { hrefFor } from "../router.js";
 
 
-const KIND_ICON = { edit: MdEdit, create: MdAddCircleOutline, save: MdSave, delete: MdDelete,
-                    run: MdRocketLaunch, task: MdTaskAlt, doc: MdInsertDriveFile };
+const KIND_ICON = { edit: IcEdit, create: IcAddCircleOutline, save: IcSave, delete: IcDelete,
+                    run: IcRocketLaunch, task: IcTaskAlt, doc: IcInsertDriveFile };
 
 export default function ChangeLogPage({ route }) {
   const { t, lang } = useI18n();
@@ -55,10 +55,10 @@ export default function ChangeLogPage({ route }) {
   return (
     <div className="ui-page" style={{ maxWidth: 1100 }}>
       <PageHead icon={NAV_ICONS.changelog} title={t("nav.changelog")} help={t("log.help")}>
-        {entries.length > 0 && <button className="ui-btn ghost" onClick={clear}><MdDelete /> {t("log.clear")}</button>}
+        {entries.length > 0 && <button className="ui-btn ghost" onClick={clear}><IcDelete /> {t("log.clear")}</button>}
       </PageHead>
       <div className="pg-toolbar">
-        <div className="pg-search"><MdSearch size={20} />
+        <div className="pg-search"><IcSearch size={20} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("log.search")} /></div>
         <select className="ui-select" style={{ width: 200 }} value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="">{t("log.all")}</option>
@@ -70,7 +70,7 @@ export default function ChangeLogPage({ route }) {
           <h4 className="par-sub" style={{ textTransform: "capitalize" }}>{dayFmt(g.d)}</h4>
           <div className="ui-card">
             {g.items.map((e) => {
-              const I = KIND_ICON[e.kind] ?? MdEdit;
+              const I = KIND_ICON[e.kind] ?? IcEdit;
               return (
                 <div key={e.id} className="task-row">
                   <span className="log-ic"><I /></span>

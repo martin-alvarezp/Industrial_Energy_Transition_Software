@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MdAdd } from "react-icons/md";
+import { IcAdd } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead, Empty } from "../kit.jsx";
@@ -32,7 +32,7 @@ export default function PotentialsPage() {
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.potentials} title={t("nav.potentials")} help={t("pot.help")}>
-        <button className="ui-btn primary" onClick={ed.add}><MdAdd /> {t("common.add")}</button>
+        <button className="ui-btn primary" onClick={ed.add}><IcAdd /> {t("common.add")}</button>
       </PageHead>
       {pots.length === 0 ? <Empty icon={NAV_ICONS.potentials} title={t("pot.empty")} /> : (
         <>

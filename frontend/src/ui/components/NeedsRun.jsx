@@ -1,7 +1,7 @@
 // Envoltorio de las vistas de resultados: sin corrida muestra cómo crear una,
 // con corrida infactible lo dice con su diagnóstico.
 import { useState } from "react";
-import { MdAdd } from "react-icons/md";
+import { IcAdd } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { Empty } from "../kit.jsx";
@@ -20,7 +20,7 @@ export function RunPicker() {
         {data && !runs.some((r) => r.id === viewing?.id) && <option value="__current">{viewing?.name} {t("sum.current")}</option>}
         {runs.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
       </select>
-      <button className="ui-btn primary" onClick={() => setOpen(true)}><MdAdd /> {t("sum.optimization")}</button>
+      <button className="ui-btn primary" onClick={() => setOpen(true)}><IcAdd /> {t("sum.optimization")}</button>
       {open && <RunModal onClose={() => setOpen(false)} />}
     </div>
   );
@@ -34,7 +34,7 @@ export default function NeedsRun({ children }) {
     return (
       <>
         <Empty icon={NAV_ICONS.optimizations} title={t("sum.noRuns")}
-               action={<button className="ui-btn primary" onClick={() => setOpen(true)}><MdAdd /> {t("sum.optimization")}</button>}>
+               action={<button className="ui-btn primary" onClick={() => setOpen(true)}><IcAdd /> {t("sum.optimization")}</button>}>
           {t("sum.noRunsText")}
         </Empty>
         {open && <RunModal onClose={() => setOpen(false)} />}

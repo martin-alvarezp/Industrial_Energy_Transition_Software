@@ -1,7 +1,7 @@
 // Piezas reutilizables de la interfaz: menú de tres puntos, modal, select con
 // rótulo flotante, encabezado de página y estado vacío.
 import { useEffect, useRef, useState } from "react";
-import { MdMoreVert, MdHelpOutline, MdClose } from "react-icons/md";
+import { IcMoreVert, IcHelpOutline, IcClose } from "./iconset.jsx";
 
 export function useClickOutside(ref, onOut, active = true) {
   useEffect(() => {
@@ -25,7 +25,7 @@ export function Menu({ trigger, items, align = "right", label = "menu", up = fal
       {trigger
         ? trigger({ open, toggle: () => setOpen((o) => !o) })
         : <button className="ui-dots" aria-label={label} onClick={() => setOpen((o) => !o)}>
-            <MdMoreVert />
+            <IcMoreVert />
           </button>}
       {open && (
         <div className={"ui-menu " + (align === "right" ? "right" : "")}
@@ -58,7 +58,7 @@ export function Modal({ title, children, onClose, footer, wide = false }) {
         <div className="ui-modal-head">
           <h3>{title}</h3>
           <button className="ui-dots" style={{ marginLeft: "auto" }} onClick={onClose}
-                  aria-label="cerrar"><MdClose /></button>
+                  aria-label="cerrar"><IcClose /></button>
         </div>
         <div className="ui-modal-body">{children}</div>
         {footer && <div className="ui-modal-foot">{footer}</div>}
@@ -82,7 +82,7 @@ export function PageHead({ icon: Icon, title, help, children }) {
   return (
     <div className="ui-page-head">
       <h1 className="ui-page-title">{Icon && <Icon />}{title}</h1>
-      {help && <span className="ui-help" title={help}><MdHelpOutline /></span>}
+      {help && <span className="ui-help" title={help}><IcHelpOutline /></span>}
       <div className="ui-page-actions">{children}</div>
     </div>
   );

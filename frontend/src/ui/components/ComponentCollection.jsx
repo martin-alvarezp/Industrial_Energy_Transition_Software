@@ -1,8 +1,8 @@
 // Colección de componentes en tres vistas (como los tres botones de la
 // referencia): tarjetas agrupadas por clase, árbol ubicación → grupo →
 // componente, y tabla con sus parámetros.
-import { MdCheckCircle, MdEdit, MdPinDrop, MdDelete, MdGridView, MdAccountTree,
-         MdTableChart, MdExpandMore, MdChevronRight } from "react-icons/md";
+import { IcCheckCircle, IcEdit, IcPinDrop, IcDelete, IcGridView, IcAccountTree,
+         IcTableChart, IcExpandMore, IcChevronRight } from "../iconset.jsx";
 import { useState } from "react";
 import { useI18n } from "../i18n.jsx";
 import { componentIcon } from "../icons.jsx";
@@ -14,7 +14,7 @@ import { num } from "../../lib/format.js";
 
 export function ViewToggle({ view, setView }) {
   const { t } = useI18n();
-  const opts = [["grid", MdGridView, "cc.grid"], ["tree", MdAccountTree, "cc.tree"], ["table", MdTableChart, "cc.table"]];
+  const opts = [["grid", IcGridView, "cc.grid"], ["tree", IcAccountTree, "cc.tree"], ["table", IcTableChart, "cc.table"]];
   return (
     <div className="ui-seg light outlined" role="group">
       {opts.map(([v, I, k]) => (
@@ -42,7 +42,7 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
   return (
     <div className="ui-card ui-comp-card" onClick={() => onOpen?.(tech)} data-testid={`comp-${tech.tech_id}`}>
       <div className="ui-comp-top">
-        <span className={"ui-status " + st.cls}><MdCheckCircle />{t(st.key, { year: st.year })}</span>
+        <span className={"ui-status " + st.cls}><IcCheckCircle />{t(st.key, { year: st.year })}</span>
         <div className="ui-comp-icon"><Ico /></div>
       </div>
       <div className="ui-comp-body">
@@ -51,10 +51,10 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
           <div className="ui-comp-type">{t(techKind(tech))}</div>
         </div>
         <Menu items={[
-          { label: t("common.edit"), icon: MdEdit, onClick: () => onOpen?.(tech) },
-          { label: t("cc.locate"), icon: MdPinDrop, onClick: () => onLocate?.(tech), hidden: !onLocate },
+          { label: t("common.edit"), icon: IcEdit, onClick: () => onOpen?.(tech) },
+          { label: t("cc.locate"), icon: IcPinDrop, onClick: () => onLocate?.(tech), hidden: !onLocate },
           "-",
-          { label: t("common.delete"), icon: MdDelete, danger: true, onClick: () => onDelete?.(tech), hidden: !onDelete },
+          { label: t("common.delete"), icon: IcDelete, danger: true, onClick: () => onDelete?.(tech), hidden: !onDelete },
         ]} />
       </div>
     </div>
@@ -115,7 +115,7 @@ export default function ComponentCollection({
           return (
             <div key={key}>
               <button className="ui-tree-row lvl0" onClick={() => setClosed((c) => ({ ...c, [key]: !c[key] }))}>
-                {closed[key] ? <MdChevronRight /> : <MdExpandMore />} {locName(lid)}
+                {closed[key] ? <IcChevronRight /> : <IcExpandMore />} {locName(lid)}
                 <small>{inLoc.length}</small>
               </button>
               {!closed[key] && GROUP_ORDER.map((g) => {

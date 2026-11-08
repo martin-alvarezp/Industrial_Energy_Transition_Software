@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MdUploadFile, MdDelete, MdDownload, MdOpenInNew, MdInsertDriveFile, MdImage, MdPictureAsPdf } from "react-icons/md";
+import { IcUploadFile, IcDelete, IcDownload, IcOpenInNew, IcInsertDriveFile, IcImage, IcPictureAsPdf } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead, Empty, Menu } from "../kit.jsx";
@@ -33,7 +33,7 @@ const putDoc = (doc) => tx("readwrite", (s) => s.put(doc));
 const delDoc = (id) => tx("readwrite", (s) => s.delete(id));
 
 const fmtSize = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
-const iconFor = (type) => (type?.startsWith("image/") ? MdImage : type === "application/pdf" ? MdPictureAsPdf : MdInsertDriveFile);
+const iconFor = (type) => (type?.startsWith("image/") ? IcImage : type === "application/pdf" ? IcPictureAsPdf : IcInsertDriveFile);
 
 export default function DocumentsPage() {
   const { t } = useI18n();
@@ -74,7 +74,7 @@ export default function DocumentsPage() {
          onDragLeave={() => setOver(false)}
          onDrop={(e) => { e.preventDefault(); setOver(false); add([...e.dataTransfer.files]); }}>
       <PageHead icon={NAV_ICONS.documents} title={t("nav.documents")} help={t("doc.help")}>
-        <button className="ui-btn primary" onClick={() => input.current?.click()}><MdUploadFile /> {t("doc.upload")}</button>
+        <button className="ui-btn primary" onClick={() => input.current?.click()}><IcUploadFile /> {t("doc.upload")}</button>
       </PageHead>
       <input ref={input} type="file" multiple hidden onChange={(e) => { add([...e.target.files]); e.target.value = ""; }} />
       {err && <div className="ui-banner bad">{err}</div>}
@@ -101,10 +101,10 @@ export default function DocumentsPage() {
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <Menu items={[
-                      { label: t("common.open"), icon: MdOpenInNew, onClick: () => open(d) },
-                      { label: t("doc.download"), icon: MdDownload, onClick: () => open(d, true) },
+                      { label: t("common.open"), icon: IcOpenInNew, onClick: () => open(d) },
+                      { label: t("doc.download"), icon: IcDownload, onClick: () => open(d, true) },
                       "-",
-                      { label: t("common.delete"), icon: MdDelete, danger: true,
+                      { label: t("common.delete"), icon: IcDelete, danger: true,
                         onClick: async () => { if (window.confirm(t("doc.deleteConfirm", { name: d.name }))) { await delDoc(d.id); logChange(`Documento eliminado: ${d.name}`, "doc"); refresh(); } } },
                     ]} />
                   </td>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MdRocketLaunch, MdSave, MdDelete, MdDownload } from "react-icons/md";
+import { IcRocketLaunch, IcSave, IcDelete, IcDownload } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { useStored, uid } from "../storage.js";
@@ -31,7 +31,7 @@ export default function ScenariosPage() {
           <div key={s} className="ui-card ui-card-pad scen-card">
             <div style={{ fontWeight: 600, fontSize: 16 }}>{t("scn." + s)}</div>
             <p className="ui-card-sub" style={{ flex: 1 }}>{t("desc." + s)}</p>
-            <button className="ui-btn outline sm" onClick={() => setRunFor(s)}><MdRocketLaunch /> {t("scen.optimize")}</button>
+            <button className="ui-btn outline sm" onClick={() => setRunFor(s)}><IcRocketLaunch /> {t("scen.optimize")}</button>
           </div>
         ))}
       </div>
@@ -41,7 +41,7 @@ export default function ScenariosPage() {
       <div className="pg-toolbar">
         <input className="ui-input" style={{ maxWidth: 360 }} placeholder={t("scen.variantName")} value={name}
                onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
-        <button className="ui-btn primary" onClick={save}><MdSave /> {t("scen.saveCurrent")}</button>
+        <button className="ui-btn primary" onClick={save}><IcSave /> {t("scen.saveCurrent")}</button>
         {flash && <span className="ui-tag ok">{flash}</span>}
       </div>
       {variants.length === 0 ? <p className="ui-hint">{t("scen.noVariants")}</p> : (
@@ -58,8 +58,8 @@ export default function ScenariosPage() {
                 <td>{v.at.slice(0, 16).replace("T", " ")}</td>
                 <td style={{ textAlign: "right" }}>
                   <button className="ui-btn ghost sm" onClick={() => { setDraft(v.cfg); setFlash(t("scen.applied")); setTimeout(() => setFlash(null), 2000); }}>
-                    <MdDownload /> {t("scen.apply")}</button>
-                  <Menu items={[{ label: t("common.delete"), icon: MdDelete, danger: true,
+                    <IcDownload /> {t("scen.apply")}</button>
+                  <Menu items={[{ label: t("common.delete"), icon: IcDelete, danger: true,
                                   onClick: () => setVariants((l) => l.filter((x) => x.id !== v.id)) }]} />
                 </td>
               </tr>
