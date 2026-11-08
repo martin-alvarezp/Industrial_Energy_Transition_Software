@@ -39,9 +39,11 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
                   for p in params.conv_inputs[id]
                   if haskey(site.carriers, p.carrier) &&
                      site.carriers[p.carrier].category == :fuel]
+    g1 = [g for g in sets.generators if get(cfg.generator_scope1_ef, g, 0.0) > 0]   # R20
     JuMP.@expression(m, scope1_y[y in years],
         sum(ef_scope1(p[2]) * p[3] * input_factor(m, p[1], p[2], s, y) * input_driver(m, p[1], s, y) * w[s]
-            for p in fuel_ports, s in steps; init = 0.0))
+            for p in fuel_ports, s in steps; init = 0.0) +
+        sum(cfg.generator_scope1_ef[g] * dispatch[g, s, y] * w[s] for g in g1, s in steps; init = 0.0))
 
     # Scope 2: compras de mercado · factor del mercado (propio o heredado del
     # carrier; 0 en combustibles — su scope 1 ya se contó al quemarlos)

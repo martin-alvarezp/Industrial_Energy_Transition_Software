@@ -415,6 +415,13 @@ export function buildLP(site0, cfg0) {
             for (const [v, k] of inputTerms(cv, s, y, curveIds))
               t[v] = (t[v] ?? 0) + f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * w[s - 1] * k;
         }
+    for (const g of gens) {                                       // R20: alcance 1 de generadores
+      const f = cfg.generator_scope1_ef?.[g.tech_id] ?? 0;
+      if (f > 0) for (const s of steps) {
+        const v = `d_${sane(g.tech_id)}_${s}_${y}`;
+        t[v] = (t[v] ?? 0) + f * w[s - 1];
+      }
+    }
     return t;
   };
 
@@ -532,7 +539,7 @@ export function buildLP(site0, cfg0) {
       for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
       constDed(-D * cfg.ets_price * (cfg.ets_free_allowance ?? 0));
     }
-    addDed(`off_${y}`, D * cfg.offset_price);
+    addDed(`off_${y}`, D * cfg.offset_price * yearFactor(cfg, "offset_price", "offsets", yr(y)));   // R20
     // cargos por demanda (M2/M2b)
     for (const mk of buys) {
       const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
@@ -879,7 +886,8 @@ export function buildLP(site0, cfg0) {
       const id = sane(mk.market_id);
       if (mk.max_power != null)
         for (const s of steps)
-          row(`mp_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1 }, "<=", mk.max_power);
+          row(`mp_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1 }, "<=",
+              mk.max_power * (cfg.market_availability?.[mk.market_id]?.[s - 1] ?? 1));   // R20
       if (mk.max_annual != null) {
         const t = T();
         steps.forEach((s) => inc(t, `mf_${id}_${s}_${y}`, w[s - 1]));

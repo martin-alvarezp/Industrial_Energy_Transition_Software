@@ -309,4 +309,14 @@ dump("demo_hitos_ponderados_n10", site0, with_config(cfg0; horizon_years = 10, b
      milestone_years = [2026, 2028, 2031, 2035], milestone_weighting = :years))
 # 38 · O&M fijo por MWh de energía (R19)
 dump("om_por_mwh_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat => 20.0), storage_energy_fixed_opex = Dict(:bat => 5000.0)))
+# 39 · piezas del sitio B (R20): red al 60 % de día con FV de alcance 1, y la
+# compensación con precio por año bajo neto cero
+s38, c38 = mt_site()
+s38 = IETO._with(s38; markets = Dict(:buy => IETO._with(s38.markets[:buy]; max_power = 5.0), :sell => s38.markets[:sell]))
+dump("red_disponibilidad_n1", s38, with_config(c38; market_availability = Dict(:buy => [fill(0.6, 12); fill(1.0, 12)]),
+     generator_scope1_ef = Dict(:pv => 0.3), carbon_price = 30.0))
+s39, c39 = carbon_site()
+dump("compensacion_por_anio_n2", s39, with_config(c39; horizon_years = 2, allow_offsets = true, max_offset_share = 1.0,
+     offset_availability = 1e9, offset_price = 10.0, emission_caps = [(:net, 1, 0.0)],
+     year_factors = Dict(:offset_price => Dict(:offsets => [(2, 3.0)]))))
 println("fixtures dorados en ", out)

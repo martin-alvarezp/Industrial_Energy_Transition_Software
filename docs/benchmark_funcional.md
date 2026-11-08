@@ -624,3 +624,13 @@ días tipo (k por año) con cronología.
   optimizador no veía ese costo y sobredimensionaba la energía (la
   reproducción de un caso real compraba el doble de MWh que la referencia).
   Oráculo en test_storage_energy.jl; golden `om_por_mwh_n1`.
+- ✅ **R20 · Piezas del sitio farmacéutico** (2026-11-08). Tres que pide un
+  caso de confiabilidad:
+  - `market_availability`: factor por paso del tope de potencia de un mercado
+    (cortes o restricciones de la red; con ellos despachan los diésel);
+  - `generator_scope1_ef`: alcance 1 de generadores cuyo combustible no se
+    modela (diésel con factor general);
+  - tipo `offset_price` en `year_factors` (objetivo `offsets`): precio de la
+    compensación por año.
+  Oráculos en test_siteb_pieces.jl; goldens `red_disponibilidad_n1` y
+  `compensacion_por_anio_n2`.

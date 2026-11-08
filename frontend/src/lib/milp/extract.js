@@ -300,6 +300,10 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         for (const s of steps)
           s1 += f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * w[s - 1];
       }
+    for (const g of gens) {                                       // R20
+      const f = cfg.generator_scope1_ef?.[g.tech_id] ?? 0;
+      if (f > 0) for (const s of steps) s1 += f * V(`d_${sane(g.tech_id)}_${s}_${y}`) * w[s - 1];
+    }
     const ge = V(`ge_${y}`), ne = V(`ne_${y}`), off = V(`off_${y}`);
     s2 = ge - s1;
     for (const g of gens) for (const s of steps)
@@ -311,7 +315,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita
     const carbon = cprice(y) * ge +
       ((cfg.ets_price ?? 0) > 0 ? cfg.ets_price * (s1 - (cfg.ets_free_allowance ?? 0)) : 0);
-    const offCost = cfg.offset_price * off;
+    const offCost = cfg.offset_price * yearFactor(cfg, "offset_price", "offsets", yr(y)) * off;
     // ajuste fiscal (M9): −t·deducibles − t·depreciación de inversiones nuevas
     let tax = 0;
     const tr = cfg.tax_rate ?? 0;

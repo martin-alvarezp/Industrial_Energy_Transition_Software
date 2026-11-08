@@ -588,7 +588,15 @@ struct ScenarioConfig
                                              # horizonte), descontados; la inversión, una vez
     # ── O&M fijo por MWh de energía propia (benchmark R19) ──
     storage_energy_fixed_opex::Dict{Symbol,Float64}  # USD/MWh·año sobre la energía disponible
+    # ── piezas del sitio B (benchmark R20) ──
+    market_availability::Dict{Symbol,Vector{Float64}}  # mercado → factor por paso de su tope
+                                             # de potencia (cortes o restricciones de red)
+    generator_scope1_ef::Dict{Symbol,Float64}  # generador → tCO₂e/MWh de alcance 1 (diésel
+                                             # sin combustible modelado)
 end
+
+# retro-compatibilidad: 67 campos → sin piezas del sitio B
+ScenarioConfig(a::Vararg{Any,67}) = ScenarioConfig(a..., Dict{Symbol,Vector{Float64}}(), Dict{Symbol,Float64}())
 
 # retro-compatibilidad: 65 campos → hitos sin peso
 ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :none)
@@ -708,7 +716,8 @@ ScenarioConfig(a::Vararg{Any,51}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol
 
 "Tipos de factor por año (R3) y a qué apuntan."
 const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex,
-                           :input_ratio)   # R11: entradas de un conversor por año (eficiencia)
+                           :input_ratio,   # R11: entradas de un conversor por año (eficiencia)
+                           :offset_price)  # R20: precio de la compensación por año (objetivo "offsets")
 
 """
     year_factor(cfg, kind, target, y) -> Float64

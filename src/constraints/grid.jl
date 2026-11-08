@@ -6,14 +6,15 @@
 # topes: potencia (MW por paso) y volumen anual (MWh/año).
 
 """
-    add_grid_constraints!(m, sets, params) -> m
+    add_grid_constraints!(m, sets, params, cfg) -> m
 
 Registra `m[:conn_import_cap]`/`m[:conn_export_cap]` (por conexión con
 mercados), los alias legacy `m[:grid_import_limit]`/`m[:grid_export_limit]`
 (conexión `:grid_import`, si existe) y los topes por mercado
 `m[:market_power_cap]`/`m[:market_annual_cap]`.
 """
-function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
+function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
+                               cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
     w = params.weight_hours
     market_flow = m[:market_flow]
@@ -43,8 +44,10 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
     annual_cap = Dict{Symbol,Any}()
     for mk in sets.markets
         if isfinite(params.market_power_cap[mk])
+            # R20: el tope puede variar por paso (disponibilidad de la red)
+            av = get(cfg.market_availability, mk, nothing)
             power_cap[mk] = JuMP.@constraint(m, [s in steps, y in years],
-                market_flow[mk, s, y] <= params.market_power_cap[mk])
+                market_flow[mk, s, y] <= params.market_power_cap[mk] * (av === nothing ? 1.0 : av[s]))
         end
         if isfinite(params.market_annual_cap[mk])
             annual_cap[mk] = JuMP.@constraint(m, [y in years],

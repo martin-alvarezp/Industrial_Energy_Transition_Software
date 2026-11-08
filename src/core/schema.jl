@@ -401,5 +401,8 @@ function load_scenario_config(path::AbstractString)
                                   for c in get(d, "emission_caps", [])],
         Symbol(get(d, "milestone_weighting", "none")),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_fixed_opex", Dict())),
+        Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
+                                     for (k, v) in get(d, "market_availability", Dict())),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_scope1_ef", Dict())),
     )
 end

@@ -134,6 +134,8 @@ export function toOverrides(cfg) {
     emission_caps: cfg.emission_caps ?? [],                 // R17: topes por año
     milestone_weighting: cfg.milestone_weighting ?? "none", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
+    market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
+    generator_scope1_ef: cfg.generator_scope1_ef ?? {},
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

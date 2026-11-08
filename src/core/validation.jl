@@ -626,7 +626,8 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             continue
         end
         for (tg, pts) in targets
-            ok = kind == :input_ratio ? haskey(site.converters, tg) :
+            ok = kind == :offset_price ? true :
+                 kind == :input_ratio ? haskey(site.converters, tg) :
                  kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
                  kind == :demand ? haskey(site.demands, tg) :
                  kind == :emission_factor ? (haskey(site.markets, tg) || haskey(site.generators, tg)) :   # R15
@@ -646,6 +647,17 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         (haskey(site.storages, t) && site.storages[t].investable) || push!(problems,
             "$f: '$t' no es un almacenamiento candidato a inversión")
         c >= 0 || push!(problems, "$f['$t']: debe ser ≥ 0")
+    end
+    # R20: disponibilidad de mercados (un factor por paso en [0,1]) y alcance 1 de generadores
+    for (mk, v) in cfg.market_availability
+        haskey(site.markets, mk) || push!(problems, "market_availability: '$mk' no es un mercado del sitio")
+        length(v) == length(site.timesteps) || push!(problems,
+            "market_availability['$mk']: $(length(v)) valores para $(length(site.timesteps)) pasos")
+        all(x -> 0 <= x <= 1, v) || push!(problems, "market_availability['$mk']: factores fuera de [0,1]")
+    end
+    for (g, f) in cfg.generator_scope1_ef
+        haskey(site.generators, g) || push!(problems, "generator_scope1_ef: '$g' no es un generador del sitio")
+        f >= 0 || push!(problems, "generator_scope1_ef['$g']: debe ser ≥ 0")
     end
     for (t, c) in cfg.storage_energy_fixed_opex   # R19
         haskey(site.storages, t) || push!(problems, "storage_energy_fixed_opex: '$t' no es un almacenamiento")

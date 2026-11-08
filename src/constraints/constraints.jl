@@ -24,7 +24,7 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_generator_constraints!(m, sets, params, cfg)      # + toma obligatoria (R12)
     add_storage_constraints!(m, sets, params, site, cfg)  # + energía propia (R2)
     add_balancing!(m, sets, params, site, cfg)            # 5.6 (usa storage_energy)
-    add_grid_constraints!(m, sets, params)
+    add_grid_constraints!(m, sets, params, cfg)          # + disponibilidad de mercados (R20)
     add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)
     return m

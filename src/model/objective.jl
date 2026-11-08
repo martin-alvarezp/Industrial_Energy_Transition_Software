@@ -98,7 +98,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # gratuita; el excedente se vende (término negativo). Suma al costo de carbono.
     JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y] +
         (cfg.ets_price > 0 ? cfg.ets_price * (m[:scope1_y][y] - cfg.ets_free_allowance) : 0.0))
-    JuMP.@expression(m, offset_cost_y[y in years], cfg.offset_price * offset_buy[y])
+    JuMP.@expression(m, offset_cost_y[y in years],   # R20: precio por año
+        cfg.offset_price * year_factor(cfg, :offset_price, :offsets, ry[y]) * offset_buy[y])
     # ventas :billing pagan su precio de inyección; las :net_metering (M2b)
     # ingresan el crédito neteado O_p · retail medio del período (el banco
     # que expira no se paga)
