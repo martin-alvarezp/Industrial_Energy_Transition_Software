@@ -586,10 +586,14 @@ struct ScenarioConfig
                                              # :years = su OPEX vale por los años hasta el
                                              # próximo hito (el último, hasta el fin del
                                              # horizonte), descontados; la inversión, una vez
+    # ── O&M fijo por MWh de energía propia (benchmark R19) ──
+    storage_energy_fixed_opex::Dict{Symbol,Float64}  # USD/MWh·año sobre la energía disponible
 end
 
 # retro-compatibilidad: 65 campos → hitos sin peso
 ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :none)
+# retro-compatibilidad: 66 campos → sin O&M por MWh
+ScenarioConfig(a::Vararg{Any,66}) = ScenarioConfig(a..., Dict{Symbol,Float64}())
 
 """
     opex_weights(cfg, ry) -> Vector{Float64}

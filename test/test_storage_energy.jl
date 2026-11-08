@@ -73,3 +73,14 @@ end
     @test_throws IETO.ValidationError bad(storage_energy_capex = Dict(:bat => 1.0), storage_energy_max = Dict(:bat => 10.0),
                                           storage_energy_min = Dict(:bat => 20.0))
 end
+
+@testset "R19: O&M fijo por MWh de energía" begin
+    # 80 MWh comprados (tope por defecto): con 5 000 USD/MWh·año el OPEX fijo
+    # sube 400 000 y la compra deja de convenir a 20 USD/kWh si el O&M supera
+    # el margen (36 500 − 22 500 = 14 000 USD por MWh·año)
+    im = energy_case(storage_energy_capex = Dict(:bat => 20.0), storage_energy_fixed_opex = Dict(:bat => 5000.0))
+    @test JuMP.value(im.model[:new_energy][:bat, 1]) ≈ 80 atol = 1e-6
+    @test JuMP.value(im.model[:fixed_opex_y][1]) ≈ 80 * 5000 rtol = 1e-9
+    im = energy_case(storage_energy_capex = Dict(:bat => 20.0), storage_energy_fixed_opex = Dict(:bat => 15000.0))
+    @test JuMP.value(im.model[:new_energy][:bat, 1]) ≈ 0 atol = 1e-6
+end

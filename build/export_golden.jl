@@ -307,4 +307,6 @@ dump("hitos_ponderados_n6", s28, with_config(c28; horizon_years = 6, wacc = 0.1,
      milestone_weighting = :years, salvage_value = true, tax_rate = 0.2))
 dump("demo_hitos_ponderados_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
      milestone_years = [2026, 2028, 2031, 2035], milestone_weighting = :years))
+# 38 · O&M fijo por MWh de energía (R19)
+dump("om_por_mwh_n1", s26, with_config(c26; storage_energy_capex = Dict(:bat => 20.0), storage_energy_fixed_opex = Dict(:bat => 5000.0)))
 println("fixtures dorados en ", out)

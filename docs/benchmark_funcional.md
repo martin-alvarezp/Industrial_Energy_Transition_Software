@@ -618,3 +618,9 @@ días tipo (k por año) con cronología.
   hasta el siguiente. Oráculos (test_milestones.jl): sin descuento, hitos 1, 3
   y 5 a 6 años ⇒ peso 2 cada uno; con 10 %, el hito 1 pesa 1/1,1 + 1/1,1².
   Goldens `hitos_ponderados_n6` y `demo_hitos_ponderados_n10`.
+- ✅ **R19 · O&M fijo por MWh de energía del almacenamiento** (2026-11-08).
+  `storage_energy_fixed_opex` (USD/MWh·año sobre la energía disponible del
+  año, al OPEX fijo), para un TES cuyo O&M se cotiza por kWh. Sin esto el
+  optimizador no veía ese costo y sobredimensionaba la energía (la
+  reproducción de un caso real compraba el doble de MWh que la referencia).
+  Oráculo en test_storage_energy.jl; golden `om_por_mwh_n1`.

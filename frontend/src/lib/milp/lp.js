@@ -445,6 +445,11 @@ export function buildLP(site0, cfg0) {
     opf = opw[y - 1] / D;
     constant += D * renewalCapex[y - 1];
     constDed(D * fixedCharges);
+    // O&M fijo por MWh de energía (R19): sobre la energía disponible del año
+    for (const st of stors) {
+      const c = cfg.storage_energy_fixed_opex?.[st.tech_id] ?? 0;
+      if (c > 0) { const en = energyOf(st, y); constDed(D * c * en.k); for (const [v, k] of en.vars) addDed(v, D * c * k); }
+    }
     // O&M fijo de las medidas activas (R10): Σ_{y'≤y} em_y'
     for (const em of EMs) if ((cfg.measure_fixed_opex?.[em.id] ?? 0) > 0)
       for (let yp = 1; yp <= y; yp++) addDed(`em_${sane(em.id)}_${yp}`, D * cfg.measure_fixed_opex[em.id]);

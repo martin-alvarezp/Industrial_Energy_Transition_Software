@@ -40,6 +40,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@expression(m, fixed_opex_y[y in years],
         sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, ry[y]) * available_capacity[t, y]
             for t in all_techs; init = 0.0) + params.fixed_charges +
+        sum(c * m[:storage_energy][st, y] for (st, c) in cfg.storage_energy_fixed_opex   # R19: por MWh
+            if st in sets.storages; init = 0.0) +
         m[:measures_opex_y][y])   # O&M fijo de las medidas activas (R10)
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
