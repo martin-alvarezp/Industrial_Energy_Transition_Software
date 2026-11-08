@@ -147,11 +147,30 @@ docs/
   assumptions_catalog.md  catálogo de supuestos (datos demo, config, límites del MVP)
 ```
 
-## Estado (v0.1-mvp)
+## Estado
 
-Implementado: modelo multi-año completo (§4-§8), escenarios predefinidos y
-Pareto (§11), Results + export (§10), API (§12), frontend ejecutivo con
-paleta accesible validada (CVD all-pairs ≥ 12), presupuesto CAPEX como
-restricción del MILP (SPEC §7.8). Documentado como pendiente: retiro de
-activos, series custom por año y curvas de aprendizaje (no-goals del MVP,
-SPEC §15).
+Implementado y verificado (suite Julia completa + equivalencia del motor web
+contra fixtures dorados del motor Julia):
+
+- **Modelo multi-año**: años hito ponderados por los años que representan
+  (cada año intermedio repite la operación del hito anterior y se descuenta
+  en su año), CAPEX en cuotas del financiamiento por activo (o de una vez),
+  valor residual, impuestos y depreciación, presupuestos total y anual.
+- **Reglas de inversión**: ventanas y permisos por tramos (por tecnología o
+  para todo el sitio), tamaño mínimo, unidades enteras, compras forzadas,
+  renovación del parque existente por tecnología, exclusiones y requisitos.
+- **Resolución temporal**: año completo o días tipo (enlazados para el
+  almacenamiento), punta mensual con días tipo, perfiles de demanda y de
+  equipos por año, factores por año en escalón (precios, demanda, emisiones,
+  cargos, OPEX, eficiencia).
+- **Física de planta**: conversores multi-puerto con COP horario, carga
+  mínima, arranques y rampas, acoplamientos, almacenamiento con energía y
+  potencia independientes, toma obligatoria, disponibilidad horaria.
+- **Mercados y clima**: tarifas con cargo por demanda, bloques y horas de
+  uso, net metering, cortes de red, alcances 1 y 2, ETS, compensaciones con
+  precio por año, topes de emisiones por año (duros, o relajados: el plan
+  más cercano a la meta y aviso del exceso), MACC y curva Pareto.
+- **Paridad funcional**: el motor se contrastó con 16 corridas reales de una
+  herramienta comercial de referencia (tres sitios industriales); cada
+  diferencia encontrada quedó como un ítem con oráculo propio
+  (`docs/benchmark_funcional.md`, bloque R).
