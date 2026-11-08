@@ -47,9 +47,9 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)
     JuMP.@expression(m, var_opex_y[y in years],
-        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, ry[y]) * dispatch[t, s, y] * w[s]
+        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, ry[y]) * dispatch[t, s, y] * w[s, y]
             for t in sets.dispatch_techs, s in steps; init = 0.0) +
-        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, ry[y]) * discharge[st, s, y] * w[s]
+        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, ry[y]) * discharge[st, s, y] * w[s, y]
             for st in sets.storages, s in steps; init = 0.0) +
         m[:startup_cost_y][y] +  # arranques (2.1): parte del OPEX variable
         m[:flex_cost_y][y])      # carga desplazada (5.4)
@@ -58,9 +58,9 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     #                   + compra implícita de combustibles SIN mercado
     # (fuel_input = ratio·dispatch por puerto de entrada; cubre CHP).
     JuMP.@expression(m, energy_purchases_y[y in years],
-        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
+        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s, y]
             for mk in sets.buy_markets, s in steps; init = 0.0) +
-        sum(params.price[p[2]][s, y] * p[3] * input_factor(m, p[1], p[2], s, y) * input_driver(m, p[1], s, y) * w[s]
+        sum(params.price[p[2]][s, y] * p[3] * input_factor(m, p[1], p[2], s, y) * input_driver(m, p[1], s, y) * w[s, y]
             for p in params.fuel_inputs, s in steps; init = 0.0))
 
     # DemandCharges_y (M2/M2b): por estación y mercado con cargo,
@@ -68,7 +68,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # · con contratada: USD/kW·mes · kW contratados (constante) +
     #   excess_penalty · kW de exceso sobre la contratada.
     # cada período de facturación (mes o estación) cubre 12/nperíodos meses
-    nse = length(params.billing_steps)
+    nse = length(params.billing_steps[1])   # R26: misma cantidad de períodos cada año
     months_per_season = 12.0 / max(nse, 1)
     contracted(mk) = get(params.market_contracted, mk, Inf)
     charged = [mk for mk in sets.buy_markets
@@ -106,7 +106,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     billing_sells = [mk for mk in sets.sell_markets
                      if !haskey(params.nm_periods, mk)]
     JuMP.@expression(m, export_revenue_y[y in years],
-        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s]
+        sum(params.market_price[mk][s, y] * market_flow[mk, s, y] * w[s, y]
             for mk in billing_sells, s in steps; init = 0.0) +
         sum(params.nm_retail[mk][pi, y] * m[:nm_offset][mk][pi, y]
             for (mk, periods) in params.nm_periods

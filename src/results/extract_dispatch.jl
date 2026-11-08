@@ -79,9 +79,9 @@ function res_share_by_year(im::IETOModel)
     m, sets, params = im.model, im.sets, im.params
     w = params.weight_hours
     return [begin
-        res = sum(JuMP.value(m[:dispatch][g, s, y]) * w[s]
+        res = sum(JuMP.value(m[:dispatch][g, s, y]) * w[s, y]
                   for g in sets.generators, s in sets.steps; init = 0.0)
-        dem = sum(params.demand[c][s, y] * w[s]
+        dem = sum(params.demand[c][s, y] * w[s, y]
                   for c in sets.demand_carriers, s in sets.steps; init = 0.0)
         dem > 0 ? res / dem : 0.0
     end for y in sets.years]

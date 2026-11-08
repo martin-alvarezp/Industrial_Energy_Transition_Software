@@ -41,9 +41,9 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
                      site.carriers[p.carrier].category == :fuel]
     g1 = [g for g in sets.generators if get(cfg.generator_scope1_ef, g, 0.0) > 0]   # R20
     JuMP.@expression(m, scope1_y[y in years],
-        sum(ef_scope1(p[2]) * p[3] * input_factor(m, p[1], p[2], s, y) * input_driver(m, p[1], s, y) * w[s]
+        sum(ef_scope1(p[2]) * p[3] * input_factor(m, p[1], p[2], s, y) * input_driver(m, p[1], s, y) * w[s, y]
             for p in fuel_ports, s in steps; init = 0.0) +
-        sum(cfg.generator_scope1_ef[g] * dispatch[g, s, y] * w[s] for g in g1, s in steps; init = 0.0))
+        sum(cfg.generator_scope1_ef[g] * dispatch[g, s, y] * w[s, y] for g in g1, s in steps; init = 0.0))
 
     # Scope 2: compras de mercado · factor del mercado (propio o heredado del
     # carrier; 0 en combustibles — su scope 1 ya se contó al quemarlos)
@@ -60,11 +60,11 @@ function add_emissions_constraints!(m::JuMP.Model, sets::ModelSets,
     credit = cfg.export_emission_credit ? sets.sell_markets : Symbol[]
     gef = [g for g in sets.generators if get(cfg.generator_ef, g, 0.0) > 0]
     JuMP.@expression(m, scope2_y[y in years],
-        sum(params.market_ef[mk][y] * market_flow[mk, s, y] * w[s]
+        sum(params.market_ef[mk][y] * market_flow[mk, s, y] * w[s, y]
             for mk in sets.buy_markets, s in steps; init = 0.0) +
         sum(cfg.generator_ef[g] * year_factor(cfg, :emission_factor, g, ry[y]) *   # R15: por año
-            m[:dispatch][g, s, y] * w[s] for g in gef, s in steps; init = 0.0) -
-        sum(sell_ef(mk, y) * market_flow[mk, s, y] * w[s] for mk in credit, s in steps; init = 0.0))
+            m[:dispatch][g, s, y] * w[s, y] for g in gef, s in steps; init = 0.0) -
+        sum(sell_ef(mk, y) * market_flow[mk, s, y] * w[s, y] for mk in credit, s in steps; init = 0.0))
     # con crédito por ventas el bruto (y el neto) pueden quedar bajo cero
     if cfg.export_emission_credit
         for y in years

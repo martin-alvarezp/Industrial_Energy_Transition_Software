@@ -46,12 +46,14 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
         if isfinite(params.market_power_cap[mk])
             # R20: el tope puede variar por paso (disponibilidad de la red)
             av = get(cfg.market_availability, mk, nothing)
+            avy = get(cfg.market_availability_by_year, mk, nothing)   # R26: por año
+            avs(s, y) = (a = by_year_at(cfg, avy, sets.year_of[y]); a !== nothing ? a[s] : av === nothing ? 1.0 : av[s])
             power_cap[mk] = JuMP.@constraint(m, [s in steps, y in years],
-                market_flow[mk, s, y] <= params.market_power_cap[mk] * (av === nothing ? 1.0 : av[s]))
+                market_flow[mk, s, y] <= params.market_power_cap[mk] * avs(s, y))
         end
         if isfinite(params.market_annual_cap[mk])
             annual_cap[mk] = JuMP.@constraint(m, [y in years],
-                sum(market_flow[mk, s, y] * w[s] for s in steps) <=
+                sum(market_flow[mk, s, y] * w[s, y] for s in steps) <=
                 params.market_annual_cap[mk])
         end
     end
@@ -65,11 +67,11 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
                if get(params.market_demand_charge, mk, 0.0) > 0 ||
                   (isfinite(get(params.market_contracted, mk, Inf)) &&
                    get(params.market_excess_penalty, mk, 0.0) > 0)]
-    nse = length(params.billing_steps)   # meses o estaciones
+    nse = length(params.billing_steps[1])   # meses o estaciones (R26: por año)
     if !isempty(charged)
         JuMP.@variable(m, market_peak[charged, 1:nse, years] >= 0)
         m[:market_peak_def] = JuMP.@constraint(m,
-            [mk in charged, se in 1:nse, s in params.billing_steps[se], y in years],
+            [mk in charged, se in 1:nse, y in years, s in params.billing_steps[y][se]],
             market_peak[mk, se, y] >= market_flow[mk, s, y])
         # potencia contratada (M2b): el exceso sobre la contratada se penaliza
         over = [mk for mk in charged if isfinite(params.market_contracted[mk])]
@@ -94,7 +96,7 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
     for (mk, t) in params.market_tariff
         M = params.market_bigM[mk]
         for y in years
-            E = sum(market_flow[mk, s, y] * w[s] for s in steps)
+            E = sum(market_flow[mk, s, y] * w[s, y] for s in steps)
             if t.uh_threshold > 0
                 P = JuMP.@variable(m, lower_bound = 0, base_name = "uh_peak_$(mk)_$y")
                 JuMP.@constraint(m, [s in steps], P >= market_flow[mk, s, y])
@@ -147,9 +149,9 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
                            base_name = "nm_offset_$mk")
         for y in years, (pi, p) in enumerate(periods)
             JuMP.@constraint(m, O[pi, y] <=
-                sum(market_flow[mk, s, y] * w[s] for s in p))
+                sum(market_flow[mk, s, y] * w[s, y] for s in p))
             JuMP.@constraint(m, O[pi, y] <=
-                sum(market_flow[b, s, y] * w[s]
+                sum(market_flow[b, s, y] * w[s, y]
                     for b in params.nm_buys[mk], s in p; init = 0.0))
         end
         nm_offset[mk] = O

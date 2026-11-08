@@ -170,7 +170,7 @@ function add_operation_constraints!(m::JuMP.Model, sets::ModelSets,
 
         # arranques: costo × veces que el paso ocurre en el año (weight/Δt)
         JuMP.@expression(m, startup_cost_y[y in years],
-            sum(conv[t].ops.startup_cost * su[t, s, y] * (w[s] / Δt[s])
+            sum(conv[t].ops.startup_cost * su[t, s, y] * (w[s, y] / Δt[s])
                 for t in U, s in steps if conv[t].ops.startup_cost > 0; init = 0.0))
     else
         JuMP.@expression(m, startup_cost_y[y in years], JuMP.AffExpr(0.0))

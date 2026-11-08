@@ -422,5 +422,12 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "debt_share", Dict())),
         Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in v]
                                             for (k, v) in get(d, "build_permission", Dict())),
+        Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in get(d, "weight_by_year", Dict())),
+        Dict{Int,Vector{Int}}(parse(Int, string(y)) => Int[Int(x) for x in v] for (y, v) in get(d, "month_by_year", Dict())),
+        Dict{Int,Vector{String}}(parse(Int, string(y)) => String[String(x) for x in v] for (y, v) in get(d, "day_sequence_by_year", Dict())),
+        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(k) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
+                       for (k, ys) in get(d, "price_profiles_by_year", Dict())),
+        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(k) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
+                       for (k, ys) in get(d, "market_availability_by_year", Dict())),
     )
 end

@@ -564,6 +564,29 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         length(unique(first.(pts))) == length(pts) || push!(problems,
             "build_permission['$k']: años repetidos")
     end
+    # R26: series por año con un valor por paso; pesos que suman el año
+    nst = length(site.timesteps)
+    for (yr, v) in cfg.weight_by_year
+        length(v) == nst || push!(problems, "weight_by_year[$yr]: $(length(v)) valores para $nst pasos")
+        isapprox(sum(v), HOURS_PER_YEAR; rtol = 1e-4) || push!(problems,
+            "weight_by_year[$yr]: Σ = $(sum(v)), debe ser $HOURS_PER_YEAR")
+    end
+    for (yr, v) in cfg.month_by_year
+        (length(v) == nst && all(1 .<= v .<= 12)) || push!(problems, "month_by_year[$yr]: un mes 1–12 por paso")
+    end
+    for (yr, v) in cfg.day_sequence_by_year
+        length(v) == 365 || push!(problems, "day_sequence_by_year[$yr]: debe tener 365 días")
+        isempty(setdiff(Set(v), Set(ts.season for ts in site.timesteps))) || push!(problems,
+            "day_sequence_by_year[$yr]: nombra períodos que el sitio no tiene")
+        isempty(cfg.day_sequence) && push!(problems,
+            "day_sequence_by_year: requiere también day_sequence (la del año base)")
+    end
+    for f in (:price_profiles_by_year, :market_availability_by_year), (mk, ys) in getfield(cfg, f)
+        haskey(effective_markets(site), mk) || push!(problems, "$f: '$mk' no es un mercado del sitio")
+        for (yr, v) in ys
+            length(v) == nst || push!(problems, "$f['$mk'][$yr]: $(length(v)) valores para $nst pasos")
+        end
+    end
     cfg.capex_accounting in (:annuity, :lump) || push!(problems,
         "capex_accounting: '$(cfg.capex_accounting)' desconocido (annuity | lump)")
     for (k, v) in cfg.financing_period_tech

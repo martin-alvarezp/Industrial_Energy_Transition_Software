@@ -16,6 +16,6 @@
     seq = [fill("A", 31); fill("B", 334)]
     im = go(with_config(cfg; day_sequence = seq))
     @test JuMP.objective_value(im.model) ≈ 380_000 rtol = 1e-9
-    @test length(im.params.billing_steps) == 12
-    @test im.params.billing_steps[1] == collect(1:24) && im.params.billing_steps[2] == collect(25:48)
+    @test length(im.params.billing_steps[1]) == 12
+    @test im.params.billing_steps[1][1] == collect(1:24) && im.params.billing_steps[1][2] == collect(25:48)
 end

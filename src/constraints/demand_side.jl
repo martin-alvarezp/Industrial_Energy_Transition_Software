@@ -41,7 +41,7 @@ function add_demand_side!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
             sum(Δt[s] * (flex_up[c, s, y] - flex_dn[c, s, y]) for s in params.season_steps[p]) == 0)
         w = params.weight_hours
         JuMP.@expression(m, flex_cost_y[y in years],
-            cfg.flex_cost * sum(flex_dn[c, s, y] * w[s] for c in FX, s in steps))
+            cfg.flex_cost * sum(flex_dn[c, s, y] * w[s, y] for c in FX, s in steps))
     else
         JuMP.@expression(m, flex_cost_y[y in years], JuMP.AffExpr(0.0))
     end

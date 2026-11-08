@@ -131,6 +131,12 @@ _coerce(::Type{Dict{Symbol,Float64}}, v) =
 _coerce(::Type{Dict{Symbol,Vector{Tuple{Int,Bool}}}}, v) =                     # permisos por tramos (R25)
     Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in pts]
                                         for (k, pts) in pairs(v))
+_coerce(::Type{Dict{Int,Vector{Int}}}, v) =                            # meses por año (R26)
+    Dict{Int,Vector{Int}}(parse(Int, string(y)) => Int[Int(x) for x in xs] for (y, xs) in pairs(v))
+_coerce(::Type{Dict{Int,Vector{String}}}, v) =                         # secuencia de días por año (R26)
+    Dict{Int,Vector{String}}(parse(Int, string(y)) => String[String(x) for x in xs] for (y, xs) in pairs(v))
+_coerce(::Type{Dict{Int,Vector{Float64}}}, v) =                        # pesos por año (R26)
+    Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in xs] for (y, xs) in pairs(v))
 _coerce(::Type{Dict{Symbol,Int}}, v) =                                 # plazo por tecnología (R27)
     Dict{Symbol,Int}(Symbol(k) => Int(x) for (k, x) in pairs(v))
 _coerce(::Type{Vector{EfficiencyMeasure}}, v) =

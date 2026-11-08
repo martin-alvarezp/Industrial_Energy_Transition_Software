@@ -66,6 +66,11 @@ export function toConfig(cfg) {
     financing_rate_tech: cfg.financing_rate_tech ?? {},
     debt_share: cfg.debt_share ?? {},
     build_permission: cfg.build_permission ?? {},           // R25: permisos por tramos
+    weight_by_year: cfg.weight_by_year ?? {},               // R26: días tipo propios de cada año
+    month_by_year: cfg.month_by_year ?? {},
+    day_sequence_by_year: cfg.day_sequence_by_year ?? {},
+    price_profiles_by_year: cfg.price_profiles_by_year ?? {},
+    market_availability_by_year: cfg.market_availability_by_year ?? {},
     milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B

@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies,
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies, byYearAt,
   modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
@@ -35,6 +35,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   // R3: factores por año sobre la escalación (espejo de lp.js)
   const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), yr(y) - 1) * yearFactor(cfg, "price", c, yr(y));
   const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, yr(y));
+  // R26: peso y precio de cada paso por año (espejo de lp.js)
+  const wY = years.map((y) => byYearAt(cfg, cfg.weight_by_year, yr(y)) ?? w);
+  const W = (s, y) => wY[y - 1][s - 1];
+  const PX = (mk, s, y) => (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], yr(y))?.[s - 1] ??
+                            mk.price[s - 1]) * mpx(mk, y);
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])
@@ -240,34 +245,34 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       for (const s of steps) {
         const v = t.type === "storage" ? V(`dc_${sane(t.tech_id)}_${s}_${y}`)
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
-        varop += t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, yr(y)) * v * w[s - 1];
+        varop += t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, yr(y)) * v * W(s, y);
       }
       // (la carga desplazada de 5.4 se suma después, una vez por año)
       // arranques (2.1): parte del OPEX variable, como en Julia
       if (t.type === "converter" && (t.startup_cost ?? 0) > 0 && hasCommitment(t) && unitMw(t) > 0)
         for (const s of steps)
           varop += t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
-                   w[s - 1] / (ts[s - 1].duration_hours ?? 1);
+                   W(s, y) / (ts[s - 1].duration_hours ?? 1);
     }
     // reserva aFRR (5.6): ingreso, junto a las ventas
     for (const t of afrrParticipants(cfg, convs, stors))
       for (const s of steps)
-        exportRev += w[s - 1] * ((cfg.afrr_price_up ?? 0) * V(`aup_${sane(t.tech_id)}_${s}_${y}`) +
+        exportRev += W(s, y) * ((cfg.afrr_price_up ?? 0) * V(`aup_${sane(t.tech_id)}_${s}_${y}`) +
                                  (cfg.afrr_price_down ?? 0) * V(`adn_${sane(t.tech_id)}_${s}_${y}`));
     // carga desplazada (5.4): costo por MWh movido, en el OPEX variable
     if ((cfg.flex_cost ?? 0) > 0)
       for (const [c, f] of Object.entries(cfg.demand_flexibility ?? {}))
         if (f > 0 && site.demands?.[c])
-          for (const s of steps) varop += cfg.flex_cost * V(`fdn_${sane(c)}_${s}_${y}`) * w[s - 1];
+          for (const s of steps) varop += cfg.flex_cost * V(`fdn_${sane(c)}_${s}_${y}`) * W(s, y);
     for (const mk of buys) for (const s of steps)
-      energy += mk.price[s - 1] * mpx(mk, y) *
-                V(`mf_${sane(mk.market_id)}_${s}_${y}`) * w[s - 1];
+      energy += PX(mk, s, y) *
+                V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
     for (const cv of convs) for (const p of portsOf(cv).ins)
       if (catOf[p.carrier] === "fuel" && !fuelWithMkt.has(p.carrier) &&
           site.prices?.[p.carrier])
         for (const s of steps)
           energy += site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
-                    p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * w[s - 1];
+                    p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * W(s, y);
     for (const mk of buys) {
       const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
       const dc = (mk.demand_charge ?? 0) * fdc, cp = mk.contracted_power,
@@ -295,33 +300,33 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         const paired = buys.filter((b) =>
           b.connection === mk.connection && b.carrier_id === mk.carrier_id);
         periods.forEach((p, pi) => {
-          const wsum = p.reduce((a, s) => a + w[s - 1], 0);
+          const wsum = p.reduce((a, s) => a + W(s, y), 0);
           const retail = paired.length === 0 ? 0 :
             paired.reduce((a, b) => a + p.reduce((x, s) =>
-              x + b.price[s - 1] * mpx(b, y) * w[s - 1], 0) / wsum, 0)
+              x + PX(b, s, y) * W(s, y), 0) / wsum, 0)
             / Math.max(paired.length, 1);
           exportRev += retail * V(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`);
         });
       } else {
         for (const s of steps)
-          exportRev += mk.price[s - 1] * mpx(mk, y) *
-                       V(`mf_${sane(mk.market_id)}_${s}_${y}`) * w[s - 1];
+          exportRev += PX(mk, s, y) *
+                       V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
       }
     }
     for (const cv of convs) for (const p of portsOf(cv).ins)
       if (catOf[p.carrier] === "fuel") {
         const f = efTab[`${p.carrier}|scope1`] ?? 0;
         for (const s of steps)
-          s1 += f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * w[s - 1];
+          s1 += f * p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * W(s, y);
       }
     for (const g of gens) {                                       // R20
       const f = cfg.generator_scope1_ef?.[g.tech_id] ?? 0;
-      if (f > 0) for (const s of steps) s1 += f * V(`d_${sane(g.tech_id)}_${s}_${y}`) * w[s - 1];
+      if (f > 0) for (const s of steps) s1 += f * V(`d_${sane(g.tech_id)}_${s}_${y}`) * W(s, y);
     }
     const ge = V(`ge_${y}`), ne = V(`ne_${y}`), off = V(`off_${y}`);
     s2 = ge - s1;
     for (const g of gens) for (const s of steps)
-      resGen += V(`d_${sane(g.tech_id)}_${s}_${y}`) * w[s - 1];
+      resGen += V(`d_${sane(g.tech_id)}_${s}_${y}`) * W(s, y);
     for (const [c, series0] of Object.entries(site.demands ?? {}))
       demTot += (demandProfileAt(cfg, c, yr(y)) ?? series0).reduce((a, v, i) => a + v * w[i], 0) *
                 Math.pow(1 + cfg.demand_growth, yr(y) - 1) * yearFactor(cfg, "demand", c, yr(y));

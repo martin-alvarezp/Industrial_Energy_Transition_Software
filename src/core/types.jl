@@ -621,7 +621,28 @@ struct ScenarioConfig
     build_permission::Dict{Symbol,Vector{Tuple{Int,Bool}}}  # tecnología (o :site = todo el sitio) →
                                              # [(año, permitido)] en escalón; antes del primero,
                                              # lo contrario del primero. Se evalúa en el año del hito
+    # ── días tipo propios de cada año (benchmark R26) ──
+    # Con series por año agrupadas año a año, el paso s de cada año es OTRO día
+    # tipo: su peso, su mes, la secuencia de días y los precios y la
+    # disponibilidad de los mercados cambian por año (en escalón desde su año).
+    weight_by_year::Dict{Int,Vector{Float64}}           # año → horas que representa cada paso (Σ = 8760)
+    month_by_year::Dict{Int,Vector{Int}}              # año → mes de cada paso (facturación de la punta)
+    day_sequence_by_year::Dict{Int,Vector{String}}       # año → día tipo de cada día del año (365)
+    price_profiles_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → precio por paso (reemplaza la forma)
+    market_availability_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → disponibilidad por paso
 end
+
+# retro-compatibilidad: 79 campos → la misma plantilla de días todos los años
+ScenarioConfig(a::Vararg{Any,79}) = ScenarioConfig(a..., Dict{Int,Vector{Float64}}(), Dict{Int,Vector{Int}}(), Dict{Int,Vector{String}}(),
+                                                   Dict{Symbol,Dict{Int,Vector{Float64}}}(), Dict{Symbol,Dict{Int,Vector{Float64}}}())
+
+"Peso (horas) del paso de cada año relativo de `ry` (R26): matriz [paso, año]."
+function weight_matrix(cfg::ScenarioConfig, site_weights::Vector{Float64}, ry::AbstractVector{<:Integer})
+    hcat([something(by_year_at(cfg, cfg.weight_by_year, r), site_weights) for r in ry]...)
+end
+
+"Secuencia de días tipo vigente en el año relativo `r` (R26), o la del escenario."
+day_sequence_at(cfg::ScenarioConfig, r::Integer) = something(by_year_at(cfg, cfg.day_sequence_by_year, r), cfg.day_sequence)
 
 # retro-compatibilidad: 78 campos → sin permisos por tramos
 ScenarioConfig(a::Vararg{Any,78}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Bool}}}())

@@ -698,3 +698,14 @@ días tipo (k por año) con cronología.
   permisos de la referencia: rangos de años o años sueltos, por activo o
   para el sitio. Oráculos en test_permissions.jl; goldens
   `permisos_tramos_n3` y `permisos_hitos_forzada_n4`.
+- ✅ **R26 · Días tipo propios de cada año** (2026-11-08). Cuando las series
+  de cada año se agrupan por separado (la referencia elige N días tipo por
+  año), el paso s de cada año es otro día. `weight_by_year` (horas de cada
+  paso, Σ = 8760), `month_by_year` (mes de cada paso, para la punta),
+  `day_sequence_by_year` (días tipo enlazados), `price_profiles_by_year` y
+  `market_availability_by_year` (por mercado) rigen desde su año, en
+  escalón; junto con los perfiles por año de demanda y equipos (R22, R23)
+  describen un año con su propio agrupamiento. El peso pasa a ser una
+  matriz [paso, año] en todo el motor (objetivo, emisiones, topes anuales,
+  ciclos, neteo, desglose). Oráculos en test_days_by_year.jl; goldens
+  `dias_por_anio_n2` y `demo_meses_por_anio_n3`.

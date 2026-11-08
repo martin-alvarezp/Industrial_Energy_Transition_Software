@@ -4,7 +4,7 @@
 
 "Parámetros precalculados, listos para indexar en la construcción del modelo."
 struct ModelParameters
-    weight_hours::Vector{Float64}                    # [step]
+    weight_hours::Matrix{Float64}                    # [step, y] (R26: por año)
     price::Dict{Symbol,Matrix{Float64}}              # carrier → [step, y] USD/MWh
     demand::Dict{Symbol,Matrix{Float64}}             # carrier → [step, y] MW
     discount::Vector{Float64}                        # [y] = 1/(1+wacc)^y
@@ -40,7 +40,7 @@ struct ModelParameters
     fixed_charges::Float64                           # USD/año, Σ cargos fijos de conexión
     market_demand_charge::Dict{Symbol,Float64}       # USD/kW·mes por mercado (M2)
     season_steps::Vector{Vector{Int}}                # pasos agrupados por estación
-    billing_steps::Vector{Vector{Int}}               # períodos de la punta tarifaria:
+    billing_steps::Vector{Vector{Vector{Int}}}       # [y][período] pasos de la punta tarifaria (R26):
                                                      # por mes si todos los pasos traen
                                                      # month, si no por estación
     duration_hours::Vector{Float64}                  # [step] Δt del paso (SOC)
@@ -92,7 +92,8 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     years = sets.years
     ry = sets.year_of        # año real de cada índice (R6)
 
-    weight = [ts.weight_hours for ts in site.timesteps]
+    weight0 = [ts.weight_hours for ts in site.timesteps]
+    weight = weight_matrix(cfg, weight0, ry)              # R26: [paso, año]
 
     price = Dict{Symbol,Matrix{Float64}}()
     for (c, ps) in site.prices
@@ -177,6 +178,11 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         mk = mkts[id]
         esc = get(cfg.price_escalation, mk.carrier, 0.0)
         market_price[id] = _scaled_matrix(mk.price, esc, ry)
+        # R26: perfil de precios del año (si hay) reemplaza la forma base
+        for (y, r) in enumerate(ry)
+            pf = by_year_at(cfg, get(cfg.price_profiles_by_year, id, nothing), r)
+            pf === nothing || (market_price[id][:, y] .= pf .* (1.0 + esc)^(r - 1))
+        end
         for y in years   # R3: factor del mercado y del vector
             market_price[id][:, y] .*= year_factor(cfg, :price, id, ry[y]) * year_factor(cfg, :price, mk.carrier, ry[y])
         end
@@ -275,30 +281,37 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
 
     # períodos de facturación de la punta: meses (en orden de aparición) si la
     # plantilla los trae en todos los pasos; si no, las estaciones de siempre
-    billing_steps = if all(ts -> ts.month > 0, site.timesteps)
-        months = Int[]; groups = Vector{Int}[]
-        for ts in site.timesteps
-            i = findfirst(==(ts.month), months)
-            i === nothing ? (push!(months, ts.month); push!(groups, Int[ts.id])) :
-                            push!(groups[i], ts.id)
+    # por año (R26): el mes de cada paso y la secuencia de días pueden cambiar
+    function billing_of(r)
+        mo = something(by_year_at(cfg, cfg.month_by_year, r), [ts.month for ts in site.timesteps])
+        seq = day_sequence_at(cfg, r)
+        if length(seq) == 365
+            # días tipo enlazados (R16): cada mes factura la punta de TODOS los
+            # días tipo que caen en él (un día tipo puede estar en varios meses)
+            mstart = cumsum([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30])
+            steps_of = Dict{String,Vector{Int}}()
+            for ts in site.timesteps
+                push!(get!(steps_of, ts.season, Int[]), ts.id)
+            end
+            return [sort!(unique!(reduce(vcat, (get(steps_of, seq[d], Int[])
+                                                 for d in (mstart[m] + 1):(m == 12 ? 365 : mstart[m + 1]));
+                                         init = Int[])))
+                    for m in 1:12]
+        elseif all(>(0), mo)
+            # meses en orden de aparición
+            months = Int[]; groups = Vector{Int}[]
+            for (s, mm) in enumerate(mo)
+                i = findfirst(==(mm), months)
+                i === nothing ? (push!(months, mm); push!(groups, Int[s])) : push!(groups[i], s)
+            end
+            return groups
         end
-        groups
-    else
-        season_steps
+        return season_steps
     end
-    # días tipo enlazados (R16): cada mes factura la punta de TODOS los días tipo
-    # que caen en él según day_sequence (un día tipo puede estar en varios meses)
-    if length(cfg.day_sequence) == 365
-        mstart = cumsum([0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30])
-        steps_of = Dict{String,Vector{Int}}()
-        for ts in site.timesteps
-            push!(get!(steps_of, ts.season, Int[]), ts.id)
-        end
-        billing_steps = [sort!(unique!(reduce(vcat, (get(steps_of, cfg.day_sequence[d], Int[])
-                                                      for d in (mstart[m] + 1):(m == 12 ? 365 : mstart[m + 1]));
-                                              init = Int[])))
-                         for m in 1:12]
-    end
+    billing_steps = [billing_of(r) for r in ry]
+    # todos los años con la misma cantidad de períodos (los que faltan, vacíos)
+    nbill = maximum(length, billing_steps)
+    billing_steps = [[i <= length(b) ? b[i] : Int[] for i in 1:nbill] for b in billing_steps]
     duration = [ts.duration_hours for ts in site.timesteps]
 
     # ── ciclo de vida (M5) ──
@@ -347,8 +360,8 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                    mb.carrier == mk.carrier]
         retail = zeros(length(periods), length(years))
         for (pi, p) in enumerate(periods), y in years
-            wsum = sum(weight[s] for s in p)
-            vals = [sum(market_price[b][s, y] * weight[s] for s in p) / wsum
+            wsum = sum(weight[s, y] for s in p)
+            vals = [sum(market_price[b][s, y] * weight[s, y] for s in p) / wsum
                     for b in buys]
             retail[pi, y] = isempty(vals) ? 0.0 : sum(vals) / length(vals)
         end

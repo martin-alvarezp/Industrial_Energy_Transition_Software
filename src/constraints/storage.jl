@@ -104,7 +104,7 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     # ciclos equivalentes por año: descarga anual ≤ ciclos × energía útil
     w = params.weight_hours
     m[:cycle_limit] = [JuMP.@constraint(m,
-            sum(discharge[st, s, y] * w[s] for s in steps) <=
+            sum(discharge[st, s, y] * w[s, y] for s in steps) <=
             S[st].phys.cycle_limit * (hi[st] - lo[st]) * storage_energy[st, y])
         for st in sets.storages for y in years if S[st].phys.cycle_limit > 0]
 
@@ -126,7 +126,7 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
                 push!(cons, JuMP.@constraint(m, soc_swing_lo[st, g, y] <= soc[st, s, y] - start[st, g, y]))
             end
             for d in 1:D
-                g = cfg.day_sequence[d]
+                g = day_sequence_at(cfg, sets.year_of[y])[d]   # R26: la secuencia del año
                 nxt = d == D ? 1 : d + 1                 # año cíclico
                 push!(cons, JuMP.@constraint(m, soc_level[st, nxt, y] ==
                     κ(st, g) * soc_level[st, d, y] + soc[st, lastof(g), y] - κ(st, g) * start[st, g, y]))

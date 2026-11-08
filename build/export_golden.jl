@@ -357,4 +357,15 @@ dump("permisos_tramos_n3", s45, with_config(c45; horizon_years = 3, wacc = 0.05,
      build_permission = Dict(:hp => [(2, true)], :site => [(3, true)])))
 dump("permisos_hitos_forzada_n4", s45, with_config(c45; horizon_years = 4, wacc = 0.05, milestone_years = [1, 3, 4],
      build_permission = Dict(:hp => [(1, false), (2, true), (3, false)]), forced_builds = [(:hp, 4, 3.0)]))
+# 46 · días tipo propios de cada año (R26): peso, precio y disponibilidad por
+# año sobre el sitio de operación; y el demo con meses por año en hitos
+s46, c46 = op_site(NO_OPERATION_LIMITS)
+s46 = IETO._with(s46; markets = Dict(:buy => IETO._with(s46.markets[:buy]; max_power = 6.0)))
+dump("dias_por_anio_n2", s46, with_config(c46; horizon_years = 2, wacc = 0.05,
+     weight_by_year = Dict(2 => [fill(500.0, 12); fill(230.0, 12)]),
+     price_profiles_by_year = Dict(:buy => Dict(2 => [fill(50.0, 12); fill(200.0, 12)])),
+     market_availability_by_year = Dict(:buy => Dict(2 => [fill(1.0, 12); fill(0.6, 12)]))))
+nst0 = length(site0.timesteps)
+dump("demo_meses_por_anio_n3", site0, with_config(cfg0; horizon_years = 3, emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9,
+     month_by_year = Dict(2 => [mod1(i, 12) for i in 1:nst0])))
 println("fixtures dorados en ", out)

@@ -75,7 +75,7 @@ function add_balancing!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     m[:afrr_cons] = cons
     w = params.weight_hours
     JuMP.@expression(m, afrr_revenue_y[y in years],
-        sum(w[s] * (cfg.afrr_price_up * afrr_up[t, s, y] + cfg.afrr_price_down * afrr_dn[t, s, y])
+        sum(w[s, y] * (cfg.afrr_price_up * afrr_up[t, s, y] + cfg.afrr_price_down * afrr_dn[t, s, y])
             for t in P, s in steps))
     return m
 end
