@@ -12,7 +12,7 @@ struct ModelParameters
     existing_capacity::Dict{Symbol,Float64}          # MW por tecnología
     max_new_capacity::Dict{Symbol,Float64}           # MW por tecnología candidata
     efficiency::Dict{Symbol,Float64}                 # storages: η de un sentido
-    cf_profile::Dict{Symbol,Vector{Float64}}         # generadores → [step]
+    cf_profile::Dict{Symbol,Matrix{Float64}}         # generadores → [step, y] (R23: por año)
     emission_factor::Dict{Tuple{Symbol,Symbol},Float64}  # (carrier, scope) → tCO₂e/MWh
     conv_inputs::Dict{Symbol,Vector{ConverterPort}}  # conversor → puertos de entrada
     conv_outputs::Dict{Symbol,Vector{ConverterPort}} # conversor → puertos de salida
@@ -31,7 +31,7 @@ struct ModelParameters
     market_ef::Dict{Symbol,Vector{Float64}}          # tCO₂e/MWh comprado, por año (M7)
     conn_buy::Dict{Symbol,Vector{Symbol}}            # conexión → mercados de compra
     conn_sell::Dict{Symbol,Vector{Symbol}}           # conexión → mercados de venta
-    conv_availability::Dict{Symbol,Vector{Float64}}  # conversor → [step] en [0,1] (M4)
+    conv_availability::Dict{Symbol,Matrix{Float64}}  # conversor → [step, y] en [0,1] (M4, R23)
     conn_import_limit::Dict{Symbol,Float64}          # MW por conexión (0 si excluida)
     conn_export_limit::Dict{Symbol,Float64}
     balanced_carriers::Vector{Symbol}                # con balance nodal (incluye fuel
@@ -118,11 +118,14 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
     existing = Dict{Symbol,Float64}()
     max_new = Dict{Symbol,Float64}()
     efficiency = Dict{Symbol,Float64}()
-    cf_profile = Dict{Symbol,Vector{Float64}}()
+    cf_profile = Dict{Symbol,Matrix{Float64}}()
+    # R23: el perfil del año (si hay) reemplaza al del sitio desde ese año
+    bymat(id, base) = hcat([something(by_year_at(cfg, get(cfg.profiles_by_year, id, nothing), r), base)
+                            for r in sets.year_of]...)
 
     conv_inputs = Dict{Symbol,Vector{ConverterPort}}()
     conv_outputs = Dict{Symbol,Vector{ConverterPort}}()
-    conv_availability = Dict{Symbol,Vector{Float64}}()
+    conv_availability = Dict{Symbol,Matrix{Float64}}()
     remaining_life = Dict{Symbol,Int}()
     for id in sets.converters
         t = site.converters[id]
@@ -131,7 +134,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         max_new[id] = t.max_new_capacity
         conv_inputs[id] = t.inputs
         conv_outputs[id] = t.outputs
-        isempty(t.availability) || (conv_availability[id] = t.availability)
+        if !isempty(t.availability) || haskey(cfg.profiles_by_year, id)
+            conv_availability[id] = bymat(id, isempty(t.availability) ? ones(length(site.timesteps)) : t.availability)
+        end
         remaining_life[id] = t.remaining_life
     end
     for id in sets.generators
@@ -139,7 +144,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         costs[id] = t.costs
         existing[id] = t.existing_capacity
         max_new[id] = t.max_new_capacity
-        cf_profile[id] = t.cf_profile
+        cf_profile[id] = bymat(id, t.cf_profile)
         remaining_life[id] = t.remaining_life
     end
     for id in sets.storages

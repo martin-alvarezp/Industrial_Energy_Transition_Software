@@ -18,11 +18,11 @@ function add_generator_constraints!(m::JuMP.Model, sets::ModelSets,
     must = [g for g in sets.generators if g in cfg.must_take]
     m[:generator_capacity] = JuMP.@constraint(m,
         [g in free, s in sets.steps, y in sets.years],
-        dispatch[g, s, y] <= params.cf_profile[g][s] * available_capacity[g, y])
+        dispatch[g, s, y] <= params.cf_profile[g][s, y] * available_capacity[g, y])
     # toma obligatoria (R12): entrega todo su perfil, sin recorte
     m[:generator_must_take] = JuMP.@constraint(m,
         [g in must, s in sets.steps, y in sets.years],
-        dispatch[g, s, y] == params.cf_profile[g][s] * available_capacity[g, y])
+        dispatch[g, s, y] == params.cf_profile[g][s, y] * available_capacity[g, y])
 
     return m
 end

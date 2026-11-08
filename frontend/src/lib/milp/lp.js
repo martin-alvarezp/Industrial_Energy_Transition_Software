@@ -186,7 +186,18 @@ export const capexAnnuity = (capex, rate, n, years = capex.map((_, i) => i + 1))
 /** Factor de la entrada `c` del conversor en (s, y) (R11), espejo de input_factors:
  *  perfil por paso × factor del año (`yr` = año relativo real). */
 export const inputFactor = (cfg, tech, c, s, yr) =>
-  (cfg.input_profiles?.[tech]?.[c]?.[s - 1] ?? 1) * yearFactor(cfg, "input_ratio", tech, yr);
+  ((byYearAt(cfg, cfg.input_profiles_by_year?.[tech]?.[c], yr) ?? cfg.input_profiles?.[tech]?.[c])?.[s - 1] ?? 1) *
+  yearFactor(cfg, "input_ratio", tech, yr);   // R23: COP horario por año
+/** Mapa año → serie en escalón para el año relativo yr (R22/R23), o null. */
+export const byYearAt = (cfg, d, yr) => {
+  if (!d) return null;
+  let best = null, by = -Infinity;
+  for (const [y, v] of Object.entries(d)) {
+    const r = relYear(cfg, +y);
+    if (r <= yr && r > by) { by = r; best = v; }
+  }
+  return best;
+};
 /** Serie base de la demanda de c en el año relativo yr (R22), o null. */
 export const demandProfileAt = (cfg, c, yr) => {
   const d = cfg.demand_profiles?.[c];
@@ -303,6 +314,8 @@ export function buildLP(site0, cfg0) {
   const esc0 = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), yr(y) - 1);
   // R3: factores por año sobre el crecimiento y la escalación
   const dgrow = (c, y) => growth0(y) * yearFactor(cfg, "demand", c, yr(y));
+  // R23: perfil horario del equipo en el año (disponibilidad o generación)
+  const profAt = (id, y) => byYearAt(cfg, cfg.profiles_by_year?.[id], yr(y)) ?? site.generation_profiles?.[id];
   // R22: serie base de la demanda del año (perfil por año o la del sitio)
   const dbase = (c, y) => demandProfileAt(cfg, c, yr(y)) ?? site.demands?.[c] ?? [];
   const esc = (c, y) => esc0(c, y) * yearFactor(cfg, "price", c, yr(y));
@@ -664,7 +677,7 @@ export function buildLP(site0, cfg0) {
     }
     // capacidad de conversores (disponibilidad M4 + ciclo de vida M5)
     for (const cv of convs) {
-      const av = site.generation_profiles?.[cv.tech_id];   // availability
+      const av = profAt(cv.tech_id, y);   // availability (R23: por año)
       for (const s of steps) {
         const a = avail(cv, y);
         const f = av ? av[s - 1] : 1;
@@ -680,7 +693,7 @@ export function buildLP(site0, cfg0) {
       if (!uc && !(rr > 0)) continue;
       const a = avail(cv, y);
       const u = unitMw(cv), ml = cv.min_load ?? 0;
-      const av = site.generation_profiles?.[cv.tech_id];
+      const av = profAt(cv.tech_id, y);
       const nst = (h, s) => (h > 0 ? Math.ceil(h / dt[s - 1] - 1e-9) : 0);
       for (const s of steps) {
         const d = `d_${id}_${s}_${y}`, dp = `d_${id}_${prev[s]}_${y}`;
@@ -735,7 +748,7 @@ export function buildLP(site0, cfg0) {
     }
     // generadores: dispatch ≤ cf·capacidad
     for (const g of gens) {
-      const cf = site.generation_profiles?.[g.tech_id] ?? steps.map(() => 0);
+      const cf = profAt(g.tech_id, y) ?? steps.map(() => 0);
       for (const s of steps) {
         const a = avail(g, y);
         const t = { [`d_${sane(g.tech_id)}_${s}_${y}`]: 1 };
@@ -833,7 +846,7 @@ export function buildLP(site0, cfg0) {
       const id = sane(t.tech_id), a = avail(t, y), ms = cfg.afrr_max_share ?? 0.5;
       const isSt = t.type === "storage";
       const [re, dir] = isSt ? [1, "st"] : elecPort(t);
-      const av = site.generation_profiles?.[t.tech_id];
+      const av = profAt(t.tech_id, y);
       const f = 1 - (t.degradation ?? 0), hrs = t.storage_hours ?? 4;
       for (const s of steps) {
         const up = `aup_${id}_${s}_${y}`, dn = `adn_${id}_${s}_${y}`;

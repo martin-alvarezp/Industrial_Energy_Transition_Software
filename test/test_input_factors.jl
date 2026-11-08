@@ -52,3 +52,17 @@ end
     @test_throws IETO.ValidationError bad(PT(:hp => Dict(:electricity => fill(0.0, 24))))
     @test IETO._coerce(PT, Dict("hp" => Dict("electricity" => [1, 2]))) == PT(:hp => Dict(:electricity => [1.0, 2.0]))
 end
+
+@testset "R23: perfiles horarios por año (disponibilidad y COP)" begin
+    # año 1 como siempre; desde el año 2 la bomba no está disponible de noche
+    # (la caldera cubre 3 MW) y su COP de día pasa a 4 (factor 0,75)
+    site, cfg = op_site(NO_OPERATION_LIMITS)
+    c = with_config(cfg; horizon_years = 2,
+                    profiles_by_year = Dict(:hp => Dict(2 => [fill(0.0, 12); fill(1.0, 12)])),
+                    input_profiles_by_year = Dict(:hp => Dict(:electricity => Dict(2 => fill(0.75, 24)))))
+    im = build_model(site, c); JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    @test JuMP.value(im.model[:energy_purchases_y][1]) ≈ 365 * 100 * 12 * (1 + 8 / 3) rtol = 1e-9
+    @test JuMP.value(im.model[:energy_purchases_y][2]) ≈ 365 * 100 * 12 * (3 + 8 * 0.25) rtol = 1e-9
+    @test im.params.conv_availability[:hp][1, 2] == 0.0 && im.params.conv_availability[:hp][1, 1] == 1.0
+end

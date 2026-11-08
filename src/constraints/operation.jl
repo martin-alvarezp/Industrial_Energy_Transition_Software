@@ -27,9 +27,12 @@ function input_factors(sets::ModelSets, site::Site, cfg::ScenarioConfig)
     ry = sets.year_of
     for t in sets.converters, p in site.converters[t].inputs
         prof = get(get(cfg.input_profiles, t, Dict{Symbol,Vector{Float64}}()), p.carrier, nothing)
+        pby = get(get(cfg.input_profiles_by_year, t, Dict{Symbol,Dict{Int,Vector{Float64}}}()), p.carrier, nothing)
         yf = [year_factor(cfg, :input_ratio, t, ry[y]) for y in sets.years]
-        prof === nothing && all(==(1.0), yf) && continue
-        M = [(prof === nothing ? 1.0 : prof[s]) * yf[y] for s in sets.steps, y in sets.years]
+        prof === nothing && pby === nothing && all(==(1.0), yf) && continue
+        # R23: el COP horario del año (si hay) reemplaza al base desde ese año
+        pr(y) = something(by_year_at(cfg, pby, ry[y]), prof, ones(length(sets.steps)))
+        M = [pr(y)[s] * yf[y] for s in sets.steps, y in sets.years]
         out[(t, p.carrier)] = M
     end
     return out
@@ -109,7 +112,7 @@ function add_operation_constraints!(m::JuMP.Model, sets::ModelSets,
     dispatch = m[:dispatch]
     cap = m[:available_capacity]
     conv = site.converters
-    avail(t, s) = haskey(params.conv_availability, t) ? params.conv_availability[t][s] : 1.0
+    avail(t, s, y) = haskey(params.conv_availability, t) ? params.conv_availability[t][s, y] : 1.0
 
     if !isempty(U)
         steps = sets.steps
@@ -124,7 +127,7 @@ function add_operation_constraints!(m::JuMP.Model, sets::ModelSets,
         m[:units_cap] = JuMP.@constraint(m, [t in U, s in steps, y in years],
             on[t, s, y] <= units_avail[t, y])
         m[:commit_max] = JuMP.@constraint(m, [t in U, s in steps, y in years],
-            dispatch[t, s, y] <= avail(t, s) * u[t] * on[t, s, y])
+            dispatch[t, s, y] <= avail(t, s, y) * u[t] * on[t, s, y])
         m[:commit_min] = JuMP.@constraint(m, [t in U, s in steps, y in years],
             dispatch[t, s, y] >= conv[t].ops.min_load * u[t] * on[t, s, y])
         m[:startup_def] = JuMP.@constraint(m, [t in U, s in steps, y in years],

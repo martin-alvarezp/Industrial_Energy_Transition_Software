@@ -66,6 +66,8 @@ export function toConfig(cfg) {
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
     renew_techs: cfg.renew_techs ?? [],                     // R21: renovación por tecnología
     demand_profiles: cfg.demand_profiles ?? {},             // R22: perfiles de demanda por año
+    profiles_by_year: cfg.profiles_by_year ?? {},           // R23: perfiles horarios por año
+    input_profiles_by_year: cfg.input_profiles_by_year ?? {},
     allow_new_fossil: cfg.allow_new_fossil,
     allowed_techs: [],
     salvage_value: cfg.salvage_value ?? false,

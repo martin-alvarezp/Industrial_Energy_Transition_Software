@@ -646,3 +646,10 @@ días tipo (k por año) con cronología.
   energía mucho más que su punta, y escalar la forma del primer año
   sobreestimaba la punta (la reproducción de un caso real quedaba infactible
   desde 2029). Oráculo en test_year_factors.jl; golden `perfil_demanda_anio_n3`.
+- ✅ **R23 · Perfiles horarios por año de equipos** (2026-11-08).
+  `profiles_by_year` (equipo → año → disponibilidad de un conversor o perfil
+  de un generador) e `input_profiles_by_year` (conversor → entrada → año →
+  COP horario): desde ese año reemplazan al perfil base, en escalón. Una
+  medida de eficiencia que cambia el modo de operación de los chillers o el
+  free cooling desde cierto año se modela así. Oráculo en
+  test_input_factors.jl; golden `perfiles_por_anio_n2`.

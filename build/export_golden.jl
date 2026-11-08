@@ -330,4 +330,9 @@ dump("demo_renovacion_parcial_n4", s40, with_config(cfg0; horizon_years = 4, ren
 s41, c41 = op_site(NO_OPERATION_LIMITS)
 dump("perfil_demanda_anio_n3", s41, with_config(c41; horizon_years = 3, wacc = 0.05,
      demand_profiles = Dict(:heat => Dict(2 => fill(5.0, 24))), year_factors = Dict(:demand => Dict(:heat => [(3, 2.0)]))))
+# 42 · perfiles horarios por año (R23): disponibilidad y COP de la bomba
+s42, c42 = op_site(NO_OPERATION_LIMITS)
+dump("perfiles_por_anio_n2", s42, with_config(c42; horizon_years = 2, wacc = 0.05,
+     profiles_by_year = Dict(:hp => Dict(2 => [fill(0.0, 12); fill(1.0, 12)])),
+     input_profiles_by_year = Dict(:hp => Dict(:electricity => Dict(2 => fill(0.75, 24))))))
 println("fixtures dorados en ", out)

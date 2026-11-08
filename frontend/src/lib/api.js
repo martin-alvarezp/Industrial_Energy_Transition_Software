@@ -138,6 +138,8 @@ export function toOverrides(cfg) {
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
     renew_techs: cfg.renew_techs ?? [],                     // R21: renovación por tecnología
     demand_profiles: cfg.demand_profiles ?? {},             // R22: perfiles de demanda por año
+    profiles_by_year: cfg.profiles_by_year ?? {},           // R23: perfiles horarios por año
+    input_profiles_by_year: cfg.input_profiles_by_year ?? {},
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",

@@ -20,11 +20,10 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     new_capacity, build = m[:new_capacity], m[:build]
     available_capacity = m[:available_capacity]
 
-    avail(t, s) = haskey(params.conv_availability, t) ?
-                  params.conv_availability[t][s] : 1.0
+    avail(t, s, y) = haskey(params.conv_availability, t) ? params.conv_availability[t][s, y] : 1.0
     m[:converter_capacity] = JuMP.@constraint(m,
         [t in sets.converters, s in steps, y in years],
-        dispatch[t, s, y] <= avail(t, s) * available_capacity[t, y])
+        dispatch[t, s, y] <= avail(t, s, y) * available_capacity[t, y])
 
     m[:new_capacity_link] = JuMP.@constraint(m, [t in sets.candidates, y in years],
         new_capacity[t, y] <= params.max_new_capacity[t] * build[t, y])

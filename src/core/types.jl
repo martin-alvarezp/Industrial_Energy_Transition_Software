@@ -600,6 +600,24 @@ struct ScenarioConfig
     demand_profiles::Dict{Symbol,Dict{Int,Vector{Float64}}}  # vector → año → serie por paso: desde
                                              # ese año reemplaza la forma de la demanda (escalón);
                                              # crecimiento y factores se aplican encima
+    # ── perfiles horarios por año de equipos (benchmark R23) ──
+    profiles_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}      # equipo → año → disponibilidad (conversor) o
+                                             # perfil (generador) desde ese año, en escalón
+    input_profiles_by_year::Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}  # conversor → entrada → año → COP horario
+end
+
+# retro-compatibilidad: 71 campos → sin perfiles horarios por año
+ScenarioConfig(a::Vararg{Any,71}) = ScenarioConfig(a..., Dict{Symbol,Dict{Int,Vector{Float64}}}(), Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}())
+
+"Valor en escalón de un mapa año → serie para el año relativo `y` (R22/R23), o `nothing`."
+function by_year_at(cfg::ScenarioConfig, d, y::Integer)
+    (d === nothing || isempty(d)) && return nothing
+    best = nothing; by = typemin(Int)
+    for (yr, v) in d
+        r = rel_year(cfg, yr)
+        r <= y && r > by && (by = r; best = v)
+    end
+    return best
 end
 
 # retro-compatibilidad: 70 campos → sin perfiles por año

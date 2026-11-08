@@ -41,7 +41,7 @@ function add_balancing!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     JuMP.@variable(m, afrr_up[P, steps, years] >= 0)
     JuMP.@variable(m, afrr_dn[P, steps, years] >= 0)
     ms = cfg.afrr_max_share
-    avail(t, s) = haskey(params.conv_availability, t) ? params.conv_availability[t][s] : 1.0
+    avail(t, s, y) = haskey(params.conv_availability, t) ? params.conv_availability[t][s, y] : 1.0
     cons = JuMP.ConstraintRef[]
     for t in P, s in steps, y in years
         up, dn = afrr_up[t, s, y], afrr_dn[t, s, y]
@@ -64,11 +64,11 @@ function add_balancing!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             low = t in sets.commit_techs ?
                   cv.ops.min_load * unit_mw(cv) * m[:units_on][t, s, y] : 0.0
             if eport(cv)[2] == :out                              # produce electricidad
-                push!(cons, JuMP.@constraint(m, re * d[t, s, y] + up <= re * avail(t, s) * cap[t, y]))
+                push!(cons, JuMP.@constraint(m, re * d[t, s, y] + up <= re * avail(t, s, y) * cap[t, y]))
                 push!(cons, JuMP.@constraint(m, re * d[t, s, y] - dn >= re * low))
             else                                                 # carga flexible
                 push!(cons, JuMP.@constraint(m, re * d[t, s, y] - up >= re * low))
-                push!(cons, JuMP.@constraint(m, re * d[t, s, y] + dn <= re * avail(t, s) * cap[t, y]))
+                push!(cons, JuMP.@constraint(m, re * d[t, s, y] + dn <= re * avail(t, s, y) * cap[t, y]))
             end
         end
     end

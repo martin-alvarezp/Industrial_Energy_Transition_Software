@@ -408,5 +408,12 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(c) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v]
                                                    for (y, v) in ys)
                        for (c, ys) in get(d, "demand_profiles", Dict())),
+        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(t) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v]
+                                                   for (y, v) in ys)
+                       for (t, ys) in get(d, "profiles_by_year", Dict())),
+        Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}(Symbol(t) => Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(c) =>
+                           Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
+                           for (c, ys) in cs)
+                       for (t, cs) in get(d, "input_profiles_by_year", Dict())),
     )
 end
