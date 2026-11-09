@@ -89,7 +89,7 @@ export function toConfig(cfg) {
     tax_rate: cfg.tax_rate ?? 0,
     depreciation_years: cfg.depreciation_years ?? 0,
     currency: cfg.currency ?? "USD",
-    carbon_price_by_year: [],
+    carbon_price_by_year: cfg.carbon_price_by_year ?? [],   // escenarios: carbono por año
     grid_ef_by_year: [],
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
@@ -101,7 +101,7 @@ export function toConfig(cfg) {
 
 /** ¿Solo la corrida pedida? Modo despacho, o "solo esta corrida" del modal:
  *  sin Pareto ni escenarios de comparación (16 MILPs → 1). */
-export const isSingleRun = (uiCfg) => !!uiCfg.dispatch_only || uiCfg.analysis === "single";
+export const isSingleRun = (uiCfg) => !!uiCfg.dispatch_only || uiCfg.analysis !== "full";   // sin comparaciones automáticas
 
 /** Espejo de apply_scenario (run_scenario.jl). */
 export function applyScenario(site, cfg, scenario) {

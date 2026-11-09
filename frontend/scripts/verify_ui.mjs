@@ -20,7 +20,7 @@ const BROWSER = process.env.IETO_BROWSER ?? [
 
 const SYSTEM = ["infrastructure", "components", "parameters", "trade", "tasks", "potentials",
   "scenarios", "timeseries", "workflows", "documents", "changelog", "optimizations", "summary",
-  "kpis", "capacities", "costs", "operation", "rlocations", "rcomponents", "dashboards", "portfolio"];
+  "kpis", "capacities", "costs", "operation", "rlocations", "rcomponents", "dashboards"];
 const LIBRARY = ["parameters", "scenarios", "carriers", "locations", "technologies", "accounting", "changelog"];
 const PREFIXES = "sum|nav|res|par|opt|kpi|cc|panel|infra|scen|task|doc|log|wf|lib|pot|trade|ts|comp|cat|type|status|group|kind|run|scn|desc|save|wx|top|user|cmd|common|systems|flow|preset|cpreset";
 const RAW = new RegExp(`\\b(?:${PREFIXES})\\.[a-zA-Z]+\\b`, "g");

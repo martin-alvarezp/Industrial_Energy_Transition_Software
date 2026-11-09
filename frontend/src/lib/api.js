@@ -10,7 +10,7 @@ import plantaRed from "../demo/planta_red.json";
 
 /** ¿Solo la corrida pedida? Modo despacho o "solo esta corrida" del modal:
  *  sin Pareto ni escenarios de comparación (misma regla que milp/engine.js). */
-export const isSingleRun = (cfg) => !!cfg?.dispatch_only || cfg?.analysis === "single";
+export const isSingleRun = (cfg) => !!cfg?.dispatch_only || cfg?.analysis !== "full";   // sin comparaciones automáticas
 
 /** El sitio que ve el MOTOR: sin las series crudas (`hourly`, bloque 1.2), que
  *  solo sirven para re-armar la plantilla y pesan MB. */
@@ -167,6 +167,7 @@ export function toOverrides(cfg) {
     commitment: cfg.commitment ?? "auto",   // 2.1: entero en despacho, lineal en planificación
     capex_learning: cfg.capex_learning ?? {},   // 3.1: CAPEX por año
     capex_by_year: cfg.capex_by_year ?? {},
+    carbon_price_by_year: cfg.carbon_price_by_year ?? [],   // escenarios: carbono por año
     // parámetros del escenario que la vista Parámetros permite sobrescribir;
     // sólo viajan si el usuario los cambió (si no, rige el YAML del sitio)
     ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => cfg[k] != null).map((k) => [k, cfg[k]])),
@@ -192,7 +193,9 @@ const scenarioName = (cfg) =>
 export async function apiAvailable() {
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 2_000);
+    // 10 s: el server local puede estar ocupado resolviendo otra corrida; con
+    // un sondeo corto la app lo daba por caído y trabajaba solo en memoria
+    const timer = setTimeout(() => ctrl.abort(), 10_000);
     const resp = await fetch(API_BASE + "/scenarios", { signal: ctrl.signal });
     clearTimeout(timer);
     // un hosting estático (SPA fallback) devuelve HTML con 200: no es la API
@@ -375,10 +378,6 @@ export const runParetoSweep = (cfg, sitePayload, siteName, points = 9, capEndMin
     ...solverBody(cfg),
   }, { timeoutMs: null });
 
-/** POST /portfolio (D5): mismo escenario sobre N sitios + agregado grupo. */
-export const runPortfolio = (sites, scenario, cfg) =>
-  post("/portfolio", { sites, scenario, config_overrides: toOverrides(cfg), ...solverBody(cfg) },
-       { timeoutMs: null });
 
 /** GET /sites: sitios guardados disponibles. Sin API van los sitios embebidos:
  * la planta con red (topología M14) y el demo de placa de cobre. */

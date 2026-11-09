@@ -8,7 +8,7 @@ import { layoutToGeoJSON, geoJSONToLayout } from "../lib/twin.js";
 
 export const EMPTY_LAYOUT = {
   address: null, center: null, boundary: null, equipment: {}, arcs: {},
-  locations: [], equipmentLocation: {}, cover: null, description: "", title: "",
+  locations: [], equipmentLocation: {}, cover: null, description: "", title: "", meta: {}, scenarios: [], params: [],
 };
 
 export function toGeoJSON(l) {
@@ -31,6 +31,9 @@ export function toGeoJSON(l) {
   g.properties.cover = l.cover ?? null;
   g.properties.description = l.description ?? "";
   g.properties.title = l.title ?? "";
+  g.properties.meta = l.meta ?? {};      // país, moneda, zona horaria, industria, unidad producida
+  g.properties.scenarios = l.scenarios ?? [];   // escenarios (capas) del sistema
+  g.properties.params = l.params ?? [];         // filas parámetro/año/valor por escenario
   return g;
 }
 
@@ -54,6 +57,9 @@ export function fromGeoJSON(g) {
   out.cover = g?.properties?.cover ?? null;
   out.description = g?.properties?.description ?? "";
   out.title = g?.properties?.title ?? "";
+  out.meta = g?.properties?.meta ?? {};
+  out.scenarios = g?.properties?.scenarios ?? [];
+  out.params = g?.properties?.params ?? [];
   return out;
 }
 

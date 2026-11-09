@@ -16,7 +16,6 @@ import { SCENARIOS } from "../components/RunModal.jsx";
 import { techKind } from "../techkind.js";
 import { CARRIER_PRESETS, TECH_PRESETS, CARRIER_CATEGORY_META } from "../../lib/twin.js";
 import { GRID_FACTORS } from "../../lib/gridFactors.js";
-import PortfolioView from "../../components/PortfolioView.jsx";
 import { num } from "../../lib/format.js";
 
 
@@ -183,13 +182,3 @@ export function AccountingPage() {
   );
 }
 
-export function PortfolioPage() {
-  const { t } = useI18n();
-  const { apiUp, draft } = useStudio();
-  return (
-    <div className="ui-page ui-legacy">
-      <PageHead icon={NAV_ICONS.portfolio} title={t("nav.portfolio")} help={t("lib.portfolioHelp")} />
-      <PortfolioView apiUp={apiUp} draft={draft} />
-    </div>
-  );
-}

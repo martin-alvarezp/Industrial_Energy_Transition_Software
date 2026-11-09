@@ -83,7 +83,13 @@ await clickText("button", "Agregar"); await waitText("Nuevo sistema");
 await p.type(".ui-modal input.ui-input", SITE);
 await clickText(".ui-radio-card", "Ejemplo (demo)");
 await clickText(".ui-modal button", "Crear sistema");
-step("sistema de prueba creado desde el demo", await waitText("Mapa", 30000));
+// esperar a que el sistema exista en disco (el diálogo de Nuevo sistema también dice «mapa»)
+let made = false;
+for (let i = 0; i < 60 && !made; i++) {
+  made = await p.evaluate(async (u, s) => (await fetch(`${u}/sites/${s}`)).ok, URL, SITE);
+  if (!made) await sleep(500);
+}
+step("sistema de prueba creado desde el demo", made);
 
 // 1 · la caldera a gas con carga mínima 30 %, arranque 1000 USD y 4 h mínimas
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/components?c=gas_boiler`, { waitUntil: "networkidle2" });
@@ -112,7 +118,6 @@ step("en disco: curva de carga parcial desde la carga mínima hasta 100 %",
 // 2 · planificación: el modal ofrece compromiso lineal (default) o entero
 const plan = await optimize("Plan lineal", async () => {
   step("el modal ofrece aproximada/exacta", !!(await p.$('[data-testid="run-commit"]')));
-  await select('[data-testid="run-analysis"]', "single");
 });
 step("planificación resuelta por el motor real",
      plan.payload?.source === "api" && plan.run?.feasible,

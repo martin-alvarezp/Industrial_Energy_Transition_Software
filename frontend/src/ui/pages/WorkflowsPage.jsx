@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IcPlayArrow, IcTrendingDown, IcTune, IcBusinessCenter, IcFileDownload, IcDescription, IcRefresh } from "../iconset.jsx";
+import { IcPlayArrow, IcTrendingDown, IcTune, IcFileDownload, IcDescription, IcRefresh } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { PageHead } from "../kit.jsx";
@@ -61,13 +61,6 @@ export default function WorkflowsPage() {
                        baselineNpv={data.result.kpis?.npv} source={data.source} />
             </div>
           ) : <p className="ui-hint">{t("wf.needRun")}</p>}
-        </section>
-
-        <section className="ui-card ui-card-pad">
-          <div className="wf-head"><IcBusinessCenter /><h3 className="ui-card-title">{t("wf.portfolio")}</h3></div>
-          <p className="ui-card-sub">{t("wf.portfolioDesc")}</p>
-          <button className="ui-btn outline sm" style={{ marginTop: 12 }}
-                  onClick={() => navigate(hrefFor({ site: siteName, page: "portfolio" }))}>{t("common.open")}</button>
         </section>
 
         <section className="ui-card ui-card-pad">

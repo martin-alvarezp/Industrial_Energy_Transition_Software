@@ -46,10 +46,6 @@ export const SYSTEM_SECTIONS = [
       { page: "dashboards", key: "nav.dashboards" },
     ],
   },
-  {
-    id: "portfolio", key: "nav.portfolio", icon: "portfolio", collapsed: true,
-    items: [{ page: "portfolio", key: "nav.portfolio" }],
-  },
 ];
 
 export const ALL_SYSTEM_PAGES = SYSTEM_SECTIONS.flatMap((s) => s.items.filter((i) => i.page));

@@ -60,7 +60,13 @@ await clickText("button", "Agregar"); await waitText("Nuevo sistema");
 await p.type(".ui-modal input.ui-input", SITE);
 await clickText(".ui-radio-card", "Ejemplo (demo)");
 await clickText(".ui-modal button", "Crear sistema");
-step("sistema de prueba creado desde el demo", await waitText("Mapa", 30000));
+// esperar a que el sistema exista en disco (el diálogo de Nuevo sistema también dice «mapa»)
+let made = false;
+for (let i = 0; i < 60 && !made; i++) {
+  made = await p.evaluate(async (u, s) => (await fetch(`${u}/sites/${s}`)).ok, URL, SITE);
+  if (!made) await sleep(500);
+}
+step("sistema de prueba creado desde el demo", made);
 
 // 1 · el diálogo ofrece límite (vacío = sin límite) y tolerancia (0,01 %)
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
@@ -74,7 +80,6 @@ step("Nueva optimización: sin límite de tiempo y tolerancia 0,01 % por defecto
 
 // 2 · corrida con 30 min de límite y 0,5 % de tolerancia → óptima y con brecha
 await p.type(".ui-modal input.ui-input", "Con límite");
-await select('[data-testid="run-analysis"]', "single");
 await typeIn('[data-testid="run-time-limit"]', "30");
 await typeIn('[data-testid="run-gap"]', "0.5");
 await clickText(".ui-modal button", "Optimizar");

@@ -20,6 +20,7 @@ import { polygonAreaM2 } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
 import { setRawSeries } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
+import { COUNTRIES, INDUSTRIES, labelOf } from "../siteinfo.js";
 
 
 const MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -161,9 +162,12 @@ export default function SystemPanel({
   onOpenComponent, onAddComponent, onDrawLocation, onRedrawLocation, onLocateComponent,
   onDeleteComponent,
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { siteName, twin, patchLayout, readonly } = useStudio();
   const { siteJson, layout } = twin;
+  // datos generales (país, industria, unidad producida…): layout.meta
+  const meta = layout.meta ?? {};
+  const setMeta = (patch) => patchLayout({ meta: { ...meta, ...patch } });
   const locId = route.query?.loc ?? null;
   const loc = locId ? layout.locations?.find((l) => l.id === locId) : null;
   const [tab, setTab] = useState(null);
@@ -232,6 +236,24 @@ export default function SystemPanel({
                   <dd><input className="ui-input" value={layout.title || ""} placeholder={siteJson.name ?? siteName}
                              onChange={(e) => patchLayout({ title: e.target.value })} /></dd>
                   <dt>{t("panel.address")}</dt><dd>{layout.address ?? t("panel.noAddress")}</dd>
+                  <dt>{t("systems.country")}</dt>
+                  <dd><select className="ui-select" value={meta.country ?? ""} onChange={(e) => setMeta({ country: e.target.value })}>
+                    <option value="">—</option>
+                    {COUNTRIES.map(([c]) => <option key={c} value={c}>{labelOf(COUNTRIES, c, lang)}</option>)}
+                  </select></dd>
+                  <dt>{t("systems.industry")}</dt>
+                  <dd><select className="ui-select" value={meta.industry ?? ""} onChange={(e) => setMeta({ industry: e.target.value })}>
+                    <option value="">—</option>
+                    {INDUSTRIES.map(([k]) => <option key={k} value={k}>{labelOf(INDUSTRIES, k, lang)}</option>)}
+                  </select></dd>
+                  <dt>{t("systems.timezone")}</dt><dd>{meta.timezone || "—"}</dd>
+                  <dt>{t("systems.pieceUnit")}</dt>
+                  <dd><input className="ui-input" value={meta.piece_unit ?? ""} placeholder={t("systems.pieceUnitPh")}
+                             data-testid="panel-piece-unit" onChange={(e) => setMeta({ piece_unit: e.target.value })} /></dd>
+                  <dt>{t("systems.production", { u: meta.piece_unit || t("systems.units") })}</dt>
+                  <dd><input className="ui-input" type="number" min={0} value={meta.production ?? ""} placeholder={t("systems.optional")}
+                             data-testid="panel-production"
+                             onChange={(e) => setMeta({ production: e.target.value === "" ? null : +e.target.value })} /></dd>
                   <dt>{t("panel.area")}</dt><dd>{area > 0 ? `${num(area / 10_000, 2)} ha` : t("panel.noBoundary")}</dd>
                   <dt>{t("panel.nLocations")}</dt><dd>{layout.locations?.length ?? 0}</dd>
                   <dt>{t("panel.nComponents")}</dt><dd>{techs.length}</dd>

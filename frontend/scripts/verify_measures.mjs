@@ -53,7 +53,13 @@ await clickText("button", "Agregar"); await waitText("Nuevo sistema");
 await p.type(".ui-modal input.ui-input", SITE);
 await clickText(".ui-radio-card", "Ejemplo (demo)");
 await clickText(".ui-modal button", "Crear sistema");
-step("sistema de prueba creado desde el demo", await waitText("Mapa", 30000));
+// esperar a que el sistema exista en disco (el diálogo de Nuevo sistema también dice «mapa»)
+let made = false;
+for (let i = 0; i < 60 && !made; i++) {
+  made = await p.evaluate(async (u, s) => (await fetch(`${u}/sites/${s}`)).ok, URL, SITE);
+  if (!made) await sleep(500);
+}
+step("sistema de prueba creado desde el demo", made);
 
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/parameters`, { waitUntil: "networkidle2" });
 await p.waitForSelector('[data-testid="add-relation"]', { timeout: 30000 });
@@ -79,7 +85,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Excluyentes");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pl = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -113,7 +118,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Eficiencia");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pe = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -144,7 +148,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Flexible");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pf = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -173,7 +176,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Respaldo");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pr = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -221,7 +223,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Balance");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pb = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -249,7 +250,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Acople");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pc = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -285,7 +285,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "MedidaKW");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pk = null;
 for (const t0 = Date.now(); Date.now() - t0 < 600000;) {

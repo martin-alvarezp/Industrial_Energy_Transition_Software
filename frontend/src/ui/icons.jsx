@@ -42,7 +42,6 @@ export const NAV_ICONS = {
   rlocations: IcOutlineLocationOn,
   rcomponents: IcOutlineViewInAr,
   dashboards: IcDashboard,
-  portfolio: IcOutlineBusinessCenter,
   operationHub: IcOutlineWorkspaces,
 };
 

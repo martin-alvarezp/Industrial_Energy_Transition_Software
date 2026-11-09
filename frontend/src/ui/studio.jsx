@@ -12,6 +12,7 @@ import {
 } from "../lib/api.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite } from "../lib/twin.js";
+import { resolveScenarios } from "../lib/scenarios.js";
 import { EMPTY_LAYOUT, toGeoJSON, fromGeoJSON } from "./layout.js";
 import { readJSON, writeJSON, uid } from "./storage.js";
 
@@ -97,7 +98,8 @@ export function StudioProvider({ children }) {
   }, [siteName, twin, data, appliedSite, viewing]);
 
   /** Nuevo sistema en memoria (sin guardar): en blanco o copiando otro. */
-  const createSite = useCallback(async (name, from = "blank", title = "") => {
+  // extra (Nuevo sistema): { meta, address, center, boundary, currency }
+  const createSite = useCallback(async (name, from = "blank", title = "", extra = {}) => {
     let siteJson, layout = { ...EMPTY_LAYOUT };
     if (from === "blank") {
       siteJson = blankSite(name);
@@ -107,14 +109,22 @@ export function StudioProvider({ children }) {
       delete siteJson.site_version;
       layout = base.layout;
     }
-    layout = { ...layout, title: title || layout.title || "" };
+    layout = { ...layout, title: title || layout.title || "",
+               ...(extra.meta ? { meta: { ...(layout.meta ?? {}), ...extra.meta } } : {}),
+               ...(extra.center ? { center: extra.center, address: extra.address ?? layout.address } : {}),
+               ...(extra.boundary?.length >= 3 ? { boundary: extra.boundary } : {}) };
     const cfg = { ...DEFAULT_CONFIG, ...readJSON("ieto.cfg._default", {}),
-                  ...(from === "blank" ? {} : readJSON(cfgKey(from), {})) };
+                  ...(from === "blank" ? {} : readJSON(cfgKey(from), {})),
+                  ...(extra.currency ? { currency: extra.currency } : {}) };
     writeJSON(cfgKey(name), cfg);
     logChange(from === "blank" ? "Sistema creado en blanco" : `Sistema creado a partir de '${from}'`,
               "create", name);
     setData(null); setViewing(null);
-    if (apiUp) {
+    // si la API no se sabe arriba (sondeo pendiente o lento al cargar),
+    // preguntar de nuevo: crear el sistema solo en memoria lo perdería al recargar
+    const up = apiUp || (await apiAvailable());
+    if (up && !apiUp) setApiUp(true);
+    if (up) {
       // con API el sistema nace en disco: desde ahí se guarda solo
       await apiSaveSite(name, siteJson, toGeoJSON(layout));
       await refreshSites();
@@ -211,19 +221,38 @@ export function StudioProvider({ children }) {
     });
   }, [siteName, apiUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Ejecuta la optimización con la config vigente; la guarda como corrida. */
-  const run = useCallback(async ({ name, notes = "", cfg: cfgOverride } = {}) => {
-    if (!twin) return null;
-    const cfg0 = cfgOverride ?? draft;
+  /** Sitio y configuración listos para el motor: aplica Base + la pila de escenarios. */
+  const prepare = useCallback((cfgIn, stack = []) => {
+    // escenarios como capas: Base + la pila elegida se aplican al sitio y a la
+    // configuración antes de resolver
+    const store = { scenarios: twin.layout?.scenarios ?? [], params: twin.layout?.params ?? [] };
+    const resolved = resolveScenarios(twin.siteJson, cfgIn, store, stack);
+    const scen = resolved.rows.length > 0;
+    const cfg0 = { ...resolved.cfg, scenario_stack: stack };
     // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del
     // twin (el payload al motor va sin `hourly`)
     const seq = daySequence(cfg0, twin.siteJson);
     const cfg = seq.length ? { ...cfg0, day_sequence: seq } : cfg0;
     const apiSite = twin.saved ? siteName : "demo";
-    const payload = !twin.saved || twin.dirty ? twin.siteJson : null;
+    const payload = scen ? resolved.siteJson : (!twin.saved || twin.dirty ? twin.siteJson : null);
     // la foto del sitio que acompaña a la corrida no lleva las series crudas
     // (bloque 1.2): pesan MB y la corrida ya tiene su plantilla expresada
-    const snapshot = enginePayload(payload ?? twin.siteJson ?? null);
+    const snapshot = enginePayload(payload ?? twin.siteJson ?? null);   // con la pila aplicada
+    return { cfg, apiSite, payload, snapshot };
+  }, [twin, siteName]);
+
+  /** Evalúa una pila sin guardarla como corrida (sensibilidades). */
+  const evaluate = useCallback(async ({ cfg: cfgIn, stack = [] } = {}) => {
+    if (!twin) return null;
+    const { cfg, apiSite, payload, snapshot } = prepare({ ...(cfgIn ?? draft), analysis: "single" }, stack);
+    const d = await compute(cfg, payload, apiSite, snapshot);
+    return { ...d, site_snapshot: snapshot, config: cfg };
+  }, [twin, draft, prepare]);
+
+  /** Ejecuta la optimización con la config vigente; la guarda como corrida. */
+  const run = useCallback(async ({ name, notes = "", cfg: cfgOverride, stack = [] } = {}) => {
+    if (!twin) return null;
+    const { cfg, apiSite, payload, snapshot } = prepare(cfgOverride ?? draft, stack);
     setRunning(true); setRunError(null);
     try {
       const d = await compute(cfg, payload, apiSite, snapshot);
@@ -256,7 +285,7 @@ export function StudioProvider({ children }) {
     } finally {
       setRunning(false);
     }
-  }, [twin, draft, siteName, apiUp, refreshRuns, logChange]);
+  }, [twin, draft, siteName, apiUp, refreshRuns, logChange, prepare]);
 
   const openRun = useCallback(async (id) => {
     const local = localRuns.find((r) => r.id === id);
@@ -285,7 +314,7 @@ export function StudioProvider({ children }) {
     apiUp, sites, refreshSites,
     siteName, twin, twinState, setTwin, loadSite, createSite, patchSite, patchLayout,
     saveCurrentSite, removeSite, saveStatus, readonly,
-    draft, setDraft, applied, running, runError, run,
+    draft, setDraft, applied, running, runError, run, evaluate,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun,
     log, logChange,

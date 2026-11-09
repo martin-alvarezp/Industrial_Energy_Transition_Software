@@ -27,7 +27,6 @@ const E = {
   "nav.costs": ["Costos", "Costs"],
   "nav.operation": ["Operación", "Operation"],
   "nav.dashboards": ["Tableros", "Dashboards"],
-  "nav.portfolio": ["Gestor de portafolio", "Portfolio manager"],
   "nav.minimize": ["Minimizar", "Minimize"],
   "nav.expand": ["Expandir", "Expand"],
   "nav.menu": ["Menú", "Menu"],

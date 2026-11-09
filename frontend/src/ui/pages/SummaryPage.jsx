@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import {
   IcAdd, IcFilterAlt, IcAccountBalance, IcOutlineCurrencyExchange, IcEco, IcFunctions,
   IcExpandMore, IcExpandLess, IcBarChart, IcTableChart, IcOutlineViewInAr, IcAccountTree,
-  IcFileDownload, IcDescription,
+  IcFileDownload, IcDescription, IcBolt,
 } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -15,7 +15,7 @@ import { ChartPanel, StackedBars, Waterfall, SankeyFlow } from "../charts.jsx";
 import RunModal from "../components/RunModal.jsx";
 import {
   investmentByYear, opexByYear, totalCostByYear, stackRows, emissionsWaterfall, horizonKpis,
-  measures, nominalFactor, calYear, entityColors,
+  measures, nominalFactor, calYear, entityColors, sourceBreakdown,
 } from "../results.js";
 import { locationOf } from "../layout.js";
 import { buildFlows } from "../../lib/flows.js";
@@ -122,6 +122,14 @@ export default function SummaryPage() {
   const entPrefs = useMemo(() => entityColors(siteJson, labels), [siteJson, labels]);
   const allKeys = calc ? [...new Set([...calc.inv, ...calc.opex].flatMap((r) => Object.keys(r.items)))] : [];
   const k = result && feasible ? horizonKpis(result, factor) : null;
+  // energía y CO₂ por fuente; por unidad producida si el sistema la tiene
+  const meta = twin?.layout?.meta ?? {};
+  const unit = meta.piece_unit || t("systems.units");
+  const [perUnit, setPerUnit] = useState(true);
+  const canPer = meta.production > 0;
+  const src = useMemo(() => (result && feasible ? sourceBreakdown(result, siteJson, {
+    production: canPer && perUnit ? meta.production : null, labels: { sale: t("sum.saleCredit") } }) : null),
+  [result, feasible, siteJson, canPer, perUnit, meta.production, t]);
 
   const flowData = useMemo(() => {
     if (!result?.dispatch?.length || !siteJson) return null;
@@ -204,6 +212,41 @@ export default function SummaryPage() {
                      unit={t("sum.comparedTo", { a: k.lastYear, b: k.firstYear })} label={t("sum.reduction")} />
             <KpiCard icon={IcFunctions} color={SLOT[3]} value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
           </div>
+
+          {src && (
+            <section className="rc-panel" data-testid="by-source">
+              <div className="sum-sec-head">
+                <h3>{t("sum.bySource")}</h3>
+                {canPer && (
+                  <div className="ui-seg light outlined small">
+                    <button className={perUnit ? "on" : ""} onClick={() => setPerUnit(true)} data-testid="by-source-unit">{t("sum.perUnit", { u: unit })}</button>
+                    <button className={!perUnit ? "on" : ""} onClick={() => setPerUnit(false)}>{t("sum.totalSite")}</button>
+                  </div>
+                )}
+              </div>
+              {!canPer && <p className="ui-hint" style={{ marginTop: 0 }}>{t("sum.perUnitHint")}</p>}
+              {src.kpis && (
+                <div className="sum-kpis">
+                  <KpiCard icon={IcFunctions} color={SLOT[3]} value={num(src.kpis.costPerUnit, 2)}
+                           unit={`${cur === "USD" ? "$" : cur}/${unit}`} label={t("sum.costPerUnit", { y: src.kpis.year })} />
+                  <KpiCard icon={IcEco} color={STATUS.ok} value={num(src.kpis.co2PerUnit, 2)}
+                           unit={`kg CO₂e/${unit}`} label={t("sum.co2PerUnit", { y: src.kpis.year })} />
+                  <KpiCard icon={IcBolt} color={SLOT[5]} value={num(src.kpis.energyPerUnit, 1)}
+                           unit={`kWh/${unit}`} label={t("sum.energyPerUnit", { y: src.kpis.year })} />
+                </div>
+              )}
+              <div className="by-source-grid">
+                <ChartPanel title={t("sum.energyBySource")}>
+                  <StackedBars data={src.energy.data} keys={src.energy.keys} height={300}
+                               unit={src.perUnit ? `kWh/${unit}` : "MWh"} digits={src.perUnit ? 1 : 0} />
+                </ChartPanel>
+                <ChartPanel title={t("sum.co2BySource")}>
+                  <StackedBars data={src.co2.data} keys={src.co2.keys} height={300}
+                               unit={src.perUnit ? `kg CO₂e/${unit}` : "t CO₂e"} digits={src.perUnit ? 2 : 0} />
+                </ChartPanel>
+              </div>
+            </section>
+          )}
 
           <div className="sum-annual">
             <button className="sum-annual-head" onClick={() => setAnnualOpen((o) => !o)}>

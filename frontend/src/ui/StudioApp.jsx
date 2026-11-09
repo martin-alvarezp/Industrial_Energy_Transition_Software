@@ -34,7 +34,6 @@ const SYSTEM_PAGES = {
   rlocations: results("ResultsLocationsPage"),
   rcomponents: results("ResultsComponentsPage"),
   dashboards: results("DashboardsPage"),
-  portfolio: library("PortfolioPage"),
 };
 const LIBRARY_PAGES = {
   parameters: ParametersPage,

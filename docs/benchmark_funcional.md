@@ -726,3 +726,20 @@ días tipo (k por año) con cronología.
   comprueba también en el motor web). Con la unidad producida y la producción
   anual del sistema, el Resumen lo muestra por unidad (kWh y kg CO₂e por
   unidad) junto al costo por unidad.
+- ✅ **Escenarios como capas, sensibilidades y nueva corrida** (2026-11-08).
+  Escenarios del sistema = capas de parámetros con color sobre Base (datos del
+  sistema): filas parámetro / año / valor para tecnologías (CAPEX, O&M, compra
+  fija, permiso, límites, vida útil), mercados (precio, factor de emisión,
+  cargo por potencia), vectores (precio, demanda) y el sistema (carbono por
+  año, WACC, crecimiento, meta, presupuesto, compensaciones, subsidio). Se
+  editan en Escenarios y en Infraestructura → activo → Parámetros por
+  escenario. La corrida elige una pila ordenada (la de arriba manda) y
+  `resolveScenarios` la traduce al sitio y la configuración del motor (igual
+  para la API y el motor web). Sensibilidades rápidas de un número (carbono,
+  gas, electricidad, red, CAPEX, subsidio, WACC, demanda, meta,
+  compensaciones, venta de excedentes) con tarjetas de decisión contra Base.
+  Nueva optimización por pasos (Básico, Modelado, Resolución temporal,
+  Optimizador) con tipo de análisis Situación actual (BaU) o Plan de
+  inversión, sin comparaciones automáticas. Nuevo sistema con país, moneda,
+  zona horaria, industria, unidad producida, producción anual y mapa. Sin
+  Gestor de portafolio en la interfaz. `verify:scenarios` y `verify:newsystem`.

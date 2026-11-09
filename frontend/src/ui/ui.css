@@ -664,3 +664,54 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .par-capex-name { flex: 1 1 140px; min-width: 0; }
 .par-capex-num { width: 96px; max-width: 100%; }
 .par-capex-traj { flex: 1 1 160px; min-width: 0; max-width: 260px; }
+
+/* Nuevo sistema: datos generales en grilla y mapa para ubicar / dibujar el límite */
+.ns-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; }
+@media (max-width: 720px) { .ns-grid { grid-template-columns: 1fr; } }
+.ns-maptools { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 8px; }
+.ns-maptools .addr-search { flex: 1; min-width: 220px; }
+.ns-map { height: 260px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border, #dfe5e2); }
+
+/* Resumen: energía y CO₂ por fuente, lado a lado */
+.by-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .by-source-grid { grid-template-columns: 1fr; } }
+
+/* Escenarios: chips de color, filtros y sensibilidades */
+.scn-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; color: #fff; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.scn-chip.base { background: transparent; color: var(--ui-text, #24302a); border: 1px solid var(--ui-border, #cfd8d3); }
+.scn-link { background: none; border: 0; padding: 0; cursor: pointer; }
+.scn-colors { display: flex; gap: 4px; flex-wrap: wrap; }
+.scn-color { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.scn-color.on { border-color: var(--ui-text, #24302a); }
+.scn-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.scn-filter button { border: 1px solid var(--ui-border, #cfd8d3); background: var(--surface, #fff); border-radius: 999px; padding: 3px 12px; cursor: pointer; font-size: 13px; }
+.scn-filter button.on { background: var(--brand, #3C533C); border-color: var(--brand, #3C533C); color: #fff; }
+.pt-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.pt-form .ui-select, .pt-form .ui-input { width: auto; min-width: 130px; flex: 1 1 140px; }
+.drawer-tabs { margin: 6px 0 10px; }
+.sens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.sens-card { display: flex; flex-direction: column; gap: 8px; }
+.sens-name { font-weight: 600; font-size: 15px; }
+.sens-row { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.sens-row .ui-input { width: 96px; flex: 0 0 auto; }
+.sens-unit { color: var(--ui-muted, #5d6b64); font-size: 12.5px; flex: 1; }
+.sens-compare { margin-top: 16px; }
+.sens-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+.sens-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.sens-kpis span { display: block; font-size: 11.5px; color: var(--ui-muted, #5d6b64); }
+.sens-kpis b.good { color: #2e7d4f; } .sens-kpis b.bad { color: #b54a4a; }
+.sens-decision { font-size: 13.5px; line-height: 1.5; }
+
+/* Nueva optimización por pasos */
+.run-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.run-steps button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ui-border, #cfd8d3); background: var(--surface, #fff); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+.run-steps .n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--brand, #3C533C); color: #fff; font-size: 11px; }
+.run-sec { margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--ui-border, #e2e8e5); font-size: 15px; }
+.run-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .run-stack { grid-template-columns: 1fr; } }
+.run-stack-h { font-size: 12px; color: var(--ui-muted, #5d6b64); margin-bottom: 6px; }
+.run-stack-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; border: 1px solid var(--ui-border, #e2e8e5); border-radius: 8px; margin-bottom: 6px; }
+.run-stack-row.base { border-style: dashed; justify-content: flex-start; }
+.run-stack-tools { display: inline-flex; }
+.run-stack-add { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 1px dashed var(--ui-border, #cfd8d3); border-radius: 8px; padding: 5px 8px; margin-bottom: 6px; cursor: pointer; }
+.run-check { display: flex; gap: 8px; align-items: center; margin: 4px 0 10px; }

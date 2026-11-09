@@ -5,6 +5,7 @@ import { fetchSolarProfile } from "../../lib/api.js";
 import { projectRaw } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
 import { useL } from "../../ui/i18n.jsx";
+import ParamTable from "../../ui/components/ParamTable.jsx";
 
 function Field({ label, hint, children }) {
   return (
@@ -106,6 +107,7 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                                           onDelete, onClose, center }) {
   const L = useL();
   const [draft, setDraft] = useState(tech);
+  const [tab, setTab] = useState("data");   // datos del activo | parámetros por escenario
   const [pvState, setPvState] = useState(null); // {loading} | {msg} | {error}
   const loadPvgis = async () => {
     setPvState({ loading: true });
@@ -151,6 +153,19 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
           <button className="chart-toggle" onClick={onClose}>{L("Cerrar", "Close")}</button>
         </div>
         {!isNew && <p className="hint">id: <code>{draft.tech_id}</code> · {L("tipo", "type")}: {L(meta?.label, ({ source: "External connection", converter: "Energy converter", generator: "Generator with profile", storage: "Storage" })[draft.type])}</p>}
+        {!isNew && draft.type !== "source" && (
+          <div className="ui-tabs drawer-tabs">
+            <button className={tab === "data" ? "on" : ""} onClick={() => setTab("data")}>{L("Datos", "Data")}</button>
+            <button className={tab === "params" ? "on" : ""} onClick={() => setTab("params")} data-testid="drawer-tab-params">
+              {L("Parámetros por escenario", "Parameters by scenario")}</button>
+          </div>
+        )}
+        {tab === "params" && !isNew ? (
+          <>
+            <p className="hint">{L("Valores por año y escenario para este activo. Base rige siempre; cada escenario de la corrida pisa a los anteriores.", "Values by year and scenario for this asset. Base always applies; each scenario in the run overrides the previous ones.")}</p>
+            <ParamTable target={draft.tech_id} kind="tech" />
+          </>
+        ) : (<>
 
         <p className="drawer-section">{L("Identidad y topología", "Identity and topology")}</p>
         <Field label={L("Nombre", "Name")}>
@@ -449,6 +464,7 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
             );
           })()}
         </div>
+        </>)}
       </aside>
     </div>
   );

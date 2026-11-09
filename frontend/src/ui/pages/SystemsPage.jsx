@@ -9,6 +9,9 @@ import { hrefFor, navigate } from "../router.js";
 import { siteMeta, invalidateSiteMeta, satelliteTile, fileToCover } from "../sitemeta.js";
 import { fetchSite, saveSite } from "../../lib/api.js";
 import { fromGeoJSON, toGeoJSON } from "../layout.js";
+import { MapContainer, TileLayer, Polygon, CircleMarker, useMap, useMapEvents } from "react-leaflet";
+import AddressSearch from "../../components/twin/AddressSearch.jsx";
+import { COUNTRIES, CURRENCIES, COUNTRY_CURRENCY, COUNTRY_TZ, INDUSTRIES, timeZones, labelOf } from "../siteinfo.js";
 
 const slug = (s) => s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
   .replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
@@ -125,11 +128,32 @@ function SystemCard({ name, onChanged, unsaved = false }) {
   );
 }
 
+// mapa del Nuevo sistema: centra en la dirección buscada y, con "dibujar",
+// cada clic agrega un vértice del límite del sitio
+function Recenter({ center }) {
+  const map = useMap();
+  useEffect(() => { if (center) map.setView(center, 16); }, [center, map]);
+  return null;
+}
+function ClickToDraw({ on, onPoint }) {
+  useMapEvents({ click: (e) => on && onPoint([e.latlng.lat, e.latlng.lng]) });
+  return null;
+}
+
 function NewSystemModal({ onClose }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { createSite, apiUp, sites } = useStudio();
   const [name, setName] = useState("");
   const [from, setFrom] = useState("blank");
+  const [country, setCountry] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [tz, setTz] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+  const [industry, setIndustry] = useState("");
+  const [pieceUnit, setPieceUnit] = useState("");
+  const [production, setProduction] = useState("");
+  const [place, setPlace] = useState(null);           // { address, center }
+  const [drawing, setDrawing] = useState(false);
+  const [boundary, setBoundary] = useState([]);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const id = slug(name);
@@ -140,29 +164,99 @@ function NewSystemModal({ onClose }) {
     { v: "planta_red", title: t("systems.fromExample") },
     ...(sites ?? []).filter((s) => !["demo", "planta_red"].includes(s)).map((s) => ({ v: s, title: s })),
   ];
+  const pickCountry = (c) => {
+    setCountry(c);
+    if (COUNTRY_CURRENCY[c]) setCurrency(COUNTRY_CURRENCY[c]);
+    if (COUNTRY_TZ[c]) setTz(COUNTRY_TZ[c]);
+  };
   const create = async () => {
     if (!id || taken) return;
     setBusy(true); setErr(null);
     try {
-      await createSite(id, from, name.trim());
+      await createSite(id, from, name.trim(), {
+        meta: { country, timezone: tz, industry, piece_unit: pieceUnit.trim(),
+                production: production === "" ? null : +production },
+        currency, address: place?.address, center: place?.center,
+        boundary: boundary.length >= 3 ? boundary : null,
+      });
       navigate(hrefFor({ site: id, page: "infrastructure" }));
       onClose();
     } catch (e) { setErr(e.message); setBusy(false); }
   };
   return (
-    <Modal title={t("systems.newTitle")} onClose={onClose}
+    <Modal title={t("systems.newTitle")} onClose={onClose} wide
            footer={<>
              <button className="ui-btn ghost" onClick={onClose}>{t("common.cancel")}</button>
-             <button className="ui-btn primary" disabled={!id || taken || busy} onClick={create}>
+             <button className="ui-btn primary" disabled={!id || taken || busy} onClick={create} data-testid="new-system-create">
                {t("systems.create")}
              </button>
            </>}>
       <div className="ui-field">
         <label>{t("systems.newName")}</label>
-        <input className="ui-input" autoFocus value={name} placeholder="planta_norte"
+        <input className="ui-input" autoFocus value={name} placeholder="planta_norte" data-testid="new-system-name"
                onChange={(e) => setName(e.target.value)}
                onKeyDown={(e) => e.key === "Enter" && create()} />
         {id && <p className={taken ? "ui-error" : "ui-hint"}>{taken ? `'${id}' ya existe` : `id: ${id}`}</p>}
+      </div>
+      <div className="ns-grid">
+        <div className="ui-field">
+          <label>{t("systems.country")}</label>
+          <select className="ui-select" value={country} onChange={(e) => pickCountry(e.target.value)} data-testid="new-system-country">
+            <option value="">—</option>
+            {COUNTRIES.map(([c]) => <option key={c} value={c}>{labelOf(COUNTRIES, c, lang)}</option>)}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label>{t("par.currency")}</label>
+          <select className="ui-select" value={currency} onChange={(e) => setCurrency(e.target.value)} data-testid="new-system-currency">
+            {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label>{t("systems.timezone")}</label>
+          <select className="ui-select" value={tz} onChange={(e) => setTz(e.target.value)}>
+            {[...new Set([tz, ...timeZones()])].map((z) => <option key={z} value={z}>{z}</option>)}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label>{t("systems.industry")}</label>
+          <select className="ui-select" value={industry} onChange={(e) => setIndustry(e.target.value)}>
+            <option value="">—</option>
+            {INDUSTRIES.map(([k]) => <option key={k} value={k}>{labelOf(INDUSTRIES, k, lang)}</option>)}
+          </select>
+        </div>
+        <div className="ui-field">
+          <label>{t("systems.pieceUnit")}</label>
+          <input className="ui-input" value={pieceUnit} placeholder={t("systems.pieceUnitPh")} data-testid="new-system-unit"
+                 onChange={(e) => setPieceUnit(e.target.value)} />
+        </div>
+        <div className="ui-field">
+          <label>{t("systems.production", { u: pieceUnit.trim() || t("systems.units") })}</label>
+          <input className="ui-input" type="number" min={0} value={production} placeholder={t("systems.optional")}
+                 data-testid="new-system-production" onChange={(e) => setProduction(e.target.value)} />
+        </div>
+      </div>
+      <p className="ui-hint" style={{ marginTop: 0 }}>{t("systems.pieceHint")}</p>
+      <div className="ui-field">
+        <label>{t("systems.location")}</label>
+        <div className="ns-maptools">
+          <AddressSearch onResult={(r) => setPlace(r)} />
+          <button className={"ui-btn sm " + (drawing ? "primary" : "outline")} onClick={() => setDrawing((d) => !d)}
+                  data-testid="new-system-draw">
+            {drawing ? t("systems.drawing", { n: boundary.length }) : t("systems.drawBoundary")}
+          </button>
+          {boundary.length > 0 && <button className="ui-btn ghost sm" onClick={() => setBoundary([])}>{t("systems.clearBoundary")}</button>}
+        </div>
+        <div className="ns-map">
+          <MapContainer center={place?.center ?? [-33.45, -70.66]} zoom={place?.center ? 16 : 3} style={{ height: "100%" }}>
+            <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+            <Recenter center={place?.center} />
+            <ClickToDraw on={drawing} onPoint={(pt) => setBoundary((b) => [...b, pt])} />
+            {boundary.length >= 3 && <Polygon positions={boundary} pathOptions={{ color: "#3C533C", weight: 2 }} />}
+            {boundary.map((pt, i) => <CircleMarker key={i} center={pt} radius={4} pathOptions={{ color: "#3C533C" }} />)}
+          </MapContainer>
+        </div>
+        <p className="ui-hint">{place?.address ?? t("systems.locationHint")}</p>
       </div>
       <div className="ui-field">
         <label>{t("systems.newFrom")}</label>

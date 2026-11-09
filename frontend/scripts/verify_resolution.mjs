@@ -128,7 +128,13 @@ await clickText("button", "Agregar"); await waitText("Nuevo sistema");
 await p.type(".ui-modal input.ui-input", SITE);
 await clickText(".ui-radio-card", "Ejemplo (demo)");
 await clickText(".ui-modal button", "Crear sistema");
-step("sistema de prueba creado desde el demo", await waitText("Mapa", 30000));
+// esperar a que el sistema exista en disco (el diálogo de Nuevo sistema también dice «mapa»)
+let made = false;
+for (let i = 0; i < 60 && !made; i++) {
+  made = await p.evaluate(async (u, s) => (await fetch(`${u}/sites/${s}`)).ok, URL, SITE);
+  if (!made) await sleep(500);
+}
+step("sistema de prueba creado desde el demo", made);
 
 // 1 · CSV horario: el crudo se guarda en disco
 await timeseries();

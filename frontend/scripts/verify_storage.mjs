@@ -64,7 +64,13 @@ await clickText("button", "Agregar"); await waitText("Nuevo sistema");
 await p.type(".ui-modal input.ui-input", SITE);
 await clickText(".ui-radio-card", "Ejemplo (demo)");
 await clickText(".ui-modal button", "Crear sistema");
-step("sistema de prueba creado desde el demo", await waitText("Mapa", 30000));
+// esperar a que el sistema exista en disco (el diálogo de Nuevo sistema también dice «mapa»)
+let made = false;
+for (let i = 0; i < 60 && !made; i++) {
+  made = await p.evaluate(async (u, s) => (await fetch(`${u}/sites/${s}`)).ok, URL, SITE);
+  if (!made) await sleep(500);
+}
+step("sistema de prueba creado desde el demo", made);
 
 // 1 · batería: η 95/95 %, SOC 5-95 %, 365 ciclos (con física más dura la
 //     batería deja de convenir y el demo no la construye)
@@ -93,7 +99,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Banda");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pl = null;
 for (let t0 = Date.now(); Date.now() - t0 < 600000;) {
@@ -128,7 +133,6 @@ await p.waitForSelector(".sum-runbar", { timeout: 60000 });
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.type(".ui-modal input.ui-input", "Energia");
-await select('[data-testid="run-analysis"]', "single");
 await clickText(".ui-modal button", "Optimizar");
 let pe = null;
 for (let t0 = Date.now(); Date.now() - t0 < 600000;) {
