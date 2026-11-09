@@ -387,3 +387,16 @@ export function projectRaw(siteJson, values, opts = {}) {
     ...(siteJson.generation_profiles ?? {}), __proj: siteJson.timesteps.map(() => 0) } };
   return getSeries(setRawSeries(tmp, key, values, opts), key);
 }
+
+/**
+ * Sitio con la resolución temporal elegida para una corrida: {method:
+ * "typical", days} o {method: "full"} re-expresa las series en esa plantilla
+ * (necesita series horarias crudas); null o "system" deja la del sistema.
+ */
+export function runTemplateSite(siteJson, rt) {
+  if (!rt || !rt.method || rt.method === "system" || !siteJson) return siteJson;
+  if (!Object.keys(siteJson.hourly?.series ?? {}).length) return siteJson;
+  const cur = siteJson.hourly?.template;
+  if (cur?.method === rt.method && (rt.method !== "typical" || cur.days === rt.days)) return siteJson;
+  return applyTemplate(siteJson, rt.method, { hemisphere: cur?.hemisphere ?? "south", days: rt.days });
+}

@@ -13,6 +13,7 @@ import {
 import { setCurrency } from "../lib/format.js";
 import { blankSite } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
+import { runTemplateSite } from "../lib/templates.js";
 import { EMPTY_LAYOUT, toGeoJSON, fromGeoJSON } from "./layout.js";
 import { readJSON, writeJSON, uid } from "./storage.js";
 
@@ -30,6 +31,7 @@ function siteFromApi({ source, site }) {
     dirty: false, saved: source === "api",
   };
 }
+
 
 export function StudioProvider({ children }) {
   const [apiUp, setApiUp] = useState(null);
@@ -231,15 +233,18 @@ export function StudioProvider({ children }) {
     const params = [...(twin.layout?.params ?? []), ...(extraRows ?? []).map((r, i) => ({ id: `${PROBE}${i}`, year: null, ...r, scenario: PROBE }))];
     const store = { scenarios: twin.layout?.scenarios ?? [], params,
                     techScenario: twin.layout?.techScenario ?? {}, meta: twin.layout?.meta ?? {} };
-    const resolved = resolveScenarios(twin.siteJson, cfgIn, store, stack);
+    // resolución temporal de ESTA corrida (días tipo / año completo) sobre las
+    // series horarias del sistema; sin elegirla, la plantilla del sistema
+    const site0 = runTemplateSite(twin.siteJson, cfgIn.run_template);
+    const resolved = resolveScenarios(site0, cfgIn, store, stack);
     const scen = resolved.rows.length > 0 || (resolved.off ?? []).length > 0;
     const cfg0 = { ...resolved.cfg, scenario_stack: stack0 };
     // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del
     // twin (el payload al motor va sin `hourly`)
-    const seq = daySequence(cfg0, twin.siteJson);
+    const seq = daySequence(cfg0, site0);
     const cfg = seq.length ? { ...cfg0, day_sequence: seq } : cfg0;
     const apiSite = twin.saved ? siteName : "demo";
-    const payload = scen ? resolved.siteJson : (!twin.saved || twin.dirty ? twin.siteJson : null);
+    const payload = scen || site0 !== twin.siteJson ? resolved.siteJson : (!twin.saved || twin.dirty ? twin.siteJson : null);
     // la foto del sitio que acompaña a la corrida no lleva las series crudas
     // (bloque 1.2): pesan MB y la corrida ya tiene su plantilla expresada
     const snapshot = enginePayload(payload ?? twin.siteJson ?? null);   // con la pila aplicada

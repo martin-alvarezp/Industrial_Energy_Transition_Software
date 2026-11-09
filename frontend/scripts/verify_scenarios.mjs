@@ -182,6 +182,9 @@ await p.waitForSelector(".sum-runbar");
 await clickText(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 step("Nueva optimización muestra los pasos", await waitText("Resolución temporal", 5000) && await waitText("Optimizador", 1000));
+step("sin series horarias: días tipo y año completo deshabilitados, con explicación",
+     await p.evaluate(() => document.querySelector('[data-testid="run-res-typical"]')?.disabled &&
+       document.querySelector('[data-testid="run-res-full"]')?.disabled && !!document.querySelector('[data-testid="run-res-noraw"]')));
 await p.type(".ui-modal input.ui-input", "Con carbono alto");
 await p.click('[data-testid="run-add-Carbono alto"]');
 await clickText(".ui-modal button", "Optimizar");

@@ -22,6 +22,7 @@
     "verify:scenarios": "node scripts/verify_scenarios.mjs",
     "verify:layers": "node scripts/verify_layers.mjs",
     "verify:breakeven": "node scripts/verify_breakeven.mjs",
+    "verify:runres": "node scripts/verify_runres.mjs",
     "verify:capex": "node scripts/verify_capex.mjs",
     "verify:units": "node scripts/verify_units.mjs",
     "verify:finance": "node scripts/verify_finance.mjs",

@@ -15,6 +15,7 @@ import { useStudio } from "../studio.jsx";
 import { Modal } from "../kit.jsx";
 import { fetchRun } from "../../lib/api.js";
 import { BASE, scenarioList } from "../../lib/scenarios.js";
+import { DEFAULT_TYPICAL_DAYS } from "../../lib/templates.js";
 import { ScenarioChip } from "./ParamTable.jsx";
 
 /** Escenarios predefinidos del motor (biblioteca y API; en la corrida: BaU o plan). */
@@ -52,6 +53,13 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const refs = [useRef(null), useRef(null), useRef(null), useRef(null)];
   const steps = twin?.siteJson?.timesteps?.length ?? 0;
   const tmpl = twin?.siteJson?.hourly?.template?.method;
+  // resolución de ESTA corrida: la del sistema, N días tipo o el año completo
+  // (las dos últimas necesitan series horarias crudas en Series de tiempo)
+  const hasRaw = Object.keys(twin?.siteJson?.hourly?.series ?? {}).length > 0;
+  const [res, setRes] = useState("system");
+  const [days, setDays] = useState(twin?.siteJson?.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS);
+  const nDays = Math.min(365, Math.max(2, Math.round(+days || DEFAULT_TYPICAL_DAYS)));
+  const runTemplate = hasRaw && res !== "system" ? { method: res, days: nDays } : null;
 
   const capacitiesOf = async (id) => {
     const r = runs.find((x) => x.id === id);
@@ -68,11 +76,12 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       const solver = { solver_time_limit_min: +limitMin > 0 ? +limitMin : null,
                        solver_gap_pct: +gapPct >= 0 ? +gapPct : 0.01 };
       const scenario = analysis === "bau" ? "bau" : useTarget ? "emissions_cap" : "least_cost";
-      let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver };
+      const solver2 = { ...solver, run_template: runTemplate };
+      let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver2 };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
         extra = { analysis: "single", dispatch_only: true, fixed_capacity: fixed,
-                  horizon_years: Math.max(1, +years || 1), commitment: "auto", ...solver };
+                  horizon_years: Math.max(1, +years || 1), commitment: "auto", ...solver2 };
       }
       const cfg = { ...draft, price_scenario: scenario === "emissions_cap" ? "base" : scenario, ...extra };
       const b = await run({ name, notes, cfg, stack });
@@ -218,7 +227,24 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
 
       {/* 3 · Resolución temporal */}
       <h4 className="run-sec" ref={refs[2]}>3 · {t("run.stepTime")}</h4>
-      <p className="ui-hint">{t("run.timeInfo", { n: steps.toLocaleString(), m: t("run.tmpl." + (tmpl ?? "seasonal")) })}</p>
+      <div className="ui-field" data-testid="run-resolution">
+        <div className="ui-seg light outlined small">
+          <button className={res === "system" ? "on" : ""} onClick={() => setRes("system")} data-testid="run-res-system">{t("run.resSystem")}</button>
+          <button className={res === "typical" ? "on" : ""} disabled={!hasRaw} onClick={() => setRes("typical")} data-testid="run-res-typical">{t("run.resTypical")}</button>
+          <button className={res === "full" ? "on" : ""} disabled={!hasRaw} onClick={() => setRes("full")} data-testid="run-res-full">{t("run.resFull")}</button>
+        </div>
+      </div>
+      {res === "system" && <p className="ui-hint">{t("run.timeInfo", { n: steps.toLocaleString(), m: t("run.tmpl." + (tmpl ?? "seasonal")) })}</p>}
+      {res === "typical" && (
+        <div className="ui-field">
+          <label>{t("run.resDays")}</label>
+          <input className="ui-input" type="number" min={2} max={365} step={1} value={days} style={{ maxWidth: 120 }}
+                 onChange={(e) => setDays(e.target.value)} data-testid="run-res-days" />
+          <p className="ui-hint">{t("run.resTypicalHint", { n: (nDays * 24).toLocaleString() })}</p>
+        </div>
+      )}
+      {res === "full" && <p className="ui-hint">{t("run.resFullHint")}</p>}
+      {!hasRaw && <p className="ui-hint" data-testid="run-res-noraw">{t("run.resNoRaw")}</p>}
 
       {/* 4 · Optimizador */}
       <h4 className="run-sec" ref={refs[3]}>4 · {t("run.stepSolver")}</h4>

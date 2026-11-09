@@ -70,12 +70,13 @@ const setHorizon = async (n) => {
   }, n);
   await sleep(1200);
 };
-const optimize = async (name) => {
+const optimize = async (name, before = null) => {
   await p.goto(`${URL}/#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
   await p.waitForSelector(".sum-runbar", { timeout: 30000 });
   await clickText(".sum-runbar button", "Optimización");
   await waitText("Nueva optimización");
   await p.type(".ui-modal input.ui-input", name);
+  if (before) await before();
   await clickText(".ui-modal button", "Optimizar");
   // "Inversión total" puede ser de la corrida ANTERIOR: se espera a que la
   // nueva quede guardada en el backend
@@ -157,6 +158,32 @@ step("Σ pesos = 8760", Math.abs(W - 8760) < 1e-6, `${W}`);
 await timeseries();
 step("al recargar sigue mensual", await waitText("576 pasos"));
 step("optimización mensual resuelta por el motor real (10 años, solo esta corrida)", await optimize("Mensual"));
+
+// 2a · días tipo SOLO para una corrida (el sistema sigue mensual)
+const okRun = await optimize("Por corrida 8 dias", async () => {
+  const dis = await p.evaluate(() => document.querySelector('[data-testid="run-res-typical"]')?.disabled);
+  step("con series horarias, «Días tipo» está habilitado en la corrida", dis === false);
+  await p.click('[data-testid="run-res-typical"]');
+  await p.waitForSelector('[data-testid="run-res-days"]');
+  await p.evaluate(() => {
+    const inp = document.querySelector('[data-testid="run-res-days"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(inp, "8");
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});
+step("optimización con 8 días tipo por corrida resuelta por el motor real", okRun);
+{
+  const runs = await p.evaluate(async (u) => (await (await fetch(u)).json()).runs ?? [], `${URL}/runs?site=${SITE}`);
+  const r = runs.find((x) => x.name === "Por corrida 8 dias");
+  const pl = r && await p.evaluate(async (u) => (await (await fetch(u)).json()).payload, `${URL}/runs/${r.id}?site=${SITE}`);
+  const ts = pl?.site_snapshot?.timesteps ?? [];
+  const seq = pl?.result?.assumptions?.scenario_config?.day_sequence ?? [];
+  step("la corrida usó 8 días tipo (192 pasos) enlazados con la secuencia del año",
+       ts.length === 192 && Math.abs(ts.reduce((a, t) => a + t.weight_hours, 0) - 8760) < 1e-6 && seq.length === 365,
+       `${ts.length} pasos · ${seq.length} días`);
+  const sNow = await getSite();
+  step("el sistema conserva su plantilla mensual", sNow.timesteps.length === 576 && sNow.hourly?.template?.method === "monthly");
+}
 
 // 2b · días tipo (R7): 12 días tipo con mes, la energía de la serie cruda se conserva
 await timeseries();
