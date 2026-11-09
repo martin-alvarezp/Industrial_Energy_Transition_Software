@@ -122,7 +122,9 @@ barra lateral:
   *Resumen* (KPIs, medidas, inversión, OPEX, costo anual, emisiones evitadas y
   Sankey), *KPIs / Situación actual*, *Capacidades*, *Costos*, *Operación*,
   *Ubicaciones*, *Componentes* y *Tableros*.
-- **Gestor de portafolio** — un escenario sobre varios sistemas.
+- **Bibliotecas** — escenarios de partida y sensibilidades predefinidas
+  (se aplican a un sistema guardado), vectores, ubicaciones, tecnologías y
+  contabilidad.
 
 Las ediciones del gemelo se guardan solas en disco (el sistema `demo` es la
 referencia y es de sólo lectura: se guarda una copia).
@@ -170,6 +172,16 @@ contra fixtures dorados del motor Julia):
   uso, net metering, cortes de red, alcances 1 y 2, ETS, compensaciones con
   precio por año, topes de emisiones por año (duros, o relajados: el plan
   más cercano a la meta y aviso del exceso), MACC y curva Pareto.
+- **Escenarios como capas**: cada escenario guarda parámetros por activo y
+  por año, y los activos pueden pertenecer a un escenario (p. ej. candidatas
+  opcionales solo en «Economic Optimum»). La corrida elige la pila: manda el
+  de arriba y lo que no define se busca en el de abajo y, al final, en Base.
+  Sensibilidades de un número (gas ×X desde el año Y, CO₂, CAPEX, WACC…) con
+  tarjetas de decisión contra Base, punto de quiebre por bisección («a partir
+  de qué valor entra la tecnología al plan») y producción por año para los
+  resultados por unidad producida.
+- **Resolución por corrida**: la del sistema, N días tipo o el año completo
+  solo para esa corrida (con series horarias del sistema).
 - **Optimizador**: HiGHS sin límite de tiempo por defecto y tolerancia de
   optimalidad 0,01 % (ambos ajustables por corrida); si se fija un límite y se
   alcanza, se entrega el mejor plan encontrado con su brecha al óptimo.
