@@ -12,6 +12,7 @@ import { PageHead } from "../kit.jsx";
 import { NAV_ICONS } from "../icons.jsx";
 import ParamTable, { ScenarioChip } from "../components/ParamTable.jsx";
 import Sensitivities from "../components/Sensitivities.jsx";
+import BreakEven from "../components/BreakEven.jsx";
 import { BASE, SCENARIO_COLORS, scenarioList } from "../../lib/scenarios.js";
 
 export default function ScenariosPage() {
@@ -122,6 +123,7 @@ export default function ScenariosPage() {
       <ParamTable key={filter} scenarioFilter={filter || null} />
 
       <Sensitivities />
+      {!readonly && <section style={{ marginTop: 24 }}><BreakEven /></section>}
     </div>
   );
 }

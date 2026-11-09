@@ -13,26 +13,26 @@ import { SCENARIO_COLORS } from "../../lib/scenarios.js";
 import { num, pct } from "../../lib/format.js";
 import { ScenarioChip } from "./ParamTable.jsx";
 
-const fuelCarriers = (sj) => (sj?.carriers ?? []).filter((c) => c.category === "fuel");
-const energyCarriers = (sj) => (sj?.carriers ?? []).filter((c) => !["emissions", "offset", "fuel"].includes(c.category));
-const investable = (sj) => (sj?.technologies ?? []).filter((x) => x.investable && x.type !== "source");
+export const fuelCarriers = (sj) => (sj?.carriers ?? []).filter((c) => c.category === "fuel");
+export const energyCarriers = (sj) => (sj?.carriers ?? []).filter((c) => !["emissions", "offset", "fuel"].includes(c.category));
+export const investable = (sj) => (sj?.technologies ?? []).filter((x) => x.investable && x.type !== "source");
 const sign = (v) => (v > 0 ? `+${v}` : `${v}`);
 
 /** Plantillas: número por defecto, a qué se aplica y qué filas genera. */
 export const TEMPLATES = [
-  { id: "carbon", es: "Precio del carbono", en: "Carbon price", unit: "USD/tCO₂e", def: 100,
+  { id: "carbon", es: "Precio del carbono", en: "Carbon price", unit: "USD/tCO₂e", def: 100, yearable: true,
     q: ["¿Desde qué precio del CO₂ conviene invertir?", "From what CO₂ price does investing pay off?"],
     name: (v) => `Carbono ${v} USD/t`, rows: (v) => [{ target: "system", param: "carbon_price", value: v }] },
-  { id: "gas", es: "Precio del gas y combustibles", en: "Gas and fuel price", unit: "%", def: 20, pick: fuelCarriers,
+  { id: "gas", es: "Precio del gas y combustibles", en: "Gas and fuel price", unit: "× precio base", def: 1.5, pick: fuelCarriers, yearable: true,
     q: ["¿Cuánto me expone el gas si no invierto?", "How exposed am I to gas if I don't invest?"],
-    name: (v, x) => `${x?.name ?? "Combustible"} ${sign(v)} %`, rows: (v, x) => [{ target: x.carrier_id, param: "carrier_price_pct", value: v }] },
-  { id: "elec", es: "Precio de la electricidad", en: "Electricity price", unit: "%", def: 20, pick: energyCarriers,
+    name: (v, x) => `${x?.name ?? "Combustible"} ×${v}`, rows: (v, x) => [{ target: x.carrier_id, param: "carrier_price_pct", value: +((v - 1) * 100).toFixed(4) }] },
+  { id: "elec", es: "Precio de la electricidad", en: "Electricity price", unit: "× precio base", def: 1.5, pick: energyCarriers, yearable: true,
     q: ["¿Electrificar sigue conviniendo si sube la luz?", "Does electrifying still pay off if power gets pricier?"],
-    name: (v, x) => `${x?.name ?? "Electricidad"} ${sign(v)} %`, rows: (v, x) => [{ target: x.carrier_id, param: "carrier_price_pct", value: v }] },
+    name: (v, x) => `${x?.name ?? "Electricidad"} ×${v}`, rows: (v, x) => [{ target: x.carrier_id, param: "carrier_price_pct", value: +((v - 1) * 100).toFixed(4) }] },
   { id: "grid", es: "Descarbonización de la red", en: "Grid decarbonisation", unit: "%/año", def: 5,
     q: ["¿Llego a la meta solo con una red más limpia?", "Do I reach the target with a cleaner grid alone?"],
     name: (v) => `Red −${v} %/año`, gridRows: true },
-  { id: "capex", es: "CAPEX de una tecnología", en: "Technology CAPEX", unit: "%", def: 20, pick: investable,
+  { id: "capex", es: "CAPEX de una tecnología", en: "Technology CAPEX", unit: "%", def: 20, pick: investable, yearable: true,
     q: ["¿Qué pasa si la inversión sale más cara?", "What if the investment costs more?"],
     name: (v, x) => `CAPEX ${x?.name ?? ""} ${sign(v)} %`,
     rows: (v, x) => [{ target: x.tech_id, param: "capex", value: +((x.capex_per_kw ?? 0) * (1 + v / 100)).toFixed(2) }] },
@@ -48,16 +48,16 @@ export const TEMPLATES = [
   { id: "target", es: "Meta de emisiones del año final", en: "Final-year emissions target", unit: "tCO₂e", def: 0,
     q: ["¿Cuánto cuesta una meta más exigente?", "What does a tougher target cost?"],
     name: (v) => `Meta ${num(v, 0)} t`, rows: (v) => [{ target: "system", param: "cap_end", value: v }] },
-  { id: "offsets", es: "Precio de compensaciones", en: "Offset price", unit: "USD/tCO₂e", def: 30,
+  { id: "offsets", es: "Precio de compensaciones", en: "Offset price", unit: "USD/tCO₂e", def: 30, yearable: true,
     q: ["¿Comprar compensaciones o invertir?", "Buy offsets or invest?"],
     name: (v) => `Compensación ${v} USD/t`, rows: (v) => [{ target: "system", param: "offset_price", value: v }] },
-  { id: "export", es: "Precio de venta de excedentes", en: "Surplus sale price", unit: "%", def: -50,
+  { id: "export", es: "Precio de venta de excedentes", en: "Surplus sale price", unit: "%", def: -50, yearable: true,
     q: ["¿Vale sobredimensionar la generación propia?", "Is oversizing own generation worth it?"],
     name: (v) => `Venta ${sign(v)} %`, sellRows: true },
 ];
 
 /** Filas de la plantilla para el sistema actual. */
-function rowsFor(tp, v, pickObj, siteJson, cfg) {
+export function rowsFor(tp, v, pickObj, siteJson, cfg) {
   if (tp.gridRows) {
     // factor de la red en cada año del horizonte: base · (1 − v)^(año − 1)
     const H = cfg.horizon_years ?? 10, B = cfg.base_year ?? 0;
@@ -98,6 +98,7 @@ export default function Sensitivities() {
   const sens = scenarios.filter((s) => s.sensitivity);
   const [vals, setVals] = useState({});
   const [picks, setPicks] = useState({});
+  const [years, setYears] = useState({});   // "desde el año" (opcional) por plantilla
   const [state, setState] = useState({ status: "idle" });   // idle | running | done | error
   const [cards, setCards] = useState(null);
 
@@ -106,10 +107,12 @@ export default function Sensitivities() {
     const opts = tp.pick ? tp.pick(siteJson) : [];
     const pickObj = tp.pick ? opts.find((o) => (o.carrier_id ?? o.tech_id) === (picks[tp.id] ?? (opts[0]?.carrier_id ?? opts[0]?.tech_id))) : null;
     if (tp.pick && !pickObj) return;
-    const rows = rowsFor(tp, +v, pickObj, siteJson, draft);
+    const yr = tp.yearable && years[tp.id] ? +years[tp.id] : null;
+    const rows = rowsFor(tp, +v, pickObj, siteJson, draft).map((r) => (yr != null && r.year == null ? { ...r, year: yr } : r));
     if (!rows.length) return;
     const id = uid();
-    const s = { id, name: tp.name(+v, pickObj), description: lang === "en" ? tp.q[1] : tp.q[0],
+    const s = { id, name: tp.name(+v, pickObj) + (yr != null ? ` ${t("sens.fromYear", { y: yr })}` : ""),
+                description: lang === "en" ? tp.q[1] : tp.q[0],
                 color: SCENARIO_COLORS[scenarios.length % SCENARIO_COLORS.length], sensitivity: tp.id,
                 created_at: new Date().toISOString() };
     patchLayout({ scenarios: [...scenarios, s],
@@ -163,6 +166,10 @@ export default function Sensitivities() {
                   <input className="ui-input" type="number" step="any" value={vals[tp.id] ?? tp.def}
                          data-testid={`sens-${tp.id}-value`} onChange={(e) => setVals({ ...vals, [tp.id]: e.target.value })} />
                   <span className="sens-unit">{tp.unit}</span>
+                  {tp.yearable && (
+                    <input className="ui-input sens-year" type="number" placeholder={t("sens.yearPh")} value={years[tp.id] ?? ""}
+                           data-testid={`sens-${tp.id}-year`} onChange={(e) => setYears({ ...years, [tp.id]: e.target.value })} />
+                  )}
                   <button className="ui-btn outline sm" onClick={() => create(tp)} data-testid={`sens-${tp.id}-add`}><IcAdd /> {t("sens.create")}</button>
                 </div>
               </div>

@@ -5,7 +5,7 @@ import { fetchSolarProfile } from "../../lib/api.js";
 import { projectRaw } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
 import { useL } from "../../ui/i18n.jsx";
-import ParamTable from "../../ui/components/ParamTable.jsx";
+import ParamTable, { AssetScenario } from "../../ui/components/ParamTable.jsx";
 
 function Field({ label, hint, children }) {
   return (
@@ -155,14 +155,15 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
         {!isNew && <p className="hint">id: <code>{draft.tech_id}</code> · {L("tipo", "type")}: {L(meta?.label, ({ source: "External connection", converter: "Energy converter", generator: "Generator with profile", storage: "Storage" })[draft.type])}</p>}
         {!isNew && draft.type !== "source" && (
           <div className="ui-tabs drawer-tabs">
-            <button className={tab === "data" ? "on" : ""} onClick={() => setTab("data")}>{L("Datos", "Data")}</button>
+            <button className={tab === "data" ? "on" : ""} onClick={() => setTab("data")} data-testid="drawer-tab-data">{L("Datos", "Data")}</button>
             <button className={tab === "params" ? "on" : ""} onClick={() => setTab("params")} data-testid="drawer-tab-params">
               {L("Parámetros por escenario", "Parameters by scenario")}</button>
           </div>
         )}
+        {!isNew && draft.type !== "source" && <AssetScenario techId={draft.tech_id} />}
         {tab === "params" && !isNew ? (
           <>
-            <p className="hint">{L("Valores por año y escenario para este activo. Base rige siempre; cada escenario de la corrida pisa a los anteriores.", "Values by year and scenario for this asset. Base always applies; each scenario in the run overrides the previous ones.")}</p>
+            <p className="hint">{L("Valores por año y escenario para este activo. En la corrida manda el escenario de más arriba de la pila; lo que no define se busca en el de abajo y, al final, en Base.", "Values by year and scenario for this asset. In a run the top scenario of the stack wins; whatever it does not define is looked up in the one below and, finally, in Base.")}</p>
             <ParamTable target={draft.tech_id} kind="tech" />
           </>
         ) : (<>

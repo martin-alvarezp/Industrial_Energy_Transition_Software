@@ -222,13 +222,18 @@ export function StudioProvider({ children }) {
   }, [siteName, apiUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Sitio y configuración listos para el motor: aplica Base + la pila de escenarios. */
-  const prepare = useCallback((cfgIn, stack = []) => {
+  const prepare = useCallback((cfgIn, stack0 = [], extraRows = null) => {
     // escenarios como capas: Base + la pila elegida se aplican al sitio y a la
-    // configuración antes de resolver
-    const store = { scenarios: twin.layout?.scenarios ?? [], params: twin.layout?.params ?? [] };
+    // configuración antes de resolver. extraRows: filas de una capa temporal
+    // encima de todo (punto de quiebre), sin guardarlas en el sistema.
+    const PROBE = "__probe";
+    const stack = extraRows?.length ? [PROBE, ...stack0] : stack0;
+    const params = [...(twin.layout?.params ?? []), ...(extraRows ?? []).map((r, i) => ({ id: `${PROBE}${i}`, year: null, ...r, scenario: PROBE }))];
+    const store = { scenarios: twin.layout?.scenarios ?? [], params,
+                    techScenario: twin.layout?.techScenario ?? {}, meta: twin.layout?.meta ?? {} };
     const resolved = resolveScenarios(twin.siteJson, cfgIn, store, stack);
-    const scen = resolved.rows.length > 0;
-    const cfg0 = { ...resolved.cfg, scenario_stack: stack };
+    const scen = resolved.rows.length > 0 || (resolved.off ?? []).length > 0;
+    const cfg0 = { ...resolved.cfg, scenario_stack: stack0 };
     // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del
     // twin (el payload al motor va sin `hourly`)
     const seq = daySequence(cfg0, twin.siteJson);
@@ -242,9 +247,9 @@ export function StudioProvider({ children }) {
   }, [twin, siteName]);
 
   /** Evalúa una pila sin guardarla como corrida (sensibilidades). */
-  const evaluate = useCallback(async ({ cfg: cfgIn, stack = [] } = {}) => {
+  const evaluate = useCallback(async ({ cfg: cfgIn, stack = [], extraRows = null } = {}) => {
     if (!twin) return null;
-    const { cfg, apiSite, payload, snapshot } = prepare({ ...(cfgIn ?? draft), analysis: "single" }, stack);
+    const { cfg, apiSite, payload, snapshot } = prepare({ ...(cfgIn ?? draft), analysis: "single" }, stack, extraRows);
     const d = await compute(cfg, payload, apiSite, snapshot);
     return { ...d, site_snapshot: snapshot, config: cfg };
   }, [twin, draft, prepare]);

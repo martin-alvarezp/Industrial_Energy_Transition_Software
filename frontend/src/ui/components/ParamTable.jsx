@@ -120,3 +120,27 @@ export default function ParamTable({ target = null, kind = null, scenarioFilter 
     </div>
   );
 }
+
+/** ¿A qué escenario pertenece el activo? Base = está siempre; un escenario = solo
+ * participa en las corridas que lo incluyen (p. ej. tecnologías opcionales). */
+export function AssetScenario({ techId }) {
+  const { t } = useI18n();
+  const { twin, patchLayout, readonly } = useStudio();
+  const layout = twin?.layout ?? {};
+  const cur = layout.techScenario?.[techId] ?? BASE;
+  const set = (v) => {
+    const m = { ...(layout.techScenario ?? {}) };
+    if (v === BASE) delete m[techId]; else m[techId] = v;
+    patchLayout({ techScenario: m }, `Activo '${techId}' en escenario '${v}'`);
+  };
+  return (
+    <div className="control" data-testid="asset-scenario">
+      <label>{t("scn2.assetScenario")}</label>
+      <select value={cur} disabled={readonly} onChange={(e) => set(e.target.value)} data-testid="asset-scenario-select">
+        <option value={BASE}>{t("scn2.base")}</option>
+        {(layout.scenarios ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <p className="hint">{t("scn2.assetScenarioHint")}</p>
+    </div>
+  );
+}

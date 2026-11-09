@@ -1,37 +1,147 @@
-// Bibliotecas globales (sin sistema abierto): escenarios, vectores,
-// ubicaciones de todos los sistemas, tecnologías y contabilidad. Y el gestor
-// de portafolio (dentro de un sistema).
+// Bibliotecas globales (sin sistema abierto): escenarios (de partida y
+// sensibilidades predefinidas), vectores, ubicaciones de todos los sistemas,
+// tecnologías y contabilidad.
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
-import { useStored } from "../storage.js";
+import { useStored, uid } from "../storage.js";
 import { PageHead } from "../kit.jsx";
 import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { siteMeta } from "../sitemeta.js";
-import { SCENARIOS } from "../components/RunModal.jsx";
+import { TEMPLATES, rowsFor } from "../components/Sensitivities.jsx";
+import { SCENARIO_COLORS } from "../../lib/scenarios.js";
+import { fetchSite, fetchSiteConfig, saveSite } from "../../lib/api.js";
+import { fromGeoJSON, toGeoJSON } from "../layout.js";
 import { techKind } from "../techkind.js";
 import { CARRIER_PRESETS, TECH_PRESETS, CARRIER_CATEGORY_META } from "../../lib/twin.js";
 import { GRID_FACTORS } from "../../lib/gridFactors.js";
 import { num } from "../../lib/format.js";
 
 
+// Biblioteca de escenarios: escenarios de partida y sensibilidades
+// predefinidas que se aplican a cualquier sistema guardado. Aplicar = crear el
+// escenario (con sus filas, si es una sensibilidad) en el layout del sistema;
+// después se edita como cualquier escenario en Escenarios del sistema.
+const STARTERS = [
+  { key: "eo", es: "Economic Optimum", en: "Economic Optimum",
+    d: ["Para las tecnologías candidatas opcionales: asígnalas a este escenario (Infraestructura → activo → Escenario del activo) y solo participan en las corridas que lo incluyan.",
+        "For optional candidate technologies: assign them to this scenario (Infrastructure → asset → Asset scenario) and they only take part in runs that include it."] },
+  { key: "supplier", es: "Proveedor alternativo", en: "Alternative supplier",
+    d: ["Para comparar ofertas: CAPEX o eficiencia distintos de un activo bajo este escenario, sin tocar Base.",
+        "To compare quotes: a different CAPEX or efficiency for an asset under this scenario, without touching Base."] },
+  { key: "reliability", es: "Confiabilidad", en: "Reliability",
+    d: ["Compras fijas de respaldo (infraestructura fija) y permisos de inversión que exige el cliente.",
+        "Fixed backup purchases (fixed infrastructure) and investment permissions required by the client."] },
+];
+
 export function LibScenariosPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { sites, apiUp, siteName, loadSite } = useStudio();
+  const editable = (sites ?? []).filter((s) => s !== "demo");
+  const [target, setTarget] = useState("");
+  const [site, setSite] = useState(null);        // { siteJson, layout, cfg }
+  const [vals, setVals] = useState({});
+  const [years, setYears] = useState({});
+  const [picks, setPicks] = useState({});
+  const [flash, setFlash] = useState(null);
+  useEffect(() => {
+    if (!target) { setSite(null); return; }
+    let alive = true;
+    (async () => {
+      const { source, site: s } = await fetchSite(target);
+      if (source !== "api") throw new Error("sin API");   // nunca guardar sobre un mock
+      const { layout, site_version, ...siteJson } = s;
+      const cfg = (await fetchSiteConfig(target)) ?? {};
+      if (alive) setSite({ siteJson, layout: layout ? fromGeoJSON(layout) : fromGeoJSON(null), cfg });
+    })().catch(() => setSite(null));
+    return () => { alive = false; };
+  }, [target]);
+  const save = async (mutate, msg) => {
+    const layout = mutate({ ...site.layout });
+    await saveSite(target, site.siteJson, toGeoJSON(layout));
+    setSite({ ...site, layout });
+    if (target === siteName) await loadSite(target, { force: true });
+    setFlash(msg); setTimeout(() => setFlash(null), 3000);
+  };
+  const addStarter = (st) => save((l) => ({ ...l, scenarios: [...(l.scenarios ?? []),
+    { id: uid(), name: lang === "en" ? st.en : st.es, description: lang === "en" ? st.d[1] : st.d[0],
+      color: SCENARIO_COLORS[(l.scenarios ?? []).length % SCENARIO_COLORS.length], created_at: new Date().toISOString() }] }),
+    t("lib.scenAdded", { s: target }));
+  const addSens = (tp) => {
+    const v = +(vals[tp.id] ?? tp.def);
+    const opts = tp.pick ? tp.pick(site.siteJson) : [];
+    const pickObj = tp.pick ? opts.find((o) => (o.carrier_id ?? o.tech_id) === (picks[tp.id] ?? (opts[0]?.carrier_id ?? opts[0]?.tech_id))) : null;
+    if (tp.pick && !pickObj) return;
+    const yr = tp.yearable && years[tp.id] ? +years[tp.id] : null;
+    const rows = rowsFor(tp, v, pickObj, site.siteJson, site.cfg).map((r) => (yr != null && r.year == null ? { ...r, year: yr } : r));
+    if (!rows.length) return;
+    const id = uid();
+    save((l) => ({ ...l,
+      scenarios: [...(l.scenarios ?? []), { id, name: tp.name(v, pickObj) + (yr != null ? ` ${t("sens.fromYear", { y: yr })}` : ""),
+        description: lang === "en" ? tp.q[1] : tp.q[0], color: SCENARIO_COLORS[(l.scenarios ?? []).length % SCENARIO_COLORS.length],
+        sensitivity: tp.id, created_at: new Date().toISOString() }],
+      params: [...(l.params ?? []), ...rows.map((r) => ({ id: uid(), year: null, ...r, scenario: id }))] }),
+      t("lib.scenAdded", { s: target }));
+  };
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.scenarios} title={t("nav.scenarios")} help={t("lib.scenHelp")} />
-      <div className="scen-grid">
-        {SCENARIOS.map((s) => (
-          <div key={s} className="ui-card ui-card-pad scen-card">
-            <div style={{ fontWeight: 600, fontSize: 16 }}>{t("scn." + s)}</div>
-            <p className="ui-card-sub">{t("desc." + s)}</p>
-            <code className="ui-tag" style={{ alignSelf: "flex-start" }}>{s}</code>
+      <div className="pg-toolbar">
+        <label>{t("lib.applyTo")}</label>
+        <select className="ui-select" style={{ maxWidth: 280 }} value={target} onChange={(e) => setTarget(e.target.value)}
+                data-testid="lib-scen-target">
+          <option value="">{t("lib.pickSystem")}</option>
+          {editable.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {flash && <span className="ui-tag ok">{flash}</span>}
+        {!apiUp && <span className="ui-hint">{t("common.apiRequired")}</span>}
+      </div>
+
+      <h3 className="ui-card-title" style={{ margin: "18px 0 8px" }}>{t("lib.starters")}</h3>
+      <div className="sens-grid">
+        {STARTERS.map((st) => (
+          <div key={st.key} className="ui-card ui-card-pad sens-card" data-testid={`lib-starter-${st.key}`}>
+            <div className="sens-name">{lang === "en" ? st.en : st.es}</div>
+            <p className="ui-card-sub">{lang === "en" ? st.d[1] : st.d[0]}</p>
+            <button className="ui-btn outline sm" disabled={!site} onClick={() => addStarter(st)} style={{ alignSelf: "flex-start" }}>
+              {t("lib.apply")}</button>
           </div>
         ))}
+      </div>
+
+      <h3 className="ui-card-title" style={{ margin: "24px 0 8px" }}>{t("lib.sensTitle")}</h3>
+      <p className="ui-hint" style={{ marginTop: 0 }}>{t("lib.sensHint")}</p>
+      <div className="sens-grid">
+        {TEMPLATES.map((tp) => {
+          const opts = site && tp.pick ? tp.pick(site.siteJson) : null;
+          return (
+            <div key={tp.id} className="ui-card ui-card-pad sens-card" data-testid={`lib-sens-${tp.id}`}>
+              <div className="sens-name">{lang === "en" ? tp.en : tp.es}</div>
+              <p className="ui-card-sub">{lang === "en" ? tp.q[1] : tp.q[0]}</p>
+              {opts && opts.length > 0 && (
+                <select className="ui-select" value={picks[tp.id] ?? (opts[0].carrier_id ?? opts[0].tech_id)}
+                        onChange={(e) => setPicks({ ...picks, [tp.id]: e.target.value })}>
+                  {opts.map((o) => <option key={o.carrier_id ?? o.tech_id} value={o.carrier_id ?? o.tech_id}>{o.name}</option>)}
+                </select>
+              )}
+              <div className="sens-row">
+                <input className="ui-input" type="number" step="any" value={vals[tp.id] ?? tp.def}
+                       onChange={(e) => setVals({ ...vals, [tp.id]: e.target.value })} />
+                <span className="sens-unit">{tp.unit}</span>
+                {tp.yearable && (
+                  <input className="ui-input sens-year" type="number" placeholder={t("sens.yearPh")} value={years[tp.id] ?? ""}
+                         onChange={(e) => setYears({ ...years, [tp.id]: e.target.value })} />
+                )}
+                <button className="ui-btn outline sm" disabled={!site || (opts && !opts.length)} onClick={() => addSens(tp)}
+                        data-testid={`lib-sens-${tp.id}-apply`}>{t("lib.apply")}</button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

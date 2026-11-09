@@ -126,10 +126,14 @@ export default function SummaryPage() {
   const meta = twin?.layout?.meta ?? {};
   const unit = meta.piece_unit || t("systems.units");
   const [perUnit, setPerUnit] = useState(true);
-  const canPer = meta.production > 0;
+  // la producción por año viaja con la corrida (parámetro «Producción» de los
+  // escenarios); si la corrida no la tiene, la producción anual del sistema
+  const prodVec = data?.config?.production_by_year;
+  const production = prodVec?.some((v) => v > 0) ? prodVec : (meta.production > 0 ? meta.production : null);
+  const canPer = production != null;
   const src = useMemo(() => (result && feasible ? sourceBreakdown(result, siteJson, {
-    production: canPer && perUnit ? meta.production : null, labels: { sale: t("sum.saleCredit") } }) : null),
-  [result, feasible, siteJson, canPer, perUnit, meta.production, t]);
+    production: canPer && perUnit ? production : null, labels: { sale: t("sum.saleCredit") } }) : null),
+  [result, feasible, siteJson, canPer, perUnit, production, t]);
 
   const flowData = useMemo(() => {
     if (!result?.dispatch?.length || !siteJson) return null;

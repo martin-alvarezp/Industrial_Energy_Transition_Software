@@ -715,3 +715,14 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .run-stack-tools { display: inline-flex; }
 .run-stack-add { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 1px dashed var(--ui-border, #cfd8d3); border-radius: 8px; padding: 5px 8px; margin-bottom: 6px; cursor: pointer; }
 .run-check { display: flex; gap: 8px; align-items: center; margin: 4px 0 10px; }
+.sens-row { flex-wrap: wrap; }
+.sens-row .ui-input.sens-year { width: 92px; }
+
+/* punto de quiebre */
+.be-card { display: flex; flex-direction: column; gap: 6px; }
+.be-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.be-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ui-muted, #667); }
+.be-range { display: flex; align-items: center; gap: 6px; }
+.be-range .ui-input { width: 100%; min-width: 0; }
+.be-result { margin-top: 10px; font-weight: 600; }
+.be-evals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-weight: 400; }

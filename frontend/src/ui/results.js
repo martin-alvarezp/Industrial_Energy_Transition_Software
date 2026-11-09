@@ -441,8 +441,9 @@ export function perComponent(result, siteJson, year) {
 /**
  * Energía y CO₂ por FUENTE y año (result.by_source del motor): compras por
  * mercado, combustible quemado sin mercado, generación propia y crédito por
- * ventas. Con `production` (unidades/año) todo se expresa por unidad
- * producida: kWh/unidad y kg CO₂e/unidad.
+ * ventas. Con `production` (unidades/año: un número, o un vector por año
+ * relativo 1..H) todo se expresa por unidad producida: kWh/unidad y
+ * kg CO₂e/unidad, cada año con su propia producción.
  */
 export function sourceBreakdown(result, siteJson, { production = null, labels = {} } = {}) {
   const rows = result?.by_source ?? [];
@@ -453,12 +454,14 @@ export function sourceBreakdown(result, siteJson, { production = null, labels = 
     const c = siteJson?.carriers?.find((x) => x.carrier_id === r.source)?.name ?? r.source;
     return r.kind === "sale" ? `${labels.sale ?? "Venta"}: ${siteJson?.markets?.find((m) => m.market_id === r.source)?.name ?? r.source}` : c;
   };
-  const per = production > 0;
-  const kE = per ? 1000 / production : 1;     // MWh → kWh/unidad
-  const kC = per ? 1000 / production : 1;     // t → kg/unidad
+  const prodAt = (y) => (Array.isArray(production) ? +(production[Math.min(y, production.length) - 1] ?? 0) : +(production ?? 0));
   const years = [...new Set(rows.map((r) => r.year))].sort((a, b) => a - b);
+  // por unidad solo si todos los años tienen producción
+  const per = years.length > 0 && years.every((y) => prodAt(y) > 0);
   const energy = [], co2 = [], eKeys = new Set(), cKeys = new Set();
   for (const y of years) {
+    const kE = per ? 1000 / prodAt(y) : 1;     // MWh → kWh/unidad
+    const kC = kE;                             // t → kg/unidad
     const e = { year: calYear(result, y) }, c = { year: calYear(result, y) };
     for (const r of rows.filter((x) => x.year === y)) {
       const n = nameOf(r);
@@ -473,11 +476,12 @@ export function sourceBreakdown(result, siteJson, { production = null, labels = 
   const last = rows.filter((r) => r.year === yl);
   const cb = (result.cost_breakdown ?? []).find((x) => x.year === yl);
   const em = (result.emissions ?? []).find((x) => x.year === yl);
+  const pl = per ? prodAt(yl) : 0;
   const kpis = per ? {
-    year: calYear(result, yl),
-    costPerUnit: cb ? cb.total / production : null,
-    co2PerUnit: em ? em.net * 1000 / production : null,
-    energyPerUnit: last.filter((r) => r.energy).reduce((a, r) => a + r.mwh, 0) * 1000 / production,
+    year: calYear(result, yl), production: pl,
+    costPerUnit: cb ? cb.total / pl : null,
+    co2PerUnit: em ? em.net * 1000 / pl : null,
+    energyPerUnit: last.filter((r) => r.energy).reduce((a, r) => a + r.mwh, 0) * 1000 / pl,
   } : null;
   return { energy: { data: energy, keys: [...eKeys] }, co2: { data: co2, keys: [...cKeys] }, kpis, perUnit: per };
 }

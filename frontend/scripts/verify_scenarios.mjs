@@ -89,12 +89,22 @@ await p.type('[data-testid="pt-value"]', "200");
 await select('[data-testid="pt-scenario"]', scId);
 await p.click('[data-testid="pt-add"]');
 step("parámetro agregado al escenario (precio del carbono 200)", await waitText("Precio del carbono", 10000));
+// producción por año (ítem 4): 2000 unidades/año desde 2030 en el mismo escenario
+await select('[data-testid="pt-target"]', "system");
+await select('[data-testid="pt-param"]', "production");
+await p.evaluate(() => { for (const id of ["pt-year", "pt-value"]) { const el = document.querySelector(`[data-testid="${id}"]`);
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ""); el.dispatchEvent(new Event("input", { bubbles: true })); } });
+await p.type('[data-testid="pt-year"]', "2030");
+await p.type('[data-testid="pt-value"]', "2000");
+await select('[data-testid="pt-scenario"]', scId);
+await p.click('[data-testid="pt-add"]');
+step("producción por año agregada al escenario", await waitText("Producción", 10000));
 
 // 2 · sensibilidad rápida: gas +20 %
 const hasGas = !!(await p.$('[data-testid="sens-gas-add"]'));
 if (hasGas) {
   await p.click('[data-testid="sens-gas-add"]');
-  step("sensibilidad «gas +20 %» creada como escenario", await waitText("+20 %", 10000));
+  step("sensibilidad «gas ×1,5» creada como escenario", await waitText("×1.5", 10000));
 } else {
   await p.click('[data-testid="sens-carbon-add"]');
   step("sensibilidad «carbono» creada como escenario", await waitText("Carbono 100 USD/t", 10000));
@@ -107,6 +117,39 @@ for (let i = 0; i < 40; i++) {
   if (n >= 2) break;
   await sleep(500);
 }
+const layoutOf = () => p.evaluate(async (u, s) => (await (await fetch(`${u}/sites/${s}`)).json()).layout?.properties ?? {}, URL, SITE);
+
+// 2b · biblioteca global: escenario de partida + sensibilidad «desde el año»
+await p.goto(`${URL}/?r=${Date.now()}#/library/scenarios`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid="lib-scen-target"]');
+for (let i = 0; i < 40; i++) {
+  if (await p.evaluate((s) => [...document.querySelectorAll('[data-testid="lib-scen-target"] option')].some((o) => o.value === s), SITE)) break;
+  await sleep(250);
+}
+await select('[data-testid="lib-scen-target"]', SITE);
+await p.waitForFunction(() => !document.querySelector('[data-testid="lib-starter-eo"] button')?.disabled, { timeout: 30000 });
+await p.click('[data-testid="lib-starter-eo"] button');
+step("la biblioteca agrega «Economic Optimum» al sistema", await waitText("Escenario agregado", 10000));
+const libGas = await p.evaluate(() => !document.querySelector('[data-testid="lib-sens-gas-apply"]')?.disabled);
+const sid = libGas ? "gas" : "carbon";
+const setVal = (sel, v) => p.evaluate((sel, v) => {
+  const el = document.querySelector(sel);
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, v);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}, sel, v);
+await setVal(`[data-testid="lib-sens-${sid}"] .sens-row input:not(.sens-year)`, libGas ? "2" : "150");
+await setVal(`[data-testid="lib-sens-${sid}"] .sens-year`, "2030");
+await p.click(`[data-testid="lib-sens-${sid}-apply"]`);
+let lay = {};
+for (let i = 0; i < 40; i++) { lay = await layoutOf(); if ((lay.scenarios ?? []).length >= 4) break; await sleep(500); }
+const eo = (lay.scenarios ?? []).find((x) => x.name === "Economic Optimum");
+const sens = (lay.scenarios ?? []).find((x) => x.sensitivity === sid && /2030/.test(x.name));
+const srows = (lay.params ?? []).filter((x) => x.scenario === sens?.id);
+step(`sensibilidad «${sid} desde 2030» aplicada desde la biblioteca`,
+     !!eo && !!sens && srows.length > 0 && srows.every((x) => x.year === 2030) &&
+     (libGas ? srows.every((x) => x.param === "carrier_price_pct" && +x.value === 100) : srows.some((x) => x.param === "carbon_price" && +x.value === 150)),
+     `${sens?.name} · ${srows.map((x) => `${x.param}=${x.value}@${x.year}`).join(", ")}`);
+
 // 3 · la pestaña Parámetros por escenario en el editor del activo
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/components`, { waitUntil: "networkidle2" });
 await sleep(1500);
@@ -121,6 +164,17 @@ const tab = await p.$('[data-testid="drawer-tab-params"]');
 step("el editor del activo tiene «Parámetros por escenario»", !!tab);
 await tab.click();
 step("la pestaña muestra la tabla de parámetros del activo", !!(await p.waitForSelector('[data-testid="param-table"]', { timeout: 10000 }).catch(() => null)));
+// 3b · el activo pasa a pertenecer a «Economic Optimum»
+await p.click('[data-testid="drawer-tab-data"]').catch(() => {});
+const asel = await p.waitForSelector('[data-testid="asset-scenario-select"]', { timeout: 10000 }).catch(() => null);
+step("el editor del activo tiene «Escenario del activo»", !!asel);
+await select('[data-testid="asset-scenario-select"]', eo.id);
+let eoTech = null;
+for (let i = 0; i < 40 && !eoTech; i++) {
+  eoTech = Object.entries((await layoutOf()).techScenario ?? {}).find(([, v]) => v === eo.id)?.[0];
+  if (!eoTech) await sleep(500);
+}
+step("el activo queda en «Economic Optimum» (guardado en el layout)", !!eoTech, eoTech ?? "");
 
 // 4 · corrida con la pila [Carbono alto] → el carbono 200 llega al motor
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/summary`, { waitUntil: "networkidle2" });
@@ -135,6 +189,13 @@ const pc = await runNamed("Con carbono alto");
 const cfgC = pc?.result?.assumptions?.scenario_config ?? {};
 step("la pila de escenarios llega al motor (carbono 200)", pc?.result?.meta?.feasible && cfgC.carbon_price === 200,
      `carbon_price ${cfgC.carbon_price}`);
+const pvec = pc?.config?.production_by_year ?? [];
+const by = pc?.result?.meta?.base_year ?? cfgC.base_year;
+step("la producción por año viaja con la corrida (2000 desde 2030)",
+     pvec.length > 0 && pvec[pvec.length - 1] === 2000 && (by >= 2030 || pvec[2030 - by] === 2000 && (2030 - by < 1 || pvec[2030 - by - 1] !== 2000)),
+     pvec.join(","));
+step("el activo de «Economic Optimum» no participa si EO no está en la pila",
+     !(pc.result.investments ?? []).some((x) => (x.tech ?? x.tech_id) === eoTech));
 
 // 5 · situación actual (BaU): sin inversiones
 await clickText(".sum-runbar button", "Optimización");
@@ -158,6 +219,29 @@ await p.click('[data-testid="sens-compare"]');
 step("Comparar con Base da tarjetas de decisión",
      !!(await p.waitForSelector('[data-testid="sens-cards"]', { timeout: 900000 }).catch(() => null)) &&
      await waitText("vs Base", 5000));
+
+// 7 · punto de quiebre
+await p.waitForSelector('[data-testid="breakeven"]');
+// CAPEX de la batería (entra en Base): al encarecerla deja de entrar → quiebre
+await select('[data-testid="be-param"]', "capex");
+await sleep(300);
+const batt = await p.evaluate(() => [...document.querySelectorAll('[data-testid="be-watch"] option')].find((o) => /batt|stor/i.test(o.value))?.value);
+if (batt) {
+  await select('[data-testid="be-pick"]', batt);
+  await select('[data-testid="be-watch"]', batt);
+}
+await p.evaluate(() => { const el = document.querySelector('[data-testid="be-hi"]');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "400"); el.dispatchEvent(new Event("input", { bubbles: true })); });
+await p.click('[data-testid="be-run"]');
+const beRes = await p.waitForSelector('[data-testid="be-result"]', { timeout: 1800000 }).catch(() => null);
+const be = beRes && await p.evaluate(() => {
+  const el = document.querySelector('[data-testid="be-result"]');
+  return { status: el.dataset.status, text: el.innerText, tags: [...el.querySelectorAll(".ui-tag")].map((x) => x.textContent) };
+});
+step("el punto de quiebre responde en 8 optimizaciones o menos",
+     !!be && ["found", "always", "never"].includes(be.status) && be.tags.length <= 8 && be.tags.length >= 2 &&
+     (be.status !== "found" || be.tags.length === 8),
+     be ? be.text.split("\n")[0] : (await text()).match(/Con el valor[^\n]*/)?.[0] ?? "sin resultado");
 
 step("sin errores de página", errors.length === 0, errors[0] ?? "");
 await cleanup();

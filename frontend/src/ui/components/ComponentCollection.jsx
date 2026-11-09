@@ -5,6 +5,8 @@ import { IcCheckCircle, IcEdit, IcPinDrop, IcDelete, IcGridView, IcAccountTree,
          IcTableChart, IcExpandMore, IcChevronRight } from "../iconset.jsx";
 import { useState } from "react";
 import { useI18n } from "../i18n.jsx";
+import { useStudio } from "../studio.jsx";
+import { ScenarioChip } from "./ParamTable.jsx";
 import { componentIcon } from "../icons.jsx";
 import { Menu } from "../kit.jsx";
 import { techKind, techStatus, GROUP_ORDER } from "../techkind.js";
@@ -39,6 +41,10 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
   const { t } = useI18n();
   const Ico = componentIcon(tech);
   const st = techStatus(tech, built);
+  // escenario al que pertenece el activo (si no es Base)
+  const { twin } = useStudio();
+  const scId = twin?.layout?.techScenario?.[tech.tech_id];
+  const scen = scId ? (twin.layout.scenarios ?? []).find((x) => x.id === scId) : null;
   return (
     <div className="ui-card ui-comp-card" onClick={() => onOpen?.(tech)} data-testid={`comp-${tech.tech_id}`}>
       <div className="ui-comp-top">
@@ -49,6 +55,7 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="ui-comp-name">{tech.name}</div>
           <div className="ui-comp-type">{t(techKind(tech))}</div>
+          {scen && <div style={{ marginTop: 4 }}><ScenarioChip s={scen} t={t} /></div>}
         </div>
         <Menu items={[
           { label: t("common.edit"), icon: IcEdit, onClick: () => onOpen?.(tech) },

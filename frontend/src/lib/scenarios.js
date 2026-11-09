@@ -7,8 +7,16 @@
 // fijas, permisos, factores de precio, demanda y emisión, carbono por año…),
 // así funciona igual con la API que con el motor web.
 //
-// Almacenamiento: en el layout del sistema (layout.scenarios, layout.params),
-// se guarda con el sitio.
+// Jerarquía: la pila va de ARRIBA hacia abajo (stack[0] es el de arriba). Para
+// cada parámetro y año manda el escenario más alto que lo defina; si no lo
+// define, se busca en el inmediatamente inferior, y al final en Base.
+// Activos por escenario: un activo puede pertenecer a un escenario
+// (layout.techScenario[tech_id]); si ese escenario no está en la pila, el
+// activo no participa (p. ej. tecnologías opcionales solo en "Economic
+// Optimum").
+//
+// Almacenamiento: en el layout del sistema (layout.scenarios, layout.params,
+// layout.techScenario), se guarda con el sitio.
 
 export const BASE = "base";
 
@@ -41,6 +49,7 @@ export const PARAMS = [
   { id: "cap_end", target: "system", es: "Meta neta del año final", en: "Final-year net target", unit: "tCO₂e", year: "none" },
   { id: "capex_budget", target: "system", es: "Presupuesto CAPEX acumulado", en: "Cumulative CAPEX budget", unit: "MUSD", year: "none" },
   { id: "offset_price", target: "system", es: "Precio de compensaciones", en: "Offset price", unit: "USD/tCO₂e", year: "optional" },
+  { id: "production", target: "system", es: "Producción", en: "Production", unit: "unidades/año", year: "optional" },
   { id: "capex_subsidy", target: "system", es: "Subsidio a la inversión", en: "Investment subsidy", unit: "% del CAPEX", year: "none" },
 ];
 export const paramDef = (id) => PARAMS.find((p) => p.id === id);
@@ -49,9 +58,9 @@ export const paramsFor = (target) => PARAMS.filter((p) => p.target === target);
 /** Etiqueta del parámetro en el idioma de la interfaz. */
 export const paramLabel = (id, lang) => { const p = paramDef(id); return p ? (lang === "en" ? p.en : p.es) : id; };
 
-/** Filas vigentes para una pila: Base primero y luego cada capa (la última manda). */
+/** Filas vigentes para una pila (stack[0] = el de arriba, que manda). */
 export function effectiveRows(params, stack = []) {
-  const order = [BASE, ...stack.filter((s) => s !== BASE)];
+  const order = [BASE, ...[...stack].reverse().filter((s) => s !== BASE)];   // de abajo hacia arriba
   const key = (r) => `${r.target}|${r.param}|${r.year ?? ""}`;
   const out = new Map();
   for (const sc of order)
@@ -81,8 +90,15 @@ function stepVector(cfg, rows, base) {
  */
 export function resolveScenarios(siteJson0, cfg0, store, stack = []) {
   const rows = effectiveRows(store?.params, stack);
-  if (!rows.length) return { siteJson: siteJson0, cfg: cfg0, rows };
+  // activos de escenarios fuera de la pila: no participan
+  const active = new Set([BASE, ...stack]);
+  const off = Object.entries(store?.techScenario ?? {}).filter(([, sc]) => sc && !active.has(sc)).map(([id]) => id);
+  if (!rows.length && !off.length) return { siteJson: siteJson0, cfg: cfg0, rows };
   const siteJson = clone(siteJson0), cfg = clone(cfg0);
+  for (const id of off) {
+    const x = siteJson.technologies.find((t) => t.tech_id === id);
+    if (x) { x.investable = false; x.max_new_capacity = 0; x.existing_capacity = 0; }
+  }
   const tech = (id) => siteJson.technologies.find((t) => t.tech_id === id);
   const market = (id) => (siteJson.markets ?? []).find((m) => m.market_id === id);
   const yf = (kind, target, pts) => {
@@ -181,6 +197,14 @@ export function resolveScenarios(siteJson0, cfg0, store, stack = []) {
       case "demand_growth": cfg.demand_growth = last(rs).value / 100; break;
       case "cap_end": cfg.emissions_cap_net_end = +last(rs).value; break;
       case "capex_budget": cfg.capex_budget_musd = +last(rs).value; break;
+      case "production": {
+        // no entra al motor: fija la producción de cada año para los
+        // resultados por unidad producida (escalón desde cada año)
+        const meta = +(store?.meta?.production ?? 0);
+        const base = noYear.length ? +last(noYear).value : (meta > 0 ? meta : null);
+        cfg.production_by_year = stepVector(cfg, withYear, base);
+        break;
+      }
       case "capex_subsidy": {
         const f = 1 - last(rs).value / 100;
         for (const x of siteJson.technologies) if (x.investable) x.capex_per_kw = (x.capex_per_kw ?? 0) * f;
@@ -189,7 +213,7 @@ export function resolveScenarios(siteJson0, cfg0, store, stack = []) {
       default: break;
     }
   }
-  return { siteJson, cfg, rows };
+  return { siteJson, cfg, rows, off };
 }
 
 /** Escenarios del sistema (layout) con el número de filas de cada uno. */
