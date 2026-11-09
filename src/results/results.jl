@@ -26,6 +26,7 @@ struct Results
     measures::DataFrame                 # medidas de eficiencia compradas (5.3): id, name, year
     storage_energy::DataFrame           # almacenamiento (R2): tech, year, mwh, new_mwh
     mip_gap::Float64                    # brecha al óptimo del plan entregado (0 = óptimo)
+    by_source::DataFrame                # energía y CO₂ por fuente y año (extract_by_source)
 end
 
 """
@@ -57,12 +58,13 @@ function extract_results(im::IETOModel; scenario::Symbol = :emissions_cap,
         _measures_bought(im),
         _storage_energy(im),
         plan_gap(im.model),
+        extract_by_source(im),
     )
     # años hito (R6): las tablas llevan el año RELATIVO real, no el índice
     ry = im.sets.year_of
     if ry != collect(im.sets.years)
         for df in (r.new_capacity, r.available_capacity, r.dispatch, r.cost_breakdown,
-                   r.emissions, r.measures, r.storage_energy)
+                   r.emissions, r.measures, r.storage_energy, r.by_source)
             hasproperty(df, :year) && (df.year = [ry[y] for y in df.year])
         end
         for (t, y) in r.investment_year
@@ -109,7 +111,7 @@ function infeasible_results(site::Site, cfg::ScenarioConfig, scenario::Symbol,
                             status::Symbol, diagnostics::Vector{String} = String[])
     return Results(site.name, scenario, cfg, status, false, cfg.horizon_years,
                    NaN, NaN, Dict{Symbol,Int}(), DataFrame(), DataFrame(),
-                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame(), DataFrame(), NaN)
+                   DataFrame(), DataFrame(), DataFrame(), Float64[], diagnostics, DataFrame(), DataFrame(), NaN, DataFrame())
 end
 
 _fmt(x; d = 1) = isnan(x) ? "—" : string(round(x; digits = d))

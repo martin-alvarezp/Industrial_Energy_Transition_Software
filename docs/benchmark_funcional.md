@@ -718,3 +718,11 @@ días tipo (k por año) con cronología.
   el Resumen lo avisa; solo sin ningún plan la corrida queda sin solución. El
   navegador ya no corta corridas largas. Tests en test_solver_limits.jl y
   `verify:solver`.
+- ✅ **Energía y CO₂ por fuente** (2026-11-08). `by_source` en los resultados
+  (y en el JSON): por año, cada compra de mercado (MWh, alcance 2), combustible
+  quemado (MWh, alcance 1; su energía no se cuenta dos veces si además se
+  compra en un mercado), generación propia y crédito por ventas. Σ alcance 1 y
+  Σ alcance 2 cuadran con los del motor (test_by_source.jl; `verify:wasm` lo
+  comprueba también en el motor web). Con la unidad producida y la producción
+  anual del sistema, el Resumen lo muestra por unidad (kWh y kg CO₂e por
+  unidad) junto al costo por unidad.

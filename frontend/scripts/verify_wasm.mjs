@@ -31,8 +31,14 @@ for (const f of readdirSync(goldenDir).filter((x) => x.endsWith(".json"))) {
       // extracción: el payload debe cuadrar con el solver por construcción
       const pay = extractPayload(g.site, g.config, sol, constant, g.name);
       const relPay = Math.abs(pay.kpis.npv - npv) / Math.abs(npv);
-      const emisOk = pay.emissions.every((e) =>
-        Math.abs(e.gross - (e.scope1 + e.scope2)) < 1e-5);
+      // highs-js entrega ~6 cifras: el alcance 2 del año sale de bruto − alcance 1,
+      // así que la cota es relativa al bruto del año
+      const emisOk = pay.emissions.every((e, _, __, near = (a, b) =>
+        Math.abs(a - b) <= 1e-5 * Math.max(1, Math.abs(e.gross), Math.abs(e.scope1), Math.abs(b))) =>
+        Math.abs(e.gross - (e.scope1 + e.scope2)) < 1e-5 &&
+        // energía y CO₂ por fuente: Σ alcance 1 y 2 de las fuentes = los del año
+        near(pay.by_source.filter((r) => r.year === e.year).reduce((a, r) => a + r.scope1, 0), e.scope1) &&
+        near(pay.by_source.filter((r) => r.year === e.year).reduce((a, r) => a + r.scope2, 0), e.scope2));
       // el VAN se compara con el objetivo de HiGHS (precisión completa); el
       // payload se recalcula con los valores de las variables, que highs-js
       // entrega con ~6 cifras significativas (2,66667 por 8/3): su cota es

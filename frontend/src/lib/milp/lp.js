@@ -190,6 +190,22 @@ export const buildAllowedAt = (cfg, tech, yo, k) => {
   const lo = k === 1 ? -Infinity : yo[k - 2] + 1;
   return relYear(cfg, w[0]) <= yo[k - 1] && relYear(cfg, w[1]) >= lo;
 };
+/** Factor de emisión (alcance 2) de cada mercado por año (espejo M7/M11). */
+export function marketEfTable(cfg, mkts, catOf, efTab, gridCarrier, years, yr) {
+  const out = {};
+  for (const mk of mkts) {
+    let v;
+    if (mk.direction !== "buy" || catOf[mk.carrier_id] === "fuel") v = years.map(() => 0);
+    else if (mk.emission_factor != null) v = years.map(() => mk.emission_factor);
+    else {
+      const base = efTab[`${mk.carrier_id}|scope2`] ?? 0;
+      const onGrid = mk.carrier_id === gridCarrier;
+      v = years.map((y) => (onGrid && cfg.grid_ef_by_year?.length ? cfg.grid_ef_by_year[yr(y) - 1] : base));
+    }
+    out[mk.market_id] = v.map((x, i) => x * yearFactor(cfg, "emission_factor", mk.market_id, yr(i + 1)));
+  }
+  return out;
+}
 /** Plazo, tasa y deuda de una compra (R27), espejo de capex_pv/capex_charge. */
 const finTerms = (cfg, id, life = Infinity) => {
   if ((cfg.capex_accounting ?? "annuity") !== "annuity") return { n: 0, a: 0, ds: 0 };
@@ -438,20 +454,7 @@ export function buildLP(site0, cfg0, opts = {}) {
     .filter((c) => BALANCED.includes(catOf[c]) || fuelWithMkt.has(c));
 
   // factor de emisión del mercado por año (espejo M7/M11)
-  const mktEF = {};
-  for (const mk of mkts) {
-    if (mk.direction !== "buy" || catOf[mk.carrier_id] === "fuel") {
-      mktEF[mk.market_id] = years.map(() => 0);
-    } else if (mk.emission_factor != null) {
-      mktEF[mk.market_id] = years.map(() => mk.emission_factor);
-    } else {
-      const base = efTab[`${mk.carrier_id}|scope2`] ?? 0;
-      const onGrid = mk.carrier_id === gridCarrier;
-      mktEF[mk.market_id] = years.map((y) =>
-        onGrid && cfg.grid_ef_by_year?.length ? cfg.grid_ef_by_year[yr(y) - 1] : base);
-    }
-    mktEF[mk.market_id] = mktEF[mk.market_id].map((v, i) => v * yearFactor(cfg, "emission_factor", mk.market_id, yr(i + 1)));
-  }
+  const mktEF = marketEfTable(cfg, mkts, catOf, efTab, gridCarrier, years, yr);
 
   // vida útil: existente vivo hasta remaining (0 = siempre; renew ⇒ siempre)
   // R21: con renew_techs solo esas se renuevan (vacío = todas)

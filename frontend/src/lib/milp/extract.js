@@ -3,7 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
-import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies, byYearAt,
+import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies, byYearAt, marketEfTable,
   modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
@@ -213,6 +213,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const cost_breakdown = [];
   const emissions = [];
   const capWarn = [];   // R24
+  const by_source = [];   // energía y CO₂ por fuente
+  const mktEF = marketEfTable(cfg, mkts, catOf, efTab, gridCarrier, years, yr);
+  const boughtC = new Set(buys.map((m) => m.carrier_id));
   const res_share = [];
   const EMs = (cfg.efficiency_measures ?? []).filter((em) => site.demands?.[em.carrier]);
   const efficiency_measures = [];
@@ -328,6 +331,39 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     }
     const ge = V(`ge_${y}`), ne = V(`ne_${y}`), off = V(`off_${y}`);
     s2 = ge - s1;
+    // energía y CO₂ por fuente (espejo de extract_by_source)
+    {
+      const flowE = (mk) => steps.reduce((a, s) => a + V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y), 0);
+      for (const mk of buys) {
+        const e = flowE(mk);
+        by_source.push({ year: y, source: mk.market_id, kind: "market", carrier: mk.carrier_id,
+                         mwh: e, scope1: 0, scope2: mktEF[mk.market_id][y - 1] * e, energy: true });
+      }
+      const burn = {};
+      for (const cv of convs) for (const p of portsOf(cv).ins)
+        if (catOf[p.carrier] === "fuel")
+          for (const s of steps)
+            burn[p.carrier] = (burn[p.carrier] ?? 0) +
+              p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * W(s, y);
+      for (const [c, e] of Object.entries(burn))
+        by_source.push({ year: y, source: c, kind: "fuel", carrier: c, mwh: e,
+                         scope1: (efTab[`${c}|scope1`] ?? 0) * e, scope2: 0, energy: !boughtC.has(c) });
+      for (const g of gens) {
+        const e = steps.reduce((a, s) => a + V(`d_${sane(g.tech_id)}_${s}_${y}`) * W(s, y), 0);
+        by_source.push({ year: y, source: g.tech_id, kind: "generation", carrier: g.output_carrier, mwh: e,
+                         scope1: (cfg.generator_scope1_ef?.[g.tech_id] ?? 0) * e,
+                         scope2: (cfg.generator_ef?.[g.tech_id] ?? 0) * yearFactor(cfg, "emission_factor", g.tech_id, yr(y)) * e,
+                         energy: true });
+      }
+      if (cfg.export_emission_credit)
+        for (const mk of sells) {
+          const e = flowE(mk);
+          const f = (mk.emission_factor ?? efTab[`${mk.carrier_id}|scope2`] ?? 0) *
+            yearFactor(cfg, "emission_factor", mk.market_id, yr(y));
+          if (e > 0) by_source.push({ year: y, source: mk.market_id, kind: "sale", carrier: mk.carrier_id,
+                                      mwh: e, scope1: 0, scope2: -f * e, energy: false });
+        }
+    }
     for (const g of gens) for (const s of steps)
       resGen += V(`d_${sane(g.tech_id)}_${s}_${y}`) * W(s, y);
     for (const [c, series0] of Object.entries(site.demands ?? {}))
@@ -411,7 +447,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       total_offsets: emissions.reduce((a, e) => a + e.offsets, 0),
       res_share_final: res_share[N - 1],
     },
-    investments, capacity, cost_breakdown, emissions, res_share, dispatch, efficiency_measures,
+    investments, capacity, cost_breakdown, emissions, res_share, dispatch, efficiency_measures, by_source,
     // energía de cada almacenamiento por año (R2), espejo de Results.storage_energy
     storage_energy: stors.flatMap((st) => years.map((y) => {
       const en = years.filter((yp) => yp <= y && yr(y) - yr(yp) < st.lifetime_years);
@@ -434,7 +470,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   // años hito (R6): las tablas llevan el año relativo real, no el índice
   if (yo.some((r, i) => r !== i + 1)) {
     for (const k of ["investments", "capacity", "cost_breakdown", "emissions", "dispatch",
-                     "efficiency_measures", "storage_energy"])
+                     "efficiency_measures", "storage_energy", "by_source"])
       for (const r of out[k]) r.year = yr(r.year);
     for (const r of out.capacity) if (r.investment_year != null) r.investment_year = yr(r.investment_year);
   }
