@@ -51,3 +51,15 @@ end
     site, cfg = carbon_site()
     @test_throws IETO.ValidationError validate_scenario(with_config(cfg; emission_cap_mode = :blanda), site)
 end
+
+@testset "R24: infactible por otra causa ⇒ se informa INFEASIBLE, no «sin resolver»" begin
+    # demanda de calor imposible de cubrir: con topes relajados sigue infactible
+    for mode in (:relax, :hard)
+        site, cfg = carbon_site()
+        site = IETO._with(site; demands = Dict(:heat => Demand(:heat, fill(1e7, 24))))
+        im = build_model(site, with_config(cfg; emissions_cap_gross = 5000.0, emission_cap_mode = mode))
+        solve!(im)
+        @test JuMP.termination_status(im.model) in (JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED)
+        @test !has_plan(im.model)
+    end
+end

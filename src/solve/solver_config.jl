@@ -63,7 +63,11 @@ function solve_relaxed_caps!(im::IETOModel)
     obj = JuMP.objective_function(m)
     JuMP.@objective(m, Min, sum(sl))
     JuMP.optimize!(m)
-    has_plan(m) || (JuMP.@objective(m, Min, obj); return im)
+    # sin plan ni aun relajando los topes: el problema es infactible por OTRA
+    # causa. Se deja el modelo tal cual (estado INFEASIBLE del intento relajado);
+    # volver a poner el objetivo original lo dejaría en OPTIMIZE_NOT_CALLED y
+    # la corrida se informaría como «no resuelta» en vez de «infactible».
+    has_plan(m) || return im
     smin = JuMP.objective_value(m)
     m[:cap_shortfall_total] = JuMP.@constraint(m, sum(sl) <= smin + 1e-6 * max(1.0, smin))
     JuMP.@objective(m, Min, obj)
