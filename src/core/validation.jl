@@ -602,7 +602,7 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         "emission_cap_mode: '$(cfg.emission_cap_mode)' desconocido (hard | relax)")
     cfg.milestone_weighting in (:none, :years) || push!(problems,
         "milestone_weighting: '$(cfg.milestone_weighting)' desconocido (none | years)")
-    # R28–R30 (estudio prosumer)
+    # R28–R30 (estudio de referencia)
     cfg.intermediate_prices in (:milestone, :own_year) || push!(problems,
         "intermediate_prices: '$(cfg.intermediate_prices)' desconocido (milestone | own_year)")
     cfg.max_new_mode in (:per_build, :alive) || push!(problems,

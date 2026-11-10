@@ -63,7 +63,7 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
             sum(build[t, y] for y in years) <= 1)
     end
 
-    # R30 (estudio prosumer): O&M fijo POR INSTALACIÓN — un costo anual mientras
+    # R30 (estudio de referencia): O&M fijo POR INSTALACIÓN — un costo anual mientras
     # haya alguna compra viva de la tecnología (una vez, aunque se amplíe en
     # otro hito). installed ∈ [0,1] ≥ cada compra viva; el objetivo lo empuja a
     # su mínimo, que es 1 si hubo compra y 0 si no.

@@ -630,7 +630,7 @@ struct ScenarioConfig
     day_sequence_by_year::Dict{Int,Vector{String}}       # año → día tipo de cada día del año (365)
     price_profiles_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → precio por paso (reemplaza la forma)
     market_availability_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → disponibilidad por paso
-    # ── estudio prosumer ──
+    # ── estudio de referencia ──
     intermediate_prices::Symbol              # R28: años entre hitos valorados con :milestone (los del hito)
                                              # o :own_year (la operación del hito con los precios de cada año)
     investment_lead_years::Int               # R29: la inversión se paga N años ANTES de operar (0 = en el año del hito)

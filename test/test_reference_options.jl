@@ -1,4 +1,4 @@
-# Opciones del estudio prosumer (otro simulador de referencia):
+# Opciones del estudio de referencia (otro simulador):
 # R29 la inversión se paga N años antes de operar; R30 O&M fijo por
 # instalación (un costo anual mientras haya alguna compra viva, una sola vez
 # aunque se amplíe). R28 (interpolación lineal entre hitos) está en

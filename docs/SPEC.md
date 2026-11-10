@@ -75,7 +75,7 @@ OffsetCost_y   = offset_price · offset_buy[y]
 ExportRevenue_y= Σ_step price_export[step,y]·grid_export_p[step,y]·weight_hours[step]
 ```
 
-**Nota clave vs v0.1:** no hay factor de anualidad (CRF). El CAPEX completo se paga en el año de la inversión y se descuenta con `(1+wacc)^y`, igual que el resto de los flujos. Esto es más simple y coincide con cómo herramientas de referencia del sector (p. ej. PROSUMER de Tractebel/ENGIE) optimizan sobre la duración real del proyecto.
+**Nota clave vs v0.1:** no hay factor de anualidad (CRF). El CAPEX completo se paga en el año de la inversión y se descuenta con `(1+wacc)^y`, igual que el resto de los flujos. Esto es más simple y coincide con cómo herramientas de referencia del sector optimizan sobre la duración real del proyecto.
 
 ## 7. Restricciones (todas indexadas por año `y`, salvo donde se indique)
 

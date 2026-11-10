@@ -384,7 +384,7 @@ let sj = JSON3.read(JSON3.write(site_json(site0)), Dict{String,Any})
          with_config(cfg0; horizon_years = 3))
 end
 
-# R28 · años entre hitos con los precios de su propio año (estudio prosumer):
+# R28 · años entre hitos con los precios de su propio año (estudio de referencia):
 # hitos calendario con escalación del gas y de la electricidad y factores por año
 dump("demo_precios_propio_anio_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
      milestone_years = [2026, 2028, 2031, 2035], intermediate_prices = :own_year,
@@ -392,7 +392,7 @@ dump("demo_precios_propio_anio_n10", site0, with_config(cfg0; horizon_years = 10
 # R32 · tope de capacidad nueva de lo comprado y vivo (con compras repetibles)
 dump("demo_tope_vivo_n6", site0, with_config(cfg0; horizon_years = 6, repeat_investments = true, max_new_mode = :alive,
      milestone_years = [1, 3, 5], intermediate_prices = :own_year, price_escalation = Dict(:electricity => 0.08)))
-# R29 · la inversión se paga un año antes de operar (estudio prosumer)
+# R29 · la inversión se paga un año antes de operar (estudio de referencia)
 dump("demo_inversion_anticipada_n5", site0, with_config(cfg0; horizon_years = 5, investment_lead_years = 1))
 # R30 · O&M fijo por instalación, con compras repetibles (se paga una vez por año)
 dump("demo_om_por_instalacion_n5", site0, with_config(cfg0; horizon_years = 5, repeat_investments = true,

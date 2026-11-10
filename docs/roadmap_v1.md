@@ -323,7 +323,7 @@ queda aislado).
 ## 6 · Brechas COMERCIALES (para venderlo — prioridad 3, pero empezar ya)
 
 - **C1 Validación y credibilidad**: benchmark reproducible contra
-  herramientas de referencia (energyPRO, HOMER, PROSUMER-like) sobre 2-3
+  herramientas de referencia (energyPRO, HOMER y similares) sobre 2-3
   casos publicados; white paper metodológico (methodology.md es la semilla);
   **1-2 pilotos internos documentados con ahorro real** — el activo de venta
   más valioso.
