@@ -8,13 +8,15 @@ import { NAV_ICONS } from "../icons.jsx";
 import { hrefFor, navigate } from "../router.js";
 import ComponentCollection, { ViewToggle, countLabel } from "../components/ComponentCollection.jsx";
 import useComponentEditor from "../components/useComponentEditor.jsx";
-import { locationOf } from "../layout.js";
+import { locationOf, nodeOf, assignToNode } from "../layout.js";
+import { MoveToNodeModal } from "../components/SystemPanel.jsx";
 import { TECH_TYPE_META } from "../../lib/twin.js";
 
 
 export default function ComponentsPage({ route }) {
   const { t } = useI18n();
-  const { siteName, twin, data, viewing } = useStudio();
+  const { siteName, twin, data, viewing, patchLayout } = useStudio();
+  const [moving, setMoving] = useState(null);
   const [view, setView] = useStored("ieto.comp.view", "grid");
   const [q, setQ] = useState("");
   const [loc, setLoc] = useState("");
@@ -33,7 +35,8 @@ export default function ComponentsPage({ route }) {
   }, [data, viewing, siteName]);
   const techs = siteJson.technologies.filter((x) => x.tech_id !== "offsets")
     .filter((x) => !q || `${x.name} ${x.tech_id}`.toLowerCase().includes(q.toLowerCase()))
-    .filter((x) => !loc || (loc === "_none" ? !locationOf(layout, x.tech_id) : locationOf(layout, x.tech_id) === loc))
+    .filter((x) => !loc || (loc === "_none" ? !locationOf(layout, x.tech_id)
+      : loc.startsWith("n:") ? nodeOf(layout, x.tech_id) === loc.slice(2) : locationOf(layout, x.tech_id) === loc))
     .filter((x) => !type || x.type === type);
   return (
     <div className="ui-page">
@@ -45,6 +48,7 @@ export default function ComponentsPage({ route }) {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("comp.search")} /></div>
         <select className="ui-select" style={{ width: 220 }} value={loc} onChange={(e) => setLoc(e.target.value)}>
           <option value="">{t("comp.allLocations")}</option>
+          {(layout.nodes ?? []).map((n) => <option key={"n:" + n.id} value={"n:" + n.id}>{t("node.node")}: {n.name}</option>)}
           {(layout.locations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           <option value="_none">{t("panel.unassigned")}</option>
         </select>
@@ -57,9 +61,16 @@ export default function ComponentsPage({ route }) {
       </div>
       <ComponentCollection techs={techs} layout={layout} view={view} builtYears={builtYears}
                            onOpen={ed.open} onDelete={ed.remove}
+                           onMoveNode={(layout.nodes ?? []).length ? setMoving : undefined}
                            onLocate={(x) => navigate(hrefFor({ site: siteName, page: "infrastructure",
                              query: locationOf(layout, x.tech_id) ? { loc: locationOf(layout, x.tech_id), tab: "components" } : {} }))} />
       {ed.node}
+      {moving && (
+        <MoveToNodeModal tech={moving} layout={layout} onClose={() => setMoving(null)}
+                         onMove={(to) => { patchLayout((l) => assignToNode(l, [moving.tech_id], to),
+                           to ? `Componente '${moving.name}' movido al nodo '${layout.nodes.find((n) => n.id === to)?.name}'`
+                              : `Componente '${moving.name}' sin nodo`); setMoving(null); }} />
+      )}
     </div>
   );
 }

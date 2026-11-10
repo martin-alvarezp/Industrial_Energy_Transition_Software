@@ -67,7 +67,7 @@ const XLSX_SHEETS = ["Resumen", "VAN_por_anio", "Capacidades", "Dispatch",
           parsed.emissions[1].gross rtol = 1e-6
     @test length(parsed.res_share) == 10
     @test length(parsed.cost_breakdown) == 10
-    @test length(parsed.dispatch) == 9 * 96 * 10
+    @test length(parsed.dispatch) == (9 + 2) * 96 * 10   # + flujo de los 2 mercados del demo
     @test !isempty(parsed.investments)
     @test parsed.investments[1].year isa Int
     @test length(parsed.scenarios) == 2

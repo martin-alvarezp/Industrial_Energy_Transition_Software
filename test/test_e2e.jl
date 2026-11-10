@@ -54,9 +54,9 @@ _e2e_post(path, body) = HTTP.post(E2E * path;
         end
         @test length(p.cost_breakdown) == 6
         @test sum(r.npv for r in p.cost_breakdown) ≈ p.kpis.npv rtol = 1e-6
-        @test length(p.dispatch) == 9 * 96 * 6
+        @test length(p.dispatch) == (9 + 2) * 96 * 6   # + flujo de los 2 mercados
         flows = Set(String(d.flow) for d in p.dispatch)
-        @test flows == Set(["output", "charge", "discharge", "soc", "import", "export"])
+        @test flows == Set(["output", "charge", "discharge", "soc", "import", "export", "market"])
 
         # pareto (el explorador)
         pr = JSON3.read(_e2e_post("/pareto",

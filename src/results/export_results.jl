@@ -261,6 +261,8 @@ function results_payload(r::Results;
         efficiency_measures = feas ? _json_rows(r.measures) : [],   # 5.3
         storage_energy = feas ? _json_rows(r.storage_energy) : [],   # R2
         by_source = feas ? _json_rows(r.by_source) : [],             # energía y CO₂ por fuente
+        by_tech = feas ? _json_rows(r.by_tech) : [],                 # costos por activo
+        by_market = feas ? _json_rows(r.by_market) : [],             # energía y costos por mercado
         scenarios = scenarios === nothing ? nothing : _json_rows(scenarios),
         pareto = pareto === nothing ? nothing : _json_rows(pareto),
         dispatch = (feas && include_dispatch) ? _json_rows(r.dispatch) : nothing,

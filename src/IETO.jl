@@ -54,6 +54,7 @@ include("results/extract_dispatch.jl")
 include("results/financials.jl")
 include("results/emissions_summary.jl")
 include("results/by_source.jl")
+include("results/by_tech.jl")
 include("results/results.jl")
 
 # solve: configuración de HiGHS, escenarios predefinidos y lote (SPEC §11-12)
@@ -94,7 +95,7 @@ export add_constraints!, add_carrier_balance!,
        add_storage_constraints!, add_grid_constraints!, add_arc_constraints!,
        add_emissions_constraints!, add_budget_constraint!, net_cap_shadow_prices
 # solve + results
-export SolverConfig, configure_solver!, solve!, has_plan, plan_gap, extract_by_source, solve_relaxed_caps!, cap_shortfall, run_scenario, apply_scenario,
+export SolverConfig, configure_solver!, solve!, has_plan, plan_gap, extract_by_source, extract_by_tech, extract_by_market, solve_relaxed_caps!, cap_shortfall, run_scenario, apply_scenario,
        with_config, PREDEFINED_SCENARIOS, run_batch, pareto_sweep, export_table,
        diagnose_infeasibility, diagnostic_messages, InfeasibilityFinding,
        budget_floor,

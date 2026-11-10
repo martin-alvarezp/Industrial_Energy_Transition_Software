@@ -32,7 +32,7 @@ const SYSTEM_PAGES = {
   costs: results("CostsPage"),
   operation: results("OperationPage"),
   rlocations: results("ResultsLocationsPage"),
-  rcomponents: results("ResultsComponentsPage"),
+  rcomponents: lazy(() => import("./pages/ComponentResultsPage.jsx")),
   dashboards: results("DashboardsPage"),
 };
 const LIBRARY_PAGES = {

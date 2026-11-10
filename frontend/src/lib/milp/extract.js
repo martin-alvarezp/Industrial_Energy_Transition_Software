@@ -131,6 +131,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       .reduce((a, m) => a + V(`mf_${sane(m.market_id)}_${s}_${y}`), 0);
     dispatch.push({ tech: "grid", flow: "import", year: y, step: s, value: gi });
     dispatch.push({ tech: "grid", flow: "export", year: y, step: s, value: ge });
+    // flujo de cada mercado (compra o venta, MW ≥ 0): menú Componentes → Mercados
+    for (const mk of [...buys, ...sells].sort((a, b) => a.market_id.localeCompare(b.market_id)))
+      dispatch.push({ tech: mk.market_id, flow: "market", year: y, step: s, value: V(`mf_${sane(mk.market_id)}_${s}_${y}`) });
     // arcos (M14): flujo NETO por (arco, vector) = enviado ida − vuelta. Los
     // bidireccionales emiten además el GROSS, sin el cual un arco que se
     // invierte durante el año se cancelaría al agregar (ver extract_dispatch.jl
@@ -214,6 +217,10 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const emissions = [];
   const capWarn = [];   // R24
   const by_source = [];   // energía y CO₂ por fuente
+  // costos por activo y por mercado (espejo de extract_by_tech / extract_by_market)
+  const BT = {}, BM = {};
+  const bt = (id, y) => ((BT[id] ??= {}))[y] ??= { capex: 0, fixed_opex: 0, var_opex: 0, fuel_cost: 0, afrr_revenue: 0 };
+  const bm = (id, y) => ((BM[id] ??= {}))[y] ??= { mwh: 0, energy_cost: 0, revenue: 0, demand_charge: 0 };
   const mktEF = marketEfTable(cfg, mkts, catOf, efTab, gridCarrier, years, yr);
   const boughtC = new Set(buys.map((m) => m.carrier_id));
   const res_share = [];
@@ -234,11 +241,14 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     // O&M fijo por MWh de energía del almacenamiento (R19)
     for (const st of stors) {
       const c = cfg.storage_energy_fixed_opex?.[st.tech_id] ?? 0;
-      if (c > 0) fixed += c * storageMwh(st, y);
+      if (c > 0) { fixed += c * storageMwh(st, y); bt(st.tech_id, y).fixed_opex += c * storageMwh(st, y); }
     }
     // medidas de eficiencia (5.3) y su O&M fijo mientras están activas (R10)
     for (const em of EMs)
-      for (let yp = 1; yp <= y; yp++) fixed += (cfg.measure_fixed_opex?.[em.id] ?? 0) * V(`em_${sane(em.id)}_${yp}`);
+      for (let yp = 1; yp <= y; yp++) {
+        const c = (cfg.measure_fixed_opex?.[em.id] ?? 0) * V(`em_${sane(em.id)}_${yp}`);
+        fixed += c; bt(em.id, y).fixed_opex += c;
+      }
     for (const em of EMs) {
       const on = V(`em_${sane(em.id)}_${y}`);
       capex += em.capex * capexFactor(cfg, em.id, yr(y)) * on;
@@ -247,58 +257,76 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         year: y, reduction: em.reduction, capex: em.capex * capexFactor(cfg, em.id, yr(y)) });
     }
     for (const t of [...convs, ...gens, ...stors]) {
-      fixed += t.fixed_opex * yearFactor(cfg, "fixed_opex", t.tech_id, yr(y)) * availOf(t, y);
+      const fo = t.fixed_opex * yearFactor(cfg, "fixed_opex", t.tech_id, yr(y)) * availOf(t, y);
+      fixed += fo; bt(t.tech_id, y).fixed_opex += fo;
       for (const s of steps) {
         const v = t.type === "storage" ? V(`dc_${sane(t.tech_id)}_${s}_${y}`)
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
-        varop += t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, yr(y)) * v * W(s, y);
+        const vo = t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, yr(y)) * v * W(s, y);
+        varop += vo; bt(t.tech_id, y).var_opex += vo;
       }
       // (la carga desplazada de 5.4 se suma después, una vez por año)
       // arranques (2.1): parte del OPEX variable, como en Julia
       if (t.type === "converter" && (t.startup_cost ?? 0) > 0 && hasCommitment(t) && unitMw(t) > 0)
-        for (const s of steps)
-          varop += t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
-                   W(s, y) / (ts[s - 1].duration_hours ?? 1);
+        for (const s of steps) {
+          const su = t.startup_cost * V(`su_${sane(t.tech_id)}_${s}_${y}`) *
+                     W(s, y) / (ts[s - 1].duration_hours ?? 1);
+          varop += su; bt(t.tech_id, y).var_opex += su;
+        }
     }
     // reserva aFRR (5.6): ingreso, junto a las ventas
     for (const t of afrrParticipants(cfg, convs, stors))
-      for (const s of steps)
-        exportRev += W(s, y) * ((cfg.afrr_price_up ?? 0) * V(`aup_${sane(t.tech_id)}_${s}_${y}`) +
-                                 (cfg.afrr_price_down ?? 0) * V(`adn_${sane(t.tech_id)}_${s}_${y}`));
+      for (const s of steps) {
+        const r = W(s, y) * ((cfg.afrr_price_up ?? 0) * V(`aup_${sane(t.tech_id)}_${s}_${y}`) +
+                             (cfg.afrr_price_down ?? 0) * V(`adn_${sane(t.tech_id)}_${s}_${y}`));
+        exportRev += r; bt(t.tech_id, y).afrr_revenue += r;
+      }
     // carga desplazada (5.4): costo por MWh movido, en el OPEX variable
     if ((cfg.flex_cost ?? 0) > 0)
       for (const [c, f] of Object.entries(cfg.demand_flexibility ?? {}))
         if (f > 0 && site.demands?.[c])
           for (const s of steps) varop += cfg.flex_cost * V(`fdn_${sane(c)}_${s}_${y}`) * W(s, y);
-    for (const mk of buys) for (const s of steps)
-      energy += PX(mk, s, y) *
-                V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
+    for (const mk of buys) for (const s of steps) {
+      const f = V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
+      energy += PX(mk, s, y) * f;
+      bm(mk.market_id, y).energy_cost += PX(mk, s, y) * f;
+      bm(mk.market_id, y).mwh += f;
+    }
     for (const cv of convs) for (const p of portsOf(cv).ins)
       if (catOf[p.carrier] === "fuel" && !fuelWithMkt.has(p.carrier) &&
           site.prices?.[p.carrier])
-        for (const s of steps)
-          energy += site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
+        for (const s of steps) {
+          const c = site.prices[p.carrier][s - 1] * esc(p.carrier, y) *
                     p.ratio * inputFactor(cfg, cv.tech_id, p.carrier, s, yr(y)) * drive(cv, s, y) * W(s, y);
+          energy += c; bt(cv.tech_id, y).fuel_cost += c;
+        }
     for (const mk of buys) {
       const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
       const dc = (mk.demand_charge ?? 0) * fdc, cp = mk.contracted_power,
             pen = (mk.excess_penalty ?? 0) * fdc;
       if (!(dc > 0 || (cp != null && pen > 0))) continue;
-      for (let se = 1; se <= nse; se++)
-        dcharges += cp != null
+      for (let se = 1; se <= nse; se++) {
+        const c = cp != null
           ? dc * 1000 * monthsSe * cp +
             pen * 1000 * monthsSe * V(`ex_${sane(mk.market_id)}_${se}_${y}`)
           : dc * 1000 * monthsSe * V(`pk_${sane(mk.market_id)}_${se}_${y}`);
+        dcharges += c; bm(mk.market_id, y).demand_charge += c;
+      }
     }
     // tarifa de red (4.3): entra a los cargos por demanda, como en Julia
     for (const mk of mkts.filter(hasTariff)) {
       const id = sane(mk.market_id);
-      if ((mk.uh_threshold ?? 0) > 0)
-        dcharges += 1000 * ((mk.uh_high_capacity ?? 0) * V(`uhph_${id}_${y}`) +
-                            (mk.uh_low_capacity ?? 0) * V(`uhpl_${id}_${y}`)) +
-                    (mk.uh_high_energy ?? 0) * V(`uheh_${id}_${y}`) +
-                    (mk.uh_low_energy ?? 0) * V(`uhel_${id}_${y}`);
-      (mk.blocks ?? []).forEach(([, pr], b) => { dcharges += pr * V(`blk_${id}_${y}_${b + 1}`); });
+      if ((mk.uh_threshold ?? 0) > 0) {
+        const c = 1000 * ((mk.uh_high_capacity ?? 0) * V(`uhph_${id}_${y}`) +
+                          (mk.uh_low_capacity ?? 0) * V(`uhpl_${id}_${y}`)) +
+                  (mk.uh_high_energy ?? 0) * V(`uheh_${id}_${y}`) +
+                  (mk.uh_low_energy ?? 0) * V(`uhel_${id}_${y}`);
+        dcharges += c; bm(mk.market_id, y).demand_charge += c;
+      }
+      (mk.blocks ?? []).forEach(([, pr], b) => {
+        const c = pr * V(`blk_${id}_${y}_${b + 1}`);
+        dcharges += c; bm(mk.market_id, y).demand_charge += c;
+      });
     }
     for (const mk of sells) {
       if (mk.scheme === "net_metering") {
@@ -311,12 +339,14 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
             paired.reduce((a, b) => a + p.reduce((x, s) =>
               x + PX(b, s, y) * W(s, y), 0) / wsum, 0)
             / Math.max(paired.length, 1);
-          exportRev += retail * V(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`);
+          const r = retail * V(`nm_${sane(mk.market_id)}_${pi + 1}_${y}`);
+          exportRev += r; bm(mk.market_id, y).revenue += r;
         });
       } else {
-        for (const s of steps)
-          exportRev += PX(mk, s, y) *
-                       V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
+        for (const s of steps) {
+          const r = PX(mk, s, y) * V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y);
+          exportRev += r; bm(mk.market_id, y).revenue += r;
+        }
       }
     }
     for (const cv of convs) for (const p of portsOf(cv).ins)
@@ -435,6 +465,29 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     .forEach((v, i) => { cost_breakdown[i].capex_annuity = v; });
   // R27: cuota de CAPEX de cada año (deuda en cuotas + parte propia), vista
   capexCharge(cfg, yo, capexBy, lifeOf).forEach((v, i) => { cost_breakdown[i].capex_charge = v; });
+  // tablas por activo y por mercado (CAPEX y cuota desde capexBy, como Julia)
+  for (const s of sources) if (allowed(s.tech_id) && (s.fixed_charge ?? 0) !== 0)
+    for (const y of years) bt(s.tech_id, y).fixed_opex += s.fixed_charge;
+  const emIds = new Set(EMs.map((em) => em.id));
+  for (const [id, v] of Object.entries(capexBy)) {
+    const ch = capexCharge(cfg, yo, { [id]: v }, lifeOf);
+    years.forEach((y) => { bt(id, y).capex += v[y - 1]; bt(id, y).capex_charge = ch[y - 1]; });
+  }
+  const by_tech = [];
+  for (const y of years)
+    for (const id of Object.keys(BT).sort())
+      if (BT[id][y]) by_tech.push({ year: y, tech: id, kind: emIds.has(id) ? "measure" : "tech",
+                                    capex_charge: 0, ...BT[id][y] });
+  const by_market = [];
+  for (const y of years) {
+    for (const mk of [...buys].sort((a, b) => a.market_id.localeCompare(b.market_id)))
+      by_market.push({ year: y, market: mk.market_id, direction: "buy", carrier: mk.carrier_id, ...(BM[mk.market_id]?.[y] ?? bm(mk.market_id, y)) });
+    for (const mk of [...sells].sort((a, b) => a.market_id.localeCompare(b.market_id))) {
+      const r = bm(mk.market_id, y);
+      r.mwh = steps.reduce((a, s) => a + V(`mf_${sane(mk.market_id)}_${s}_${y}`) * W(s, y), 0);
+      by_market.push({ year: y, market: mk.market_id, direction: "sell", carrier: mk.carrier_id, ...r });
+    }
+  }
   const npv = cost_breakdown.reduce((a, c) => a + c.npv, 0);
   const out = {
     meta,
@@ -448,6 +501,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       res_share_final: res_share[N - 1],
     },
     investments, capacity, cost_breakdown, emissions, res_share, dispatch, efficiency_measures, by_source,
+    by_tech, by_market,
     // energía de cada almacenamiento por año (R2), espejo de Results.storage_energy
     storage_energy: stors.flatMap((st) => years.map((y) => {
       const en = years.filter((yp) => yp <= y && yr(y) - yr(yp) < st.lifetime_years);
@@ -470,7 +524,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   // años hito (R6): las tablas llevan el año relativo real, no el índice
   if (yo.some((r, i) => r !== i + 1)) {
     for (const k of ["investments", "capacity", "cost_breakdown", "emissions", "dispatch",
-                     "efficiency_measures", "storage_energy", "by_source"])
+                     "efficiency_measures", "storage_energy", "by_source", "by_tech", "by_market"])
       for (const r of out[k]) r.year = yr(r.year);
     for (const r of out.capacity) if (r.investment_year != null) r.investment_year = yr(r.investment_year);
   }

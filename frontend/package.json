@@ -30,7 +30,8 @@
     "verify:tariff": "node scripts/verify_tariff.mjs",
     "verify:catalog": "node scripts/verify_catalog.mjs",
     "verify:measures": "node scripts/verify_measures.mjs",
-    "verify:nodes": "node scripts/verify_nodes.mjs"
+    "verify:nodes": "node scripts/verify_nodes.mjs",
+    "verify:components": "node scripts/verify_components.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

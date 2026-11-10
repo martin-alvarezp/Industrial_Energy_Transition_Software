@@ -30,10 +30,13 @@
         @test all(diff(mw) .>= -1e-9)
     end
 
-    # dispatch tidy: 4 techs + 3 flows de battery + import/export = 9 series
-    @test nrow(r.dispatch) == 9 * 96 * 10
+    # dispatch tidy: 4 techs + 3 flows de battery + import/export = 9 series,
+    # más el flujo de cada mercado (menú Componentes → Mercados)
+    nmk = length(unique(r.dispatch.tech[r.dispatch.flow .== :market]))
+    @test nmk >= 2                                   # compra y venta de red del demo
+    @test nrow(r.dispatch) == (9 + nmk) * 96 * 10
     @test Set(unique(r.dispatch.flow)) ==
-          Set([:output, :charge, :discharge, :soc, :import, :export])
+          Set([:output, :charge, :discharge, :soc, :import, :export, :market])
 
     # emisiones: caps respetados y MACC recuperable los 10 años
     @test nrow(r.emissions) == 10

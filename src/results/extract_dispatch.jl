@@ -56,6 +56,10 @@ function extract_dispatch(im::IETOModel)
         end
         record!(:grid, :import, y, s, JuMP.value(m[:grid_import_p][s, y]))
         record!(:grid, :export, y, s, JuMP.value(m[:grid_export_p][s, y]))
+        # flujo de cada mercado (compra o venta, MW ≥ 0): menú Componentes → Mercados
+        for mk in sort!(collect(sets.buy_markets ∪ sets.sell_markets); by = string)
+            record!(mk, :market, y, s, JuMP.value(m[:market_flow][mk, s, y]))
+        end
         for (aid, c, fkey, rkey) in arc_specs
             fv = JuMP.value(m[:arc_flow][fkey, s, y])
             rv = rkey === nothing ? 0.0 : JuMP.value(m[:arc_flow][rkey, s, y])

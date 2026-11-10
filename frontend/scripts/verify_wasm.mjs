@@ -43,10 +43,28 @@ for (const f of readdirSync(goldenDir).filter((x) => x.endsWith(".json"))) {
       // payload se recalcula con los valores de las variables, que highs-js
       // entrega con ~6 cifras significativas (2,66667 por 8/3): su cota es
       // esa precisión, no la del solver
-      ok = sol.Status === "Optimal" && rel < 1e-6 && relPay < 1e-5 && emisOk;
+      // costos por activo y por mercado: cada columna suma la del desglose del año
+      // (la carga desplazada 5.4 no es de un activo: con ella no se mira el O&M variable)
+      const flex = (g.config.flex_cost ?? 0) > 0;
+      let btWorst = 0, btWhat = "";
+      for (const c of pay.cost_breakdown) {
+        const r = pay.by_tech.filter((x) => x.year === c.year), q = pay.by_market.filter((x) => x.year === c.year);
+        const S = (rows, k) => rows.reduce((a, x) => a + x[k], 0);
+        const chk = [["capex", S(r, "capex"), c.capex], ["fijo", S(r, "fixed_opex"), c.fixed_opex],
+                     ...(flex ? [] : [["variable", S(r, "var_opex"), c.var_opex]]),
+                     ["energía", S(q, "energy_cost") + S(r, "fuel_cost"), c.energy_purchases],
+                     ["cargos", S(q, "demand_charge"), c.demand_charges],
+                     ["ventas", S(q, "revenue") + S(r, "afrr_revenue"), c.export_revenue]];
+        for (const [n, x, y] of chk) {
+          const e = Math.abs(x - y) / Math.max(1, Math.abs(y));
+          if (e > btWorst) { btWorst = e; btWhat = `${n} año ${c.year}: ${x.toFixed(1)} vs ${y.toFixed(1)}`; }
+        }
+      }
+      const btOk = btWorst < 1e-9;
+      ok = sol.Status === "Optimal" && rel < 1e-6 && relPay < 1e-5 && emisOk && btOk;
       detail = `julia ${g.expected_npv.toFixed(2)} · wasm ${npv.toFixed(2)} · ` +
                `Δrel ${rel.toExponential(1)} · payload Δ ${relPay.toExponential(1)}` +
-               `${emisOk ? "" : " · EMISIONES NO CUADRAN"} · ${meta.binaries} bin · ${secs}s`;
+               `${emisOk ? "" : " · EMISIONES NO CUADRAN"}${btOk ? "" : ` · POR ACTIVO NO CUADRA (${btWhat})`} · ${meta.binaries} bin · ${secs}s`;
     }
   } catch (e) {
     ok = false;

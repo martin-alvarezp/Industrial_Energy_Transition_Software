@@ -21,6 +21,7 @@ const DEMO_DIR = normpath(joinpath(@__DIR__, "..", "data", "sample_sites", "demo
     include("test_carriers.jl")
     include("test_markets.jl")
     include("test_topology.jl")
+    include("test_by_tech.jl")
     include("test_calendar.jl")
     include("test_lifecycle.jl")
     include("test_assurance.jl")

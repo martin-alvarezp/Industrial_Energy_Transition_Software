@@ -10,7 +10,7 @@ import { ScenarioChip } from "./ParamTable.jsx";
 import { componentIcon } from "../icons.jsx";
 import { Menu } from "../kit.jsx";
 import { techKind, techStatus, GROUP_ORDER } from "../techkind.js";
-import { locationOf } from "../layout.js";
+import { locationOf, nodeOf } from "../layout.js";
 import { num } from "../../lib/format.js";
 
 
@@ -96,7 +96,8 @@ export default function ComponentCollection({
                 <tr key={x.tech_id} className="click" onClick={() => onOpen?.(x)}>
                   <td><b style={{ fontWeight: 600 }}>{x.name}</b></td>
                   <td>{t(techKind(x))}</td>
-                  <td>{layout ? locName(locationOf(layout, x.tech_id)) : "—"}</td>
+                  <td>{layout ? [layout.nodes?.find((n) => n.id === nodeOf(layout, x.tech_id))?.name,
+                                 locName(locationOf(layout, x.tech_id))].filter(Boolean).join(" · ") : "—"}</td>
                   <td style={{ color: "var(--ui-muted)" }}>{flowsOf(x)}</td>
                   <td className="num">{num(x.existing_capacity, 1)}</td>
                   <td className="num">{num(x.max_new_capacity, 1)}</td>

@@ -67,7 +67,7 @@ _body(resp) = JSON3.read(resp.body)
         resp = _post("/scenario", (site = "demo", include_dispatch = true,
                                    config_overrides = (horizon_years = 2,)))
         @test resp.status == 200
-        @test length(_body(resp).dispatch) == 9 * 96 * 2
+        @test length(_body(resp).dispatch) == (9 + 2) * 96 * 2   # + flujo de los 2 mercados
 
         # escenario infactible = 200 con feasible=false (no es error de input)
         resp = _post("/scenario",
