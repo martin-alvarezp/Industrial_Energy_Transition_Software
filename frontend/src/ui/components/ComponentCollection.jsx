@@ -2,7 +2,7 @@
 // referencia): tarjetas agrupadas por clase, árbol ubicación → grupo →
 // componente, y tabla con sus parámetros.
 import { IcCheckCircle, IcEdit, IcPinDrop, IcDelete, IcGridView, IcAccountTree,
-         IcTableChart, IcExpandMore, IcChevronRight } from "../iconset.jsx";
+         IcTableChart, IcExpandMore, IcChevronRight, IcNode } from "../iconset.jsx";
 import { useState } from "react";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -37,7 +37,7 @@ function flowsOf(tech) {
   return `${ins.join(" + ") || "—"} → ${outs.join(" + ") || "—"}`;
 }
 
-export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
+export function ComponentCard({ tech, built, onOpen, onLocate, onDelete, onMoveNode }) {
   const { t } = useI18n();
   const Ico = componentIcon(tech);
   const st = techStatus(tech, built);
@@ -60,6 +60,7 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
         <Menu items={[
           { label: t("common.edit"), icon: IcEdit, onClick: () => onOpen?.(tech) },
           { label: t("cc.locate"), icon: IcPinDrop, onClick: () => onLocate?.(tech), hidden: !onLocate },
+          { label: t("node.moveTo"), icon: IcNode, onClick: () => onMoveNode?.(tech), hidden: !onMoveNode },
           "-",
           { label: t("common.delete"), icon: IcDelete, danger: true, onClick: () => onDelete?.(tech), hidden: !onDelete },
         ]} />
@@ -69,7 +70,7 @@ export function ComponentCard({ tech, built, onOpen, onLocate, onDelete }) {
 }
 
 export default function ComponentCollection({
-  techs, layout, view = "grid", builtYears = {}, onOpen, onLocate, onDelete, columns,
+  techs, layout, view = "grid", builtYears = {}, onOpen, onLocate, onDelete, onMoveNode, columns,
 }) {
   const { t } = useI18n();
   const [closed, setClosed] = useState({});
@@ -157,7 +158,7 @@ export default function ComponentCollection({
           <div className="ui-comp-grid" style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
             {list.map((x) => (
               <ComponentCard key={x.tech_id} tech={x} built={builtYears[x.tech_id]}
-                             onOpen={onOpen} onLocate={onLocate} onDelete={onDelete} />
+                             onOpen={onOpen} onLocate={onLocate} onDelete={onDelete} onMoveNode={onMoveNode} />
             ))}
           </div>
         </section>

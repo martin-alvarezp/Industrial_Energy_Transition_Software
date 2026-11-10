@@ -13,6 +13,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { carrierColor } from "../../lib/twin.js";
 import { componentIcon } from "../icons.jsx";
+import { IcNode } from "../iconset.jsx";
+import { endpointPositions, techsInNode } from "../layout.js";
 
 export const BASE_LAYERS = {
   // calles de OpenStreetMap aclaradas a gris (clase sm-tiles-light): el mapa
@@ -44,6 +46,22 @@ function markerIcon(tech, { selected, dim, pending }) {
     }));
   }
   return byFlags.get(key);
+}
+
+// marcador de NODO: ícono apilado, número de componentes y nombre debajo
+const nodeIconCache = new Map();
+function nodeMarkerIcon(name, n, { selected }) {
+  const key = `${name}|${n}|${selected}`;
+  if (!nodeIconCache.has(key)) {
+    const svg = renderToStaticMarkup(<IcNode size={20} />);
+    const esc = String(name).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    nodeIconCache.set(key, L.divIcon({
+      className: "",
+      html: `<div class="sm-node${selected ? " selected" : ""}"><div class="sm-node-ico">${svg}<span class="sm-node-n">${n}</span></div><div class="sm-node-name">${esc}</div></div>`,
+      iconSize: [36, 36], iconAnchor: [18, 18],
+    }));
+  }
+  return nodeIconCache.get(key);
 }
 
 const vertexIcon = L.divIcon({ className: "", html: '<div class="sm-vertex"></div>',
@@ -92,14 +110,16 @@ export function systemPoints(layout) {
   const pts = [...(layout.boundary ?? [])];
   for (const l of layout.locations ?? []) pts.push(...(l.polygon ?? []));
   pts.push(...Object.values(layout.equipment ?? {}));
+  for (const n of layout.nodes ?? []) if (n.pos) pts.push(n.pos);
   return pts;
 }
 
 export default function SystemMap({
   siteJson, layout, base = "standard", mapRef, fitKey,
-  filters = {}, selectedComponent, selectedLocation, focusLocation,
+  filters = {}, selectedComponent, selectedLocation, selectedNode, focusLocation,
   editing = false, mode = null, draft = [], cursor = null, draftArc = null,
   onMapClick, onCursor, onSelectComponent, onSelectLocation, onSelectArc, onMoveComponent,
+  onSelectNode, onMoveNode,
 }) {
   const techs = siteJson.technologies ?? [];
   const byId = useMemo(() => Object.fromEntries(techs.map((t) => [t.tech_id, t])), [techs]);
@@ -109,6 +129,7 @@ export default function SystemMap({
   const drawing = mode === "draw-boundary" || mode === "draw-location";
   const connecting = mode === "connect";
   const pts = useMemo(() => systemPoints(layout), [layout]);
+  const positions = useMemo(() => endpointPositions(layout), [layout]);
   const hiddenType = (t) => filters.types && filters.types[t.type] === false;
   const hiddenCarrier = (c) => filters.carriers && filters.carriers[c] === false;
 
@@ -143,7 +164,7 @@ export default function SystemMap({
       {(siteJson.arcs ?? []).map((arc) => {
         const carrier = arc.ports?.[0]?.carrier;
         if (hiddenCarrier(carrier)) return null;
-        const path = arcPath(arc, layout.arcs, layout.equipment ?? {});
+        const path = arcPath(arc, layout.arcs, positions);
         if (!path) return null;
         const color = carrierColor(carrierById[carrier]);
         const mid = Math.max(1, Math.floor(path.length / 2));
@@ -170,8 +191,8 @@ export default function SystemMap({
           {draft.map((p, i) => <Marker key={i} position={p} icon={vertexIcon} interactive={false} />)}
         </>
       )}
-      {connecting && draftArc?.from && layout.equipment?.[draftArc.from] && (
-        <Polyline positions={[layout.equipment[draftArc.from], ...draftArc.waypoints, ...(cursor ? [cursor] : [])]}
+      {connecting && draftArc?.from && positions[draftArc.from] && (
+        <Polyline positions={[positions[draftArc.from], ...draftArc.waypoints, ...(cursor ? [cursor] : [])]}
                   pathOptions={{ color: SLR.darkGreen, weight: 2.5, dashArray: "5 5" }} />
       )}
 
@@ -190,6 +211,22 @@ export default function SystemMap({
           </Marker>
         );
       })}
+
+      {filters.nodes !== false && (layout.nodes ?? []).map((n) => n.pos && (
+        <Marker key={"n:" + n.id} position={n.pos} draggable={editing && !connecting && !drawing}
+                icon={nodeMarkerIcon(n.name, techsInNode(layout, n.id).filter((t) => byId[t]).length,
+                                     { selected: n.id === selectedNode || draftArc?.from === n.id })}
+                eventHandlers={{
+                  click: (e) => { L.DomEvent.stopPropagation(e); onSelectNode?.(n.id); },
+                  dragend: (e) => { const ll = e.target.getLatLng(); onMoveNode?.(n.id, [ll.lat, ll.lng]); },
+                }}>
+          <Tooltip direction="top" offset={[0, -18]}>
+            <b>{n.name}</b>
+            {techsInNode(layout, n.id).filter((t) => byId[t]).slice(0, 12).map((t) => <div key={t}>{byId[t].name}</div>)}
+            {techsInNode(layout, n.id).filter((t) => byId[t]).length > 12 && <div>…</div>}
+          </Tooltip>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }

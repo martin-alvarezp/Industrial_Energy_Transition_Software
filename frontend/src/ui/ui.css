@@ -363,6 +363,18 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .sm-marker:hover { transform: scale(1.12); }
 .sm-marker.selected { box-shadow: 0 0 0 3px var(--ui-text), 0 1px 6px rgba(0,0,0,0.35); transform: scale(1.18); }
 .sm-marker.dim { opacity: 0.45; }
+.sm-node { position: relative; width: 36px; height: 36px; }
+.sm-node-ico { width: 36px; height: 36px; border-radius: 9px; background: #fff; color: var(--ui-text);
+               display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.28);
+               border: 1.5px solid var(--ui-text); transition: transform 0.12s; position: relative; }
+.sm-node:hover .sm-node-ico { transform: scale(1.1); }
+.sm-node.selected .sm-node-ico { box-shadow: 0 0 0 3px var(--ui-primary), 0 1px 6px rgba(0,0,0,0.35); }
+.sm-node-n { position: absolute; top: -8px; right: -9px; min-width: 18px; height: 18px; padding: 0 4px;
+             border-radius: 9px; background: var(--ui-primary); color: #fff; font-size: 11px; font-weight: 600;
+             line-height: 18px; text-align: center; }
+.sm-node-name { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+                font-size: 12px; font-weight: 600; color: var(--ui-text);
+                text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; pointer-events: none; }
 .sm-vertex { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--ui-primary); }
 .sm-arrow { font-size: 15px; line-height: 18px; text-align: center; font-weight: 700;
             text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
@@ -726,3 +738,7 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .be-range .ui-input { width: 100%; min-width: 0; }
 .be-result { margin-top: 10px; font-weight: 600; }
 .be-evals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-weight: 400; }
+.node-pick-list { max-height: 52vh; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.node-pick-row { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 6px; cursor: pointer; }
+.node-pick-row:hover { background: var(--ui-hover, #f2f4f3); }
+.node-pick-row small { margin-left: auto; color: var(--ui-muted); }

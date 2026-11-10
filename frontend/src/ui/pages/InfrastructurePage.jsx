@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IcFilterAlt, IcAdd, IcEdit, IcCheck, IcMap, IcLan, IcLayers, IcNearMe, IcRemove,
   IcOutlineViewInAr, IcOutlineLocationOn, IcOutlineCable, IcBolt, IcOutlineHandshake,
-  IcPolyline, IcOutlineCropFree, IcPinDrop, IcClose, IcSatelliteAlt,
+  IcPolyline, IcOutlineCropFree, IcPinDrop, IcClose, IcSatelliteAlt, IcNode,
 } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -13,7 +13,7 @@ import SystemMap, { systemPoints } from "../map/SystemMap.jsx";
 import FlowView from "../map/FlowView.jsx";
 import SystemPanel from "../components/SystemPanel.jsx";
 import CatalogModal from "../components/CatalogModal.jsx";
-import { newLocationId, locationOf } from "../layout.js";
+import { newLocationId, locationOf, newNodeId, nodeOf, assignToNode, endpointPositions } from "../layout.js";
 import { componentIcon } from "../icons.jsx";
 import EquipmentDrawer from "../../components/twin/EquipmentDrawer.jsx";
 import CarrierDrawer from "../../components/twin/CarrierDrawer.jsx";
@@ -65,10 +65,14 @@ export default function InfrastructurePage({ route }) {
   const [catalog, setCatalog] = useState(null);
   const [carrierPick, setCarrierPick] = useState(false);
   const [newLoc, setNewLoc] = useState(null);
+  const [newNode, setNewNode] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
   const [flash, setFlash] = useFlash();
   const selLoc = route.query?.loc ?? null;
+  const selNode = route.query?.node ?? null;
+  const goNode = (id, tab = "components") =>
+    navigate(hrefFor({ site: siteName, page: "infrastructure", query: { node: id, tab } }));
 
   const builtYears = useMemo(() => {
     if (!data?.result || (viewing?.site && viewing.site !== siteName)) return {};
@@ -78,7 +82,7 @@ export default function InfrastructurePage({ route }) {
   }, [data, viewing, siteName]);
 
   // elegir una ubicación abre el panel
-  useEffect(() => { if (selLoc) setCollapsed(false); }, [selLoc]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selLoc || selNode) setCollapsed(false); }, [selLoc, selNode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cancelMode = () => { setMode(null); setDraft([]); setDraftArc(null); setCursor(null); setPendingLoc(null); };
   useEffect(() => {
@@ -119,6 +123,9 @@ export default function InfrastructurePage({ route }) {
       setDraft((d) => [...d, p]);
     } else if (mode === "connect") {
       setDraftArc((d) => (d?.from ? { ...d, waypoints: [...d.waypoints, p] } : d));
+    } else if (mode === "place-node") {
+      setNewNode({ pos: p, name: "" });
+      setMode(null); setCursor(null);
     } else if (mode?.startsWith("place:")) {
       const id = mode.slice(6);
       patchLayout((l) => ({
@@ -130,11 +137,37 @@ export default function InfrastructurePage({ route }) {
       cancelMode();
     }
   };
+  const createNode = () => {
+    const name = newNode.name.trim() || t("node.new");
+    const id = newNodeId(layout, name, siteJson.technologies.map((x) => x.tech_id));
+    patchLayout((l) => ({ nodes: [...(l.nodes ?? []), { id, name, pos: newNode.pos, description: "" }],
+                          center: l.center ?? newNode.pos }),
+                `Nodo '${name}' creado`);
+    setNewNode(null);
+    goNode(id);
+  };
+  // un extremo de línea puede ser un componente o un nodo
+  const pickEndpoint = (id) => {
+    if (!draftArc?.from) { setDraftArc({ from: id, waypoints: [] }); return; }
+    if (id === draftArc.from) return;
+    const pos = endpointPositions(layout);
+    const a = pos[draftArc.from], b = pos[id];
+    setArcDrawer({ draft: blankArc(draftArc.from, id, siteJson), isNew: true,
+                   geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
+    cancelMode();
+  };
+  const onSelectNode = (id) => {
+    if (mode === "connect") return pickEndpoint(id);
+    if (!mode) goNode(id);
+  };
   const onSelectComponent = (id) => {
     if (mode === "connect") {
+      const node = nodeOf(layout, id);
+      if (node && !layout.equipment?.[id]) return pickEndpoint(node);
       if (!draftArc?.from) { setDraftArc({ from: id, waypoints: [] }); return; }
       if (id === draftArc.from) return;
-      const a = layout.equipment[draftArc.from], b = layout.equipment[id];
+      const pos = endpointPositions(layout);
+      const a = pos[draftArc.from], b = pos[id];
       setArcDrawer({ draft: blankArc(draftArc.from, id, siteJson), isNew: true,
                      geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
       cancelMode();
@@ -146,10 +179,11 @@ export default function InfrastructurePage({ route }) {
 
   // ── componentes ──
   const openComponent = (tech) => setDrawer({ tech: { ...tech, ports_mode: isMultiport(tech) }, isNew: false });
-  const addComponent = (locId) => setCatalog({ locId });
+  const addComponent = (locId, nodeId = null) => setCatalog({ locId, nodeId });
   const onCatalogPick = ({ tech, siteJson: sj, added }) => {
     if (added.length) patchSite(() => sj, `Vectores agregados: ${added.join(", ")}`);
-    setDrawer({ tech, isNew: true, locId: catalog?.locId ?? selLoc ?? null });
+    const nodeId = catalog?.nodeId ?? null;
+    setDrawer({ tech, isNew: true, locId: nodeId ? null : (catalog?.locId ?? selLoc ?? null), nodeId });
     setCatalog(null);
   };
   const saveTech = (tech) => {
@@ -157,8 +191,12 @@ export default function InfrastructurePage({ route }) {
     patchSite((sj) => upsertTech(sj, tech),
               isNew ? `Componente '${tech.name}' agregado` : `Componente '${tech.name}' editado`);
     const loc = drawer?.locId;
+    const nodeId = drawer?.nodeId;
     setDrawer(null);
-    if (!layout.equipment?.[tech.tech_id] && view === "map") {
+    if (nodeId) {
+      // dentro de un nodo: no se ubica en el mapa, vive en el marcador del nodo
+      patchLayout((l) => assignToNode(l, [tech.tech_id], nodeId));
+    } else if (!layout.equipment?.[tech.tech_id] && !nodeOf(layout, tech.tech_id) && view === "map") {
       setPendingLoc(loc ?? null);
       setMode("place:" + tech.tech_id);
     } else if (loc) {
@@ -171,7 +209,8 @@ export default function InfrastructurePage({ route }) {
     patchLayout((l) => {
       const { [techId]: _a, ...equipment } = l.equipment ?? {};
       const { [techId]: _b, ...equipmentLocation } = l.equipmentLocation ?? {};
-      return { equipment, equipmentLocation };
+      const { [techId]: _c, ...techNode } = l.techNode ?? {};
+      return { equipment, equipmentLocation, techNode };
     });
     setDrawer(null);
   };
@@ -200,7 +239,8 @@ export default function InfrastructurePage({ route }) {
     if (arc) setArcDrawer({ draft: { ...arc }, isNew: false, geometry: layout.arcs?.[id] });
   };
 
-  const unplaced = siteJson.technologies.filter((x) => x.tech_id !== "offsets" && !layout.equipment?.[x.tech_id]);
+  const unplaced = siteJson.technologies.filter((x) => x.tech_id !== "offsets" && !layout.equipment?.[x.tech_id]
+                                                  && !nodeOf(layout, x.tech_id));
   const fit = () => {
     if (view === "flow") return flowRef.current?.fit();
     const pts = systemPoints(layout);
@@ -218,6 +258,7 @@ export default function InfrastructurePage({ route }) {
     if (mode === "draw-location") return t("infra.modeLocation", { n: draft.length });
     if (mode?.startsWith("redraw:")) return t("infra.modeRedraw", { n: draft.length,
       name: layout.locations?.find((l) => l.id === mode.slice(7))?.name ?? "" });
+    if (mode === "place-node") return t("node.modePlace");
     if (mode?.startsWith("place:")) return t("infra.modePlace",
       { name: siteJson.technologies.find((x) => x.tech_id === mode.slice(6))?.name ?? "" });
     if (mode === "connect") return draftArc?.from
@@ -229,16 +270,17 @@ export default function InfrastructurePage({ route }) {
   const carriersInArcs = [...new Set((siteJson.arcs ?? []).map((a) => a.ports?.[0]?.carrier).filter(Boolean))];
 
   return (
-    <div className={"ip-wrap" + (isPoly || mode === "connect" ? " drawing" : "") + (mode?.startsWith("place:") ? " placing" : "")}
+    <div className={"ip-wrap" + (isPoly || mode === "connect" ? " drawing" : "") + (mode?.startsWith("place") ? " placing" : "")}
          data-testid="infrastructure">
       {view === "map" ? (
         <SystemMap siteJson={siteJson} layout={layout} base={base} mapRef={mapRef} fitKey={siteName}
-                   filters={filters} selectedComponent={drawer?.tech?.tech_id} selectedLocation={selLoc}
+                   filters={filters} selectedComponent={drawer?.tech?.tech_id} selectedLocation={selLoc} selectedNode={selNode}
                    editing={editing} mode={mode} draft={draft} cursor={cursor} draftArc={draftArc}
                    onMapClick={onMapClick} onCursor={isPoly || mode === "connect" ? setCursor : undefined}
                    onSelectComponent={onSelectComponent}
                    onSelectLocation={(id) => navigate(hrefFor({ site: siteName, page: "infrastructure", query: { loc: id, tab: "components" } }))}
-                   onSelectArc={openArc}
+                   onSelectArc={openArc} onSelectNode={onSelectNode}
+                   onMoveNode={(id, p) => patchLayout((l) => ({ nodes: l.nodes.map((n) => (n.id === id ? { ...n, pos: p } : n)) }))}
                    onMoveComponent={(id, p) => patchLayout((l) => ({ equipment: { ...l.equipment, [id]: p } }))} />
       ) : (
         <FlowView ref={flowRef} siteJson={siteJson} selectedComponent={drawer?.tech?.tech_id}
@@ -253,7 +295,8 @@ export default function InfrastructurePage({ route }) {
               trigger={({ toggle }) => (
                 <button className="ui-btn primary" onClick={toggle}><IcAdd /> {t("common.add")}</button>)}
               items={[
-                { label: t("infra.addComponent"), icon: IcOutlineViewInAr, onClick: () => addComponent(selLoc) },
+                { label: t("infra.addComponent"), icon: IcOutlineViewInAr, onClick: () => addComponent(selLoc, selNode) },
+                { label: t("node.add"), icon: IcNode, onClick: () => { setView("map"); cancelMode(); setMode("place-node"); } },
                 { label: t("infra.addLocation"), icon: IcOutlineLocationOn, onClick: () => { setView("map"); setMode("draw-location"); setDraft([]); } },
                 { label: t("infra.addConnection"), icon: IcOutlineCable, onClick: () => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); } },
                 "-",
@@ -268,7 +311,7 @@ export default function InfrastructurePage({ route }) {
       {filterOpen && (
         <div className="ip-filter-pop">
           <h4>{t("infra.fLayers")}</h4>
-          {[["boundary", "infra.fBoundary"], ["locations", "infra.fLocations"]].map(([k, key]) => (
+          {[["boundary", "infra.fBoundary"], ["locations", "infra.fLocations"], ["nodes", "node.layer"]].map(([k, key]) => (
             <label key={k}><input type="checkbox" checked={filters[k] !== false}
                                   onChange={(e) => setFilters({ ...filters, [k]: e.target.checked })} />{t(key)}</label>
           ))}
@@ -301,6 +344,8 @@ export default function InfrastructurePage({ route }) {
             <IcOutlineCropFree /> {t("infra.drawBoundary")}</button>
           <button className="ui-menu-row" onClick={() => { setView("map"); setMode("draw-location"); setDraft([]); }}>
             <IcPolyline /> {t("infra.drawLocation")}</button>
+          <button className="ui-menu-row" onClick={() => { setView("map"); setMode("place-node"); }}>
+            <IcNode /> {t("node.add")}</button>
           <button className="ui-menu-row" onClick={() => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); }}>
             <IcOutlineCable /> {t("infra.connect")}</button>
           {unplaced.length > 0 && <div className="ui-nav-sub" style={{ padding: "8px 10px 2px" }}>{t("infra.unplaced")}</div>}
@@ -326,6 +371,7 @@ export default function InfrastructurePage({ route }) {
       <SystemPanel route={route} collapsed={collapsed} setCollapsed={setCollapsed}
                    compView={compView} setCompView={setCompView} builtYears={builtYears}
                    onOpenComponent={openComponent} onAddComponent={addComponent}
+                   onAddNode={() => { setView("map"); cancelMode(); setMode("place-node"); }}
                    onDrawLocation={() => { setView("map"); setMode("draw-location"); setDraft([]); }}
                    onRedrawLocation={(id) => { setView("map"); setMode("redraw:" + id); setDraft([]); }}
                    onLocateComponent={locateComponent} onDeleteComponent={(x) => deleteTech(x.tech_id)} />
@@ -382,6 +428,22 @@ export default function InfrastructurePage({ route }) {
             <input className="ui-input" autoFocus value={newLoc.name} placeholder="Planta principal"
                    onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })}
                    onKeyDown={(e) => e.key === "Enter" && createLocation()} />
+          </div>
+        </Modal>
+      )}
+      {newNode && (
+        <Modal title={t("node.new")} onClose={() => setNewNode(null)}
+               footer={<>
+                 <button className="ui-btn ghost" onClick={() => setNewNode(null)}>{t("common.cancel")}</button>
+                 <button className="ui-btn primary" data-testid="node-create" onClick={createNode}>{t("common.save")}</button>
+               </>}>
+          <div className="ui-field">
+            <label>{t("node.name")}</label>
+            <input className="ui-input" autoFocus value={newNode.name} placeholder={t("node.namePh")}
+                   data-testid="node-name"
+                   onChange={(e) => setNewNode({ ...newNode, name: e.target.value })}
+                   onKeyDown={(e) => e.key === "Enter" && createNode()} />
+            <p className="ui-hint">{t("node.hint")}</p>
           </div>
         </Modal>
       )}

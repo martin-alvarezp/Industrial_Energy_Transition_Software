@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import {
   IcArrowBack, IcExpandLess, IcExpandMore, IcOutlineInfo, IcOutlineViewInAr,
   IcOutlineWbSunny, IcLocationOn, IcAdd, IcHistory, IcEdit, IcDelete, IcPolyline,
-  IcOutlineLocationOn,
+  IcOutlineLocationOn, IcNode,
 } from "../iconset.jsx";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useI18n } from "../i18n.jsx";
@@ -14,7 +14,7 @@ import { useStudio } from "../studio.jsx";
 import { NAV_ICONS } from "../icons.jsx";
 import { Menu, Modal } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
-import { locationOf, polygonCentroid } from "../layout.js";
+import { locationOf, polygonCentroid, nodeOf, techsInNode, nodeLocation, assignToNode } from "../layout.js";
 import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
 import { polygonAreaM2 } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
@@ -69,11 +69,64 @@ function SaveCopy() {
   );
 }
 
-function WeatherTab({ loc, techs }) {
+/** Elegir componentes del sistema para sumarlos a un nodo. */
+function AddExistingModal({ node, techs, layout, onClose, onAdd }) {
+  const { t } = useI18n();
+  const [sel, setSel] = useState({});
+  const cands = techs.filter((x) => nodeOf(layout, x.tech_id) !== node.id);
+  const ids = Object.keys(sel).filter((k) => sel[k]);
+  return (
+    <Modal title={t("node.addExisting")} onClose={onClose}
+           footer={<>
+             <button className="ui-btn ghost" onClick={onClose}>{t("common.cancel")}</button>
+             <button className="ui-btn primary" disabled={!ids.length} data-testid="node-add-existing-ok"
+                     onClick={() => onAdd(ids)}>{t("node.addN", { n: ids.length })}</button>
+           </>}>
+      {!cands.length && <p className="ui-hint">{t("node.noneToAdd")}</p>}
+      <div className="node-pick-list">
+        {cands.map((x) => {
+          const other = nodeOf(layout, x.tech_id);
+          return (
+            <label key={x.tech_id} className="node-pick-row">
+              <input type="checkbox" checked={!!sel[x.tech_id]}
+                     onChange={(e) => setSel({ ...sel, [x.tech_id]: e.target.checked })} />
+              <span>{x.name}</span>
+              <small>{other ? (layout.nodes.find((n) => n.id === other)?.name ?? other) : ""}</small>
+            </label>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
+/** Mover un componente a otro nodo (o dejarlo sin nodo). */
+export function MoveToNodeModal({ tech, layout, onClose, onMove }) {
+  const { t } = useI18n();
+  const [to, setTo] = useState(nodeOf(layout, tech.tech_id) ?? "");
+  return (
+    <Modal title={t("node.moveTitle", { name: tech.name })} onClose={onClose}
+           footer={<>
+             <button className="ui-btn ghost" onClick={onClose}>{t("common.cancel")}</button>
+             <button className="ui-btn primary" onClick={() => onMove(to || null)}>{t("common.save")}</button>
+           </>}>
+      <div className="ui-field">
+        <label>{t("node.node")}</label>
+        <select className="ui-select" value={to} onChange={(e) => setTo(e.target.value)} data-testid="node-move-select">
+          <option value="">{t("node.none")}</option>
+          {(layout.nodes ?? []).map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+        </select>
+        <p className="ui-hint">{t("node.moveHint")}</p>
+      </div>
+    </Modal>
+  );
+}
+
+function WeatherTab({ loc, techs, at }) {
   const { t, lang } = useI18n();
   const { twin, patchSite } = useStudio();
   const [state, setState] = useState(null);
-  const center = loc?.polygon ? polygonCentroid(loc.polygon) : twin.layout.center;
+  const center = at ?? (loc?.polygon ? polygonCentroid(loc.polygon) : twin.layout.center);
   const solar = techs.filter((x) => x.type === "generator" && !/wind|eolic|eólic/i.test(x.tech_id + x.name));
   const load = async () => {
     setState({ loading: true });
@@ -160,7 +213,7 @@ function WeatherTab({ loc, techs }) {
 export default function SystemPanel({
   route, collapsed, setCollapsed, compView, setCompView, builtYears,
   onOpenComponent, onAddComponent, onDrawLocation, onRedrawLocation, onLocateComponent,
-  onDeleteComponent,
+  onDeleteComponent, onAddNode,
 }) {
   const { t, lang } = useI18n();
   const { siteName, twin, patchLayout, readonly } = useStudio();
@@ -169,24 +222,45 @@ export default function SystemPanel({
   const meta = layout.meta ?? {};
   const setMeta = (patch) => patchLayout({ meta: { ...meta, ...patch } });
   const locId = route.query?.loc ?? null;
-  const loc = locId ? layout.locations?.find((l) => l.id === locId) : null;
+  const nodeId = route.query?.node ?? null;
+  const node = nodeId ? (layout.nodes ?? []).find((n) => n.id === nodeId) ?? null : null;
+  const loc = !node && locId ? layout.locations?.find((l) => l.id === locId) : null;
   const [tab, setTab] = useState(null);
+  const [addExisting, setAddExisting] = useState(false);
+  const [moving, setMoving] = useState(null);
   const setLoc = (id, extra = {}) =>
     navigate(hrefFor({ site: siteName, page: "infrastructure", query: { ...(id ? { loc: id } : {}), ...extra } }));
+  const setNode = (id, extra = {}) =>
+    navigate(hrefFor({ site: siteName, page: "infrastructure", query: { ...(id ? { node: id } : {}), ...extra } }));
   const techs = siteJson.technologies.filter((x) => x.tech_id !== "offsets");
-  const inLoc = useMemo(
-    () => (loc ? techs.filter((x) => locationOf(layout, x.tech_id) === loc.id) : techs),
-    [loc, techs, layout]);
-  const tabs = loc
+  const inLoc = useMemo(() => {
+    if (node) { const ids = new Set(techsInNode(layout, node.id)); return techs.filter((x) => ids.has(x.tech_id)); }
+    return loc ? techs.filter((x) => locationOf(layout, x.tech_id) === loc.id) : techs;
+  }, [node, loc, techs, layout]);
+  const tabs = node
+    ? [["info", IcOutlineInfo, "panel.info"], ["components", IcOutlineViewInAr, "panel.components"],
+       ["weather", IcOutlineWbSunny, "panel.weather"]]
+    : loc
     ? [["info", IcOutlineInfo, "panel.info"], ["components", IcOutlineViewInAr, "panel.components"],
        ["weather", IcOutlineWbSunny, "panel.weather"]]
     : [["info", IcOutlineInfo, "panel.info"], ["locations", IcOutlineLocationOn, "panel.locations"],
-       ["components", IcOutlineViewInAr, "panel.components"]];
+       ["nodes", IcNode, "node.nodes"], ["components", IcOutlineViewInAr, "panel.components"]];
   const curTab = tabs.some(([k]) => k === (route.query?.tab ?? tab)) ? (route.query?.tab ?? tab) : "components";
-  const pickTab = (k) => { setTab(k); setLoc(locId, { tab: k }); };
+  const pickTab = (k) => { setTab(k); node ? setNode(node.id, { tab: k }) : setLoc(locId, { tab: k }); };
   const area = polygonAreaM2(loc ? loc.polygon : layout.boundary);
   const SysIcon = NAV_ICONS.systems;
 
+  const patchNode = (patch) => patchLayout((l) => ({
+    nodes: l.nodes.map((x) => (x.id === node.id ? { ...x, ...patch } : x)) }));
+  const deleteNode = () => {
+    if (!window.confirm(t("node.deleteConfirm", { name: node.name }))) return;
+    patchLayout((l) => ({
+      nodes: l.nodes.filter((x) => x.id !== node.id),
+      techNode: Object.fromEntries(Object.entries(l.techNode ?? {}).filter(([, v]) => v !== node.id)),
+    }), `Nodo '${node.name}' eliminado`);
+    setNode(null);
+  };
+  const nodeLocName = node ? layout.locations?.find((l) => l.id === nodeLocation(layout, node))?.name : null;
   const renameLoc = (name) => patchLayout((l) => ({
     locations: l.locations.map((x) => (x.id === loc.id ? { ...x, name } : x)) }));
   const describeLoc = (description) => patchLayout((l) => ({
@@ -204,10 +278,16 @@ export default function SystemPanel({
     <div className={"ip-panel" + (collapsed ? " collapsed" : "")} data-testid="system-panel">
       <div className="ip-panel-head">
         <button className="ui-dots" aria-label={t("common.back")}
-                onClick={() => (loc ? setLoc(null) : navigate("#/systems"))}><IcArrowBack /></button>
-        <h2>{loc ? <IcLocationOn /> : <SysIcon />}{loc ? loc.name : layout.title || siteJson.name || siteName}</h2>
+                onClick={() => (node || loc ? setLoc(null) : navigate("#/systems"))}><IcArrowBack /></button>
+        <h2 data-testid="panel-title">{node ? <IcNode /> : loc ? <IcLocationOn /> : <SysIcon />}
+          {node ? node.name : loc ? loc.name : layout.title || siteJson.name || siteName}</h2>
         <SaveStatus />
         {readonly && <SaveCopy />}
+        {node && (
+          <Menu items={[
+            { label: t("node.delete"), icon: IcDelete, danger: true, onClick: deleteNode },
+          ]} />
+        )}
         {loc && (
           <Menu items={[
             { label: t("panel.redraw"), icon: IcPolyline, onClick: () => onRedrawLocation(loc.id) },
@@ -265,6 +345,18 @@ export default function SystemPanel({
                 </dl>
               </>
             )}
+            {curTab === "info" && node && (
+              <dl className="ip-kv">
+                <dt>{t("common.name")}</dt>
+                <dd><input className="ui-input" value={node.name} onChange={(e) => patchNode({ name: e.target.value })} /></dd>
+                <dt>{t("node.location")}</dt><dd>{nodeLocName ?? t("cc.noLocation")}</dd>
+                <dt>{t("panel.nComponents")}</dt><dd>{inLoc.length}</dd>
+                <dt>{t("panel.center")}</dt><dd>{node.pos.map((v) => v.toFixed(5)).join(", ")}</dd>
+                <dt>{t("panel.description")}</dt>
+                <dd><textarea className="ui-textarea" value={node.description ?? ""}
+                              onChange={(e) => patchNode({ description: e.target.value })} /></dd>
+              </dl>
+            )}
             {curTab === "info" && loc && (
               <dl className="ip-kv">
                 <dt>{t("common.name")}</dt>
@@ -300,12 +392,37 @@ export default function SystemPanel({
                 </div>
               </>
             )}
+            {curTab === "nodes" && !node && !loc && (
+              <>
+                <div className="ip-panel-bar">
+                  <button className="ui-btn primary" onClick={onAddNode} data-testid="panel-add-node">
+                    <IcAdd /> {t("common.add")}
+                  </button>
+                  <span className="count">{(layout.nodes ?? []).length} {t("node.nodes").toLowerCase()}</span>
+                </div>
+                {(layout.nodes ?? []).length === 0 && <p className="ui-hint">{t("node.empty")}</p>}
+                <div className="ip-loc-list">
+                  {(layout.nodes ?? []).map((n) => (
+                    <button key={n.id} className="ip-loc-row" onClick={() => setNode(n.id, { tab: "components" })}>
+                      <IcNode size={22} /> {n.name}
+                      <small>{countLabel(t, techsInNode(layout, n.id).filter((id) => techs.some((x) => x.tech_id === id)).length)}</small>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {curTab === "components" && (
               <>
                 <div className="ip-panel-bar">
-                  <button className="ui-btn primary" onClick={() => onAddComponent(loc?.id ?? null)}>
+                  <button className="ui-btn primary" data-testid="panel-add-component"
+                          onClick={() => (node ? onAddComponent(null, node.id) : onAddComponent(loc?.id ?? null))}>
                     <IcAdd /> {t("common.add")}
                   </button>
+                  {node && (
+                    <button className="ui-btn outline" data-testid="node-add-existing" onClick={() => setAddExisting(true)}>
+                      {t("node.addExisting")}
+                    </button>
+                  )}
                   <button className="ui-btn ghost icon" title={t("panel.history")}
                           onClick={() => navigate(hrefFor({ site: siteName, page: "changelog" }))}>
                     <IcHistory />
@@ -315,12 +432,31 @@ export default function SystemPanel({
                 </div>
                 <ComponentCollection techs={inLoc} layout={layout} view={compView} builtYears={builtYears}
                                      onOpen={onOpenComponent} onLocate={onLocateComponent}
-                                     onDelete={onDeleteComponent} />
+                                     onDelete={onDeleteComponent}
+                                     onMoveNode={(layout.nodes ?? []).length ? setMoving : undefined} />
               </>
             )}
             {curTab === "weather" && loc && <WeatherTab loc={loc} techs={inLoc} />}
+            {curTab === "weather" && node && <WeatherTab techs={inLoc} at={node.pos} />}
           </div>
         </>
+      )}
+      {addExisting && node && (
+        <AddExistingModal node={node} techs={techs} layout={layout} onClose={() => setAddExisting(false)}
+                          onAdd={(ids) => {
+                            patchLayout((l) => assignToNode(l, ids, node.id),
+                                        `${ids.length} componente(s) agregados al nodo '${node.name}'`);
+                            setAddExisting(false);
+                          }} />
+      )}
+      {moving && (
+        <MoveToNodeModal tech={moving} layout={layout} onClose={() => setMoving(null)}
+                         onMove={(to) => {
+                           patchLayout((l) => assignToNode(l, [moving.tech_id], to),
+                                       to ? `Componente '${moving.name}' movido al nodo '${layout.nodes.find((n) => n.id === to)?.name}'`
+                                          : `Componente '${moving.name}' sin nodo`);
+                           setMoving(null);
+                         }} />
       )}
     </div>
   );

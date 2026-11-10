@@ -97,7 +97,10 @@ const _HeatPump = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2
 const _Tank = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M7 6.5h10v12.5H7z\"/><path d=\"M9 6.5V4h6v2.5M7 10.5h10\"/></g><path stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-dasharray=\"1 2.2\" stroke-linecap=\"round\" d=\"M9.5 14h5M9.5 16.5h5\"/>");
 const _Co2 = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M6.5 17.5a3.5 3.5 0 0 1 0-7 5 5 0 0 1 9.7-1.2A4 4 0 0 1 17.5 17.5z\"/></g><text x=\"12\" y=\"15.6\" font-size=\"4.6\" font-family=\"sans-serif\" font-weight=\"700\" text-anchor=\"middle\" fill=\"currentColor\">CO₂</text>");
 
+// nodo: componentes apilados en un mismo punto
+const _Node = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M9 9h10v10H9z\"/><path d=\"M6 15H5V5h10v1\"/></g><circle cx=\"14\" cy=\"14\" r=\"1.6\" fill=\"currentColor\"/>");
 export const IcAdd = _Add;
+export const IcNode = _Node;
 export const IcRemove = _Remove;
 export const IcClose = _Close;
 export const IcCheck = _Check;

@@ -850,3 +850,31 @@ extend({
   "cpreset.lpg": ["Gas licuado (GLP)", "Liquefied petroleum gas (LPG)"],
   "cpreset.custom": ["Otro (definir desde cero)", "Other (define from scratch)"],
 });
+
+// ── nodos (punto con muchos componentes) ──
+extend({
+  "node.add": ["Nodo", "Node"],
+  "node.new": ["Nuevo nodo", "New node"],
+  "node.name": ["Nombre del nodo", "Node name"],
+  "node.namePh": ["Casa de calderas", "Boiler house"],
+  "node.hint": ["Un nodo agrupa muchos componentes en un solo punto del mapa: agrégalos desde su panel sin ubicarlos uno por uno.",
+                "A node groups many components at a single point on the map: add them from its panel without placing each one."],
+  "node.modePlace": ["Haz clic en el mapa donde va el nodo", "Click on the map where the node goes"],
+  "node.layer": ["Nodos", "Nodes"],
+  "node.nodes": ["Nodos", "Nodes"],
+  "node.node": ["Nodo", "Node"],
+  "node.none": ["Sin nodo (posición propia)", "No node (own position)"],
+  "node.empty": ["Aún no hay nodos. Crea uno (Casa de calderas, Sala de máquinas…) y agrégale todos sus componentes.",
+                 "No nodes yet. Create one (Boiler house, Engine room…) and add all its components."],
+  "node.location": ["Ubicación (área)", "Location (area)"],
+  "node.delete": ["Eliminar nodo", "Delete node"],
+  "node.deleteConfirm": ["¿Eliminar el nodo '{name}'? Sus componentes quedan en el sistema, sin nodo.",
+                         "Delete node '{name}'? Its components stay in the system, without a node."],
+  "node.addExisting": ["Agregar existentes", "Add existing"],
+  "node.addN": ["Agregar {n}", "Add {n}"],
+  "node.noneToAdd": ["Todos los componentes ya están en este nodo.", "All components are already in this node."],
+  "node.moveTo": ["Mover a nodo…", "Move to node…"],
+  "node.moveTitle": ["Mover «{name}»", "Move «{name}»"],
+  "node.moveHint": ["En un nodo, el componente se ve dentro del marcador del nodo y no necesita posición propia.",
+                    "In a node, the component shows inside the node marker and needs no position of its own."],
+});
