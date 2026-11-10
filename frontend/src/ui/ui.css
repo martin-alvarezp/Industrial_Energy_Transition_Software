@@ -742,3 +742,13 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .node-pick-row { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 6px; cursor: pointer; }
 .node-pick-row:hover { background: var(--ui-hover, #f2f4f3); }
 .node-pick-row small { margin-left: auto; color: var(--ui-muted); }
+.nf-wrap { overflow: auto; padding: 8px 0 4px; background: #f6f7f6; border-radius: 10px; margin-top: 12px; }
+.nf-title { font: 700 15px var(--ui-font); letter-spacing: 0.4px; text-transform: uppercase; text-align: center;
+            color: var(--ui-text); padding: 6px 0 2px; }
+.nf-bus-label { font: 600 11px var(--ui-font); fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,0.25); stroke-width: 2px; }
+.nf-bus-tag { font: 500 10px var(--ui-font); fill: #fff; }
+.nf-comp rect { fill: #fff; stroke: #d5d9d6; stroke-width: 1.2; }
+.nf-comp:hover rect { stroke: var(--ui-primary); stroke-width: 2; }
+.nf-comp svg { color: var(--ui-text); }
+.nf-name { font: 600 11.5px var(--ui-font); fill: var(--ui-text); }
+.nf-kind { font: 400 10px var(--ui-font); fill: var(--ui-muted); }

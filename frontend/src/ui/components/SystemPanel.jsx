@@ -6,8 +6,9 @@ import { useMemo, useState } from "react";
 import {
   IcArrowBack, IcExpandLess, IcExpandMore, IcOutlineInfo, IcOutlineViewInAr,
   IcOutlineWbSunny, IcLocationOn, IcAdd, IcHistory, IcEdit, IcDelete, IcPolyline,
-  IcOutlineLocationOn, IcNode,
+  IcOutlineLocationOn, IcNode, IcOutlineSchema,
 } from "../iconset.jsx";
+import NodeFlow from "../map/NodeFlow.jsx";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -239,7 +240,7 @@ export default function SystemPanel({
   }, [node, loc, techs, layout]);
   const tabs = node
     ? [["info", IcOutlineInfo, "panel.info"], ["components", IcOutlineViewInAr, "panel.components"],
-       ["weather", IcOutlineWbSunny, "panel.weather"]]
+       ["flow", IcOutlineSchema, "nf.tab"], ["weather", IcOutlineWbSunny, "panel.weather"]]
     : loc
     ? [["info", IcOutlineInfo, "panel.info"], ["components", IcOutlineViewInAr, "panel.components"],
        ["weather", IcOutlineWbSunny, "panel.weather"]]
@@ -438,6 +439,9 @@ export default function SystemPanel({
             )}
             {curTab === "weather" && loc && <WeatherTab loc={loc} techs={inLoc} />}
             {curTab === "weather" && node && <WeatherTab techs={inLoc} at={node.pos} />}
+            {curTab === "flow" && node && (
+              <NodeFlow siteJson={siteJson} techs={inLoc} name={node.name} onSelectComponent={onOpenComponent} />
+            )}
           </div>
         </>
       )}

@@ -878,3 +878,10 @@ extend({
   "node.moveHint": ["En un nodo, el componente se ve dentro del marcador del nodo y no necesita posición propia.",
                     "In a node, the component shows inside the node marker and needs no position of its own."],
 });
+
+// ── flujo interno del nodo ──
+extend({
+  "nf.tab": ["Flujo", "Flow"],
+  "nf.bought": ["compra", "purchase"],
+  "nf.demand": ["demanda", "demand"],
+});

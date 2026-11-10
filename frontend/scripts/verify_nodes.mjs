@@ -69,7 +69,7 @@ await clickText(".ip-toolbar button", "Agregar");
 await sleep(200);
 step("el menú Agregar ofrece «Nodo»", await clickText(".ui-menu-row, .ui-menu button", "Nodo"));
 await waitText("donde va el nodo", 5000);
-const box = await p.$eval(".sm-map", (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width * 0.4, r.y + r.height * 0.5]; });
+const box = await p.$eval(".sm-map", (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width * 0.15, r.y + r.height * 0.6]; });
 await p.mouse.click(box[0], box[1]);
 await p.waitForSelector('[data-testid="node-name"]', { timeout: 5000 });
 await p.type('[data-testid="node-name"]', "Casa de calderas");
@@ -121,8 +121,11 @@ await p.waitForSelector(".sm-node", { timeout: 60000 });
 step("tras recargar sigue un solo marcador de nodo", (await p.$$(".sm-node")).length === 1 && (await p.$$(".sm-marker")).length === 0);
 
 // 6 · mover un componente fuera del nodo
+// con el panel abierto el mapa centrado queda debajo: se pliega, como haría el usuario
+if (!(await p.$(".ip-panel.collapsed"))) await p.click('.ip-panel-head button[aria-label="toggle"]');
+await sleep(800);
 await p.click(".sm-node");
-await waitText("Agregar existentes", 5000);
+step("clic en el marcador abre el panel del nodo", await waitText("Agregar existentes", 5000));
 const firstCard = await p.$(".ui-comp-card .ui-dots, .ui-comp-card button[aria-label]");
 step("la tarjeta tiene menú", !!firstCard);
 await firstCard.click();
@@ -138,6 +141,16 @@ await clickText(".ui-modal button", "Guardar");
 await sleep(500);
 const n3 = await p.$eval(".sm-node-n", (e) => +e.textContent).catch(() => 0);
 step("sacar un componente del nodo baja el contador", n3 === techIds.length, `${n3}`);
+
+// 7 · pestaña Flujo: el diagrama interno del nodo con una barra por vector
+await clickText(".ip-panel .ui-tabs button", "Flujo");
+await p.waitForSelector('[data-testid="node-flow"]', { timeout: 5000 }).catch(() => null);
+await sleep(400);
+if (process.env.SHOT_FLOW) await p.screenshot({ path: process.env.SHOT_FLOW });
+const nBus = (await p.$$('[data-testid^="nf-bus-"]')).length, nComp = (await p.$$(".nf-comp")).length;
+const inNode = Object.entries((await layoutOnDisk())?.properties?.techNode ?? {}).length;
+step("Flujo del nodo: barras por vector y un recuadro por componente", nBus >= 2 && nComp === n3,
+     `${nBus} barras, ${nComp} componentes (${inNode} en el nodo)`);
 
 step("sin errores de página", errors.length === 0, errors[0] ?? "");
 await cleanup();
