@@ -510,6 +510,8 @@ extend({
   "par.newFossil": ["Permitir nuevas tecnologías fósiles", "Allow new fossil technologies"],
   "par.renew": ["Renovar equipos existentes al fin de su vida", "Renew existing equipment at end of life"],
   "par.repeat": ["Permitir inversiones repetidas", "Allow repeated investments"],
+  "par.maxNewAlive": ["El máximo nuevo de cada tecnología es el total instalado (techo, terreno), no el de cada compra",
+                      "Each technology's new maximum is the total installed (roof, land), not per purchase"],
   "par.forced": ["Compras forzadas", "Forced builds"],
   "par.forcedHint": ["Obliga a construir un componente candidato en un año. El VAN muestra el costo de la política.",
                      "Forces a candidate component to be built in a year. The NPV shows the cost of the policy."],

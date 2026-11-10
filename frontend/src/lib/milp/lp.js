@@ -1231,6 +1231,13 @@ export function buildLP(site0, cfg0, opts = {}) {
       years.forEach((y) => inc(tr, `b_${id}_${y}`, 1));
       row(`once_${id}`, tr, "<=", 1);
     }
+    // R32: tope de lo comprado y vivo en cada año (espejo de capacity.jl)
+    if (cfg.max_new_mode === "alive")
+      for (const y of years) {
+        const tr = T();
+        for (const yp of years) if (yp <= y && yr(y) - yr(yp) < t.lifetime_years) inc(tr, `nc_${id}_${yp}`, 1);
+        row(`alive_${id}_${y}`, tr, "<=", t.max_new_capacity);
+      }
     // R30: instalada en y ≥ cada compra viva (el objetivo la deja en su mínimo)
     if ((cfg.fixed_opex_per_build?.[t.tech_id] ?? 0) > 0)
       for (const y of years) for (const yp of years)

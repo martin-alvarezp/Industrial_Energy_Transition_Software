@@ -635,7 +635,12 @@ struct ScenarioConfig
                                              # o :own_year (la operación del hito con los precios de cada año)
     investment_lead_years::Int               # R29: la inversión se paga N años ANTES de operar (0 = en el año del hito)
     fixed_opex_per_build::Dict{Symbol,Float64}  # R30: USD/año por instalación comprada, mientras existe (además del USD/MW·año)
+    max_new_mode::Symbol                     # R32: :per_build (default) = max_new_capacity por compra;
+                                             # :alive = tope de lo comprado y VIVO en cada año (potencial del sitio)
 end
+
+# retro-compatibilidad: 87 campos → tope de capacidad nueva por compra
+ScenarioConfig(a::Vararg{Any,87}) = ScenarioConfig(a..., :per_build)
 
 # retro-compatibilidad: 84 campos → inversión en el año del hito y sin O&M por instalación
 ScenarioConfig(a::Vararg{Any,84}) = ScenarioConfig(a..., :milestone, 0, Dict{Symbol,Float64}())

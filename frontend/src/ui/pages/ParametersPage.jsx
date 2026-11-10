@@ -256,6 +256,10 @@ export default function ParametersPage({ route }) {
           <Toggle on={draft.allow_new_fossil} onChange={(x) => set({ allow_new_fossil: x })} label={t("par.newFossil")} />
           <Toggle on={draft.renew_existing} onChange={(x) => set({ renew_existing: x })} label={t("par.renew")} />
           <Toggle on={draft.repeat_investments} onChange={(x) => set({ repeat_investments: x })} label={t("par.repeat")} />
+          {draft.repeat_investments && (
+            <Toggle on={draft.max_new_mode === "alive"} onChange={(x) => set({ max_new_mode: x ? "alive" : "per_build" })}
+                    label={t("par.maxNewAlive")} />
+          )}
           {!lib && <>
           <h4 className="par-sub">{t("par.forced")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.forcedHint")}</p>

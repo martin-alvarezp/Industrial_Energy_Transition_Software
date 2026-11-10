@@ -89,3 +89,21 @@ end
           build_model(site, full).params.market_price[mk]
     @test_throws IETO.ValidationError validate_scenario(with_config(own; intermediate_prices = :otro), site)
 end
+
+@testset "R32: tope de capacidad nueva de lo comprado y vivo" begin
+    # con compras repetibles y un tope de 9 MW: por compra se pueden sumar más
+    # de 9 MW en el horizonte; con :alive, lo vivo nunca pasa de 9 MW
+    per = po_case(repeat_investments = true, forced_builds = [(:hp, 1, 9.0), (:hp, 3, 9.0)])
+    @test JuMP.value(per.model[:new_capacity][:hp, 3]) ≈ 9 atol = 1e-6
+    site, cfg = discrete_case(0.0)
+    c = with_config(cfg; horizon_years = 5, wacc = 0.1, repeat_investments = true, max_new_mode = :alive,
+                    forced_builds = [(:hp, 1, 9.0), (:hp, 3, 9.0)])
+    im = build_model(site, c)
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) in (JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED)
+    # sin forzar: la decisión óptima respeta el tope en todos los años
+    al = po_case(repeat_investments = true, max_new_mode = :alive)
+    tot = [sum(JuMP.value(al.model[:new_capacity][:hp, yp]) for yp in 1:y) for y in 1:5]
+    @test all(tot .<= im.params.max_new_capacity[:hp] + 1e-6)
+    @test_throws IETO.ValidationError validate_scenario(with_config(al.config; max_new_mode = :otro), al.site)
+end

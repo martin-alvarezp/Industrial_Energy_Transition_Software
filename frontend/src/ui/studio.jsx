@@ -13,7 +13,7 @@ import {
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
-import { runTemplateSite } from "../lib/templates.js";
+import { runTemplateSite, projectConfigProfiles } from "../lib/templates.js";
 import { EMPTY_LAYOUT, toGeoJSON, fromGeoJSON } from "./layout.js";
 import { readJSON, writeJSON, uid } from "./storage.js";
 
@@ -244,7 +244,9 @@ export function StudioProvider({ children }) {
     // resolución temporal de ESTA corrida (días tipo / año completo) sobre las
     // series horarias del sistema; sin elegirla, la plantilla del sistema
     const site0 = runTemplateSite(twin.siteJson, cfgIn.run_template);
-    const resolved = resolveScenarios(site0, cfgIn, store, stack);
+    const resolved0 = resolveScenarios(site0, cfgIn, store, stack);
+    // R31: los perfiles por año de la configuración siguen a la plantilla de la corrida
+    const resolved = { ...resolved0, cfg: projectConfigProfiles(resolved0.cfg, twin.siteJson, site0) };
     const scen = resolved.rows.length > 0 || (resolved.off ?? []).length > 0;
     const cfg0 = { ...resolved.cfg, scenario_stack: stack0 };
     // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del

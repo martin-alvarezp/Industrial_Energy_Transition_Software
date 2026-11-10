@@ -432,5 +432,6 @@ function load_scenario_config(path::AbstractString)
         Symbol(get(d, "intermediate_prices", "milestone")),
         Int(get(d, "investment_lead_years", 0)),
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_opex_per_build", Dict())),
+        Symbol(get(d, "max_new_mode", "per_build")),
     )
 end

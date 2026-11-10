@@ -69,6 +69,15 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
         for t in FB, y in years, yp in years
         if yp <= y && sets.year_of[y] - sets.year_of[yp] < params.costs[t].lifetime_years]
 
+    # R32: con compras repetibles, max_new_capacity como tope de lo comprado y
+    # vivo en cada año (potencial del sitio: techo, terreno), no de cada compra
+    if cfg.max_new_mode == :alive
+        lt(t) = params.costs[t].lifetime_years
+        m[:max_new_alive] = [JuMP.@constraint(m,
+            sum(new_capacity[t, yp] for yp in years if yp <= y && sets.year_of[y] - sets.year_of[yp] < lt(t)) <=
+            params.max_new_capacity[t]) for t in sets.candidates, y in years]
+    end
+
     # M12: compras forzadas del escenario — new_capacity[t,y] ≥ MW fuerza
     # build[t,y] = 1 vía new_capacity_link (sin fijar binarias)
     forced = [f for f in params.forced_builds

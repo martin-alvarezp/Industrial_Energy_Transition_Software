@@ -12,6 +12,7 @@
 import { readFileSync } from "node:fs";
 import {
   applyTemplate, setRawSeries, templateSteps, expandTo8760, getSeries, seriesKeys, HOURS, clusterDays, projectSeries,
+  projectConfigProfiles,
 } from "../src/lib/templates.js";
 
 const problems = [];
@@ -121,6 +122,25 @@ for (const method of ["seasonal", "monthly", "typical", "full"]) {
   const s30 = applyTemplate(setRawSeries(demo, "demands.electricity", raw), "typical", { days: 30 });
   check(s30.timesteps.length === 720 && s30.hourly.template.days === 30, `typical k=30: ${s30.timesteps.length} pasos`);
   console.log(`✓ typical  días tipo: k=2 exacto (error ${err.toExponential(1)}), k=30 → 720 pasos, determinista`);
+}
+
+// R31: la resolución de la corrida re-expresa también los perfiles por paso de
+// la configuración (demanda por año, precio por año…) y conserva su energía
+{
+  const site = setRawSeries(demo, "demands.electricity", raw);
+  const prof = site.timesteps.map((_, i) => 10 + (i % 24));                  // perfil por paso del sitio
+  const cfg = { demand_profiles: { electricity: { "3": prof } }, price_profiles_by_year: { m: { "2": prof } },
+                weight_by_year: { "2": [1] } };
+  const t30 = applyTemplate(site, "typical", { days: 30 });
+  const pc = projectConfigProfiles(cfg, site, t30);
+  const out = pc.demand_profiles.electricity["3"];
+  const e0 = energy(prof, site.timesteps), e1 = energy(out, t30.timesteps);
+  check(out.length === t30.timesteps.length, `R31: el perfil quedó con ${out.length} pasos (plantilla ${t30.timesteps.length})`);
+  check(close(e0, e1, 1e-5), `R31: energía del perfil ${e0} → ${e1}`);
+  check(pc.price_profiles_by_year.m["2"].length === t30.timesteps.length, "R31: el precio por año no se re-expresó");
+  check(pc.weight_by_year === undefined, "R31: los días tipo propios de cada año (plantilla vieja) debían descartarse");
+  check(projectConfigProfiles(cfg, site, site) === cfg, "R31: sin cambio de plantilla la configuración debe quedar igual");
+  console.log(`✓ R31     perfiles de la configuración en la plantilla de la corrida (${prof.length} → ${out.length} pasos, energía ${e1.toFixed(1)})`);
 }
 
 if (problems.length) {

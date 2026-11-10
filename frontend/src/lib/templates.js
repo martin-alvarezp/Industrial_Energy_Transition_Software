@@ -323,7 +323,46 @@ export function applyTemplate(siteJson, method, { hemisphere = "south", days = D
               template: method === "typical" ? { method, hemisphere, days, day_map: assign } : { method, hemisphere } },
   };
   for (const k of keys) out = setSeries(out, k, projectSeries(full8760[k], steps).map(round));
+  STEPS.set(out, steps);
   return out;
+}
+
+// R31: el mapa de cada paso nuevo a sus horas, para re-expresar también las
+// series por paso de la CONFIGURACIÓN (perfiles por año) en la misma plantilla
+const STEPS = new WeakMap();
+
+/** Una serie por paso del sitio `from` re-expresada en la plantilla de `to` (o tal cual). */
+export function projectStepSeries(values, from, to) {
+  const steps = STEPS.get(to);
+  if (!steps || !Array.isArray(values) || values.length !== from.timesteps.length) return values;
+  const h = values.length === HOURS || values.length === 4 * HOURS ? values
+    : expandTo8760(values, from.timesteps, from.hourly?.template?.hemisphere ?? "south", from.hourly?.template?.day_map);
+  return projectSeries(h, steps).map(round);
+}
+
+/**
+ * R31: re-expresa en la plantilla de la corrida los perfiles por paso de la
+ * configuración (demanda, precios, disponibilidad y COP por año, disponibilidad
+ * de mercados). Los días tipo propios de cada año (R26) describen la plantilla
+ * vieja: se descartan. Sin cambio de plantilla devuelve la configuración tal cual.
+ */
+export function projectConfigProfiles(cfg, from, to) {
+  if (!STEPS.get(to) || from === to) return cfg;
+  const P = (v) => projectStepSeries(v, from, to);
+  const map1 = (d) => (d ? Object.fromEntries(Object.entries(d).map(([k, v]) => [k, P(v)])) : d);
+  const map2 = (d) => (d ? Object.fromEntries(Object.entries(d).map(([k, v]) => [k, map1(v)])) : d);
+  const map3 = (d) => (d ? Object.fromEntries(Object.entries(d).map(([k, v]) => [k, map2(v)])) : d);
+  const { weight_by_year: _w, month_by_year: _m, day_sequence_by_year: _s, ...rest } = cfg;
+  return {
+    ...rest,
+    demand_profiles: map2(cfg.demand_profiles),
+    price_profiles_by_year: map2(cfg.price_profiles_by_year),
+    profiles_by_year: map2(cfg.profiles_by_year),
+    market_availability_by_year: map2(cfg.market_availability_by_year),
+    market_availability: map1(cfg.market_availability),
+    input_profiles: map2(cfg.input_profiles),
+    input_profiles_by_year: map3(cfg.input_profiles_by_year),
+  };
 }
 
 /**
