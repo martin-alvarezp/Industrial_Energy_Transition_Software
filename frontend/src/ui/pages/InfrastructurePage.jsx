@@ -465,7 +465,7 @@ export default function InfrastructurePage({ route }) {
                       onClose={() => setMarketDrawer(null)} />
       )}
       {arcDrawer && (
-        <ArcDrawer draft={arcDrawer.draft} isNew={arcDrawer.isNew} siteJson={siteJson}
+        <ArcDrawer draft={arcDrawer.draft} isNew={arcDrawer.isNew} siteJson={siteJson} nodes={layout.nodes ?? []}
                    onSave={saveArc} onDelete={deleteArc} onClose={() => setArcDrawer(null)} />
       )}
       {!layout.center && !systemPoints(layout).length && view === "map" && !editing && (

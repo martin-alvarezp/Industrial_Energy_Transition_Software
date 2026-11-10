@@ -885,3 +885,12 @@ extend({
   "nf.bought": ["compra", "purchase"],
   "nf.demand": ["demanda", "demand"],
 });
+
+// ── nodos conectados por líneas ──
+extend({
+  "node.lines": ["Líneas", "Lines"],
+  "node.noLines": ["Sin líneas: comparte la barra común del sistema", "No lines: shares the system's common bus"],
+  "node.demands": ["Demandas que se consumen aquí", "Demands consumed here"],
+  "node.demandsNeedLine": ["Conecta el nodo con una línea para que una demanda se balancee en él.",
+                           "Connect the node with a line so a demand can balance in it."],
+});

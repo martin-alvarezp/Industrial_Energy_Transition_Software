@@ -11,7 +11,7 @@ import {
   daySequence,
 } from "../lib/api.js";
 import { setCurrency } from "../lib/format.js";
-import { blankSite } from "../lib/twin.js";
+import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
 import { runTemplateSite } from "../lib/templates.js";
 import { EMPTY_LAYOUT, toGeoJSON, fromGeoJSON } from "./layout.js";
@@ -139,15 +139,23 @@ export function StudioProvider({ children }) {
     return name;
   }, [apiUp, logChange, refreshSites, loadSite]);
 
+  // la membresía en nodos vive en el layout pero define la barra de cada
+  // equipo en el modelo: tras cada cambio se re-sincroniza (applyTopology)
+  const syncTopo = (siteJson, layout) =>
+    (siteJson?.arcs?.length && topologyDiffers(siteJson, layout?.techNode)
+      ? applyTopology(siteJson, layout?.techNode) : siteJson);
   const patchSite = useCallback((fn, text) => {
-    setTwin((t) => t && ({ ...t, dirty: true, siteJson: fn(t.siteJson) }));
+    setTwin((t) => t && ({ ...t, dirty: true, siteJson: syncTopo(fn(t.siteJson), t.layout) }));
     if (text) logChange(text);
-  }, [logChange]);
+  }, [logChange]); // eslint-disable-line react-hooks/exhaustive-deps
   const patchLayout = useCallback((p, text) => {
-    setTwin((t) => t && ({ ...t, dirty: true,
-      layout: { ...t.layout, ...(typeof p === "function" ? p(t.layout) : p) } }));
+    setTwin((t) => {
+      if (!t) return t;
+      const layout = { ...t.layout, ...(typeof p === "function" ? p(t.layout) : p) };
+      return { ...t, dirty: true, layout, siteJson: syncTopo(t.siteJson, layout) };
+    });
     if (text) logChange(text);
-  }, [logChange]);
+  }, [logChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveCurrentSite = useCallback(async (asName) => {
     const name = asName ?? siteName;

@@ -152,7 +152,59 @@ const inNode = Object.entries((await layoutOnDisk())?.properties?.techNode ?? {}
 step("Flujo del nodo: barras por vector y un recuadro por componente", nBus >= 2 && nComp === n3,
      `${nBus} barras, ${nComp} componentes (${inNode} en el nodo)`);
 
+// 8 · segundo nodo + línea entre nodos: los componentes del nodo pasan a su barra
+const siteOnDisk = async () => api(`/sites/${SITE}`);
+await clickText(".ip-toolbar button", "Agregar");
+await sleep(200);
+await clickText(".ui-menu-row, .ui-menu button", "Nodo");
+const box2 = await p.$eval(".sm-map", (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width * 0.12, r.y + r.height * 0.25]; });
+await p.mouse.click(box2[0], box2[1]);
+await p.waitForSelector('[data-testid="node-name"]', { timeout: 5000 });
+await p.type('[data-testid="node-name"]', "Planta");
+await p.click('[data-testid="node-create"]');
+await sleep(600);
+if (!(await p.$(".ip-panel.collapsed"))) await p.click('.ip-panel-head button[aria-label="toggle"]');
+await sleep(500);
+step("dos marcadores de nodo", (await p.$$(".sm-node")).length === 2);
+await clickText(".ip-toolbar button", "Agregar");
+await sleep(200);
+await clickText(".ui-menu-row, .ui-menu button", "Conexión");
+await sleep(300);
+const marks = await p.$$(".sm-node");
+const names = await Promise.all(marks.map((m) => m.evaluate((e) => e.textContent)));
+const casa = marks[names.findIndex((x) => x.includes("Casa"))], planta = marks[names.findIndex((x) => x.includes("Planta"))];
+await casa.click(); await sleep(250); await planta.click(); await sleep(500);
+step("conectar dos nodos abre la conexión con sus nombres", await waitText("Nueva conexión", 5000) &&
+     (await text()).includes("Casa de calderas") && (await text()).includes("Planta"));
+await clickText("button", "Crear conexión");
+let sd = null;
+for (let i = 0; i < 30; i++) {
+  sd = await siteOnDisk();
+  if ((sd?.arcs ?? []).length) break;
+  await sleep(500);
+}
+const nodeIds = Object.fromEntries((sd?.layout?.features ?? []).filter((f) => f.properties?.role === "node").map((f) => [f.properties.name, f.properties.node_id]));
+const arc = sd?.arcs?.[0];
+step("la línea une los dos nodos en el sitio guardado", arc?.from === nodeIds["Casa de calderas"] && arc?.to === nodeIds["Planta"],
+     `${arc?.from} → ${arc?.to}`);
+const members = Object.entries(sd?.layout?.properties?.techNode ?? {}).filter(([, n]) => n === nodeIds["Casa de calderas"]).map(([t]) => t);
+const byId = Object.fromEntries((sd?.technologies ?? []).map((t) => [t.tech_id, t]));
+step("los componentes del nodo conectado comparten su barra en el modelo (node = id del nodo)",
+     members.length > 0 && members.every((t) => byId[t]?.node === nodeIds["Casa de calderas"]), `${members.length} componentes`);
+const loose = (sd?.technologies ?? []).filter((t) => !members.includes(t.tech_id) && t.tech_id !== "offsets");
+step("los que no están en un nodo conectado siguen en la barra común", loose.every((t) => !t.node),
+     loose.map((t) => `${t.tech_id}:${t.node}`).join(","));
+
+// 9 · la demanda se consume en «Planta»
+await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/infrastructure?node=${nodeIds["Planta"]}&tab=info`, { waitUntil: "networkidle2" });
+await p.waitForSelector('[data-testid^="node-demand-"]', { timeout: 30000 });
+const dem = await p.$$eval('[data-testid^="node-demand-"]', (els) => els.map((e) => e.getAttribute("data-testid").replace("node-demand-", "")));
+await p.click(`[data-testid="node-demand-${dem[0]}"]`);
+for (let i = 0; i < 30; i++) { sd = await siteOnDisk(); if (sd?.demand_nodes?.[dem[0]]) break; await sleep(500); }
+step("marcar una demanda en el nodo la guarda en demand_nodes", sd?.demand_nodes?.[dem[0]] === nodeIds["Planta"],
+     JSON.stringify(sd?.demand_nodes));
+
 step("sin errores de página", errors.length === 0, errors[0] ?? "");
 await cleanup();
 await b.close();
-console.log("\nNODOS OK: crear nodo → agregar muchos componentes → un solo marcador → guardado → mover fuera.");
+console.log("\nNODOS OK: crear nodo → muchos componentes → un solo marcador → guardado → mover fuera → flujo → línea entre nodos → demanda en el nodo.");

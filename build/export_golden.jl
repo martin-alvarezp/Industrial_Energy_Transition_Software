@@ -369,3 +369,17 @@ nst0 = length(site0.timesteps)
 dump("demo_meses_por_anio_n3", site0, with_config(cfg0; horizon_years = 3, emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9,
      month_by_year = Dict(2 => [mod1(i, 12) for i in 1:nst0])))
 println("fixtures dorados en ", out)
+
+# Nodos con muchos componentes (como los arma la interfaz): todo el demo en el
+# nodo "nodo_casa_de_calderas", las demandas en "nodo_planta" y una línea con
+# η = 0,9 entre ambos. Ancla el espejo web de nodos que NO son componentes.
+let sj = JSON3.read(JSON3.write(site_json(site0)), Dict{String,Any})
+    for t in sj["technologies"]; t["node"] = "nodo_casa_de_calderas"; end
+    dem = collect(keys(sj["demands"]))
+    sj["arcs"] = [Dict("arc_id" => "linea", "name" => "Línea", "from" => "nodo_casa_de_calderas",
+                       "to" => "nodo_planta", "directed" => true,
+                       "ports" => [Dict("carrier" => c, "capacity" => nothing, "efficiency" => 0.9) for c in dem])]
+    sj["demand_nodes"] = Dict(c => "nodo_planta" for c in dem)
+    dump("demo_nodos_linea_n3", IETO.site_from_json(JSON3.read(JSON3.write(sj))),
+         with_config(cfg0; horizon_years = 3))
+end

@@ -72,11 +72,13 @@ export function nodeFlowLayout(siteJson, techs) {
   return { buses, techs: T.map((x) => ({ ...x, pos: techPos.get(x.t.tech_id) })), links, width, height: y - ROW_GAP + PAD };
 }
 
-export default function NodeFlow({ siteJson, techs, name, onSelectComponent }) {
+export default function NodeFlow({ siteJson, techs, name, nodeId, onSelectComponent }) {
   const { t } = useI18n();
   const g = useMemo(() => nodeFlowLayout(siteJson, techs), [siteJson, techs]);
   const bought = new Set((siteJson.markets ?? []).filter((m) => (m.direction ?? "buy") === "buy").map((m) => m.carrier_id ?? m.carrier));
-  const demand = new Set(Object.keys(siteJson.demands ?? {}));
+  // con red, la demanda se consume en su nodo (demand_nodes); sin red, en todos lados
+  const demand = new Set(Object.keys(siteJson.demands ?? {}).filter((c) =>
+    !siteJson.arcs?.length || (siteJson.demand_nodes?.[c] ?? "main") === nodeId));
   if (!techs.length) return <p className="ui-hint" style={{ padding: "12px 0" }}>{t("cc.empty")}</p>;
   return (
     <div className="nf-wrap" data-testid="node-flow">

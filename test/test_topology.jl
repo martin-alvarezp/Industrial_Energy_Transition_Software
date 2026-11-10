@@ -251,3 +251,37 @@ end
     @test err isa ValidationError
     @test any(occursin("efficiency", p) for p in err.problems)
 end
+
+@testset "Nodos con muchos componentes (como los arma la interfaz): JSON con node = id del nodo" begin
+    # La interfaz agrupa componentes en NODOS del mapa ("Casa de calderas"):
+    # cada componente lleva `node = "nodo_…"` y las líneas unen nodos que NO
+    # son componentes. Oráculo exacto: todo el demo en un nodo, las demandas
+    # en otro, unidos por una línea sin tope y η = 1 ⇒ el MISMO VAN que la
+    # placa de cobre. Con η < 1 la línea pierde energía ⇒ cuesta más.
+    site, cfg = load_and_validate(DEMO_DIR)
+    cfg3 = with_config(cfg; horizon_years = 3)
+    base = run_scenario(site, cfg3; verbose = false, shadow_prices = false)
+    sj = JSON3.read(JSON3.write(site_json(site)), Dict{String,Any})
+    dem = collect(keys(sj["demands"]))
+    for t in sj["technologies"]
+        t["node"] = "nodo_casa_de_calderas"
+    end
+    mk(eta) = begin
+        d = deepcopy(sj)
+        d["arcs"] = [Dict("arc_id" => "linea", "name" => "Línea", "from" => "nodo_casa_de_calderas",
+                          "to" => "nodo_planta", "directed" => true,
+                          "ports" => [Dict("carrier" => c, "capacity" => nothing, "efficiency" => eta) for c in dem])]
+        d["demand_nodes"] = Dict(c => "nodo_planta" for c in dem)
+        site_from_json(JSON3.read(JSON3.write(d)))
+    end
+    s1 = mk(1.0)
+    @test validate_site(s1)
+    @test Set(site_nodes(s1)) ⊇ Set([:nodo_casa_de_calderas, :nodo_planta])
+    @test all(tech_node(s1, Symbol(t["tech_id"])) == :nodo_casa_de_calderas for t in sj["technologies"])
+    r1 = run_scenario(s1, cfg3; verbose = false, shadow_prices = false)
+    @test r1.feasible
+    @test r1.npv ≈ base.npv rtol = 1e-6
+    r9 = run_scenario(mk(0.9), cfg3; verbose = false, shadow_prices = false)
+    @test r9.feasible
+    @test r9.npv > base.npv * (1 + 1e-6)     # el VAN es costo (positivo): las pérdidas lo encarecen
+end

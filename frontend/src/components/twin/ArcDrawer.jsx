@@ -10,7 +10,7 @@ import { useL } from "../../ui/i18n.jsx";
  * capacidad (MW, vacío = sin tope) y su eficiencia de transporte (η). El
  * recorrido en el mapa se dibuja a mano; aquí solo van los parámetros físicos.
  */
-export default function ArcDrawer({ draft: initial, isNew, siteJson,
+export default function ArcDrawer({ draft: initial, isNew, siteJson, nodes = [],
                                     onSave, onDelete, onClose }) {
   const L = useL();
   const [draft, setDraft] = useState(initial);
@@ -18,9 +18,9 @@ export default function ArcDrawer({ draft: initial, isNew, siteJson,
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
   const opts = arcCarrierOptions(siteJson);
-  const problems = arcProblems(draft, siteJson, isNew);
-  const from = arcEndpointLabel(siteJson, draft.from);
-  const to = arcEndpointLabel(siteJson, draft.to);
+  const problems = arcProblems(draft, siteJson, isNew, nodes);
+  const from = arcEndpointLabel(siteJson, draft.from, nodes);
+  const to = arcEndpointLabel(siteJson, draft.to, nodes);
 
   const setPort = (i, patch) =>
     set({ ports: draft.ports.map((p, j) => (j === i ? { ...p, ...patch } : p)) });

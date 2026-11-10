@@ -863,8 +863,8 @@ const techById = (siteJson, id) =>
 export const arcCarrierOptions = (siteJson) =>
   siteJson.carriers.filter((c) => ARC_CARRIER_CATS.includes(c.category));
 
-export const arcEndpointLabel = (siteJson, id) =>
-  techById(siteJson, id)?.name ?? id;
+export const arcEndpointLabel = (siteJson, id, nodes = []) =>
+  techById(siteJson, id)?.name ?? nodes.find((n) => n.id === id)?.name ?? id;
 
 /** Arco nuevo entre dos equipos, listo para el drawer. */
 export function blankArc(from, to, siteJson) {
@@ -877,24 +877,40 @@ export function blankArc(from, to, siteJson) {
 
 /**
  * Deriva el `node` de cada equipo a partir de los arcos: un equipo enchufado a
- * algún arco es su propia barra (node = tech_id); el resto queda en la barra
- * común (:main, sin clave). Sin arcos, el sitio recupera su forma canónica del
- * MVP (sin claves de topología) — la huella no cambia.
+ * algún arco es su propia barra (node = tech_id); un equipo que vive en un
+ * NODO del mapa (`techNode`: componente → nodo, del layout) conectado por
+ * alguna línea comparte la barra de ese nodo (node = id del nodo); el resto
+ * queda en la barra común (:main, sin clave). Las demandas asignadas a un
+ * nodo que ya no está conectado vuelven a :main. Sin arcos, el sitio recupera
+ * su forma canónica del MVP (sin claves de topología) — la huella no cambia.
  */
-export function applyTopology(siteJson) {
+export function applyTopology(siteJson, techNode = null) {
   const arcs = siteJson.arcs ?? [];
   const endpoints = new Set(arcs.flatMap((a) => [a.from, a.to]));
   const technologies = siteJson.technologies.map((t) => {
     if (endpoints.has(t.tech_id))
       return t.node === t.tech_id ? t : { ...t, node: t.tech_id };
+    const home = techNode?.[t.tech_id];
+    if (home && endpoints.has(home)) return t.node === home ? t : { ...t, node: home };
     if (t.node == null) return t;
     const { node: _n, ...rest } = t;
     return rest;
   });
   const out = { ...siteJson, technologies };
   if (arcs.length === 0) { delete out.arcs; delete out.demand_nodes; }
-  else out.arcs = arcs;
+  else {
+    out.arcs = arcs;
+    const dn = Object.fromEntries(Object.entries(siteJson.demand_nodes ?? {}).filter(([, n]) => endpoints.has(n)));
+    if (Object.keys(dn).length) out.demand_nodes = dn; else delete out.demand_nodes;
+  }
   return out;
+}
+
+/** ¿Cambiaría applyTopology algo? (evita re-escribir el sitio sin necesidad) */
+export function topologyDiffers(siteJson, techNode) {
+  const next = applyTopology(siteJson, techNode);
+  if ((next.technologies ?? []).some((t, i) => t.node !== siteJson.technologies[i]?.node)) return true;
+  return JSON.stringify(next.demand_nodes ?? null) !== JSON.stringify(siteJson.demand_nodes ?? null);
 }
 
 export function upsertArc(siteJson, arc) {
@@ -918,12 +934,13 @@ export function setDemandNode(siteJson, carrier, node) {
 export const hasTopology = (siteJson) => (siteJson.arcs ?? []).length > 0;
 
 /** Validación ligera de un arco (espejo de validate_site, M14). */
-export function arcProblems(draft, siteJson, isNew) {
+export function arcProblems(draft, siteJson, isNew, nodes = []) {
   const p = [];
+  const exists = (id) => techById(siteJson, id) || nodes.some((n) => n.id === id);
   if (draft.from === draft.to)
     p.push("un arco no puede conectar un equipo consigo mismo");
-  if (!techById(siteJson, draft.from)) p.push("el extremo de origen no existe");
-  if (!techById(siteJson, draft.to)) p.push("el extremo de destino no existe");
+  if (!exists(draft.from)) p.push("el extremo de origen no existe");
+  if (!exists(draft.to)) p.push("el extremo de destino no existe");
   if ((draft.ports ?? []).length === 0)
     p.push("un arco necesita al menos un vector");
   for (const port of draft.ports ?? []) {

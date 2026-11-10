@@ -17,7 +17,7 @@ import { Menu, Modal } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { locationOf, polygonCentroid, nodeOf, techsInNode, nodeLocation, assignToNode } from "../layout.js";
 import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
-import { polygonAreaM2 } from "../../lib/twin.js";
+import { polygonAreaM2, setDemandNode } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
 import { setRawSeries } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
@@ -217,7 +217,7 @@ export default function SystemPanel({
   onDeleteComponent, onAddNode,
 }) {
   const { t, lang } = useI18n();
-  const { siteName, twin, patchLayout, readonly } = useStudio();
+  const { siteName, twin, patchLayout, patchSite, readonly } = useStudio();
   const { siteJson, layout } = twin;
   // datos generales (país, industria, unidad producida…): layout.meta
   const meta = layout.meta ?? {};
@@ -261,6 +261,7 @@ export default function SystemPanel({
     }), `Nodo '${node.name}' eliminado`);
     setNode(null);
   };
+  const nodeArcs = node ? (siteJson.arcs ?? []).filter((a) => a.from === node.id || a.to === node.id) : [];
   const nodeLocName = node ? layout.locations?.find((l) => l.id === nodeLocation(layout, node))?.name : null;
   const renameLoc = (name) => patchLayout((l) => ({
     locations: l.locations.map((x) => (x.id === loc.id ? { ...x, name } : x)) }));
@@ -356,6 +357,21 @@ export default function SystemPanel({
                 <dt>{t("panel.description")}</dt>
                 <dd><textarea className="ui-textarea" value={node.description ?? ""}
                               onChange={(e) => patchNode({ description: e.target.value })} /></dd>
+                <dt>{t("node.lines")}</dt>
+                <dd>{nodeArcs.length ? nodeArcs.map((a) => a.name || a.arc_id).join(", ") : t("node.noLines")}</dd>
+                <dt>{t("node.demands")}</dt>
+                <dd>
+                  {!nodeArcs.length && <span className="ui-hint">{t("node.demandsNeedLine")}</span>}
+                  {nodeArcs.length > 0 && Object.keys(siteJson.demands ?? {}).map((c) => (
+                    <label key={c} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input type="checkbox" data-testid={`node-demand-${c}`}
+                             checked={siteJson.demand_nodes?.[c] === node.id}
+                             onChange={(e) => patchSite((sj) => setDemandNode(sj, c, e.target.checked ? node.id : null),
+                               e.target.checked ? `Demanda de '${c}' consumida en el nodo '${node.name}'` : `Demanda de '${c}' vuelve a la barra común`)} />
+                      {siteJson.carriers.find((x) => x.carrier_id === c)?.name ?? c}
+                    </label>
+                  ))}
+                </dd>
               </dl>
             )}
             {curTab === "info" && loc && (
@@ -440,7 +456,7 @@ export default function SystemPanel({
             {curTab === "weather" && loc && <WeatherTab loc={loc} techs={inLoc} />}
             {curTab === "weather" && node && <WeatherTab techs={inLoc} at={node.pos} />}
             {curTab === "flow" && node && (
-              <NodeFlow siteJson={siteJson} techs={inLoc} name={node.name} onSelectComponent={onOpenComponent} />
+              <NodeFlow siteJson={siteJson} techs={inLoc} name={node.name} nodeId={node.id} onSelectComponent={onOpenComponent} />
             )}
           </div>
         </>
