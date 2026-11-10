@@ -210,10 +210,23 @@ export function emissionsWaterfall(result, kind = "net") {
 }
 
 /** KPIs del horizonte (con factor nominal/real). */
+/** Años que representa cada fila del desglose: 1, o con hitos que valen por sus
+ *  años (R18) los que van hasta el hito siguiente (el último, hasta el horizonte). */
+export function repYearCounts(result) {
+  const cb = result?.cost_breakdown ?? [];
+  const cfg = result?.assumptions?.scenario_config ?? {};
+  if (!(cfg.milestone_years ?? []).length || (cfg.milestone_weighting ?? "years") !== "years") return cb.map(() => 1);
+  const H = cfg.horizon_years ?? cb[cb.length - 1]?.year ?? 0;
+  return cb.map((c, i) => Math.max(1, (i + 1 < cb.length ? cb[i + 1].year : H + 1) - c.year));
+}
+
 export function horizonKpis(result, factor = () => 1) {
   const cb = result?.cost_breakdown ?? [];
+  const n = repYearCounts(result);
   const inv = cb.reduce((s, c) => s + c.capex * factor(c.year), 0);
-  const total = cb.reduce((s, c) => s + (c.total - (c.salvage_credit ?? 0)) * factor(c.year), 0);
+  // la inversión es del año en que se paga; el resto de los costos de un hito
+  // se repite en cada año que el hito representa (antes se sumaba una sola vez)
+  const total = inv + cb.reduce((s, c, i) => s + (c.total - (c.salvage_credit ?? 0) - c.capex) * n[i] * factor(c.year), 0);
   const em = result?.emissions ?? [];
   const red = em.length > 1 && em[0].net > 0 ? 1 - em[em.length - 1].net / em[0].net : null;
   return { investment: inv, opex: total - inv, total, reduction: red,
