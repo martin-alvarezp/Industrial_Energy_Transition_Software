@@ -32,7 +32,8 @@
     "verify:measures": "node scripts/verify_measures.mjs",
     "verify:nodes": "node scripts/verify_nodes.mjs",
     "verify:components": "node scripts/verify_components.mjs",
-    "verify:examples": "node scripts/verify_examples.mjs"
+    "verify:examples": "node scripts/verify_examples.mjs",
+    "verify:examples-ui": "node scripts/verify_examples_ui.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

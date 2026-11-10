@@ -78,6 +78,7 @@ export function toConfig(cfg) {
     max_new_mode: cfg.max_new_mode ?? "per_build",           // R32: tope por compra o de lo vivo
     replace_between_milestones: !!cfg.replace_between_milestones,   // R34: reposición automática entre hitos
     build_limits: cfg.build_limits ?? {},                   // R35: tamaño de compra por tramos de años
+    bau_techs: cfg.bau_techs ?? [],                         // situación actual: candidatas con que repone y crece
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
@@ -118,8 +119,10 @@ export function applyScenario(site, cfg, scenario) {
       return [site, { ...c, emissions_cap_net_start: UNCAPPED,
                       emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED }];
     case "bau": {
+      // el parque existente y las candidatas que la situación actual puede
+      // comprar (bau_techs: reposición y crecimiento), espejo de apply_scenario
       const existing = site.technologies
-        .filter((t) => !t.investable).map((t) => t.tech_id);
+        .filter((t) => !t.investable || (c.bau_techs ?? []).includes(t.tech_id)).map((t) => t.tech_id);
       return [site, { ...c, emissions_cap_net_start: UNCAPPED,
                       emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED,
                       allowed_techs: existing }];

@@ -164,6 +164,7 @@ export function toOverrides(cfg) {
     max_new_mode: cfg.max_new_mode ?? "per_build",           // R32: tope por compra o de lo vivo
     replace_between_milestones: !!cfg.replace_between_milestones,   // R34: reposición automática entre hitos
     build_limits: cfg.build_limits ?? {},                   // R35: tamaño de compra por tramos de años
+    bau_techs: cfg.bau_techs ?? [],                         // situación actual: candidatas con que repone y crece
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},

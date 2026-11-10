@@ -727,6 +727,8 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .run-stack-tools { display: inline-flex; }
 .run-stack-add { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 1px dashed var(--ui-border, #cfd8d3); border-radius: 8px; padding: 5px 8px; margin-bottom: 6px; cursor: pointer; }
 .run-check { display: flex; gap: 8px; align-items: center; margin: 4px 0 10px; }
+.par-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; margin-bottom: 8px; }
+.par-checks .run-check { margin: 2px 0; }
 .sens-row { flex-wrap: wrap; }
 .sens-row .ui-input.sens-year { width: 92px; }
 

@@ -3,6 +3,7 @@
 // (docs/api_contract.md) — la UI no distingue la fuente. Espejo de
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
+import { diagnoseWeb } from "./diagnose.js";
 import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies, cohortLinks, cohortLife, coverIndex, salvageEnd, byYearAt, marketEfTable,
   modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt , milestoneMean, costFactor } from "./lp.js";
 
@@ -66,9 +67,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     return { meta, kpis: {}, investments: [], capacity: [], cost_breakdown: [],
              emissions: [], res_share: [], dispatch: [],
              assumptions: { scenario_config: cfg, log: [] },
-             infeasibility: { hints: [
-               "El optimizador web no encontró un plan factible — revisa capacidades máximas, metas de emisiones y demandas (el diagnóstico analítico detallado corre en la versión de escritorio).",
-             ] } };
+             infeasibility: { hints: diagnoseWeb(site, cfg, scenario) } };
 
   const V = (name) => sol.Columns[name]?.Primal ?? 0;
 

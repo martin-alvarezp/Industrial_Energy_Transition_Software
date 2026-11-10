@@ -25,7 +25,7 @@ const STEPS = ["run.stepBasic", "run.stepModel", "run.stepTime", "run.stepSolver
 
 export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const { t } = useI18n();
-  const { draft, run, running, runError, runs = [], twin, siteName } = useStudio();
+  const { draft, run, running, runError, runs = [], twin, siteName, apiUp } = useStudio();
   const techIds = new Set((twin?.siteJson?.technologies ?? []).map((x) => x.tech_id));
   const scenarios = scenarioList({ scenarios: twin?.layout?.scenarios ?? [], params: twin?.layout?.params ?? [] });
   const [name, setName] = useState("");
@@ -65,6 +65,22 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const nDays = Math.min(365, Math.max(2, Math.round(+days || DEFAULT_TYPICAL_DAYS)));
   const runTemplate = hasRaw && res !== "system" ? { method: res, days: nDays, ...(res === "typical" && peaks ? { peaks: true } : {}) } : null;
 
+  // años que se optimizan EN ESTA CORRIDA (hitos, R6): parten de los de
+  // Parámetros; el primer año del horizonte siempre es hito (cada hito vale
+  // hasta el siguiente y los años antes del primero quedarían sin costo)
+  const by = draft.base_year > 0 ? draft.base_year : 1;
+  const lastY = by + (draft.horizon_years ?? 1) - 1;
+  const [msText, setMsText] = useState((draft.milestone_years ?? []).join(", "));
+  const msParsed = msText.split(/[,;\s]+/).filter(Boolean).map(Number);
+  const msBad = msParsed.filter((x) => !Number.isInteger(x) || x < by || x > lastY);
+  const milestones = msParsed.length ? [...new Set([by, ...msParsed.filter((x) => !msBad.includes(x))])].sort((a, b) => a - b) : [];
+  const nYears = milestones.length || (draft.horizon_years ?? 1);
+  // peso de la corrida: pasos por año × años optimizados (el navegador no da para todo)
+  const stepsRun = res === "typical" ? nDays * 24 : res === "full" ? 8760 : steps;
+  const heavy = !apiUp && stepsRun * nYears > 25_000;
+  // situación actual: lo que puede comprar (bau_techs)
+  const bauBuy = (draft.bau_techs ?? []).map((id) => twin?.siteJson?.technologies?.find((x) => x.tech_id === id)?.name ?? id);
+
   const capacitiesOf = async (id) => {
     const r = runs.find((x) => x.id === id);
     const bundle = r?.bundle ?? (await fetchRun(siteName, id))?.payload;
@@ -80,7 +96,8 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       const solver = { solver_time_limit_min: +limitMin > 0 ? +limitMin : null,
                        solver_gap_pct: +gapPct >= 0 ? +gapPct : 0.01 };
       const scenario = analysis === "bau" ? "bau" : useTarget ? "emissions_cap" : "least_cost";
-      const solver2 = { ...solver, run_template: runTemplate };
+      const solver2 = { ...solver, run_template: runTemplate,
+                        ...(dispatch ? {} : { milestone_years: milestones }) };
       let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver2 };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
@@ -133,7 +150,8 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
             {[["bau", "run.bau", "run.bauHint"], ["plan", "run.plan", "run.planHint"]].map(([v, k, h]) => (
               <label key={v} className={"ui-radio-card" + (analysis === v ? " on" : "")} data-testid={`run-analysis-${v}`}>
                 <input type="radio" name="analysis" checked={analysis === v} onChange={() => setAnalysis(v)} />
-                <b>{t(k)}</b><span className="ui-hint" style={{ margin: 0 }}>{t(h)}</span>
+                <b>{t(k)}</b><span className="ui-hint" style={{ margin: 0 }}>
+                  {v === "bau" && bauBuy.length ? t("run.bauHintBuy", { list: bauBuy.join(", ") }) : t(h)}</span>
               </label>
             ))}
           </div>
@@ -254,6 +272,18 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       )}
       {res === "full" && <p className="ui-hint">{t("run.resFullHint")}</p>}
       {!hasRaw && <p className="ui-hint" data-testid="run-res-noraw">{t("run.resNoRaw")}</p>}
+      {!dispatch && (
+        <div className="ui-field">
+          <label>{t("run.milestones", { a: by, b: lastY })}</label>
+          <input className="ui-input" data-testid="run-milestones" value={msText} placeholder={t("par.allYears")}
+                 onChange={(e) => setMsText(e.target.value)} />
+          <p className="ui-hint">
+            {milestones.length ? t("run.milestonesHint", { n: milestones.length, list: milestones.join(", ") }) : t("run.milestonesAll", { n: draft.horizon_years })}
+            {msBad.length > 0 && <> {t("run.milestonesBad", { list: msBad.join(", ") })}</>}
+          </p>
+        </div>
+      )}
+      {heavy && <p className="ui-banner warn" data-testid="run-heavy">{t("run.heavy", { n: (stepsRun * nYears).toLocaleString() })}</p>}
 
       {/* 4 · Optimizador */}
       <h4 className="run-sec" ref={refs[3]}>4 · {t("run.stepSolver")}</h4>

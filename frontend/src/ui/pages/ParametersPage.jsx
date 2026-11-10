@@ -271,6 +271,25 @@ export default function ParametersPage({ route }) {
                     label={t("par.replaceBetween")} />
           )}
           {!lib && <>
+          {/* situación actual (BaU): con qué candidatas repone y crece */}
+          <h4 className="par-sub">{t("par.bauTechs")}</h4>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.bauTechsHint")}</p>
+          {candidates.length === 0 ? <p className="ui-hint">{t("par.noCandidates")}</p> : (
+            <div className="par-checks" data-testid="bau-techs">
+              {candidates.map((x) => {
+                const on = (draft.bau_techs ?? []).includes(x.tech_id);
+                return (
+                  <label key={x.tech_id} className="run-check">
+                    <input type="checkbox" checked={on} data-testid={`bau-${x.tech_id}`}
+                           onChange={(e) => set({ bau_techs: e.target.checked
+                             ? [...(draft.bau_techs ?? []), x.tech_id]
+                             : (draft.bau_techs ?? []).filter((id) => id !== x.tech_id) })} />
+                    {x.name ?? x.tech_id}
+                  </label>
+                );
+              })}
+            </div>
+          )}
           <h4 className="par-sub">{t("par.forced")}</h4>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.forcedHint")}</p>
           {candidates.length === 0 ? <p className="ui-hint">{t("par.noCandidates")}</p> : (
