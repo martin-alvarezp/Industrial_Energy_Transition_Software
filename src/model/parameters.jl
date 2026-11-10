@@ -186,7 +186,9 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         mcol(r) = begin
             pf = by_year_at(cfg, get(cfg.price_profiles_by_year, id, nothing), r)
             (pf === nothing ? mk.price : pf) .*
-                ((1.0 + esc)^(r - 1) * year_factor(cfg, :price, id, r) * year_factor(cfg, :price, mk.carrier, r))
+                ((1.0 + esc)^(r - 1) * year_factor(cfg, :price, id, r) *
+                 # el del vector, salvo que el mercado se llame igual que su vector (no dos veces)
+                 (mk.carrier == id ? 1.0 : year_factor(cfg, :price, mk.carrier, r)))
         end
         for y in years
             market_price[id][:, y] .= milestone_mean(mcol, cfg, ry, y)

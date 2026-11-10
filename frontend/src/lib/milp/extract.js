@@ -40,7 +40,9 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const W = (s, y) => wY[y - 1][s - 1];
   const PX = (mk, s, y) => milestoneMean((r) =>
     (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], r)?.[s - 1] ?? mk.price[s - 1]) *
-    escR(mk.carrier_id, r) * yearFactor(cfg, "price", mk.market_id, r), cfg, yo, y);
+    (mk.carrier_id === mk.market_id ? Math.pow(1 + (cfg.price_escalation?.[mk.carrier_id] ?? 0), r - 1)
+                                    : escR(mk.carrier_id, r)) *
+    yearFactor(cfg, "price", mk.market_id, r), cfg, yo, y);   // mercado con el id de su vector: el factor una vez
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])

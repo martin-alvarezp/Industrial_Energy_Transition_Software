@@ -107,3 +107,16 @@ end
     @test all(tot .<= im.params.max_new_capacity[:hp] + 1e-6)
     @test_throws IETO.ValidationError validate_scenario(with_config(al.config; max_new_mode = :otro), al.site)
 end
+
+@testset "Factor de precio por año: un mercado con el mismo id que su vector lo aplica una vez" begin
+    site, cfg = load_and_validate(DEMO_DIR)
+    sj = JSON3.read(JSON3.write(site_json(site)), Dict{String,Any})
+    # mercado de compra de electricidad llamado igual que su vector
+    sj["markets"] = [Dict("market_id" => "electricity", "name" => "Red", "carrier_id" => "electricity",
+                          "direction" => "buy", "price" => fill(100.0, length(sj["timesteps"])), "max_power" => nothing)]
+    s2 = IETO.site_from_json(JSON3.read(JSON3.write(sj)))
+    c = with_config(cfg; horizon_years = 3, price_escalation = Dict{Symbol,Float64}(),
+                    year_factors = Dict(:price => Dict(:electricity => [(1, 1.0), (2, 2.0)])))
+    im = build_model(s2, c)
+    @test im.params.market_price[:electricity][1, 2] ≈ 2 * im.params.market_price[:electricity][1, 1] rtol = 1e-12
+end
