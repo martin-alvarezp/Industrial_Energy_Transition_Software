@@ -68,7 +68,9 @@ function apply_scenario(site::Site, cfg::ScenarioConfig, scenario::Symbol)
         with_config(cfg; emissions_cap_net_start = UNCAPPED,
                     emissions_cap_net_end = UNCAPPED, emissions_cap_gross = UNCAPPED)
     if scenario == :bau
-        existing_only = [t for t in all_tech_ids(site) if !find_tech(site, t).investable]
+        # el parque existente y, si el sistema las declara, las candidatas con
+        # que la situación actual repone y crece (bau_techs): mismos equipos
+        existing_only = [t for t in all_tech_ids(site) if !find_tech(site, t).investable || t in cfg.bau_techs]
         return site, with_config(cfg; emissions_cap_net_start = UNCAPPED,
                                  emissions_cap_net_end = UNCAPPED,
                                  emissions_cap_gross = UNCAPPED,
@@ -108,6 +110,13 @@ function run_scenario(site::Site, cfg::ScenarioConfig;
             findings = add_budget_floor!(diagnose_infeasibility(site2, cfg2),
                                          site2, cfg2; solver)
             diagnostics = diagnostic_messages(findings)
+            if sname == :bau
+                buy = [find_tech(site2, t).name for t in cfg.bau_techs if find_tech(site2, t) !== nothing]
+                push!(diagnostics, isempty(buy) ?
+                    "la situación actual no compra ningún equipo: si la demanda crece o hay equipos que se " *
+                    "retiran por vida útil, declara en Parámetros con qué equipos repone y crece, o corre un plan de inversión" :
+                    "la situación actual solo puede comprar: $(join(buy, ", "))")
+            end
             @warn "El escenario '$sname' es infactible para el sitio " *
                   "'$(site2.name)'. Diagnóstico:\n  - " * join(diagnostics, "\n  - ")
         else

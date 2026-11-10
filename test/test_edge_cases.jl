@@ -297,7 +297,10 @@ end
                      shadow_prices = false)
     end
     @test !rbau.feasible
-    @test any(h -> occursin("hot_water", h), rbau.diagnostics)
+    # (con el NOMBRE del vector, el año calendario o relativo y el déficit)
+    hw = site.carriers[:hot_water].name
+    @test any(h -> occursin("falta capacidad de $hw", h) && occursin("déficit", h), rbau.diagnostics)
+    @test any(h -> occursin("situación actual no compra", h), rbau.diagnostics)
 end
 
 @testset "edge: API en los bordes" begin

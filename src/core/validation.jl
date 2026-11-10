@@ -499,6 +499,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             "scenario_config.yaml: price_escalation referencia el carrier desconocido '$c'")
     end
     known = Set(all_tech_ids(site))
+    for t in cfg.bau_techs
+        t in all_tech_ids(site) || push!(problems,
+            "bau_techs: referencia la tecnología desconocida '$t'")
+    end
     for t in cfg.allowed_techs
         t in known || push!(problems,
             "scenario_config.yaml: allowed_techs referencia la tecnología desconocida '$t'")
@@ -552,6 +556,11 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
             "milestone_years: todos los hitos deben caer en el horizonte " *
             "($(calendar_year(cfg, 1))-$(calendar_year(cfg, cfg.horizon_years))); valores: $(cfg.milestone_years)")
         allunique(rel) || push!(problems, "milestone_years: hay hitos repetidos ($(cfg.milestone_years))")
+        # con hitos que valen por sus años, cada hito cubre hasta el siguiente:
+        # los años ANTES del primero no tendrían costo ni operación
+        cfg.milestone_weighting == :years && minimum(rel) > 1 && push!(problems,
+            "milestone_years: el primer año del horizonte ($(calendar_year(cfg, 1))) debe ser hito — " *
+            "los años antes del primer hito quedarían fuera del costo")
         last_m = maximum(rel)
         for (t, yr, _) in cfg.forced_builds
             rel_year(cfg, yr) <= last_m || push!(problems,

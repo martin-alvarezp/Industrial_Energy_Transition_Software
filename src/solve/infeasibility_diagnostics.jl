@@ -81,32 +81,64 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         end
     end
 
-    # ── 1 · capacidad pico por carrier ──
-    for c in sets.demand_carriers
-        peak = maximum(site.demands[c].values) * grow(N)
+    # ── 1 · capacidad pico por vector, en cada año que se optimiza ──
+    # la punta de la demanda del año (perfil del año R22, crecimiento y factor
+    # por año) contra lo máximo que pueden entregar los equipos PERMITIDOS: lo
+    # existente que sigue vivo, lo que se puede comprar hasta ese año (ventana y
+    # tramos R35) y la compra directa a los mercados del vector. Un aviso por
+    # vector: el primer año en que falta.
+    cname(c) = haskey(site.carriers, c) ? site.carriers[c].name : String(c)
+    tname(t) = (x = find_tech(site, t); x === nothing ? String(t) : x.name)
+    can_buy(t, r) = any(k -> ry[k] <= r && build_allowed(cfg, t, ry, k), 1:N)
+    function cap_at(t, r)
+        x = find_tech(site, t)
+        rl = hasproperty(x, :remaining_life) ? x.remaining_life : 0
+        mw = (rl == 0 || cfg.renew_existing || r <= rl) ? x.existing_capacity : 0.0
+        if t in sets.candidates && can_buy(t, r)
+            lims = [build_limit_at(cfg, t, ry[k]) for k in 1:N if ry[k] <= r]
+            mw += maximum((l === nothing ? x.max_new_capacity : l[2]) for l in lims; init = x.max_new_capacity)
+        end
+        return mw
+    end
+    EMK = effective_markets(site)
+    for c in sets.demand_carriers, k in 1:N
+        r = ry[k]
+        base = something(demand_profile_at(cfg, c, r), site.demands[c].values)
+        peak = maximum(base) * grow(k) * year_factor(cfg, :demand, c, r)
         supply = 0.0
-        for id in sets.converters
-            cv = site.converters[id]
-            for p in cv.outputs
-                p.carrier == c &&
-                    (supply += (cv.existing_capacity + cv.max_new_capacity) * p.ratio)
-            end
+        who = String[]
+        add!(name, mw) = mw > 1e-9 && (supply += mw; push!(who, "$name $(_r1(mw))"))
+        for id in sets.converters, p in site.converters[id].outputs
+            p.carrier == c && add!(tname(id), cap_at(id, r) * p.ratio)
         end
         for id in sets.generators
-            gn = site.generators[id]
-            gn.output_carrier == c && (supply += gn.existing_capacity + gn.max_new_capacity)
+            site.generators[id].output_carrier == c && add!(tname(id), cap_at(id, r))
         end
         for id in sets.storages
-            st = site.storages[id]
-            st.carrier == c && (supply += st.existing_capacity + st.max_new_capacity)
+            site.storages[id].carrier == c && add!(tname(id), cap_at(id, r))
         end
-        c == grid_carrier && (supply += import_limit)
-        if peak > supply + 1e-9
+        for (mid, mk) in EMK
+            (mk.direction == :buy && mk.carrier == c) || continue
+            # el tope del mercado y, si entra por una conexión, el de la conexión
+            cap = mk.max_power
+            if mk.connection != Symbol("") && haskey(site.sources, mk.connection)
+                src = site.sources[mk.connection]
+                ok = isempty(cfg.allowed_techs) || mk.connection in cfg.allowed_techs
+                cap = ok ? min(cap, src.existing_capacity + (src.investable ? src.max_new_capacity : 0.0)) : 0.0
+            end
+            cap > 0 || continue
+            supply += cap
+            push!(who, "compra $(mk.name)" * (isfinite(cap) ? " $(_r1(cap))" : ""))
+        end
+        if peak > supply + 1e-6
             push!(findings, InfeasibilityFinding(:capacity,
-                "falta capacidad de '$c': la demanda pico del año $N es " *
-                "$(_r1(peak)) MW y el máximo instalable que la produce es " *
-                "$(_r1(supply)) MW (déficit $(_r1(peak - supply)) MW) — " *
-                "sube max_new_capacity o revisa allowed_techs"))
+                "falta capacidad de $(cname(c)) en $(calendar_year(cfg, r)): la punta de la demanda es " *
+                "$(_r1(peak)) MW y lo máximo que pueden entregar los equipos permitidos es " *
+                "$(_r1(supply)) MW" * (isempty(who) ? " (ninguno)" : " ($(join(who, ", ")))") *
+                ", déficit $(_r1(peak - supply)) MW" *
+                " — permite comprar más (capacidad máxima, ventana de compra) o, en la situación " *
+                "actual, declara con qué equipos repone y crece"))
+            break
         end
     end
 
@@ -235,8 +267,9 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         end
     end
 
-    # ── 3 · red en la punta (sin sol) ──
-    if !isempty(elec_carriers)
+    # ── 3 · red en la punta (sin sol) — solo en el modelo antiguo de red (sin
+    # mercados declarados): con mercados, su tope ya está en el chequeo 1 ──
+    if !isempty(elec_carriers) && isempty(site.markets)
         elec_peak = sum(maximum(site.demands[c].values) for c in elec_carriers) * grow(N)
         heat_peak = isempty(heat_carriers) ? 0.0 :
             sum(maximum(site.demands[c].values) for c in heat_carriers) * grow(N)

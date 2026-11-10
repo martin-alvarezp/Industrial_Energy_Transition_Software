@@ -641,7 +641,12 @@ struct ScenarioConfig
                                              # (mismo tamaño, CAPEX de ese año) y sigue viva; false = como siempre
     build_limits::Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}  # R35: tecnología → [(año, mín, máx)] MW de CADA compra desde
                                              # ese año (escalón); reemplaza a max_new_capacity y min_build en esos años
+    bau_techs::Vector{Symbol}                # candidatas que la SITUACIÓN ACTUAL (escenario :bau) puede comprar
+                                             # (reposición y crecimiento con los mismos equipos); vacío = solo lo existente
 end
+
+# retro-compatibilidad: 90 campos → la situación actual no compra nada
+ScenarioConfig(a::Vararg{Any,90}) = ScenarioConfig(a..., Symbol[])
 
 # retro-compatibilidad: 89 campos → tamaño de compra igual todos los años
 ScenarioConfig(a::Vararg{Any,89}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}())

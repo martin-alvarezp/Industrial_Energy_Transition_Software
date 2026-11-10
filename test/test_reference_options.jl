@@ -213,3 +213,28 @@ end
     @test_throws IETO.ValidationError validate_scenario(
         with_config(lim.config; build_limits = Dict(:hp => [(1, 5.0, 2.0)])), lim.site)
 end
+
+@testset "Situación actual (BaU) con equipos para reponer y crecer (bau_techs)" begin
+    # la bomba es candidata: sin bau_techs la situación actual no la puede comprar;
+    # con ella declarada, sí (y el resto de las candidatas sigue fuera)
+    site, cfg = discrete_case(0.0)
+    c = with_config(cfg; horizon_years = 5, wacc = 0.1)
+    s0, c0 = IETO.apply_scenario(site, c, :bau)
+    @test !(:hp in c0.allowed_techs)
+    s1, c1 = IETO.apply_scenario(site, with_config(c; bau_techs = [:hp]), :bau)
+    @test :hp in c1.allowed_techs
+    @test all(t -> !find_tech(site, t).investable || t == :hp, c1.allowed_techs)
+    r = run_scenario(site, with_config(c; bau_techs = [:hp]); scenario = :bau, verbose = false, shadow_prices = false)
+    @test r.feasible
+    @test sum(r.new_capacity.mw[r.new_capacity.tech .== :hp]) > 1
+    @test_throws IETO.ValidationError validate_scenario(with_config(c; bau_techs = [:no_existe]), site)
+end
+
+@testset "Hitos que valen por sus años: el primer año del horizonte debe ser hito" begin
+    site, cfg = discrete_case(0.0)
+    ok = with_config(cfg; horizon_years = 6, milestone_years = [1, 4], milestone_weighting = :years)
+    validate_scenario(ok, site)
+    @test_throws IETO.ValidationError validate_scenario(with_config(ok; milestone_years = [2, 4]), site)
+    # con hitos que no ponderan años (cada hito es solo su año) se sigue permitiendo
+    validate_scenario(with_config(ok; milestone_years = [2, 4], milestone_weighting = :none), site)
+end
