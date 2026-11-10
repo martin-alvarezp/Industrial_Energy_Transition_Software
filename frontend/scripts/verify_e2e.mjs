@@ -49,7 +49,10 @@ await p.goto(URL, { waitUntil: "networkidle2", timeout: 60000 });
 await p.evaluate(() => { localStorage.clear(); localStorage.setItem("ieto.lang", "es"); });
 await api(`/sites/${SITE}`, { method: "DELETE" });
 await p.goto(`${URL}/?r=${Date.now()}#/systems`, { waitUntil: "networkidle2" });
-step("app servida: Sistemas con el demo", await waitText("Sistemas") && !!(await p.$('[data-testid="system-demo"]')));
+// la lista muestra los sistemas de ejemplo; el demo de referencia sigue existiendo pero no se lista
+step("app servida: Sistemas con los ejemplos (y sin el demo en la lista)", await waitText("Sistemas") &&
+     !!(await p.waitForSelector('[data-testid="system-dummy_mexico"]', { timeout: 15000 }).catch(() => null)) &&
+     !!(await p.$('[data-testid="system-dummy_japon"]')) && !(await p.$('[data-testid="system-demo"]')));
 
 // 1 · crear un sistema a partir del demo
 step("modal de sistema nuevo", await clickText("button", "Agregar") && await waitText("Nuevo sistema"));

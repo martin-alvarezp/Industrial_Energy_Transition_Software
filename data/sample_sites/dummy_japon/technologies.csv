@@ -1,0 +1,9 @@
+tech_id,name,type,input_carrier,output_carrier,existing_capacity,max_new_capacity,efficiency,investable,storage_hours,ports,export_capacity,fixed_charge,remaining_life
+absorption_chillers,Chillers de absorción,converter,lng,chilled_water_bldg_a,3.165,0.0,1.27,false,,,,,25
+air_cooled_chillers,Chillers enfriados por aire,converter,electricity,chilled_water_bldg_b,0.0,11.6,3.0300000000000002,true,,,,,
+cogens,Cogeneración,converter,lng,electricity,1.4,0.0,0.4180000869440181,false,,"{""inputs"":[{""carrier"":""lng"",""ratio"":2.392344}],""outputs"":[{""carrier"":""electricity"",""ratio"":1.0},{""carrier"":""steam"",""ratio"":0.3157895}]}",,,25
+empalme_electricity_recs_existing,Empalme · Electricidad (certificados existentes),source,,electricity,4.0,0.0,1.0,false,,,,,
+empalme_electricity_recs_new,Empalme · Electricidad (certificados nuevos),source,,electricity_recs_new,4.0,0.0,1.0,false,,,,,
+new_grid_elec,Ampliación de empalme,converter,electricity_recs_new,electricity,0.0,4.0,1.0,true,,,,,
+new_steam_boilers,Calderas de vapor nuevas,converter,lng,steam,0.0,9.648,0.98,true,,,,,
+steam_boilers,Calderas de vapor,converter,lng,steam,5.636,0.0,0.98,false,,,,,25

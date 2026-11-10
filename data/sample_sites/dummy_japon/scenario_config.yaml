@@ -1,0 +1,14 @@
+# Sistema de ejemplo: la configuración que usa la interfaz viaja en
+# layout.geojson (properties.siteConfig); esto es solo la base.
+horizon_years: 1
+wacc: 0.08
+demand_growth: 0.0
+emissions_cap_net_start: 1.0e12
+emissions_cap_net_end: 1.0e12
+emissions_cap_gross: 1.0e12
+allow_offsets: false
+max_offset_share: 0.0
+offset_price: 0.0
+offset_availability: 0.0
+carbon_price: 0.0
+allow_new_fossil: false

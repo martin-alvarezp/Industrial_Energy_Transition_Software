@@ -1,0 +1,9 @@
+tech_id,capex_per_kw,fixed_opex,variable_opex,lifetime_years
+absorption_chillers,0.0,0.0,31.19687,25
+air_cooled_chillers,1000.0,0.0,0.0,25
+cogens,0.0,0.0,96.72369,25
+empalme_electricity_recs_existing,0.0,0.0,0.0,99
+empalme_electricity_recs_new,0.0,0.0,0.0,99
+new_grid_elec,0.0,0.0,0.0,25
+new_steam_boilers,20.0,0.0,50.15302,25
+steam_boilers,0.0,0.0,50.15302,25

@@ -1,0 +1,8 @@
+carrier_id,name,unit,category,level,color
+chilled_water_bldg_a,Agua helada edificio A,MWh,cooling,,
+chilled_water_bldg_b,Agua helada otros edificios,MWh,cooling,,
+co2e,CO₂ equivalente,tCO2e,emissions,,
+electricity,Electricidad,MWh,energy,,
+electricity_recs_new,Electricidad (empalme nuevo),MWh,energy,,
+lng,GNL,MWh,fuel,,
+steam,Vapor,MWh,heat,,

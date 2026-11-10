@@ -7,7 +7,7 @@ import { NAV_ICONS } from "../icons.jsx";
 import { Menu, Modal, PageHead, Empty, useFlash } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { siteMeta, invalidateSiteMeta, satelliteTile, fileToCover } from "../sitemeta.js";
-import { fetchSite, saveSite } from "../../lib/api.js";
+import { fetchSite, saveSite, HIDDEN_SITES } from "../../lib/api.js";
 import { fromGeoJSON, toGeoJSON } from "../layout.js";
 import { MapContainer, TileLayer, Polygon, CircleMarker, useMap, useMapEvents } from "react-leaflet";
 import AddressSearch from "../../components/twin/AddressSearch.jsx";
@@ -161,8 +161,7 @@ function NewSystemModal({ onClose }) {
   const options = [
     { v: "blank", title: t("systems.fromBlank") },
     { v: "demo", title: t("systems.fromDemo") },
-    { v: "planta_red", title: t("systems.fromExample") },
-    ...(sites ?? []).filter((s) => !["demo", "planta_red"].includes(s)).map((s) => ({ v: s, title: s })),
+    ...(sites ?? []).filter((s) => !HIDDEN_SITES.includes(s)).map((s) => ({ v: s, title: s })),
   ];
   const pickCountry = (c) => {
     setCountry(c);
@@ -292,7 +291,7 @@ export default function SystemsPage() {
         : (
           <div className="ui-grid-cards">
             {unsaved && <SystemCard key={"u:" + siteName} name={siteName} unsaved onChanged={refreshSites} />}
-            {sites.map((s) => <SystemCard key={s} name={s} onChanged={refreshSites} />)}
+            {sites.filter((s) => !HIDDEN_SITES.includes(s)).map((s) => <SystemCard key={s} name={s} onChanged={refreshSites} />)}
           </div>
         )}
       {creating && <NewSystemModal onClose={() => setCreating(false)} />}

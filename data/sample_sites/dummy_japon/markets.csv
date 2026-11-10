@@ -1,0 +1,4 @@
+market_id,name,carrier_id,direction,max_power,max_annual,emission_factor,connection,demand_charge,contracted_power,excess_penalty,scheme,netting
+electricity_recs_existing,Electricidad (certificados existentes),electricity,buy,4.0,,0.487,empalme_electricity_recs_existing,,,,,
+electricity_recs_new,Electricidad (certificados nuevos),electricity_recs_new,buy,4.0,,0.487,empalme_electricity_recs_new,,,,,
+lng,GNL,lng,buy,,,,,,,,,

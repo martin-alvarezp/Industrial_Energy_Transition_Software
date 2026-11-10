@@ -8,6 +8,7 @@ import { NAV_ICONS } from "../icons.jsx";
 import { hrefFor, navigate } from "../router.js";
 import RunModal from "../components/RunModal.jsx";
 import { fetchSiteConfig, EXTRA_OVERRIDES } from "../../lib/api.js";
+import { baseConfig } from "../studio.jsx";
 import { DEFAULT_CONFIG } from "../../lib/mockEngine.js";
 
 
@@ -70,7 +71,11 @@ export default function ParametersPage({ route }) {
   const resetAll = () => setDraft((d) => {
     const n = { ...d };
     for (const k of EXTRA_OVERRIDES) delete n[k];
-    return { ...DEFAULT_CONFIG, ...n };
+    // en un sistema que trae su propia configuración (layout.siteConfig, los
+    // sitios de ejemplo) estos parámetros vuelven a SU valor, no al del YAML
+    const own = lib ? {} : baseConfig(studio.twin?.layout);
+    return { ...DEFAULT_CONFIG, ...n,
+             ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => own[k] != null).map((k) => [k, own[k]])) };
   });
   const num = (k, { pct = false, step = "any" } = {}) => (
     <input className="ui-input" type="number" step={step}
@@ -259,6 +264,11 @@ export default function ParametersPage({ route }) {
           {draft.repeat_investments && (
             <Toggle on={draft.max_new_mode === "alive"} onChange={(x) => set({ max_new_mode: x ? "alive" : "per_build" })}
                     label={t("par.maxNewAlive")} />
+          )}
+          {/* R34: solo tiene efecto con hitos que valen por sus años */}
+          {(draft.milestone_years ?? []).length > 0 && (draft.milestone_weighting ?? "years") === "years" && (
+            <Toggle on={!!draft.replace_between_milestones} onChange={(x) => set({ replace_between_milestones: x })}
+                    label={t("par.replaceBetween")} />
           )}
           {!lib && <>
           <h4 className="par-sub">{t("par.forced")}</h4>

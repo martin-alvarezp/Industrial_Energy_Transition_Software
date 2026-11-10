@@ -1,0 +1,8 @@
+carrier_id,name,unit,category,level,color
+chilled_water,Agua helada,MWh,cooling,,
+co2e,CO₂ equivalente,tCO2e,emissions,,
+compressed_air,Aire comprimido,MWh,energy,,
+electricity,Electricidad,MWh,energy,,
+gas,Gas natural,MWh,fuel,,
+hot_water,Agua caliente,MWh,heat,,
+steam,Vapor,MWh,heat,,

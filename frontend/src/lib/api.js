@@ -6,7 +6,6 @@ import {
   runPareto as mockPareto, runBatch as mockBatch, mockSiteJson,
 } from "./mockEngine.js";
 import { tornadoLevers, buildTornado } from "./sensitivity.js";
-import plantaRed from "../demo/planta_red.json";
 
 /** ¿Solo la corrida pedida? Modo despacho o "solo esta corrida" del modal:
  *  sin Pareto ni escenarios de comparación (misma regla que milp/engine.js). */
@@ -20,16 +19,24 @@ export const enginePayload = (sj) => {
   return rest;
 };
 
-// Sitios que la app lleva embebidos para funcionar SIN backend (GitHub Pages).
-// `planta_red` es la planta de ejemplo con topología de red (M14): barras por
-// equipo, alimentadores y colectores con tope y pérdida. Su resultado está
-// anclado a Julia por los fixtures dorados planta_red_n5/n10 (verify:wasm).
-const BUNDLED_SITES = { planta_red: plantaRed };
+// Sitios que la app lleva embebidos para funcionar SIN backend (GitHub Pages),
+// cada uno en su propio chunk (se descargan al abrirlos):
+// · dummy_mexico / dummy_japon: los sistemas de ejemplo que se ven al entrar,
+//   con su configuración por defecto en layout.siteConfig.
+// · planta_red: planta con topología de red (M14), anclada a Julia por los
+//   fixtures dorados planta_red_n5/n10 (verify:wasm); oculta de la lista.
+const BUNDLED_SITES = {
+  dummy_mexico: () => import("../demo/dummy_mexico.json"),
+  dummy_japon: () => import("../demo/dummy_japon.json"),
+  planta_red: () => import("../demo/planta_red.json"),
+};
+/** Sitios que existen (las pruebas los abren por URL) pero no se listan. */
+export const HIDDEN_SITES = ["demo", "planta_red"];
 
 // API same-origin por default: el escritorio/portable sirven UI+API juntos;
 // publicada como estático (GitHub Pages) no hay API ⇒ motor web (HiGHS wasm).
 // Para desarrollo con vite dev: VITE_IETO_API=http://127.0.0.1:8080
-const API_BASE = import.meta.env.VITE_IETO_API ?? "";
+const API_BASE = import.meta.env?.VITE_IETO_API ?? "";   // ?. : también corre en node (scripts)
 
 // timeoutMs = null ⇒ sin tope del lado del navegador (las corridas pueden durar
 // horas; el único límite es el que el usuario fija al optimizador)
@@ -155,6 +162,7 @@ export function toOverrides(cfg) {
     investment_lead_years: cfg.investment_lead_years ?? 0,  // R29: inversión N años antes
     fixed_opex_per_build: cfg.fixed_opex_per_build ?? {},   // R30: O&M fijo por instalación
     max_new_mode: cfg.max_new_mode ?? "per_build",           // R32: tope por compra o de lo vivo
+    replace_between_milestones: !!cfg.replace_between_milestones,   // R34: reposición automática entre hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
@@ -444,7 +452,7 @@ export async function fetchSite(name = "demo") {
   // sitio embebido: viaja completo (incluido el layout del mapa) y el motor
   // del navegador lo resuelve de verdad — no es un mock de resultados
   if (BUNDLED_SITES[name])
-    return { source: "bundled", site: structuredClone(BUNDLED_SITES[name]) };
+    return { source: "bundled", site: structuredClone((await BUNDLED_SITES[name]()).default) };
   return { source: "mock", site: mockSiteJson() };
 }
 

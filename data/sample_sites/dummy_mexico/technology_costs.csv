@@ -1,0 +1,10 @@
+tech_id,capex_per_kw,fixed_opex,variable_opex,lifetime_years
+chillers,0.0,10005.67,0.0,25
+compressors,0.0,11303.87,0.0,25
+empalme_electricity_market,0.0,0.0,0.0,99
+gas_boiler_1,0.0,6635.591,0.0,5
+gas_boiler_2,0.0,6635.591,0.0,15
+gas_boiler_extra,307.3926,6635.591,0.0,15
+solar_pv,0.0,16078.55,0.0,25
+solar_pv_extra,1315.745,13843.72,0.0,25
+steam_to_hot_water,0.0,0.0,0.0,99

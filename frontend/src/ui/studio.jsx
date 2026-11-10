@@ -21,6 +21,21 @@ const Ctx = createContext(null);
 export const useStudio = () => useContext(Ctx);
 
 const cfgKey = (site) => `ieto.cfg.${site}`;
+
+// Configuración por defecto que trae el sistema (layout.siteConfig, p. ej. los
+// sitios de ejemplo). Lo liviano entra al borrador (editable, se guarda por
+// sistema); los perfiles por paso pesan MB (localStorage no los aguanta) y se
+// agregan recién al correr, debajo de lo que haya en el borrador.
+export const HEAVY_CFG = ["demand_profiles", "input_profiles", "profiles_by_year",
+  "price_profiles_by_year", "input_profiles_by_year", "market_availability_by_year",
+  "market_availability", "weight_by_year", "month_by_year", "day_sequence_by_year"];
+export const siteCfgLight = (sc) => Object.fromEntries(
+  Object.entries(sc ?? {}).filter(([k]) => !HEAVY_CFG.includes(k)));
+export const siteCfgHeavy = (sc) => Object.fromEntries(
+  Object.entries(sc ?? {}).filter(([k]) => HEAVY_CFG.includes(k)));
+/** Configuración de partida de un sistema (sin lo que el usuario cambió). */
+export const baseConfig = (layout) => ({ ...DEFAULT_CONFIG, ...readJSON("ieto.cfg._default", {}),
+  ...siteCfgLight(layout?.siteConfig) });
 const logKey = (site) => `ieto.log.${site ?? "_global"}`;
 
 function siteFromApi({ source, site }) {
@@ -87,7 +102,7 @@ export function StudioProvider({ children }) {
       const t = siteFromApi(fetched);
       setSiteName(name);
       setTwin(t);
-      setDraftState({ ...DEFAULT_CONFIG, ...readJSON("ieto.cfg._default", {}), ...readJSON(cfgKey(name), {}) });
+      setDraftState({ ...baseConfig(t.layout), ...readJSON(cfgKey(name), {}) });
       setTwinState("idle");
       if (data && appliedSite !== name && viewing?.site !== name) {
         setData(null); setViewing(null);
@@ -115,7 +130,7 @@ export function StudioProvider({ children }) {
                ...(extra.meta ? { meta: { ...(layout.meta ?? {}), ...extra.meta } } : {}),
                ...(extra.center ? { center: extra.center, address: extra.address ?? layout.address } : {}),
                ...(extra.boundary?.length >= 3 ? { boundary: extra.boundary } : {}) };
-    const cfg = { ...DEFAULT_CONFIG, ...readJSON("ieto.cfg._default", {}),
+    const cfg = { ...baseConfig(layout),
                   ...(from === "blank" ? {} : readJSON(cfgKey(from), {})),
                   ...(extra.currency ? { currency: extra.currency } : {}) };
     writeJSON(cfgKey(name), cfg);
@@ -232,7 +247,8 @@ export function StudioProvider({ children }) {
   }, [siteName, apiUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Sitio y configuración listos para el motor: aplica Base + la pila de escenarios. */
-  const prepare = useCallback((cfgIn, stack0 = [], extraRows = null) => {
+  const prepare = useCallback((cfgIn0, stack0 = [], extraRows = null) => {
+    const cfgIn = { ...siteCfgHeavy(twin.layout?.siteConfig), ...cfgIn0 };
     // escenarios como capas: Base + la pila elegida se aplican al sitio y a la
     // configuración antes de resolver. extraRows: filas de una capa temporal
     // encima de todo (punto de quiebre), sin guardarlas en el sistema.
@@ -243,7 +259,7 @@ export function StudioProvider({ children }) {
                     techScenario: twin.layout?.techScenario ?? {}, meta: twin.layout?.meta ?? {} };
     // resolución temporal de ESTA corrida (días tipo / año completo) sobre las
     // series horarias del sistema; sin elegirla, la plantilla del sistema
-    const site0 = runTemplateSite(twin.siteJson, cfgIn.run_template);
+    const site0 = runTemplateSite(twin.siteJson, cfgIn.run_template, cfgIn);
     const resolved0 = resolveScenarios(site0, cfgIn, store, stack);
     // R31: los perfiles por año de la configuración siguen a la plantilla de la corrida
     const resolved = { ...resolved0, cfg: projectConfigProfiles(resolved0.cfg, twin.siteJson, site0) };

@@ -1,0 +1,10 @@
+tech_id,name,type,input_carrier,output_carrier,existing_capacity,max_new_capacity,efficiency,investable,storage_hours,ports,export_capacity,fixed_charge,remaining_life
+chillers,Chillers,converter,electricity,chilled_water,0.0,10.0,1.0,true,,,,,
+compressors,Compresores de aire,converter,electricity,compressed_air,0.0,10.0,1.0,true,,,,,
+empalme_electricity_market,Empalme · Electricidad,source,,electricity,5.4,0.0,1.0,false,,,,,
+gas_boiler_1,Caldera a gas 1,converter,gas,steam,3.924,0.0,0.83,false,,,,,5
+gas_boiler_2,Caldera a gas 2,converter,gas,steam,6.54,0.0,0.83,false,,,,,15
+gas_boiler_extra,Calderas a gas nuevas,converter,gas,steam,0.0,20.0,0.83,true,,,,,
+solar_pv,Solar FV existente,generator,,electricity,0.405,0.0,1.0,false,,,,,25
+solar_pv_extra,Solar FV nueva,generator,,electricity,0.0,4.995,1.0,true,,,,,
+steam_to_hot_water,Intercambiador vapor → agua caliente,converter,steam,hot_water,15.0,0.0,1.0,false,,,,,99

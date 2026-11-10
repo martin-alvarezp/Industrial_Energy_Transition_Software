@@ -103,7 +103,6 @@ const E = {
   "systems.newFrom": ["Partir de", "Start from"],
   "systems.fromBlank": ["Sistema en blanco", "Blank system"],
   "systems.fromDemo": ["Ejemplo (demo)", "Example (demo)"],
-  "systems.fromExample": ["Ejemplo con red interna", "Example with internal grid"],
   "systems.create": ["Crear sistema", "Create system"],
   "systems.deleteConfirm": ["¿Eliminar el sistema '{name}'? No se puede deshacer.",
                             "Delete system '{name}'? This cannot be undone."],

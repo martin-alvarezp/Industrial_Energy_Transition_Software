@@ -45,8 +45,11 @@ const waitText = async (txt, ms = 30000) => {
 await p.goto(APP_URL + "/", { waitUntil: "networkidle2", timeout: 60000 });
 await p.evaluate(() => { localStorage.clear(); localStorage.setItem("ieto.lang", "es"); });
 await p.goto(`${APP_URL}/?r=${Date.now()}#/systems`, { waitUntil: "networkidle2" });
-const card = await p.waitForSelector('[data-testid="system-planta_red"]', { timeout: 15000 }).catch(() => null);
-step("el ejemplo con red se ofrece sin backend", !!card);
+// la lista muestra los sistemas de ejemplo; planta_red sigue embebida (se abre
+// por URL) pero ya no se lista
+const card = await p.waitForSelector('[data-testid="system-dummy_mexico"]', { timeout: 15000 }).catch(() => null);
+const oculto = await p.$('[data-testid="system-planta_red"]');
+step("sin backend se ofrecen los ejemplos y no la planta con red", !!card && !oculto);
 
 // mapa de infraestructura
 await p.evaluate(() => { localStorage.setItem("ieto.infra.view", JSON.stringify("map")); });
@@ -76,6 +79,16 @@ step("el Resumen traza el diagrama de flujos", paths > 20, `${paths} trazos`);
 const esperado = `${(golden.expected_npv / 1e6).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MUSD`;
 await p.evaluate(() => { window.location.hash = "#/sys/planta_red/kpis"; });
 step("el VAN mostrado es el del motor Julia", await waitText(esperado, 30000), `esperado ${esperado}`);
+
+// sistema de ejemplo: abre con SU configuración (layout.siteConfig) y su planta
+// es un nodo con todos los equipos
+await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/dummy_japon/parameters`, { waitUntil: "networkidle2" });
+const hitos = await p.waitForSelector('[data-testid="milestones"]', { timeout: 60000 })
+  .then((el) => el.evaluate((x) => x.value)).catch(() => "");
+step("el ejemplo abre con sus hitos y su configuración", hitos.replace(/\s/g, "") === "2028,2030,2045", hitos);
+await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/dummy_japon/infrastructure`, { waitUntil: "networkidle2" });
+const nodo = await p.waitForSelector(".sm-node", { timeout: 30000 }).catch(() => null);
+step("la planta del ejemplo es un nodo en el mapa", !!nodo);
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 await b.close();
 if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }
