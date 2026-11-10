@@ -15,7 +15,7 @@ import { useStudio } from "../studio.jsx";
 import { Modal } from "../kit.jsx";
 import { fetchRun } from "../../lib/api.js";
 import { BASE, scenarioList } from "../../lib/scenarios.js";
-import { DEFAULT_TYPICAL_DAYS } from "../../lib/templates.js";
+import { DEFAULT_TYPICAL_DAYS, hasHourly } from "../../lib/templates.js";
 import { ScenarioChip } from "./ParamTable.jsx";
 
 /** Escenarios predefinidos del motor (biblioteca y API; en la corrida: BaU o plan). */
@@ -55,11 +55,15 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const tmpl = twin?.siteJson?.hourly?.template?.method;
   // resolución de ESTA corrida: la del sistema, N días tipo o el año completo
   // (las dos últimas necesitan series horarias crudas en Series de tiempo)
-  const hasRaw = Object.keys(twin?.siteJson?.hourly?.series ?? {}).length > 0;
-  const [res, setRes] = useState("system");
-  const [days, setDays] = useState(twin?.siteJson?.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS);
+  // …o un sistema guardado en año completo). La configuración del sistema puede
+  // traer su resolución por defecto (draft.run_template, sitios de ejemplo).
+  const hasRaw = hasHourly(twin?.siteJson);
+  const rt0 = hasRaw ? draft.run_template : null;
+  const [res, setRes] = useState(rt0?.method ?? "system");
+  const [days, setDays] = useState(rt0?.days ?? twin?.siteJson?.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS);
+  const [peaks, setPeaks] = useState(rt0?.peaks ?? true);
   const nDays = Math.min(365, Math.max(2, Math.round(+days || DEFAULT_TYPICAL_DAYS)));
-  const runTemplate = hasRaw && res !== "system" ? { method: res, days: nDays } : null;
+  const runTemplate = hasRaw && res !== "system" ? { method: res, days: nDays, ...(res === "typical" && peaks ? { peaks: true } : {}) } : null;
 
   const capacitiesOf = async (id) => {
     const r = runs.find((x) => x.id === id);
@@ -241,6 +245,11 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
           <input className="ui-input" type="number" min={2} max={365} step={1} value={days} style={{ maxWidth: 120 }}
                  onChange={(e) => setDays(e.target.value)} data-testid="run-res-days" />
           <p className="ui-hint">{t("run.resTypicalHint", { n: (nDays * 24).toLocaleString() })}</p>
+          <label className="run-check">
+            <input type="checkbox" checked={peaks} onChange={(e) => setPeaks(e.target.checked)} data-testid="run-res-peaks" />
+            {" "}{t("run.resPeaks")}
+          </label>
+          <p className="ui-hint">{t("run.resPeaksHint")}</p>
         </div>
       )}
       {res === "full" && <p className="ui-hint">{t("run.resFullHint")}</p>}

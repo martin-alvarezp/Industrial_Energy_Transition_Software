@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import {
   applyTemplate, setRawSeries, templateSteps, expandTo8760, getSeries, seriesKeys, HOURS, clusterDays, projectSeries,
-  projectConfigProfiles,
+  projectConfigProfiles, runTemplateSite, hasHourly,
 } from "../src/lib/templates.js";
 
 const problems = [];
@@ -141,6 +141,30 @@ for (const method of ["seasonal", "monthly", "typical", "full"]) {
   check(pc.weight_by_year === undefined, "R31: los días tipo propios de cada año (plantilla vieja) debían descartarse");
   check(projectConfigProfiles(cfg, site, site) === cfg, "R31: sin cambio de plantilla la configuración debe quedar igual");
   console.log(`✓ R31     perfiles de la configuración en la plantilla de la corrida (${prof.length} → ${out.length} pasos, energía ${e1.toFixed(1)})`);
+}
+
+// R33: días de punta. Un sistema guardado en año completo (sin series crudas)
+// se puede correr en días tipo; con `peaks`, el día de la mayor demanda horaria
+// queda como día tipo propio ⇒ la punta de la plantilla es la del año, y la
+// energía anual se conserva igual
+{
+  const full = applyTemplate(setRawSeries(demo, "demands.electricity", raw), "full");
+  const { hourly: _h, ...bare } = full;                       // sin crudas: solo los 8760 pasos
+  check(hasHourly(bare), "R33: un sistema en año completo debe ofrecer días tipo");
+  const dem = bare.demands.electricity, peak = Math.max(...dem);
+  const flat = runTemplateSite(bare, { method: "typical", days: 12 });
+  const pk = runTemplateSite(bare, { method: "typical", days: 12, peaks: true });
+  check(pk.timesteps.length === 12 * 24, `R33: con puntas deben seguir siendo 12 días (${pk.timesteps.length / 24})`);
+  check(close(Math.max(...pk.demands.electricity), peak, 1e-6), `R33: la punta ${Math.max(...pk.demands.electricity)} debía ser la del año ${peak}`);
+  check(Math.max(...flat.demands.electricity) < peak - 1e-6, "R33: sin puntas el promedio debía aplanar la punta (el caso no prueba nada)");
+  check(close(energy(pk.demands.electricity, pk.timesteps), energy(dem, bare.timesteps), 1e-5), "R33: la energía anual debe conservarse");
+  // la demanda de OTRO año (configuración) con su punta en otro día también la conserva
+  const other = dem.map((v, i) => (i >= 24 * 200 && i < 24 * 201 ? v * 3 : v));
+  const cfgO = { demand_profiles: { electricity: { "5": other } } };
+  const pk2 = runTemplateSite(bare, { method: "typical", days: 12, peaks: true }, cfgO);
+  const o2 = projectConfigProfiles(cfgO, bare, pk2).demand_profiles.electricity["5"];
+  check(close(Math.max(...o2), Math.max(...other), 1e-6), `R33: la punta de la demanda por año ${Math.max(...o2)} debía ser ${Math.max(...other)}`);
+  console.log(`✓ R33     días de punta: punta ${peak.toFixed(3)} conservada (sin la opción ${Math.max(...flat.demands.electricity).toFixed(3)}), energía igual, también para la demanda por año`);
 }
 
 if (problems.length) {
