@@ -244,6 +244,15 @@ export const capexPv = (cfg, yo, k, id, life = Infinity, at = yo[k - 1]) => {
   else for (const r of yo) if (r >= at && r <= last + lead) s += d(r - lead);
   return ds * a * s + (1 - ds) * d(r0);
 };
+/** R35: límites [mín, máx] MW de una compra de `tech` en el año relativo `yr` (tramo vigente), o null. */
+export const buildLimitAt = (cfg, tech, yr) => {
+  let best = null, by = -Infinity;
+  for (const [y, lo, hi] of cfg.build_limits?.[tech] ?? []) {
+    const r = relYear(cfg, +y);
+    if (r <= yr && r > by) { by = r; best = [lo, hi]; }
+  }
+  return best;
+};
 /** R34: ¿se reponen solas las compras que vencen entre hitos? */
 export const autoReplace = (cfg) => !!cfg.replace_between_milestones && (cfg.milestone_weighting ?? "years") === "years";
 /** Años relativos de cada eslabón de la compra del hito k con vida L (espejo de cohort_links):
@@ -1246,8 +1255,9 @@ export function buildLP(site0, cfg0, opts = {}) {
         row(`units_${id}_${y}`, { [`nc_${id}_${y}`]: 1, [`nu_${id}_${y}`]: -uSz }, "=", 0);
       }
       binaries.push(`b_${id}_${y}`);
+      const bl = buildLimitAt(cfg, t.tech_id, yr(y));                   // R35: tamaño de compra por tramos
       row(`link_${id}_${y}`,
-          { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -t.max_new_capacity }, "<=", 0);
+          { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -(bl ? bl[1] : t.max_new_capacity) }, "<=", 0);
       // reglas de construcción (R1): ventana y tamaño mínimo
       if (!buildAllowedAt(cfg, t.tech_id, yo, y)) row(`bwin_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "<=", 0);
       // permisos por tramos (R25), salvo la compra forzada de ese hito
@@ -1258,7 +1268,7 @@ export function buildLP(site0, cfg0, opts = {}) {
       if (ownEnergy(cfg, t))                                             // R2: eng ≤ Emáx·b
         row(`elink_${id}_${y}`, { [`eng_${id}_${y}`]: 1,
           [`b_${id}_${y}`]: -(cfg.storage_energy_max?.[t.tech_id] ?? t.max_new_capacity * (t.storage_hours ?? 4)) }, "<=", 0);
-      const mb = cfg.min_build?.[t.tech_id] ?? 0;
+      const mb = bl ? bl[0] : cfg.min_build?.[t.tech_id] ?? 0;
       if (mb > 0) row(`bmin_${id}_${y}`, { [`nc_${id}_${y}`]: 1, [`b_${id}_${y}`]: -mb }, ">=", 0);
     }
     if (!cfg.repeat_investments) {

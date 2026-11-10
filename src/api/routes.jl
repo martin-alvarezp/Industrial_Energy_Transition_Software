@@ -131,6 +131,9 @@ _coerce(::Type{Dict{Symbol,Float64}}, v) =
 _coerce(::Type{Dict{Symbol,Vector{Tuple{Int,Bool}}}}, v) =                     # permisos por tramos (R25)
     Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in pts]
                                         for (k, pts) in pairs(v))
+_coerce(::Type{Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}}, v) =            # tamaño de compra por tramos (R35)
+    Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}(Symbol(k) => Tuple{Int,Float64,Float64}[(Int(p[1]), Float64(p[2]), Float64(p[3])) for p in pts]
+                                                    for (k, pts) in pairs(v))
 _coerce(::Type{Dict{Int,Vector{Int}}}, v) =                            # meses por año (R26)
     Dict{Int,Vector{Int}}(parse(Int, string(y)) => Int[Int(x) for x in xs] for (y, xs) in pairs(v))
 _coerce(::Type{Dict{Int,Vector{String}}}, v) =                         # secuencia de días por año (R26)

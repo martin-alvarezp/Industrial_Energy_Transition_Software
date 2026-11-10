@@ -639,6 +639,27 @@ struct ScenarioConfig
                                              # :alive = tope de lo comprado y VIVO en cada año (potencial del sitio)
     replace_between_milestones::Bool         # R34: una compra que vence ENTRE hitos se repone sola ese año
                                              # (mismo tamaño, CAPEX de ese año) y sigue viva; false = como siempre
+    build_limits::Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}  # R35: tecnología → [(año, mín, máx)] MW de CADA compra desde
+                                             # ese año (escalón); reemplaza a max_new_capacity y min_build en esos años
+end
+
+# retro-compatibilidad: 89 campos → tamaño de compra igual todos los años
+ScenarioConfig(a::Vararg{Any,89}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}())
+
+"""
+Límites (mín, máx) en MW de una compra de `t` en el año relativo `y` (R35): el
+tramo vigente de `build_limits` (rige desde su año), o `nothing` si la
+tecnología no tiene o el año es anterior a su primer tramo.
+"""
+function build_limit_at(cfg::ScenarioConfig, t::Symbol, y::Integer)
+    pts = get(cfg.build_limits, t, nothing)
+    pts === nothing && return nothing
+    best = nothing; by = typemin(Int)
+    for (yr, lo, hi) in pts
+        r = rel_year(cfg, yr)
+        r <= y && r > by && (by = r; best = (lo, hi))
+    end
+    return best
 end
 
 # retro-compatibilidad: 88 campos → sin reposición automática entre hitos

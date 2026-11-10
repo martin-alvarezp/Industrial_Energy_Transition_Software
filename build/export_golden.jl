@@ -403,3 +403,6 @@ dump("demo_om_por_instalacion_n5", site0, with_config(cfg0; horizon_years = 5, r
 dump("demo_reposicion_entre_hitos_n30", site0, with_config(cfg0; horizon_years = 30, repeat_investments = true,
      milestone_years = [1, 11, 21], replace_between_milestones = true, salvage_value = true,
      investment_lead_years = 1, capex_accounting = :lump))
+# R35 · tamaño de cada compra por tramos de años (con compras repetibles)
+dump("demo_compra_por_tramos_n6", site0, with_config(cfg0; horizon_years = 6, repeat_investments = true,
+     build_limits = Dict(:pv => [(1, 0.0, 5.0), (4, 2.0, 30.0)], :heat_pump => [(1, 3.0, 3.0), (3, 0.0, 15.0)])))

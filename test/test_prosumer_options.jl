@@ -190,3 +190,21 @@ end
     @test r.cost_breakdown.salvage_credit[end] ≈ -capex * 20 / 30 rtol = 1e-9
     @test sum(r.cost_breakdown.npv) ≈ r.npv rtol = 1e-9
 end
+
+@testset "R35: tamaño de cada compra por tramos de años" begin
+    # la bomba (máx 12 MW por compra, óptimo 9 MW en el año 1): con un tramo que
+    # la limita a 4 MW hasta el año 2 y a 12 desde el 3, compra 4 al inicio y
+    # completa después; con mínimo = máximo el tamaño queda fijo si se compra
+    lim = po_case(repeat_investments = true, build_limits = Dict(:hp => [(1, 0.0, 4.0), (3, 0.0, 12.0)]))
+    nc(im, y) = JuMP.value(im.model[:new_capacity][:hp, y])
+    @test nc(lim, 1) ≈ 4 atol = 1e-6
+    @test nc(lim, 2) <= 4 + 1e-6
+    @test sum(nc(lim, y) for y in 1:5) > 4 + 1e-6
+    @test IETO.build_limit_at(lim.config, :hp, 2) == (0.0, 4.0)
+    @test IETO.build_limit_at(lim.config, :hp, 3) == (0.0, 12.0)
+    @test IETO.build_limit_at(lim.config, :eb, 3) === nothing
+    fix = po_case(build_limits = Dict(:hp => [(1, 6.0, 6.0)]))
+    @test nc(fix, 1) ≈ 6 atol = 1e-6
+    @test_throws IETO.ValidationError validate_scenario(
+        with_config(lim.config; build_limits = Dict(:hp => [(1, 5.0, 2.0)])), lim.site)
+end

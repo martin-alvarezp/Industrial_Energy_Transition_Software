@@ -611,6 +611,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         (cfg.financing_years > 0 || !isempty(cfg.financing_period_tech)) && push!(problems,
         "replace_between_milestones: la reposición automática entre hitos solo está definida con pago de una vez " *
         "(capex_accounting: lump, o sin plazo de financiamiento)")
+    for (t, pts) in cfg.build_limits, (yr, lo, hi) in pts
+        (0 <= lo <= hi) || push!(problems,
+            "build_limits[$t]: desde $yr el mínimo ($lo) y el máximo ($hi) deben cumplir 0 ≤ mín ≤ máx")
+    end
     cfg.investment_lead_years >= 0 || push!(problems,
         "investment_lead_years: debe ser ≥ 0 (valor: $(cfg.investment_lead_years))")
     for (t, c) in cfg.fixed_opex_per_build

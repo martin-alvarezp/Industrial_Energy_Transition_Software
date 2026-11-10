@@ -434,5 +434,7 @@ function load_scenario_config(path::AbstractString)
         Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_opex_per_build", Dict())),
         Symbol(get(d, "max_new_mode", "per_build")),
         Bool(get(d, "replace_between_milestones", false)),
+        Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}(Symbol(k) => Tuple{Int,Float64,Float64}[(Int(p[1]), Float64(p[2]), Float64(p[3])) for p in pts]
+            for (k, pts) in get(d, "build_limits", Dict())),
     )
 end
