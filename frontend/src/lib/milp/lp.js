@@ -1281,7 +1281,7 @@ export function buildLP(site0, cfg0, opts = {}) {
       for (const y of years) {
         const tr = T();
         for (const yp of years) if (yp <= y && yr(y) - yr(yp) < cohortLife(cfg, yo, yp, t.lifetime_years)) inc(tr, `nc_${id}_${yp}`, 1);
-        row(`alive_${id}_${y}`, tr, "<=", t.max_new_capacity);
+        row(`alive_${id}_${y}`, tr, "<=", buildLimitAt(cfg, t.tech_id, yr(y))?.[1] ?? t.max_new_capacity);   // R35: tope del tramo
       }
     // R30: instalada en y ≥ cada compra viva (el objetivo la deja en su mínimo)
     if ((cfg.fixed_opex_per_build?.[t.tech_id] ?? 0) > 0)

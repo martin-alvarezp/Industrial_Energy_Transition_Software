@@ -203,6 +203,11 @@ end
     @test IETO.build_limit_at(lim.config, :hp, 2) == (0.0, 4.0)
     @test IETO.build_limit_at(lim.config, :hp, 3) == (0.0, 12.0)
     @test IETO.build_limit_at(lim.config, :eb, 3) === nothing
+    # con el tope de lo VIVO (R32) el máximo del tramo es de lo instalado, no de cada compra
+    al = po_case(repeat_investments = true, max_new_mode = :alive, build_limits = Dict(:hp => [(1, 0.0, 4.0), (3, 0.0, 7.0)]))
+    tot(y) = sum(nc(al, yp) for yp in 1:y)
+    @test tot(2) <= 4 + 1e-6
+    @test tot(5) ≈ 7 atol = 1e-6
     fix = po_case(build_limits = Dict(:hp => [(1, 6.0, 6.0)]))
     @test nc(fix, 1) ≈ 6 atol = 1e-6
     @test_throws IETO.ValidationError validate_scenario(

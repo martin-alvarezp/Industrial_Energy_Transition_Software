@@ -205,7 +205,7 @@ export function templateSteps(method, { driver = null, quarter = false, hemisphe
  * mayor carga, 100 iteraciones como máximo. Devuelve el grupo de cada día,
  * numerado por orden de aparición.
  */
-export function clusterDays(seriesList, k, { peakOf = [] } = {}) {
+export function clusterDays(seriesList, k, { peakOf = [], sumPeakOf = [] } = {}) {
   const D = 365;
   // días de punta (opcional): el día que contiene el máximo horario de cada
   // serie de `peakOf` queda como día tipo PROPIO (peso 1 día). Un promedio de
@@ -218,6 +218,17 @@ export function clusterDays(seriesList, k, { peakOf = [] } = {}) {
     for (let t = 1; t < HOURS; t++) if (h[t] > h[bt]) bt = t;
     const d = Math.floor(bt / 24);
     if (h[bt] > 0 && !peaks.includes(d)) peaks.push(d);
+  }
+  // …y el día de la punta COINCIDENTE de cada grupo de `sumPeakOf` (la suma de
+  // todas las demandas de un año): las puntas de cada vector pueden caer en días
+  // distintos del día en que juntas piden más al empalme
+  for (const grp of sumPeakOf) {
+    if (grp.length < 2) continue;
+    const hs = grp.map((i) => toHourly(seriesList[i]));
+    let bt = 0, bv = -Infinity;
+    for (let t = 0; t < HOURS; t++) { let v = 0; for (const h of hs) v += h[t]; if (v > bv) { bv = v; bt = t; } }
+    const d = Math.floor(bt / 24);
+    if (bv > 0 && !peaks.includes(d)) peaks.push(d);
   }
   if (peaks.length) {
     const kk = Math.max(1, Math.min(Math.round(k), D) - peaks.length);
@@ -313,7 +324,7 @@ const round = (v) => Math.round(v * 1e6) / 1e6;
  * El día de punta mensual lo elige la suma de las demandas crudas (o, sin
  * crudas, la de las demandas proyectadas).
  */
-export function applyTemplate(siteJson, method, { hemisphere = "south", days = DEFAULT_TYPICAL_DAYS, peaks = false, extra = [] } = {}) {
+export function applyTemplate(siteJson, method, { hemisphere = "south", days = DEFAULT_TYPICAL_DAYS, peaks = false, extra = [], extraGroups = [] } = {}) {
   const raw = siteJson.hourly?.series ?? {};
   const keys = seriesKeys(siteJson);
   const full8760 = {};
@@ -339,7 +350,11 @@ export function applyTemplate(siteJson, method, { hemisphere = "south", days = D
   // cada demanda (del sitio y de `extra`) queda como día tipo propio
   const feats = [...keys.map((k) => full8760[k]), ...extra];
   const peakOf = peaks ? feats.map((_, i) => i).filter((i) => i >= keys.length || keys[i].startsWith("demands.")) : [];
-  const assign = method === "typical" ? clusterDays(feats, days, { peakOf }) : null;
+  // puntas coincidentes: las demandas del sitio juntas y, por cada año de la
+  // configuración (`extraGroups`: índices de `extra`), las de ese año
+  const sumPeakOf = peaks ? [keys.map((_, i) => i).filter((i) => keys[i].startsWith("demands.")),
+                             ...extraGroups.map((g) => g.map((j) => keys.length + j))] : [];
+  const assign = method === "typical" ? clusterDays(feats, days, { peakOf, sumPeakOf }) : null;
   const steps = templateSteps(method, { driver, quarter, hemisphere, assign });
   let out = {
     ...siteJson,
@@ -458,6 +473,16 @@ export function projectRaw(siteJson, values, opts = {}) {
  * (necesita series horarias crudas o un sistema en año completo); null o
  * "system" deja la del sistema. `rt.peaks`: días de punta como días tipo propios.
  */
+/** Demandas por año de la configuración (R22) que vienen en horas: la lista
+ *  plana (`extra`) y sus índices agrupados por año (`extraGroups`). */
+export function yearDemandSeries(cfg) {
+  const extra = [], byYear = {};
+  for (const d of Object.values(cfg?.demand_profiles ?? {}))
+    for (const [y, v] of Object.entries(d))
+      if (Array.isArray(v) && v.length === HOURS) { (byYear[y] ??= []).push(extra.length); extra.push(v); }
+  return { extra, extraGroups: Object.values(byYear) };
+}
+
 /** ¿El sitio tiene resolución horaria de dónde rearmar otra plantilla? Series
  *  crudas cargadas, o el propio sistema guardado en año completo (8760 pasos). */
 export function hasHourly(siteJson) {
@@ -471,7 +496,6 @@ export function runTemplateSite(siteJson, rt, cfg = null) {
   if (cur.method === rt.method && (rt.method !== "typical" || (cur.days === rt.days && !!cur.peaks === !!rt.peaks))) return siteJson;
   // los días tipo también miran las demandas por año de la configuración (R22)
   // cuando vienen en horas: sus formas y sus días de punta
-  const extra = Object.values(cfg?.demand_profiles ?? {}).flatMap((d) => Object.values(d))
-    .filter((v) => Array.isArray(v) && v.length === HOURS);
-  return applyTemplate(siteJson, rt.method, { hemisphere: cur.hemisphere ?? "south", days: rt.days, peaks: !!rt.peaks, extra });
+  const { extra, extraGroups } = yearDemandSeries(cfg);
+  return applyTemplate(siteJson, rt.method, { hemisphere: cur.hemisphere ?? "south", days: rt.days, peaks: !!rt.peaks, extra, extraGroups });
 }
