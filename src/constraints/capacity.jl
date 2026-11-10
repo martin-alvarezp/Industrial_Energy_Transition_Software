@@ -8,6 +8,10 @@
 # Los generadores tienen su propia cota con perfil (§7.5, generators.jl) y el
 # storage sus límites de SOC/potencia (§7.4, storage.jl).
 
+"Candidatas con O&M fijo por instalación (R30)."
+fixed_opex_build_techs(sets, cfg::ScenarioConfig) =
+    [t for t in sets.candidates if get(cfg.fixed_opex_per_build, t, 0.0) > 0]
+
 """
     add_capacity_constraints!(m, sets, params, cfg) -> m
 
@@ -54,6 +58,16 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
         m[:build_once] = JuMP.@constraint(m, [t in sets.candidates],
             sum(build[t, y] for y in years) <= 1)
     end
+
+    # R30 (estudio prosumer): O&M fijo POR INSTALACIÓN — un costo anual mientras
+    # haya alguna compra viva de la tecnología (una vez, aunque se amplíe en
+    # otro hito). installed ∈ [0,1] ≥ cada compra viva; el objetivo lo empuja a
+    # su mínimo, que es 1 si hubo compra y 0 si no.
+    FB = fixed_opex_build_techs(sets, cfg)
+    JuMP.@variable(m, installed[t in FB, y in years], lower_bound = 0, upper_bound = 1)
+    m[:installed_link] = [JuMP.@constraint(m, installed[t, y] >= build[t, yp])
+        for t in FB, y in years, yp in years
+        if yp <= y && sets.year_of[y] - sets.year_of[yp] < params.costs[t].lifetime_years]
 
     # M12: compras forzadas del escenario — new_capacity[t,y] ≥ MW fuerza
     # build[t,y] = 1 vía new_capacity_link (sin fijar binarias)

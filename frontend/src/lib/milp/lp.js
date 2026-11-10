@@ -156,6 +156,23 @@ export const buildAllowed = (cfg, tech, y) => {
   return !w || (relYear(cfg, w[0]) <= y && y <= relYear(cfg, w[1]));
 };
 export const fixedCapex = (cfg, tech) => cfg.fixed_capex?.[tech] ?? 0;
+/** R28: años que representa el hito k (1-based), espejo de rep_years. */
+export const repYears = (cfg, yo, k) => {
+  const a = yo[k - 1], b = k === yo.length ? cfg.horizon_years : yo[k] - 1;
+  return Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
+};
+/** R28: ¿años entre hitos con los precios de su propio año? */
+export const ownYearPrices = (cfg) =>
+  cfg.intermediate_prices === "own_year" && (cfg.milestone_weighting ?? "years") === "years";
+/** R28: f(r) del hito k, o su promedio en el tramo ponderado por el descuento (espejo de milestone_mean). */
+export const milestoneMean = (f, cfg, yo, k) => {
+  if (!ownYearPrices(cfg)) return f(yo[k - 1]);
+  let sw = 0, s = 0;
+  for (const r of repYears(cfg, yo, k)) { const d = 1 / Math.pow(1 + cfg.wacc, r); sw += d; s += d * f(r); }
+  return s / sw;
+};
+/** Factor de costo por año del hito k (R3; R28: promedio del tramo), espejo de cost_factor. */
+export const costFactor = (cfg, kind, id, yo, k) => milestoneMean((r) => yearFactor(cfg, kind, id, r), cfg, yo, k);
 /** Factor del OPEX de cada hito (R18), espejo de opex_weights. */
 export const opexWeights = (cfg, yo) => yo.map((r, k) => {
   const d = (j) => 1 / Math.pow(1 + cfg.wacc, j);
@@ -216,13 +233,14 @@ const finTerms = (cfg, id, life = Infinity) => {
 };
 /** Peso en el VAN de 1 USD de CAPEX del hito k (1-based) — espejo de capex_pv (R27). */
 export const capexPv = (cfg, yo, k, id, life = Infinity) => {
-  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j), r0 = yo[k - 1];
+  const lead = cfg.investment_lead_years ?? 0;                  // R29: se paga N años antes de operar
+  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j), r0 = yo[k - 1] - lead;
   const { n, a, ds } = finTerms(cfg, id, life);
   if (!n) return d(r0);
   const last = Math.min(r0 + n - 1, cfg.horizon_years);
   let s = 0;
   if ((cfg.milestone_weighting ?? "years") === "years") { for (let j = r0; j <= last; j++) s += d(j); }
-  else for (const r of yo) if (r >= r0 && r <= last) s += d(r);
+  else for (const r of yo) if (r >= yo[k - 1] && r <= last + lead) s += d(r - lead);
   return ds * a * s + (1 - ds) * d(r0);
 };
 /** Cuota de CAPEX de cada hito (R27, vista): capexBy = {id: [USD por hito]}. */
@@ -392,11 +410,13 @@ export function buildLP(site0, cfg0, opts = {}) {
   const profAt = (id, y) => byYearAt(cfg, cfg.profiles_by_year?.[id], yr(y)) ?? site.generation_profiles?.[id];
   // R22: serie base de la demanda del año (perfil por año o la del sitio)
   const dbase = (c, y) => demandProfileAt(cfg, c, yr(y)) ?? site.demands?.[c] ?? [];
-  const esc = (c, y) => esc0(c, y) * yearFactor(cfg, "price", c, yr(y));
-  const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, yr(y));
+  // precio del año r (escalación y factores R3); R28: el del hito es el promedio de su tramo
+  const escR = (c, r) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), r - 1) * yearFactor(cfg, "price", c, r);
+  const esc = (c, y) => milestoneMean((r) => escR(c, r), cfg, yo, y);
   // R26: el perfil de precios del año (si hay) reemplaza la forma base
-  const PX = (mk, s, y) => (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], yr(y))?.[s - 1] ??
-                            mk.price[s - 1]) * mpx(mk, y);
+  const PX = (mk, s, y) => milestoneMean((r) =>
+    (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], r)?.[s - 1] ?? mk.price[s - 1]) *
+    escR(mk.carrier_id, r) * yearFactor(cfg, "price", mk.market_id, r), cfg, yo, y);
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])
@@ -542,8 +562,8 @@ export function buildLP(site0, cfg0, opts = {}) {
   const capNet = (y) => H === 1 ? cfg.emissions_cap_net_start :
     cfg.emissions_cap_net_start +
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
-  const cprice = (y) => cfg.carbon_price_by_year?.length
-    ? cfg.carbon_price_by_year[yr(y) - 1] : cfg.carbon_price;
+  const cprice = (y) => milestoneMean((r) => (cfg.carbon_price_by_year?.length
+    ? cfg.carbon_price_by_year[r - 1] : cfg.carbon_price), cfg, yo, y);
   const NA = yr(N);   // último año optimizado (R6): el valor residual se mide ahí
   const salvOn = salvageApplies(cfg);   // R27: con cuotas no hay castigo de fin de horizonte
 
@@ -556,6 +576,11 @@ export function buildLP(site0, cfg0, opts = {}) {
     for (const st of stors) {
       const c = cfg.storage_energy_fixed_opex?.[st.tech_id] ?? 0;
       if (c > 0) { const en = energyOf(st, y); constDed(D * c * en.k); for (const [v, k] of en.vars) addDed(v, D * c * k); }
+    }
+    // O&M fijo por instalación (R30): mientras haya una compra viva
+    for (const tc of cands) {
+      const c = cfg.fixed_opex_per_build?.[tc.tech_id] ?? 0;
+      if (c > 0) addDed(`inst_${sane(tc.tech_id)}_${y}`, D * c);
     }
     // O&M fijo de las medidas activas (R10): Σ_{y'≤y} em_y'
     for (const em of EMs) if ((cfg.measure_fixed_opex?.[em.id] ?? 0) > 0)
@@ -590,8 +615,8 @@ export function buildLP(site0, cfg0, opts = {}) {
     }
     for (const tc of [...convs, ...gens, ...stors]) {
       const a = avail(tc, y);
-      const fo = tc.fixed_opex * yearFactor(cfg, "fixed_opex", tc.tech_id, yr(y));      // R3
-      const vo = tc.variable_opex * yearFactor(cfg, "variable_opex", tc.tech_id, yr(y));
+      const fo = tc.fixed_opex * costFactor(cfg, "fixed_opex", tc.tech_id, yo, y);      // R3 (R28: del tramo)
+      const vo = tc.variable_opex * costFactor(cfg, "variable_opex", tc.tech_id, yo, y);
       constDed(D * fo * a.k);
       for (const v of a.ncs) addDed(v, D * fo);
       if (tc.type !== "storage")
@@ -640,10 +665,10 @@ export function buildLP(site0, cfg0, opts = {}) {
       for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
       constDed(-D * cfg.ets_price * (cfg.ets_free_allowance ?? 0));
     }
-    addDed(`off_${y}`, D * cfg.offset_price * yearFactor(cfg, "offset_price", "offsets", yr(y)));   // R20
+    addDed(`off_${y}`, D * cfg.offset_price * costFactor(cfg, "offset_price", "offsets", yo, y));   // R20
     // cargos por demanda (M2/M2b)
     for (const mk of buys) {
-      const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
+      const fdc = costFactor(cfg, "demand_charge", mk.market_id, yo, y);   // R3 (R28: del tramo)
       const dc = (mk.demand_charge ?? 0) * fdc;
       const cp = mk.contracted_power;
       const pen = (mk.excess_penalty ?? 0) * fdc;
@@ -1206,6 +1231,11 @@ export function buildLP(site0, cfg0, opts = {}) {
       years.forEach((y) => inc(tr, `b_${id}_${y}`, 1));
       row(`once_${id}`, tr, "<=", 1);
     }
+    // R30: instalada en y ≥ cada compra viva (el objetivo la deja en su mínimo)
+    if ((cfg.fixed_opex_per_build?.[t.tech_id] ?? 0) > 0)
+      for (const y of years) for (const yp of years)
+        if (yp <= y && yr(y) - yr(yp) < t.lifetime_years)
+          row(`inst_${id}_${y}_${yp}`, { [`inst_${id}_${y}`]: 1, [`b_${id}_${yp}`]: -1 }, ">=", 0);
   }
   for (const [tech, yf, mw] of (cfg.forced_builds ?? []).map((f) =>
        Array.isArray(f) ? f : [f.tech, f.year, f.mw])) {

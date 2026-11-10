@@ -100,8 +100,10 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         c == :grid_export && continue
         esc = get(cfg.price_escalation, c, 0.0)
         price[c] = _scaled_matrix(ps.values, esc, ry)
-        for y in years   # factores por año (R3), sobre la escalación
-            price[c][:, y] .*= year_factor(cfg, :price, c, ry[y])
+        # factores por año (R3), sobre la escalación; con R28, promedio del tramo
+        col(r) = ps.values .* ((1.0 + esc)^(r - 1) * year_factor(cfg, :price, c, r))
+        for y in years
+            price[c][:, y] .= milestone_mean(col, cfg, ry, y)
         end
     end
 
@@ -178,13 +180,16 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
         mk = mkts[id]
         esc = get(cfg.price_escalation, mk.carrier, 0.0)
         market_price[id] = _scaled_matrix(mk.price, esc, ry)
-        # R26: perfil de precios del año (si hay) reemplaza la forma base
-        for (y, r) in enumerate(ry)
+        # precio del año r: el perfil del año (R26) o la forma base, con la
+        # escalación y los factores del mercado y del vector (R3); con R28, el
+        # del hito es el promedio de su tramo ponderado por el descuento
+        mcol(r) = begin
             pf = by_year_at(cfg, get(cfg.price_profiles_by_year, id, nothing), r)
-            pf === nothing || (market_price[id][:, y] .= pf .* (1.0 + esc)^(r - 1))
+            (pf === nothing ? mk.price : pf) .*
+                ((1.0 + esc)^(r - 1) * year_factor(cfg, :price, id, r) * year_factor(cfg, :price, mk.carrier, r))
         end
-        for y in years   # R3: factor del mercado y del vector
-            market_price[id][:, y] .*= year_factor(cfg, :price, id, ry[y]) * year_factor(cfg, :price, mk.carrier, ry[y])
+        for y in years
+            market_price[id][:, y] .= milestone_mean(mcol, cfg, ry, y)
         end
         market_carrier[id] = mk.carrier
         market_dir[id] = mk.direction

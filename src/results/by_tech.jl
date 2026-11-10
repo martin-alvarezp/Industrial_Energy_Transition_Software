@@ -46,7 +46,7 @@ function extract_by_tech(im::IETOModel)
     allowed(id) = isempty(cfg.allowed_techs) || id in cfg.allowed_techs
     for y in years
         for t in all_techs
-            row(t, y)[3] += P.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, ry[y]) *
+            row(t, y)[3] += P.costs[t].fixed_opex * cost_factor(cfg, :fixed_opex, t, ry, y) *
                             v(m[:available_capacity][t, y])
         end
         for (st, c) in cfg.storage_energy_fixed_opex          # R19: por MWh de energía
@@ -55,17 +55,20 @@ function extract_by_tech(im::IETOModel)
         for (id, s) in site.sources
             allowed(id) && s.fixed_charge != 0 && (row(id, y)[3] += s.fixed_charge)
         end
+        for t in fixed_opex_build_techs(sets, cfg)              # R30: O&M fijo por instalación
+            row(t, y)[3] += cfg.fixed_opex_per_build[t] * v(m[:installed][t, y])
+        end
         for k in ems                                            # R10: O&M de medidas activas
             row(k, y)[3] += get(cfg.measure_fixed_opex, k, 0.0) * v(m[:em_active][k, y])
         end
         # O&M variable (el despacho de un almacenamiento es su descarga)
         for t in sets.dispatch_techs
-            f = P.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, ry[y])
+            f = P.costs[t].variable_opex * cost_factor(cfg, :variable_opex, t, ry, y)
             f == 0 && continue
             row(t, y)[4] += f * sum(v(m[:dispatch][t, s, y]) * w[s, y] for s in steps; init = 0.0)
         end
         for st in sets.storages
-            f = P.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, ry[y])
+            f = P.costs[st].variable_opex * cost_factor(cfg, :variable_opex, st, ry, y)
             f == 0 && continue
             row(st, y)[4] += f * sum(v(m[:discharge][st, s, y]) * w[s, y] for s in steps; init = 0.0)
         end
@@ -124,7 +127,7 @@ function extract_by_market(im::IETOModel)
             dc = 0.0
             if get(P.market_demand_charge, mk, 0.0) > 0 ||
                (isfinite(contracted(mk)) && get(P.market_excess_penalty, mk, 0.0) > 0)
-                f = year_factor(cfg, :demand_charge, mk, ry[y])
+                f = cost_factor(cfg, :demand_charge, mk, ry, y)
                 k = P.market_demand_charge[mk] * KW_PER_MW * mps * f
                 for se in 1:nse
                     dc += isfinite(contracted(mk)) ?

@@ -383,3 +383,14 @@ let sj = JSON3.read(JSON3.write(site_json(site0)), Dict{String,Any})
     dump("demo_nodos_linea_n3", IETO.site_from_json(JSON3.read(JSON3.write(sj))),
          with_config(cfg0; horizon_years = 3))
 end
+
+# R28 · años entre hitos con los precios de su propio año (estudio prosumer):
+# hitos calendario con escalación del gas y de la electricidad y factores por año
+dump("demo_precios_propio_anio_n10", site0, with_config(cfg0; horizon_years = 10, base_year = 2026,
+     milestone_years = [2026, 2028, 2031, 2035], intermediate_prices = :own_year,
+     price_escalation = Dict(:electricity => 0.04, :natural_gas => 0.06), carbon_price_by_year = collect(40.0:10.0:130.0)))
+# R29 · la inversión se paga un año antes de operar (estudio prosumer)
+dump("demo_inversion_anticipada_n5", site0, with_config(cfg0; horizon_years = 5, investment_lead_years = 1))
+# R30 · O&M fijo por instalación, con compras repetibles (se paga una vez por año)
+dump("demo_om_por_instalacion_n5", site0, with_config(cfg0; horizon_years = 5, repeat_investments = true,
+     fixed_opex_per_build = Dict(:pv => 50_000.0, :heat_pump => 80_000.0)))

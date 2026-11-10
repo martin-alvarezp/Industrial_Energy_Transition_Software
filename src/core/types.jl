@@ -630,7 +630,42 @@ struct ScenarioConfig
     day_sequence_by_year::Dict{Int,Vector{String}}       # año → día tipo de cada día del año (365)
     price_profiles_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → precio por paso (reemplaza la forma)
     market_availability_by_year::Dict{Symbol,Dict{Int,Vector{Float64}}}  # mercado → año → disponibilidad por paso
+    # ── estudio prosumer ──
+    intermediate_prices::Symbol              # R28: años entre hitos valorados con :milestone (los del hito)
+                                             # o :own_year (la operación del hito con los precios de cada año)
+    investment_lead_years::Int               # R29: la inversión se paga N años ANTES de operar (0 = en el año del hito)
+    fixed_opex_per_build::Dict{Symbol,Float64}  # R30: USD/año por instalación comprada, mientras existe (además del USD/MW·año)
 end
+
+# retro-compatibilidad: 84 campos → inversión en el año del hito y sin O&M por instalación
+ScenarioConfig(a::Vararg{Any,84}) = ScenarioConfig(a..., :milestone, 0, Dict{Symbol,Float64}())
+
+"Años relativos que representa el hito k (R18): de ry[k] al anterior al próximo; el último, hasta el horizonte."
+rep_years(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer) =
+    ry[k]:(k == length(ry) ? cfg.horizon_years : ry[k + 1] - 1)
+
+"R28: ¿los años entre hitos se valoran con los precios de su propio año?"
+own_year_prices(cfg::ScenarioConfig) = cfg.intermediate_prices == :own_year && cfg.milestone_weighting == :years
+
+"""
+    milestone_mean(f, cfg, ry, k)
+
+Valor de `f(r)` (escalar o vector por paso) para el hito `k`: `f(ry[k])`, o con
+precios del propio año (R28) el promedio de `f` en los años que el hito
+representa, ponderado por el descuento de cada año. Como el objetivo multiplica
+por la suma de esos descuentos, el resultado es exactamente «la operación del
+hito valorada año a año con su precio, descontada en su año».
+"""
+function milestone_mean(f, cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer)
+    own_year_prices(cfg) || return f(ry[k])
+    rs = rep_years(cfg, ry, k)
+    ws = [discount_factor(cfg.wacc, r) for r in rs]
+    return sum(w * f(r) for (w, r) in zip(ws, rs)) / sum(ws)
+end
+
+"Factor de costo por año (R3) para el hito k: el de su año, o el promedio de su tramo (R28)."
+cost_factor(cfg::ScenarioConfig, kind::Symbol, id, ry::AbstractVector{<:Integer}, k::Integer) =
+    milestone_mean(r -> year_factor(cfg, kind, id, r), cfg, ry, k)
 
 # retro-compatibilidad: 79 campos → la misma plantilla de días todos los años
 ScenarioConfig(a::Vararg{Any,79}) = ScenarioConfig(a..., Dict{Int,Vector{Float64}}(), Dict{Int,Vector{Int}}(), Dict{Int,Vector{String}}(),
@@ -688,14 +723,16 @@ vida útil + 1 (fórmula de la referencia: min(plazo − 1, vida) + 1). Sin plaz
 """
 function capex_pv(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer, id::Symbol;
                   life::Integer = typemax(Int))
-    d0 = discount_factor(cfg.wacc, ry[k])
+    r0 = ry[k] - cfg.investment_lead_years      # R29: se paga N años antes de operar
+    d0 = discount_factor(cfg.wacc, r0)
     cfg.capex_accounting == :annuity || return d0
     n = min(get(cfg.financing_period_tech, id, cfg.financing_years), life == typemax(Int) ? life : life + 1)
     n > 0 || return d0
     a = annuity_factor(get(cfg.financing_rate_tech, id, cfg.financing_rate), n)
     ds = get(cfg.debt_share, id, 1.0)
-    last_y = min(ry[k] + n - 1, cfg.horizon_years)
-    yrs = cfg.milestone_weighting == :years ? (ry[k]:last_y) : [r for r in ry if ry[k] <= r <= last_y]
+    last_y = min(r0 + n - 1, cfg.horizon_years)
+    yrs = cfg.milestone_weighting == :years ? (r0:last_y) :
+          [r - cfg.investment_lead_years for r in ry if ry[k] <= r <= last_y + cfg.investment_lead_years]
     return ds * a * sum(j -> discount_factor(cfg.wacc, j), yrs; init = 0.0) + (1 - ds) * d0
 end
 

@@ -4,7 +4,7 @@
 // src/results/{financials,emissions_summary,extract_dispatch,export_results}.
 
 import { timeGroups, fixInfrastructure, hasCommitment, unitMw, inputTerms, capexFactor, hasTariff, afrrParticipants, fixedCapex, ownEnergy, energyCapex, yearFactor, capexAnnuity, capexPv, capexCharge, salvageApplies, byYearAt, marketEfTable,
-  modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt } from "./lp.js";
+  modelYears, milestoneIndex, inputFactor, opexWeights, demandProfileAt , milestoneMean, costFactor } from "./lp.js";
 
 const sane = (x) => String(x).replace(/[^A-Za-z0-9]/g, "_");
 const fnv12 = (s) => {
@@ -33,13 +33,14 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const disc = years.map((y) => 1 / Math.pow(1 + cfg.wacc, yr(y)));
   const opw = opexWeights(cfg, yo);
   // R3: factores por año sobre la escalación (espejo de lp.js)
-  const esc = (c, y) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), yr(y) - 1) * yearFactor(cfg, "price", c, yr(y));
-  const mpx = (mk, y) => esc(mk.carrier_id, y) * yearFactor(cfg, "price", mk.market_id, yr(y));
+  const escR = (c, r) => Math.pow(1 + (cfg.price_escalation?.[c] ?? 0), r - 1) * yearFactor(cfg, "price", c, r);
+  const esc = (c, y) => milestoneMean((r) => escR(c, r), cfg, yo, y);   // R28: promedio del tramo
   // R26: peso y precio de cada paso por año (espejo de lp.js)
   const wY = years.map((y) => byYearAt(cfg, cfg.weight_by_year, yr(y)) ?? w);
   const W = (s, y) => wY[y - 1][s - 1];
-  const PX = (mk, s, y) => (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], yr(y))?.[s - 1] ??
-                            mk.price[s - 1]) * mpx(mk, y);
+  const PX = (mk, s, y) => milestoneMean((r) =>
+    (byYearAt(cfg, cfg.price_profiles_by_year?.[mk.market_id], r)?.[s - 1] ?? mk.price[s - 1]) *
+    escR(mk.carrier_id, r) * yearFactor(cfg, "price", mk.market_id, r), cfg, yo, y);
   const catOf = Object.fromEntries(site.carriers.map((c) => [c.carrier_id, c.category]));
   const efTab = {};
   for (const f of site.emission_factors ?? [])
@@ -198,8 +199,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     .reduce((a, s) => a + (s.fixed_charge ?? 0), 0);
   const { seasonSteps, billingSteps } = timeGroups(ts, cfg);
   const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
-  const cprice = (y) => cfg.carbon_price_by_year?.length
-    ? cfg.carbon_price_by_year[yr(y) - 1] : cfg.carbon_price;
+  const cprice = (y) => milestoneMean((r) => (cfg.carbon_price_by_year?.length
+    ? cfg.carbon_price_by_year[r - 1] : cfg.carbon_price), cfg, yo, y);
   const capNet = (y) => H === 1 ? cfg.emissions_cap_net_start :
     cfg.emissions_cap_net_start +
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
@@ -243,6 +244,11 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
       const c = cfg.storage_energy_fixed_opex?.[st.tech_id] ?? 0;
       if (c > 0) { fixed += c * storageMwh(st, y); bt(st.tech_id, y).fixed_opex += c * storageMwh(st, y); }
     }
+    // O&M fijo por instalación (R30)
+    for (const t of cands) {
+      const c = cfg.fixed_opex_per_build?.[t.tech_id] ?? 0;
+      if (c > 0) { const f = c * V(`inst_${sane(t.tech_id)}_${y}`); fixed += f; bt(t.tech_id, y).fixed_opex += f; }
+    }
     // medidas de eficiencia (5.3) y su O&M fijo mientras están activas (R10)
     for (const em of EMs)
       for (let yp = 1; yp <= y; yp++) {
@@ -257,12 +263,12 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
         year: y, reduction: em.reduction, capex: em.capex * capexFactor(cfg, em.id, yr(y)) });
     }
     for (const t of [...convs, ...gens, ...stors]) {
-      const fo = t.fixed_opex * yearFactor(cfg, "fixed_opex", t.tech_id, yr(y)) * availOf(t, y);
+      const fo = t.fixed_opex * costFactor(cfg, "fixed_opex", t.tech_id, yo, y) * availOf(t, y);
       fixed += fo; bt(t.tech_id, y).fixed_opex += fo;
       for (const s of steps) {
         const v = t.type === "storage" ? V(`dc_${sane(t.tech_id)}_${s}_${y}`)
                                        : V(`d_${sane(t.tech_id)}_${s}_${y}`);
-        const vo = t.variable_opex * yearFactor(cfg, "variable_opex", t.tech_id, yr(y)) * v * W(s, y);
+        const vo = t.variable_opex * costFactor(cfg, "variable_opex", t.tech_id, yo, y) * v * W(s, y);
         varop += vo; bt(t.tech_id, y).var_opex += vo;
       }
       // (la carga desplazada de 5.4 se suma después, una vez por año)
@@ -301,7 +307,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
           energy += c; bt(cv.tech_id, y).fuel_cost += c;
         }
     for (const mk of buys) {
-      const fdc = yearFactor(cfg, "demand_charge", mk.market_id, yr(y));   // R3
+      const fdc = costFactor(cfg, "demand_charge", mk.market_id, yo, y);   // R3 (R28: del tramo)
       const dc = (mk.demand_charge ?? 0) * fdc, cp = mk.contracted_power,
             pen = (mk.excess_penalty ?? 0) * fdc;
       if (!(dc > 0 || (cp != null && pen > 0))) continue;
@@ -403,7 +409,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
     // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita
     const carbon = cprice(y) * ge +
       ((cfg.ets_price ?? 0) > 0 ? cfg.ets_price * (s1 - (cfg.ets_free_allowance ?? 0)) : 0);
-    const offCost = cfg.offset_price * yearFactor(cfg, "offset_price", "offsets", yr(y)) * off;
+    const offCost = cfg.offset_price * costFactor(cfg, "offset_price", "offsets", yo, y) * off;
     // ajuste fiscal (M9): −t·deducibles − t·depreciación de inversiones nuevas
     let tax = 0;
     const tr = cfg.tax_rate ?? 0;

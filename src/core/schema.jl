@@ -429,5 +429,8 @@ function load_scenario_config(path::AbstractString)
                        for (k, ys) in get(d, "price_profiles_by_year", Dict())),
         Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(k) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
                        for (k, ys) in get(d, "market_availability_by_year", Dict())),
+        Symbol(get(d, "intermediate_prices", "milestone")),
+        Int(get(d, "investment_lead_years", 0)),
+        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_opex_per_build", Dict())),
     )
 end

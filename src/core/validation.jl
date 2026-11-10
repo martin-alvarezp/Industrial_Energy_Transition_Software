@@ -602,6 +602,15 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         "emission_cap_mode: '$(cfg.emission_cap_mode)' desconocido (hard | relax)")
     cfg.milestone_weighting in (:none, :years) || push!(problems,
         "milestone_weighting: '$(cfg.milestone_weighting)' desconocido (none | years)")
+    # R28–R30 (estudio prosumer)
+    cfg.intermediate_prices in (:milestone, :own_year) || push!(problems,
+        "intermediate_prices: '$(cfg.intermediate_prices)' desconocido (milestone | own_year)")
+    cfg.investment_lead_years >= 0 || push!(problems,
+        "investment_lead_years: debe ser ≥ 0 (valor: $(cfg.investment_lead_years))")
+    for (t, c) in cfg.fixed_opex_per_build
+        c >= 0 || push!(problems, "fixed_opex_per_build['$t']: debe ser ≥ 0")
+        find_tech(site, t) === nothing && push!(problems, "fixed_opex_per_build['$t']: no existe una tecnología con ese id")
+    end
     # R17: topes por año
     for (k, yr, cap) in cfg.emission_caps
         k in (:scope1, :scope2, :gross, :net) || push!(problems,

@@ -72,6 +72,9 @@ export function toConfig(cfg) {
     price_profiles_by_year: cfg.price_profiles_by_year ?? {},
     market_availability_by_year: cfg.market_availability_by_year ?? {},
     milestone_weighting: cfg.milestone_weighting ?? "years", // R18: peso de los hitos
+    intermediate_prices: cfg.intermediate_prices ?? "milestone", // R28: precios del propio año entre hitos
+    investment_lead_years: cfg.investment_lead_years ?? 0,  // R29: inversión N años antes
+    fixed_opex_per_build: cfg.fixed_opex_per_build ?? {},   // R30: O&M fijo por instalación
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},

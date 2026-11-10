@@ -38,18 +38,20 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # FixedOPEX_y = Σ_tech fixed_opex · available_capacity[tech,y]
     #             + cargos fijos de las conexiones de red (USD/año, M11)
     JuMP.@expression(m, fixed_opex_y[y in years],
-        sum(params.costs[t].fixed_opex * year_factor(cfg, :fixed_opex, t, ry[y]) * available_capacity[t, y]
+        sum(params.costs[t].fixed_opex * cost_factor(cfg, :fixed_opex, t, ry, y) * available_capacity[t, y]
             for t in all_techs; init = 0.0) + params.fixed_charges +
         sum(c * m[:storage_energy][st, y] for (st, c) in cfg.storage_energy_fixed_opex   # R19: por MWh
             if st in sets.storages; init = 0.0) +
-        m[:measures_opex_y][y])   # O&M fijo de las medidas activas (R10)
+        m[:measures_opex_y][y] +  # O&M fijo de las medidas activas (R10)
+        sum(cfg.fixed_opex_per_build[t] * m[:installed][t, y]       # R30: por instalación
+            for t in fixed_opex_build_techs(sets, cfg); init = 0.0))
 
     # VarOPEX_y = Σ_tech,step variable_opex · dispatch · weight_hours
     # (el "dispatch" de un storage es su descarga)
     JuMP.@expression(m, var_opex_y[y in years],
-        sum(params.costs[t].variable_opex * year_factor(cfg, :variable_opex, t, ry[y]) * dispatch[t, s, y] * w[s, y]
+        sum(params.costs[t].variable_opex * cost_factor(cfg, :variable_opex, t, ry, y) * dispatch[t, s, y] * w[s, y]
             for t in sets.dispatch_techs, s in steps; init = 0.0) +
-        sum(params.costs[st].variable_opex * year_factor(cfg, :variable_opex, st, ry[y]) * discharge[st, s, y] * w[s, y]
+        sum(params.costs[st].variable_opex * cost_factor(cfg, :variable_opex, st, ry, y) * discharge[st, s, y] * w[s, y]
             for st in sets.storages, s in steps; init = 0.0) +
         m[:startup_cost_y][y] +  # arranques (2.1): parte del OPEX variable
         m[:flex_cost_y][y])      # carga desplazada (5.4)
@@ -76,7 +78,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                   (isfinite(contracted(mk)) &&
                    get(params.market_excess_penalty, mk, 0.0) > 0)]
     dc_term(mk, se, y) = begin
-        f = year_factor(cfg, :demand_charge, mk, ry[y])   # R3: cargo y penalidad por año
+        f = cost_factor(cfg, :demand_charge, mk, ry, y)   # R3: cargo y penalidad por año (R28: del tramo)
         c = params.market_demand_charge[mk] * KW_PER_MW * months_per_season * f
         if isfinite(contracted(mk))
             c * contracted(mk) +
@@ -92,14 +94,14 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
         m[:tariff_cost_y][y])   # tarifa de red (4.3): horas de utilización y bloques
 
     # CarbonCost_y + OffsetCost_y − ExportRevenue_y (ventas de mercados)
-    cprice(y) = isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :
-                cfg.carbon_price_by_year[ry[y]]   # trayectoria regulatoria (M7)
+    cprice(y) = milestone_mean(r -> isempty(cfg.carbon_price_by_year) ? cfg.carbon_price :
+                                    cfg.carbon_price_by_year[r], cfg, ry, y)   # trayectoria (M7); R28: del tramo
     # ETS (4.2): derechos sobre el alcance 1 por encima de la asignación
     # gratuita; el excedente se vende (término negativo). Suma al costo de carbono.
     JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y] +
         (cfg.ets_price > 0 ? cfg.ets_price * (m[:scope1_y][y] - cfg.ets_free_allowance) : 0.0))
     JuMP.@expression(m, offset_cost_y[y in years],   # R20: precio por año
-        cfg.offset_price * year_factor(cfg, :offset_price, :offsets, ry[y]) * offset_buy[y])
+        cfg.offset_price * cost_factor(cfg, :offset_price, :offsets, ry, y) * offset_buy[y])
     # ventas :billing pagan su precio de inyección; las :net_metering (M2b)
     # ingresan el crédito neteado O_p · retail medio del período (el banco
     # que expira no se paga)

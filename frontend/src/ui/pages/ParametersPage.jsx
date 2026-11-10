@@ -118,6 +118,15 @@ export default function ParametersPage({ route }) {
                 <option value="none">{t("par.weightNone")}</option>
               </select>
             </Field>
+            {(draft.milestone_weighting ?? "years") === "years" && (
+              <Field t={t} label={t("par.interPrices")}>
+                <select className="ui-select" data-testid="intermediate-prices" value={draft.intermediate_prices ?? "milestone"}
+                        onChange={(e) => set({ intermediate_prices: e.target.value })}>
+                  <option value="milestone">{t("par.interMilestone")}</option>
+                  <option value="own_year">{t("par.interOwnYear")}</option>
+                </select>
+              </Field>
+            )}
             <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.weightHint")}</p>
           </>}
           {twin.siteJson.hourly?.template?.method === "typical" && <>
@@ -171,6 +180,12 @@ export default function ParametersPage({ route }) {
             </select>
           </Field>
           <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.capexModeHint")}</p>
+          <Field t={t} label={t("par.leadYears")} unit={t("par.buildYears")}>
+            <input className="ui-input" type="number" min={0} step={1} data-testid="lead-years"
+                   value={draft.investment_lead_years || ""} placeholder="0"
+                   onChange={(e) => set({ investment_lead_years: Math.max(0, Math.round(+e.target.value || 0)) })} />
+          </Field>
+          <p className="ui-hint" style={{ marginTop: 0 }}>{t("par.leadYearsHint")}</p>
           <Toggle on={draft.salvage_value} onChange={(x) => set({ salvage_value: x })} label={t("par.salvage")} />
         </section>
 
@@ -606,6 +621,10 @@ export default function ParametersPage({ route }) {
                        value={draft.fixed_capex?.[c.tech_id] ?? ""} aria-label={t("par.fixedCapex")} data-fixed-capex={c.tech_id}
                        onChange={(e) => { const v = +e.target.value; setKey("fixed_capex", v > 0 ? v : null); }} />
                 <span className="unit">{t("par.fixedCapex")}</span>
+                <input className="ui-input par-capex-num" type="number" min={0} step={1000}
+                       value={draft.fixed_opex_per_build?.[c.tech_id] ?? ""} aria-label={t("par.fixedOpexBuild")} data-fixed-opex-build={c.tech_id}
+                       onChange={(e) => { const v = +e.target.value; setKey("fixed_opex_per_build", v > 0 ? v : null); }} />
+                <span className="unit">{t("par.fixedOpexBuild")}</span>
               </div>
             );
           })}
