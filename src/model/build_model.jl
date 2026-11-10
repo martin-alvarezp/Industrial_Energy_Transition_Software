@@ -27,7 +27,7 @@ function build_model(site::Site, cfg::ScenarioConfig;
     m = JuMP.Model(optimizer)
     silent && JuMP.set_silent(m)
 
-    add_variables!(m, sets, params)
+    add_variables!(m, sets, params, cfg)
     add_constraints!(m, sets, params, site, cfg)
     set_objective!(m, sets, params, cfg)
     # el presupuesto (§7.8) va después del objetivo: usa su expresión capex_y

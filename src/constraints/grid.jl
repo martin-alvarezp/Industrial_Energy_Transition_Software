@@ -51,6 +51,15 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
             power_cap[mk] = JuMP.@constraint(m, [s in steps, y in years],
                 market_flow[mk, s, y] <= params.market_power_cap[mk] * avs(s, y))
         end
+        if !isfinite(params.market_power_cap[mk]) &&
+           (haskey(cfg.market_availability, mk) || haskey(cfg.market_availability_by_year, mk))
+            # sin tope de potencia la disponibilidad no tenía de dónde colgarse
+            # y se ignoraba: un paso con disponibilidad 0 es «no se puede comprar»
+            av0 = get(cfg.market_availability, mk, nothing)
+            avy0 = get(cfg.market_availability_by_year, mk, nothing)
+            off(s, y) = (a = by_year_at(cfg, avy0, sets.year_of[y]); (a !== nothing ? a[s] : av0 === nothing ? 1.0 : av0[s]) <= 0)
+            power_cap[mk] = [JuMP.@constraint(m, market_flow[mk, s, y] <= 0) for s in steps, y in years if off(s, y)]
+        end
         if isfinite(params.market_annual_cap[mk])
             annual_cap[mk] = JuMP.@constraint(m, [y in years],
                 sum(market_flow[mk, s, y] * w[s, y] for s in steps) <=

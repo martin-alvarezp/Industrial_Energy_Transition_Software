@@ -26,7 +26,23 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
 
     # CAPEX_y = Σ_tech capex·1000·new_capacity + renovaciones determinísticas
     # del parque existente (M5, renew_existing)
+    # R34: reposiciones automáticas de las compras que vencen entre hitos —
+    # (tecnología, hito de la compra, año en que opera la reposición, hito que
+    # cubre ese año). Su CAPEX se informa en el hito que cubre el año.
+    # (con hitos que valen por sus años, el hito k cubre [ry[k], ry[k+1]−1]: R18)
+    REP = [(t, k, e, findlast(<=(e), ry)) for t in sets.candidates for k in years
+           for e in cohort_links(cfg, ry, k, params.costs[t].lifetime_years)[2:end]]
+    m[:replacement_links] = REP
+    EC = JuMP.axes(m[:new_energy], 1)
+    # CAPEX de reponer en el año `e` la compra (t, k): por kW, fijo por compra y energía propia
+    rep_cost(t, k, e) =
+        params.costs[t].capex_per_kw * capex_factor(cfg, t, e) * KW_PER_MW * new_capacity[t, k] +
+        get(cfg.fixed_capex, t, 0.0) * m[:build][t, k] +
+        (t in EC ? cfg.storage_energy_capex[t] * KW_PER_MW * capex_factor(cfg, t, e) * m[:new_energy][t, k] : 0.0)
+    JuMP.@expression(m, replacement_capex_y[y in years],
+        sum(rep_cost(t, k, e) for (t, k, e, j) in REP if j == y; init = 0.0))
     JuMP.@expression(m, capex_y[y in years],
+        replacement_capex_y[y] +
         sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW *
             new_capacity[t, y] for t in sets.candidates; init = 0.0) +
         sum(get(cfg.fixed_capex, t, 0.0) * m[:build][t, y]   # CAPEX fijo por compra (R1)
@@ -145,17 +161,20 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
     # horizonte por la vida útil no consumida — capex·(vida−años_usados)/vida,
     # descontado al año N. Sin él, invertir tarde en activos longevos queda
     # castigado por el truncamiento del VAN (la vida útil sería solo traza).
-    N = ry[last(years)]      # último año optimizado (R6)
+    # Con hitos que valen por sus años (R18) el horizonte llega hasta
+    # horizon_years, no hasta el último hito. Con reposición automática (R34)
+    # lo que queda sin usar es el ÚLTIMO eslabón de cada compra, a su precio.
+    N = salvage_end(cfg, ry)
+    lastlink(t, y) = cohort_links(cfg, ry, y, params.costs[t].lifetime_years)[end]
     sfrac(t, y) = cfg.salvage_value ?
-        max(0.0, (params.costs[t].lifetime_years - (N - ry[y] + 1)) / params.costs[t].lifetime_years) : 0.0
+        max(0.0, (params.costs[t].lifetime_years - (N - lastlink(t, y) + 1)) / params.costs[t].lifetime_years) : 0.0
     JuMP.@expression(m, salvage_credit,
-        sum(ecap(tc, y) * sfrac(tc, y) for tc in E, y in years; init = 0.0) +
-        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, ry[y]) * KW_PER_MW *
-            new_capacity[t, y] *
-            (cfg.salvage_value ?
-             max(0.0, (params.costs[t].lifetime_years - (N - ry[y] + 1)) /
-                      params.costs[t].lifetime_years) : 0.0)
+        sum(cfg.storage_energy_capex[tc] * KW_PER_MW * capex_factor(cfg, tc, lastlink(tc, y)) * m[:new_energy][tc, y] *
+            sfrac(tc, y) for tc in E, y in years; init = 0.0) +
+        sum(params.costs[t].capex_per_kw * capex_factor(cfg, t, lastlink(t, y)) * KW_PER_MW *
+            new_capacity[t, y] * sfrac(t, y)
             for t in sets.candidates, y in years; init = 0.0))
+    m[:salvage_discount] = discount_factor(cfg.wacc, N)
 
     # R27: cada CAPEX con su peso en el VAN (cuotas del financiamiento o, sin
     # plazo / con :lump, el descuento del año de compra)
@@ -168,6 +187,8 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                          get(cfg.fixed_capex, t, 0.0) * m[:build][t, y])
             for t in sets.candidates; init = 0.0) +
         sum(cpv(st, y) * ecap(st, y) for st in E; init = 0.0) +
+        sum(capex_pv(cfg, ry, j, t; life = life(t), at = e) * rep_cost(t, k, e)     # R34
+            for (t, k, e, j) in REP if j == y; init = 0.0) +
         sum(capex_pv(cfg, ry, y, id; life = life(id)) * v[y] for (id, v) in params.renewal_capex_by; init = 0.0) +
         (haskey(JuMP.object_dictionary(m), :em_buy) ?
          sum(capex_pv(cfg, ry, y, k) * emcap[k] * capex_factor(cfg, k, ry[y]) * m[:em_buy][k, y]
@@ -182,7 +203,7 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
             ow[y] * (fixed_opex_y[y] + var_opex_y[y] + energy_purchases_y[y] +
                      demand_charges_y[y] + carbon_cost_y[y] + offset_cost_y[y] -
                      export_revenue_y[y] + tax_y[y])
-            for y in years) - (sal ? params.discount[end] * salvage_credit : 0.0))
+            for y in years) - (sal ? m[:salvage_discount] * salvage_credit : 0.0))
     m[:salvage_applies] = sal
 
     return m

@@ -67,14 +67,15 @@ function add_capacity_constraints!(m::JuMP.Model, sets::ModelSets, params::Model
     JuMP.@variable(m, installed[t in FB, y in years], lower_bound = 0, upper_bound = 1)
     m[:installed_link] = [JuMP.@constraint(m, installed[t, y] >= build[t, yp])
         for t in FB, y in years, yp in years
-        if yp <= y && sets.year_of[y] - sets.year_of[yp] < params.costs[t].lifetime_years]
+        if yp <= y && sets.year_of[y] - sets.year_of[yp] <
+                      cohort_life(cfg, sets.year_of, yp, params.costs[t].lifetime_years)]
 
     # R32: con compras repetibles, max_new_capacity como tope de lo comprado y
     # vivo en cada año (potencial del sitio: techo, terreno), no de cada compra
     if cfg.max_new_mode == :alive
-        lt(t) = params.costs[t].lifetime_years
+        lt(t, yp) = cohort_life(cfg, sets.year_of, yp, params.costs[t].lifetime_years)
         m[:max_new_alive] = [JuMP.@constraint(m,
-            sum(new_capacity[t, yp] for yp in years if yp <= y && sets.year_of[y] - sets.year_of[yp] < lt(t)) <=
+            sum(new_capacity[t, yp] for yp in years if yp <= y && sets.year_of[y] - sets.year_of[yp] < lt(t, yp)) <=
             params.max_new_capacity[t]) for t in sets.candidates, y in years]
     end
 

@@ -397,3 +397,9 @@ dump("demo_inversion_anticipada_n5", site0, with_config(cfg0; horizon_years = 5,
 # R30 · O&M fijo por instalación, con compras repetibles (se paga una vez por año)
 dump("demo_om_por_instalacion_n5", site0, with_config(cfg0; horizon_years = 5, repeat_investments = true,
      fixed_opex_per_build = Dict(:pv => 50_000.0, :heat_pump => 80_000.0)))
+# R34 · reposición automática de lo que vence entre hitos + valor residual al
+# fin del horizonte (hitos 1, 11 y 21 de 30 años: lo comprado en el año 1 con
+# vida 15 vence en el 16, dentro de un tramo; con vida 25, en el 26)
+dump("demo_reposicion_entre_hitos_n30", site0, with_config(cfg0; horizon_years = 30, repeat_investments = true,
+     milestone_years = [1, 11, 21], replace_between_milestones = true, salvage_value = true,
+     investment_lead_years = 1, capex_accounting = :lump))

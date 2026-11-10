@@ -2,13 +2,14 @@
 # se agregan en src/constraints/ (prompts posteriores).
 
 """
-    add_variables!(m, sets, params) -> m
+    add_variables!(m, sets, params, cfg) -> m
 
 Declara todas las variables del MVP indexadas por [tech, step, y] según SPEC §5,
 más la expresión derivada `available_capacity[tech,y]` (existente + acumulado de
 new_capacity, sin retiro).
 """
-function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
+function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
+                        cfg::ScenarioConfig)
     steps, years = sets.steps, sets.years
 
     # Operación: MW de output por tecnología despachable, paso y año.
@@ -60,7 +61,8 @@ function add_variables!(m::JuMP.Model, sets::ModelSets, params::ModelParameters)
         (alive(t, y) ? params.existing_capacity[t] : 0.0) +
         (t in sets.candidates ?
          sum(new_capacity[t, yp] for yp in 1:y
-             if sets.year_of[y] - sets.year_of[yp] < params.costs[t].lifetime_years; init = 0.0) : 0.0))
+             if sets.year_of[y] - sets.year_of[yp] <
+                cohort_life(cfg, sets.year_of, yp, params.costs[t].lifetime_years); init = 0.0) : 0.0))
 
     return m
 end

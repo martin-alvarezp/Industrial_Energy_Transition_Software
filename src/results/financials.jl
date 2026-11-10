@@ -48,7 +48,8 @@ function extract_financials(im::IETOModel)
     # R18/R27: cada inversión con su peso en el VAN (cuotas o descuento del año
     # de compra), en el año de compra; el resto con el peso del hito
     ow = opex_weights(im.config, im.sets.year_of)
-    df.npv = [JuMP.value(m[:capex_pv_y][y]) for y in years] .+ df.salvage_credit .* df.discount_factor .+
+    sd = get(JuMP.object_dictionary(m), :salvage_discount, df.discount_factor[end])   # al fin del horizonte
+    df.npv = [JuMP.value(m[:capex_pv_y][y]) for y in years] .+ df.salvage_credit .* sd .+
              (df.total .- df.capex .- df.salvage_credit) .* ow
     df.opex_weight = ow
 
@@ -71,6 +72,13 @@ function _capex_by(im::IETOModel)
     end
     for (id, v) in im.params.renewal_capex_by, y in sets.years
         add(id, y, v[y])
+    end
+    # R34: reposiciones entre hitos, en el hito que cubre su año
+    E = JuMP.axes(m[:new_energy], 1)
+    for (t, k, e, j) in get(JuMP.object_dictionary(m), :replacement_links, ())
+        add(t, j, im.params.costs[t].capex_per_kw * capex_factor(cfg, t, e) * KW_PER_MW * JuMP.value(m[:new_capacity][t, k]) +
+                  get(cfg.fixed_capex, t, 0.0) * JuMP.value(m[:build][t, k]) +
+                  (t in E ? cfg.storage_energy_capex[t] * KW_PER_MW * capex_factor(cfg, t, e) * JuMP.value(m[:new_energy][t, k]) : 0.0))
     end
     if haskey(JuMP.object_dictionary(m), :em_buy)
         cap = Dict(em.id => em.capex for em in cfg.efficiency_measures)

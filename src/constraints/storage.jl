@@ -90,7 +90,7 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
         bought(yp) = st in E ? new_energy[st, yp] : hours[st] * newcap[st, yp]
         nw = st in sets.candidates ?
              sum(bought(yp) * f^(ry[y] - ry[yp]) for yp in 1:y
-                 if ry[y] - ry[yp] < params.costs[st].lifetime_years; init = 0.0) : 0.0
+                 if ry[y] - ry[yp] < cohort_life(cfg, ry, yp, params.costs[st].lifetime_years); init = 0.0) : 0.0
         return hours[st] * ex + nw
     end
     JuMP.@expression(m, storage_energy[st in sets.storages, y in years], energy(st, y))

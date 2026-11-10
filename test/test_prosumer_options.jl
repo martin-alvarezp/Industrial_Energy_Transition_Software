@@ -120,3 +120,73 @@ end
     im = build_model(s2, c)
     @test im.params.market_price[:electricity][1, 2] ≈ 2 * im.params.market_price[:electricity][1, 1] rtol = 1e-12
 end
+
+# R34: caso de la bomba con vida 4 años, horizonte 10 y hitos 1 y 6 (valen por
+# sus años). La compra del año 1 vence en el 5 y en el 9: DENTRO del tramo de
+# cada hito, donde la operación del hito se repite y la capacidad debe seguir.
+function rb_case(life; kw...)
+    site, cfg = discrete_case(0.0)
+    hp = IETO._with(site.converters[:hp]; costs = TechCosts(200.0, 0.0, 0.0, life))
+    site = IETO._with(site; converters = Dict(:hp => hp, :eb => site.converters[:eb]))
+    im = build_model(site, with_config(cfg; horizon_years = 10, wacc = 0.1, milestone_years = [1, 6],
+                                       milestone_weighting = :years, repeat_investments = true, kw...))
+    JuMP.optimize!(im.model)
+    @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+    return im
+end
+
+@testset "R34: reposición automática de lo que vence entre hitos" begin
+    d(r) = 1 / 1.1^r
+    capex = 9 * 1000 * 200.0
+    off = rb_case(4)
+    on = rb_case(4; replace_between_milestones = true)
+    ry = on.sets.year_of
+    # la cadena: vence en 5 y 9 (dentro de un tramo) y el 13 queda fuera del horizonte
+    @test IETO.cohort_links(on.config, ry, 1, 4) == [1, 5, 9]
+    @test IETO.cohort_links(on.config, ry, 2, 4) == [6, 10]
+    @test IETO.cohort_links(on.config, ry, 1, 5) == [1]          # vence EN un hito: decide el optimizador
+    @test IETO.cohort_links(off.config, ry, 1, 4) == [1]         # sin la opción, como siempre
+    @test IETO.cohort_life(on.config, ry, 1, 4) == 12
+    # sin la opción: la compra del año 1 cubre gratis hasta el 5 y se recompra en el hito 6
+    @test JuMP.value(off.model[:new_capacity][:hp, 1]) ≈ 9 atol = 1e-6
+    @test JuMP.value(off.model[:new_capacity][:hp, 2]) ≈ 9 atol = 1e-6
+    # con la opción: se repone sola en 5 y 9 y sigue viva en el hito 6 (no se recompra)
+    @test JuMP.value(on.model[:new_capacity][:hp, 1]) ≈ 9 atol = 1e-6
+    @test JuMP.value(on.model[:new_capacity][:hp, 2]) ≈ 0 atol = 1e-6
+    @test JuMP.value(on.model[:available_capacity][:hp, 2]) ≈ 9 atol = 1e-6
+    # misma operación; cambia solo el CAPEX: años 1, 5 y 9 en vez de 1 y 6
+    @test JuMP.objective_value(on.model) - JuMP.objective_value(off.model) ≈ capex * (d(5) + d(9) - d(6)) rtol = 1e-9
+    r = extract_results(on; shadow_prices = false)
+    # cada reposición se informa en el hito que cubre su año, y el desglose suma el VAN
+    @test r.cost_breakdown.capex ≈ [2capex, capex] rtol = 1e-9
+    @test sum(r.cost_breakdown.npv) ≈ r.npv rtol = 1e-9
+    bt = r.by_tech
+    @test sum(bt.capex[bt.tech .== :hp]) ≈ 3capex rtol = 1e-9
+    # con la inversión anticipada (R29) cada reposición también se paga un año antes
+    lead = rb_case(4; replace_between_milestones = true, investment_lead_years = 1)
+    @test JuMP.objective_value(lead.model) - JuMP.objective_value(on.model) ≈
+          capex * (d(0) + d(4) + d(8) - d(1) - d(5) - d(9)) rtol = 1e-9
+    # valor residual: queda sin usar el ÚLTIMO eslabón (comprado en 9, usado 9 y 10 de 4 años)
+    sv = rb_case(4; replace_between_milestones = true, salvage_value = true)
+    @test JuMP.objective_value(sv.model) - JuMP.objective_value(on.model) ≈ -capex * 0.5 * d(10) rtol = 1e-9
+    rs = extract_results(sv; shadow_prices = false)
+    @test sum(rs.cost_breakdown.npv) ≈ rs.npv rtol = 1e-9
+    # solo con pago de una vez
+    @test_throws IETO.ValidationError validate_scenario(
+        with_config(on.config; capex_accounting = :annuity, financing_years = 5, financing_rate = 0.05), on.site)
+end
+
+@testset "Valor residual con hitos que valen por sus años: se mide al fin del horizonte" begin
+    # vida 30, compra en el año 1, horizonte 10 con hitos 1 y 6: al final quedan
+    # 20 de 30 años sin usar (antes se medía en el último HITO, año 6: 24 de 30,
+    # y se descontaba en el año 6)
+    d(r) = 1 / 1.1^r
+    capex = 9 * 1000 * 200.0
+    base = rb_case(30)
+    sv = rb_case(30; salvage_value = true)
+    @test JuMP.value(sv.model[:new_capacity][:hp, 1]) ≈ 9 atol = 1e-6
+    @test JuMP.objective_value(sv.model) - JuMP.objective_value(base.model) ≈ -capex * (20 / 30) * d(10) rtol = 1e-9
+    r = extract_results(sv; shadow_prices = false)
+    @test r.cost_breakdown.salvage_credit[end] ≈ -capex * 20 / 30 rtol = 1e-9
+    @test sum(r.cost_breakdown.npv) ≈ r.npv rtol = 1e-9
+end

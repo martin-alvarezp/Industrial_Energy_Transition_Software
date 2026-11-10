@@ -607,6 +607,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         "intermediate_prices: '$(cfg.intermediate_prices)' desconocido (milestone | own_year)")
     cfg.max_new_mode in (:per_build, :alive) || push!(problems,
         "max_new_mode: '$(cfg.max_new_mode)' desconocido (per_build | alive)")
+    cfg.replace_between_milestones && cfg.capex_accounting == :annuity &&
+        (cfg.financing_years > 0 || !isempty(cfg.financing_period_tech)) && push!(problems,
+        "replace_between_milestones: la reposición automática entre hitos solo está definida con pago de una vez " *
+        "(capex_accounting: lump, o sin plazo de financiamiento)")
     cfg.investment_lead_years >= 0 || push!(problems,
         "investment_lead_years: debe ser ≥ 0 (valor: $(cfg.investment_lead_years))")
     for (t, c) in cfg.fixed_opex_per_build

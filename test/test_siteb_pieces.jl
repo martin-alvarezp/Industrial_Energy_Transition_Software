@@ -23,6 +23,19 @@
     @test JuMP.value(im.model[:scope1_y][1]) ≈ 0.3 * pv rtol = 1e-9
     @test_throws IETO.ValidationError validate_scenario(with_config(cfg; market_availability = Dict(:buy => fill(2.0, 24))), site)
     @test_throws IETO.ValidationError validate_scenario(with_config(cfg; generator_scope1_ef = Dict(:buy => 0.1)), site)
+    # sin tope de potencia la disponibilidad se ignoraba: 0 = no se puede comprar en ese paso
+    off = [fill(0.0, 12); fill(1.0, 12)]
+    free = build_model(site, with_config(cfg; market_availability = Dict(:buy => off)))
+    JuMP.optimize!(free.model)
+    @test JuMP.termination_status(free.model) == JuMP.MOI.OPTIMAL
+    @test all(JuMP.value(free.model[:market_flow][:buy, s, 1]) <= 1e-9 for s in 1:12)
+    @test sum(JuMP.value(free.model[:market_flow][:buy, s, 1]) for s in 13:24) > 1
+    # y por año (R26): disponible el año 1, cerrado desde el 2
+    byy = build_model(site, with_config(cfg; horizon_years = 2,
+                      market_availability_by_year = Dict(:buy => Dict(1 => fill(1.0, 24), 2 => off))))
+    JuMP.optimize!(byy.model)
+    @test sum(JuMP.value(byy.model[:market_flow][:buy, s, 1]) for s in 13:24) > 1
+    @test all(JuMP.value(byy.model[:market_flow][:buy, s, 2]) <= 1e-9 for s in 1:12)
 end
 
 @testset "R20: precio de la compensación por año" begin

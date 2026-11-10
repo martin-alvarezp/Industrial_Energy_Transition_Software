@@ -637,7 +637,12 @@ struct ScenarioConfig
     fixed_opex_per_build::Dict{Symbol,Float64}  # R30: USD/año por instalación comprada, mientras existe (además del USD/MW·año)
     max_new_mode::Symbol                     # R32: :per_build (default) = max_new_capacity por compra;
                                              # :alive = tope de lo comprado y VIVO en cada año (potencial del sitio)
+    replace_between_milestones::Bool         # R34: una compra que vence ENTRE hitos se repone sola ese año
+                                             # (mismo tamaño, CAPEX de ese año) y sigue viva; false = como siempre
 end
+
+# retro-compatibilidad: 88 campos → sin reposición automática entre hitos
+ScenarioConfig(a::Vararg{Any,88}) = ScenarioConfig(a..., false)
 
 # retro-compatibilidad: 87 campos → tope de capacidad nueva por compra
 ScenarioConfig(a::Vararg{Any,87}) = ScenarioConfig(a..., :per_build)
@@ -648,6 +653,39 @@ ScenarioConfig(a::Vararg{Any,84}) = ScenarioConfig(a..., :milestone, 0, Dict{Sym
 "Años relativos que representa el hito k (R18): de ry[k] al anterior al próximo; el último, hasta el horizonte."
 rep_years(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer) =
     ry[k]:(k == length(ry) ? cfg.horizon_years : ry[k + 1] - 1)
+
+"R34: ¿se reponen solas las compras que vencen entre hitos? (solo con hitos que valen por sus años)"
+auto_replace(cfg::ScenarioConfig) = cfg.replace_between_milestones && cfg.milestone_weighting == :years
+
+"""
+    cohort_links(cfg, ry, k, L) -> Vector{Int}
+
+Años relativos en que se compra (opera por primera vez) cada eslabón de la
+compra hecha en el hito `k` con vida `L`: el propio `ry[k]` y, con reposición
+automática (R34), cada vencimiento `ry[k] + n·L` que cae DENTRO del tramo de un
+hito (no en un año hito ni después del horizonte). Los años entre hitos repiten
+la operación del hito, así que su capacidad debe seguir ahí: se repone sola, al
+CAPEX de ese año. Un vencimiento en un año hito corta la cadena: ahí decide el
+optimizador.
+"""
+function cohort_links(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer, L::Integer)
+    out = [Int(ry[k])]
+    (auto_replace(cfg) && L > 0) || return out
+    e = ry[k] + L
+    while e <= cfg.horizon_years && !(e in ry)
+        push!(out, e)
+        e += L
+    end
+    return out
+end
+
+"Vida efectiva de la compra del hito `k` (R34): su vida por el número de eslabones de la cadena."
+cohort_life(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer, L::Integer) =
+    auto_replace(cfg) ? length(cohort_links(cfg, ry, k, L)) * L : L
+
+"Último año del horizonte para el valor residual: el horizonte completo si los hitos valen por sus años."
+salvage_end(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}) =
+    cfg.milestone_weighting == :years ? max(cfg.horizon_years, Int(ry[end])) : Int(ry[end])
 
 "R28: ¿los años entre hitos se valoran con los precios de su propio año?"
 own_year_prices(cfg::ScenarioConfig) = cfg.intermediate_prices == :own_year && cfg.milestone_weighting == :years
@@ -727,8 +765,9 @@ vida útil + 1 (fórmula de la referencia: min(plazo − 1, vida) + 1). Sin plaz
 (o `:lump`) es el descuento del año de compra.
 """
 function capex_pv(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer, id::Symbol;
-                  life::Integer = typemax(Int))
-    r0 = ry[k] - cfg.investment_lead_years      # R29: se paga N años antes de operar
+                  life::Integer = typemax(Int), at::Integer = ry[k])
+    # `at`: año relativo en que opera la compra (R34: la reposición entre hitos)
+    r0 = at - cfg.investment_lead_years         # R29: se paga N años antes de operar
     d0 = discount_factor(cfg.wacc, r0)
     cfg.capex_accounting == :annuity || return d0
     n = min(get(cfg.financing_period_tech, id, cfg.financing_years), life == typemax(Int) ? life : life + 1)
@@ -737,7 +776,7 @@ function capex_pv(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer
     ds = get(cfg.debt_share, id, 1.0)
     last_y = min(r0 + n - 1, cfg.horizon_years)
     yrs = cfg.milestone_weighting == :years ? (r0:last_y) :
-          [r - cfg.investment_lead_years for r in ry if ry[k] <= r <= last_y + cfg.investment_lead_years]
+          [r - cfg.investment_lead_years for r in ry if at <= r <= last_y + cfg.investment_lead_years]
     return ds * a * sum(j -> discount_factor(cfg.wacc, j), yrs; init = 0.0) + (1 - ds) * d0
 end
 

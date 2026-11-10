@@ -232,17 +232,34 @@ const finTerms = (cfg, id, life = Infinity) => {
            ds: cfg.debt_share?.[id] ?? 1 };
 };
 /** Peso en el VAN de 1 USD de CAPEX del hito k (1-based) — espejo de capex_pv (R27). */
-export const capexPv = (cfg, yo, k, id, life = Infinity) => {
+export const capexPv = (cfg, yo, k, id, life = Infinity, at = yo[k - 1]) => {
   const lead = cfg.investment_lead_years ?? 0;                  // R29: se paga N años antes de operar
-  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j), r0 = yo[k - 1] - lead;
+  // `at`: año relativo en que opera la compra (R34: la reposición entre hitos)
+  const d = (j) => 1 / Math.pow(1 + cfg.wacc, j), r0 = at - lead;
   const { n, a, ds } = finTerms(cfg, id, life);
   if (!n) return d(r0);
   const last = Math.min(r0 + n - 1, cfg.horizon_years);
   let s = 0;
   if ((cfg.milestone_weighting ?? "years") === "years") { for (let j = r0; j <= last; j++) s += d(j); }
-  else for (const r of yo) if (r >= yo[k - 1] && r <= last + lead) s += d(r - lead);
+  else for (const r of yo) if (r >= at && r <= last + lead) s += d(r - lead);
   return ds * a * s + (1 - ds) * d(r0);
 };
+/** R34: ¿se reponen solas las compras que vencen entre hitos? */
+export const autoReplace = (cfg) => !!cfg.replace_between_milestones && (cfg.milestone_weighting ?? "years") === "years";
+/** Años relativos de cada eslabón de la compra del hito k con vida L (espejo de cohort_links):
+ *  el propio y, con R34, cada vencimiento que cae DENTRO del tramo de un hito. */
+export const cohortLinks = (cfg, yo, k, L) => {
+  const out = [yo[k - 1]];
+  if (!autoReplace(cfg) || !(L > 0)) return out;
+  for (let e = yo[k - 1] + L; e <= cfg.horizon_years && !yo.includes(e); e += L) out.push(e);
+  return out;
+};
+export const cohortLife = (cfg, yo, k, L) => (autoReplace(cfg) ? cohortLinks(cfg, yo, k, L).length * L : L);
+/** Hito que cubre el año relativo e cuando los hitos valen por sus años (R18): [yo[k], yo[k+1]−1]. */
+export const coverIndex = (yo, e) => { let k = 0; yo.forEach((r, i) => { if (r <= e) k = i + 1; }); return k; };
+/** Fin del horizonte para el valor residual: el horizonte completo si los hitos valen por sus años. */
+export const salvageEnd = (cfg, yo) => ((cfg.milestone_weighting ?? "years") === "years"
+  ? Math.max(cfg.horizon_years, yo[yo.length - 1]) : yo[yo.length - 1]);
 /** Cuota de CAPEX de cada hito (R27, vista): capexBy = {id: [USD por hito]}. */
 export const capexCharge = (cfg, yo, capexBy, life = {}) => yo.map((ry, y) => {
   let out = 0;
@@ -490,7 +507,7 @@ export function buildLP(site0, cfg0, opts = {}) {
   const avail = (t, y) => ({
     k: alive(t, y) ? t.existing_capacity : 0,
     ncs: t.investable
-      ? years.filter((yp) => yp <= y && yr(y) - yr(yp) < t.lifetime_years)
+      ? years.filter((yp) => yp <= y && yr(y) - yr(yp) < cohortLife(cfg, yo, yp, t.lifetime_years))
              .map((yp) => `nc_${sane(t.tech_id)}_${yp}`)
       : [],
   });
@@ -566,7 +583,11 @@ export function buildLP(site0, cfg0, opts = {}) {
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
   const cprice = (y) => milestoneMean((r) => (cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[r - 1] : cfg.carbon_price), cfg, yo, y);
-  const NA = yr(N);   // último año optimizado (R6): el valor residual se mide ahí
+  // valor residual: se mide al fin del horizonte (el completo si los hitos
+  // valen por sus años) y, con R34, sobre el ÚLTIMO eslabón de cada compra
+  const NA = salvageEnd(cfg, yo), salvDisc = 1 / Math.pow(1 + cfg.wacc, NA);
+  const lastLink = (tc, y) => { const l = cohortLinks(cfg, yo, y, tc.lifetime_years); return l[l.length - 1]; };
+  const salvFrac = (tc, y) => Math.max(0, (tc.lifetime_years - (NA - lastLink(tc, y) + 1)) / tc.lifetime_years);
   const salvOn = salvageApplies(cfg);   // R27: con cuotas no hay castigo de fin de horizonte
 
   for (const y of years) {
@@ -597,15 +618,21 @@ export function buildLP(site0, cfg0, opts = {}) {
         const ne = `eng_${sane(tc.tech_id)}_${y}`, ec = energyCapex(cfg, tc, yr(y));
         add(ne, P * ec);
         if (cfg.salvage_value && salvOn)
-          add(ne, -disc[N - 1] * ec * Math.max(0, (tc.lifetime_years - (NA - yr(y) + 1)) / tc.lifetime_years));
+          add(ne, -salvDisc * energyCapex(cfg, tc, lastLink(tc, y)) * salvFrac(tc, y));
+        for (const e of cohortLinks(cfg, yo, y, tc.lifetime_years).slice(1))   // R34
+          add(ne, capexPv(cfg, yo, coverIndex(yo, e), tc.tech_id, tc.lifetime_years, e) * energyCapex(cfg, tc, e));
         if (t > 0) {
           const Dp = depYears(tc);
           for (let yy = y; yy <= N && yr(yy) < yr(y) + Dp; yy++) add(ne, -opw[yy - 1] * t * ec / Dp);
         }
       }
-      if (cfg.salvage_value && salvOn) {
-        const frac = Math.max(0, (tc.lifetime_years - (NA - yr(y) + 1)) / tc.lifetime_years);
-        add(`nc_${sane(tc.tech_id)}_${y}`, -disc[N - 1] * cpk * 1000 * frac);
+      if (cfg.salvage_value && salvOn)
+        add(`nc_${sane(tc.tech_id)}_${y}`, -salvDisc * tc.capex_per_kw * capexFactor(cfg, tc.tech_id, lastLink(tc, y)) * 1000 * salvFrac(tc, y));
+      // R34: reposiciones automáticas de esta compra en los años entre hitos
+      for (const e of cohortLinks(cfg, yo, y, tc.lifetime_years).slice(1)) {
+        const P2 = capexPv(cfg, yo, coverIndex(yo, e), tc.tech_id, tc.lifetime_years, e);
+        add(`nc_${sane(tc.tech_id)}_${y}`, P2 * tc.capex_per_kw * capexFactor(cfg, tc.tech_id, e) * 1000);
+        if (fixedCapex(cfg, tc.tech_id) > 0) add(`b_${sane(tc.tech_id)}_${y}`, P2 * fixedCapex(cfg, tc.tech_id));
       }
       // escudo fiscal: −t·capex/D en la ventana de depreciación desde y
       if (t > 0) {
@@ -1019,6 +1046,12 @@ export function buildLP(site0, cfg0, opts = {}) {
           row(`mp_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1 }, "<=",
               mk.max_power * ((byYearAt(cfg, cfg.market_availability_by_year?.[mk.market_id], yr(y)) ??
                               cfg.market_availability?.[mk.market_id])?.[s - 1] ?? 1));   // R20 + R26
+      else {
+        // sin tope de potencia: un paso con disponibilidad 0 es «no se puede comprar» (espejo de grid.jl)
+        const av = byYearAt(cfg, cfg.market_availability_by_year?.[mk.market_id], yr(y)) ?? cfg.market_availability?.[mk.market_id];
+        if (av) for (const s of steps) if ((av[s - 1] ?? 1) <= 0)
+          row(`mp_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1 }, "<=", 0);
+      }
       if (mk.max_annual != null) {
         const t = T();
         steps.forEach((s) => inc(t, `mf_${id}_${s}_${y}`, W(s, y)));
@@ -1237,13 +1270,13 @@ export function buildLP(site0, cfg0, opts = {}) {
     if (cfg.max_new_mode === "alive")
       for (const y of years) {
         const tr = T();
-        for (const yp of years) if (yp <= y && yr(y) - yr(yp) < t.lifetime_years) inc(tr, `nc_${id}_${yp}`, 1);
+        for (const yp of years) if (yp <= y && yr(y) - yr(yp) < cohortLife(cfg, yo, yp, t.lifetime_years)) inc(tr, `nc_${id}_${yp}`, 1);
         row(`alive_${id}_${y}`, tr, "<=", t.max_new_capacity);
       }
     // R30: instalada en y ≥ cada compra viva (el objetivo la deja en su mínimo)
     if ((cfg.fixed_opex_per_build?.[t.tech_id] ?? 0) > 0)
       for (const y of years) for (const yp of years)
-        if (yp <= y && yr(y) - yr(yp) < t.lifetime_years)
+        if (yp <= y && yr(y) - yr(yp) < cohortLife(cfg, yo, yp, t.lifetime_years))
           row(`inst_${id}_${y}_${yp}`, { [`inst_${id}_${y}`]: 1, [`b_${id}_${yp}`]: -1 }, ">=", 0);
   }
   for (const [tech, yf, mw] of (cfg.forced_builds ?? []).map((f) =>
@@ -1324,6 +1357,11 @@ export function buildLP(site0, cfg0, opts = {}) {
         inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yr(y)) * 1000);
         if (fixedCapex(cfg, tc.tech_id) > 0) inc(tb, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
         if (ownEnergy(cfg, tc)) inc(tb, `eng_${sane(tc.tech_id)}_${y}`, energyCapex(cfg, tc, yr(y)));
+        for (const e of cohortLinks(cfg, yo, y, tc.lifetime_years).slice(1)) {   // R34: las reposiciones también son CAPEX
+          inc(tb, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, e) * 1000);
+          if (fixedCapex(cfg, tc.tech_id) > 0) inc(tb, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
+          if (ownEnergy(cfg, tc)) inc(tb, `eng_${sane(tc.tech_id)}_${y}`, energyCapex(cfg, tc, e));
+        }
       }
     row("budget", tb, "<=",
         cfg.capex_budget - renewalCapex.reduce((a, b) => a + b, 0));
@@ -1336,6 +1374,14 @@ export function buildLP(site0, cfg0, opts = {}) {
         inc(ta, `nc_${sane(tc.tech_id)}_${y}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, yr(y)) * 1000);
         if (fixedCapex(cfg, tc.tech_id) > 0) inc(ta, `b_${sane(tc.tech_id)}_${y}`, fixedCapex(cfg, tc.tech_id));
         if (ownEnergy(cfg, tc)) inc(ta, `eng_${sane(tc.tech_id)}_${y}`, energyCapex(cfg, tc, yr(y)));
+        // R34: reposiciones (de compras de este hito o anteriores) cuyo año cae en este hito
+        for (let k = 1; k <= y; k++)
+          for (const e of cohortLinks(cfg, yo, k, tc.lifetime_years).slice(1)) {
+            if (coverIndex(yo, e) !== y) continue;
+            inc(ta, `nc_${sane(tc.tech_id)}_${k}`, tc.capex_per_kw * capexFactor(cfg, tc.tech_id, e) * 1000);
+            if (fixedCapex(cfg, tc.tech_id) > 0) inc(ta, `b_${sane(tc.tech_id)}_${k}`, fixedCapex(cfg, tc.tech_id));
+            if (ownEnergy(cfg, tc)) inc(ta, `eng_${sane(tc.tech_id)}_${k}`, energyCapex(cfg, tc, e));
+          }
       }
       row(`budget_y${y}`, ta, "<=", cfg.capex_budget_annual - renewalCapex[y - 1]);
     }

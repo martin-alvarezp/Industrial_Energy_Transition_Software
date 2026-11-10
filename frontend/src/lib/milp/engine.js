@@ -76,6 +76,7 @@ export function toConfig(cfg) {
     investment_lead_years: cfg.investment_lead_years ?? 0,  // R29: inversión N años antes
     fixed_opex_per_build: cfg.fixed_opex_per_build ?? {},   // R30: O&M fijo por instalación
     max_new_mode: cfg.max_new_mode ?? "per_build",           // R32: tope por compra o de lo vivo
+    replace_between_milestones: !!cfg.replace_between_milestones,   // R34: reposición automática entre hitos
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
