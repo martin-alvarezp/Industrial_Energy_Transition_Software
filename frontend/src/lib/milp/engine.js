@@ -110,22 +110,21 @@ export function toConfig(cfg) {
  *  sin Pareto ni escenarios de comparación (16 MILPs → 1). */
 export const isSingleRun = (uiCfg) => !!uiCfg.dispatch_only || uiCfg.analysis !== "full";   // sin comparaciones automáticas
 
+const NOCAPS = { emissions_cap_net_start: UNCAPPED, emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED,
+                 emission_caps: [], scope1_cap: null, scope2_cap: null };
 /** Espejo de apply_scenario (run_scenario.jl). */
 export function applyScenario(site, cfg, scenario) {
   const c = { ...cfg };
   switch (scenario) {
     case "emissions_cap": return [site, c];
-    case "least_cost":
-      return [site, { ...c, emissions_cap_net_start: UNCAPPED,
-                      emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED }];
+    case "least_cost":   // sin meta: ni trayectoria, ni topes por año (R17), ni por alcance
+      return [site, { ...c, ...NOCAPS }];
     case "bau": {
       // el parque existente y las candidatas que la situación actual puede
       // comprar (bau_techs: reposición y crecimiento), espejo de apply_scenario
       const existing = site.technologies
         .filter((t) => !t.investable || (c.bau_techs ?? []).includes(t.tech_id)).map((t) => t.tech_id);
-      return [site, { ...c, emissions_cap_net_start: UNCAPPED,
-                      emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED,
-                      allowed_techs: existing }];
+      return [site, { ...c, ...NOCAPS, allowed_techs: existing }];
     }
     case "no_offsets": return [site, { ...c, allow_offsets: false }];
     case "high_gas": {

@@ -64,17 +64,17 @@ Transformación del caso base por escenario (SPEC §11):
 """
 function apply_scenario(site::Site, cfg::ScenarioConfig, scenario::Symbol)
     scenario == :emissions_cap && return site, cfg
-    scenario == :least_cost && return site,
-        with_config(cfg; emissions_cap_net_start = UNCAPPED,
-                    emissions_cap_net_end = UNCAPPED, emissions_cap_gross = UNCAPPED)
+    # «sin meta de emisiones» quita TODAS las metas: la trayectoria, los topes
+    # por año (R17) y los topes por alcance (antes los dos últimos seguían rigiendo)
+    nocaps = (emissions_cap_net_start = UNCAPPED, emissions_cap_net_end = UNCAPPED,
+              emissions_cap_gross = UNCAPPED, emission_caps = Tuple{Symbol,Int,Float64}[],
+              scope1_cap = nothing, scope2_cap = nothing)
+    scenario == :least_cost && return site, with_config(cfg; nocaps...)
     if scenario == :bau
         # el parque existente y, si el sistema las declara, las candidatas con
         # que la situación actual repone y crece (bau_techs): mismos equipos
         existing_only = [t for t in all_tech_ids(site) if !find_tech(site, t).investable || t in cfg.bau_techs]
-        return site, with_config(cfg; emissions_cap_net_start = UNCAPPED,
-                                 emissions_cap_net_end = UNCAPPED,
-                                 emissions_cap_gross = UNCAPPED,
-                                 allowed_techs = existing_only)
+        return site, with_config(cfg; nocaps..., allowed_techs = existing_only)
     end
     scenario == :no_offsets && return site, with_config(cfg; allow_offsets = false)
     scenario == :high_gas && return _scale_prices(site, :natural_gas, 1.5), cfg
