@@ -50,6 +50,17 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const [gapPct, setGapPct] = useState(draft.solver_gap_pct ?? 0.01);
   const srcRun = runs.find((r) => r.id === capSource);
   const dispatch = mode === "dispatch";
+  // un sistema sin equipos existentes (todo se compra en el plan) no tiene
+  // parque que despachar: al pasar a despacho se propone la última corrida factible
+  const emptyPark = !(twin?.siteJson?.technologies ?? []).some((x) => x.type !== "source" && (x.existing_capacity ?? 0) > 0);
+  const pickMode = (m) => {
+    setMode(m);
+    if (m === "dispatch" && emptyPark && capSource === "existing") {
+      const last = runs.filter((r) => r.feasible !== false)
+        .sort((a, b) => String(b.saved_at ?? "").localeCompare(String(a.saved_at ?? "")))[0];
+      if (last) setCapSource(last.id);
+    }
+  };
   const refs = [useRef(null), useRef(null), useRef(null), useRef(null)];
   const steps = twin?.siteJson?.timesteps?.length ?? 0;
   const tmpl = twin?.siteJson?.hourly?.template?.method;
@@ -108,8 +119,15 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver2 };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
+        // el despacho corre sobre sus propios años: los hitos y las metas de
+        // emisiones que caen después no aplican (un hito fuera del horizonte
+        // dejaba la meta de ese año rigiendo sobre capacidades fijas → infactible)
+        const nDisp = Math.max(1, +years || 1), endDisp = by + nDisp - 1;
+        const inDisp = (x) => !(x > 1900) || x <= endDisp;
         extra = { analysis: "single", dispatch_only: true, fixed_capacity: fixed,
-                  horizon_years: Math.max(1, +years || 1), commitment: "auto", ...solver2 };
+                  horizon_years: nDisp, commitment: "auto", ...solver2,
+                  milestone_years: (draft.milestone_years ?? []).filter(inDisp),
+                  emission_caps: (draft.emission_caps ?? []).filter((c) => inDisp(Array.isArray(c) ? c[1] : c.year)) };
       }
       const cfg = { ...draft, price_scenario: scenario === "emissions_cap" ? "base" : scenario, ...extra };
       const b = await run({ name, notes, cfg, stack });
@@ -145,7 +163,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       </div>
       <div className="ui-field">
         <label>{t("run.mode")}</label>
-        <select className="ui-select" value={mode} onChange={(e) => setMode(e.target.value)} data-testid="run-mode">
+        <select className="ui-select" value={mode} onChange={(e) => pickMode(e.target.value)} data-testid="run-mode">
           <option value="plan">{t("run.modePlan")}</option>
           <option value="dispatch">{t("run.modeDispatch")}</option>
         </select>
@@ -189,6 +207,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
                      onChange={(e) => setYears(Math.max(1, +e.target.value || 1))} />
             </div>
           </div>
+          {emptyPark && capSource === "existing" && <p className="ui-banner warn" data-testid="run-empty-park">{t("run.emptyPark")}</p>}
           <p className="ui-hint">{t("run.dispatchHint")}</p>
         </>
       )}

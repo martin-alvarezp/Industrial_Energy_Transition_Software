@@ -67,6 +67,15 @@ step(api ? "con API, el año completo no lleva aviso del navegador" : "año comp
 await p.click('[data-testid="run-res-typical"]');
 await sleep(300);
 step("con días tipo no hay aviso", !(await p.$('[data-testid="run-heavy"]')));
+// despacho: México no tiene equipos existentes → sin corridas, el modal lo avisa
+await p.select('[data-testid="run-mode"]', "dispatch");
+await sleep(300);
+// (con API puede haber corridas guardadas de antes: entonces propone una en vez de avisar)
+const src0 = await p.$eval('[data-testid="run-cap-source"]', (x) => x.value).catch(() => "existing");
+step("despacho sin parque existente: el modal lo avisa, o propone una corrida guardada",
+     src0 === "existing" ? !!(await p.$('[data-testid="run-empty-park"]')) : !(await p.$('[data-testid="run-empty-park"]')), src0);
+await p.select('[data-testid="run-mode"]', "plan");
+await sleep(300);
 await p.click('[data-testid="run-analysis-bau"]');
 let tx = await runAndWait();
 step("México: la situación actual (BaU) corre y es factible", tx.includes("Inversión total") && !/infactible/i.test(tx));
@@ -74,6 +83,20 @@ await p.evaluate(() => { window.location.hash = "#/sys/dummy_mexico/kpis"; });
 await sleep(2500);
 const kpi = await text();
 step("KPIs: el VAN de la situación actual (29,3 M€)", /29[.,]2|29[.,]3/.test(kpi), (kpi.match(/VAN[^\n]*\n?[^\n]*/) ?? [""])[0].replace(/\n/g, " "));
+
+// ── México: con una corrida factible, el despacho la propone como origen de las capacidades ──
+// (sin recargar: sin API las corridas viven en la sesión)
+await p.evaluate(() => { window.location.hash = "#/sys/dummy_mexico/summary"; });
+await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+await clickBtn(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.select('[data-testid="run-mode"]', "dispatch");
+await sleep(300);
+const src = await p.$eval('[data-testid="run-cap-source"]', (x) => x.value).catch(() => "existing");
+step("despacho tras una corrida: propone sus capacidades", src !== "existing" && !(await p.$('[data-testid="run-empty-park"]')), src);
+const txd = await runAndWait();
+step("México: el despacho de esa corrida termina y es factible", !txd.includes("Nueva optimización") && !/infactible/i.test(txd),
+     (txd.match(/[^\n]*(infactible|no tiene capacidades)[^\n]*/i) ?? [""])[0].slice(0, 200));
 
 // ── México: menos años optimizados desde el modal ──
 await openModal("dummy_mexico");
