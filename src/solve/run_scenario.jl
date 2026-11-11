@@ -55,7 +55,8 @@ end
 Transformación del caso base por escenario (SPEC §11):
 - `emissions_cap`: el config tal cual (usa la trayectoria del §8).
 - `least_cost`: sin caps de emisiones.
-- `bau`: sin caps y sin tecnologías candidatas (solo el parque existente).
+- `bau`: sin caps y sin tecnologías candidatas (solo el parque existente, que
+  se reinstala al vencer su vida útil; más las `bau_techs` para crecer).
 - `no_offsets`: `allow_offsets = false`.
 - `high_gas`: precio del gas × 1.5.
 - `high_carbon`: precio de carbono × 3 (150 USD/t si el base es 0).
@@ -74,7 +75,11 @@ function apply_scenario(site::Site, cfg::ScenarioConfig, scenario::Symbol)
         # el parque existente y, si el sistema las declara, las candidatas con
         # que la situación actual repone y crece (bau_techs): mismos equipos
         existing_only = [t for t in all_tech_ids(site) if !find_tech(site, t).investable || t in cfg.bau_techs]
-        return site, with_config(cfg; nocaps..., allowed_techs = existing_only)
+        # …y los activos iniciales se reinstalan al cumplir su vida útil (si el
+        # horizonte la supera), pagando su CAPEX: la situación actual evalúa el
+        # horizonte «si seguimos funcionando como hoy», no dejando caer el parque
+        return site, with_config(cfg; nocaps..., allowed_techs = existing_only,
+                                 renew_existing = true, renew_techs = Symbol[])
     end
     scenario == :no_offsets && return site, with_config(cfg; allow_offsets = false)
     scenario == :high_gas && return _scale_prices(site, :natural_gas, 1.5), cfg

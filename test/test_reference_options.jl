@@ -221,6 +221,11 @@ end
     c = with_config(cfg; horizon_years = 5, wacc = 0.1)
     s0, c0 = IETO.apply_scenario(site, c, :bau)
     @test !(:hp in c0.allowed_techs)
+    # toda situación actual reinstala los activos iniciales al vencer su vida
+    # útil («seguir como hoy»), aunque el config no lo pida ni liste equipos
+    @test !c.renew_existing && c0.renew_existing && isempty(c0.renew_techs)
+    _, cr = IETO.apply_scenario(site, with_config(c; renew_existing = true, renew_techs = [:hp]), :bau)
+    @test cr.renew_existing && isempty(cr.renew_techs)
     s1, c1 = IETO.apply_scenario(site, with_config(c; bau_techs = [:hp]), :bau)
     @test :hp in c1.allowed_techs
     @test all(t -> !find_tech(site, t).investable || t == :hp, c1.allowed_techs)

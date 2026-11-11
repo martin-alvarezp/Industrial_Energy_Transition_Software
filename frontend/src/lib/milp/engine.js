@@ -124,7 +124,8 @@ export function applyScenario(site, cfg, scenario) {
       // comprar (bau_techs: reposición y crecimiento), espejo de apply_scenario
       const existing = site.technologies
         .filter((t) => !t.investable || (c.bau_techs ?? []).includes(t.tech_id)).map((t) => t.tech_id);
-      return [site, { ...c, ...NOCAPS, allowed_techs: existing }];
+      // …y los activos iniciales se reinstalan al vencer su vida útil (si el horizonte la supera)
+      return [site, { ...c, ...NOCAPS, allowed_techs: existing, renew_existing: true, renew_techs: [] }];
     }
     case "no_offsets": return [site, { ...c, allow_offsets: false }];
     case "high_gas": {
