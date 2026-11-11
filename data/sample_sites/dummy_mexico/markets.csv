@@ -1,3 +1,4 @@
 market_id,name,carrier_id,direction,max_power,max_annual,emission_factor,connection,demand_charge,contracted_power,excess_penalty,scheme,netting
-electricity_market,Electricidad,electricity,buy,5.4,,0.438,empalme_electricity_market,,,,,
-gas_market,Gas natural,gas,buy,,,,,,,,,
+biomethane_market,Biometano,biomethane,buy,,,,conn_biomethane_market,,,,,
+gas_market,Gas natural,gas,buy,,,,conn_gas_market,,,,,
+grid,Red eléctrica,electricity,buy,10.8,,0.438,conn_grid,,,,,

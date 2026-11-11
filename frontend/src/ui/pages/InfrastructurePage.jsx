@@ -47,7 +47,10 @@ export default function InfrastructurePage({ route }) {
   const { siteJson, layout } = twin;
   const mapRef = useRef(null);
   const flowRef = useRef(null);
-  const [base, setBase] = useStored("ieto.map.base", "standard");
+  // mapa base: lo que eligió el usuario; si no eligió, el que trae el sistema
+  // (layout.meta.map_base, p. ej. satélite en los sistemas de ejemplo) o calles
+  const [baseChoice, setBase] = useStored("ieto.map.base", null);
+  const base = baseChoice ?? (layout?.meta?.map_base === "satellite" ? "satellite" : "standard");
   const [view, setView] = useStored("ieto.infra.view", "map");
   const [collapsed, setCollapsed] = useStored("ieto.infra.panel.collapsed", true);
   const [compView, setCompView] = useStored("ieto.comp.view", "grid");

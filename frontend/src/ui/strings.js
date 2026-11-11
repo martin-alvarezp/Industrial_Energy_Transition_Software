@@ -170,6 +170,7 @@ extend({
   "run.milestones": ["Años que se optimizan ({a}–{b})", "Years optimized ({a}–{b})"],
   "run.milestonesHint": ["Se optimizan {n} años: {list}. Cada uno vale hasta el siguiente (los años intermedios repiten su operación con sus propios precios si así está en Parámetros). El primer año siempre se incluye. Solo para esta corrida.", "{n} years optimized: {list}. Each one stands for the years until the next. The first year is always included. For this run only."],
   "run.milestonesAll": ["Vacío: se optimizan los {n} años del horizonte, uno por uno.", "Empty: all {n} years of the horizon are optimized, one by one."],
+  "run.milestonesCap": ["Se agrega {list}: ahí empieza a regir una meta de emisiones, y sin ese año la meta no se aplicaría.", "{list} added: an emissions target starts there, and without that year the target would not apply."],
   "run.milestonesBad": ["Fuera del horizonte o no válidos (se ignoran): {list}.", "Outside the horizon or invalid (ignored): {list}."],
   "run.heavy": ["Esta corrida tiene {n} pasos en total y se resuelve en tu navegador: puede tardar muchos minutos o no terminar. Usa días tipo, menos años, o la versión de escritorio.", "This run has {n} steps in total and is solved in your browser: it may take many minutes or not finish. Use typical days, fewer years, or the desktop version."],
   "run.bauHintBuy": ["El parque existente, reponiendo y ampliando solo con: {list} (se define en Parámetros).", "The existing assets, replacing and expanding only with: {list} (set in Parameters)."],
@@ -752,6 +753,14 @@ extend({
 // ── techkind.js ──
 extend({
   "kind.pv": ["Solar fotovoltaica", "Solar PV"],
+  "kind.efficiency": ["Medida de eficiencia", "Efficiency measure"],
+  "kind.heatRecovery": ["Recuperación de calor", "Heat recovery"],
+  "kind.fuelSupply": ["Suministro de combustible", "Fuel supply"],
+  "kind.transformer": ["Transformador / empalme", "Transformer / connection"],
+  "kind.network": ["Red de distribución", "Distribution network"],
+  "kind.freeCooling": ["Enfriamiento libre", "Free cooling"],
+  "kind.compressor": ["Compresor de aire", "Air compressor"],
+  "kind.h2Boiler": ["Caldera de hidrógeno", "Hydrogen boiler"],
   "kind.solarThermal": ["Solar térmica", "Solar thermal"],
   "kind.wind": ["Eólica", "Wind turbine"],
   "kind.grid": ["Conexión a red", "Grid connection"],

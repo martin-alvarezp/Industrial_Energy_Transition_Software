@@ -1,4 +1,7 @@
 market_id,name,carrier_id,direction,max_power,max_annual,emission_factor,connection,demand_charge,contracted_power,excess_penalty,scheme,netting
-electricity_recs_existing,Electricidad (certificados existentes),electricity,buy,4.0,,0.487,empalme_electricity_recs_existing,,,,,
-electricity_recs_new,Electricidad (certificados nuevos),electricity_recs_new,buy,4.0,,0.487,empalme_electricity_recs_new,,,,,
-lng,GNL,lng,buy,,,,,,,,,
+biomass_pellets,Pellets,biomass_pellets,buy,,,,conn_biomass_pellets,,,,,
+biomass_wood_chips,Astillas de madera,biomass_wood_chips,buy,,,,conn_biomass_wood_chips,,,,,
+contract_lng,GNL (contrato),contract_lng,buy,,,,conn_contract_lng,,,,,
+grid_existing,Red eléctrica (empalme actual),electricity,buy,4.0,,,conn_grid_existing,,,,,
+grid_new,Red eléctrica (empalme nuevo),grid_new_supply,buy,4.0,,,conn_grid_new,,,,,
+hydrogen,Hidrógeno,hydrogen,buy,,,,conn_hydrogen,,,,,

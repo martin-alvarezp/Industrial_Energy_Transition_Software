@@ -15,10 +15,12 @@ import { computeViaWeb } from "../src/lib/milp/engine.js";
 import { runTemplateSite, projectConfigProfiles, hasHourly } from "../src/lib/templates.js";
 import { horizonKpis, repYearCounts } from "../src/ui/results.js";
 
-// VAN de referencia (EUR) del caso base de cada sistema a 8760 h
+// VAN de referencia (EUR) del ÓPTIMO ECONÓMICO de cada sistema en el simulador
+// de origen (plan con meta de emisiones). La corrida por defecto usa 20 días
+// tipo y 1 % de tolerancia para resolver en el navegador en menos de un minuto.
 const CASES = [
-  { id: "dummy_japon", ref: 46_046_314, tol: 0.005, fewer: [2028, 2045] },
-  { id: "dummy_mexico", ref: 27_257_623, tol: 0.005, fewer: [2025, 2030, 2040] },
+  { id: "dummy_japon", ref: 55_300_387, tol: 0.015, fewer: [2028, 2045], nodes: 9 },
+  { id: "dummy_mexico", ref: 40_137_869, tol: 0.015, fewer: [2025], nodes: 8 },
 ];
 const only = process.argv[2];
 const highs = await highsLoader();
@@ -37,8 +39,19 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
   step(`${c.id}: trae su configuración y su resolución por defecto`,
        sc.milestone_years?.length > 0 && sc.run_template?.method === "typical" && hasHourly(site));
   const nodes = layout.features.filter((f) => f.properties.role === "node");
-  step(`${c.id}: la planta es un nodo con todos sus equipos`,
-       nodes.length === 1 && site.technologies.every((t) => layout.properties.techNode[t.tech_id] === nodes[0].properties.node_id));
+  // gemelo digital: equipos repartidos en nodos, nodos unidos por líneas, mercados con su conexión física
+  const nodeIds = new Set(nodes.map((f) => f.properties.node_id));
+  step(`${c.id}: los equipos están repartidos en ${c.nodes} nodos del predio`,
+       nodes.length === c.nodes && site.technologies.every((t) => nodeIds.has(layout.properties.techNode[t.tech_id]) && t.node === layout.properties.techNode[t.tech_id]));
+  step(`${c.id}: los nodos están unidos por líneas y cada mercado entra por su conexión`,
+       site.arcs.length >= c.nodes - 1 && site.arcs.every((a) => nodeIds.has(a.from) && nodeIds.has(a.to) && a.ports.length > 0) &&
+       site.markets.every((m) => site.technologies.some((t) => t.tech_id === m.connection && t.type === "source")) &&
+       layout.features.filter((f) => f.properties.role === "arc").length === site.arcs.length,
+       `${site.arcs.length} líneas · ${site.arcs.reduce((a, x) => a + x.ports.length, 0)} vectores · ${site.markets.length} mercados`);
+  // todos los nodos quedan conectados entre sí
+  const reach = new Set([nodes[0].properties.node_id]);
+  for (let i = 0; i < nodes.length; i++) for (const a of site.arcs) { if (reach.has(a.from)) reach.add(a.to); if (reach.has(a.to)) reach.add(a.from); }
+  step(`${c.id}: ningún nodo queda aislado`, reach.size === nodes.length, `${reach.size}/${nodes.length}`);
 
   // el mismo camino de RunModal.go + studio.prepare()
   const runAs = (extra) => {
@@ -54,7 +67,7 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
 
   // 1 · plan de inversión (lo que corre por defecto)
   const { r, secs, steps } = runAs({ price_scenario: "base" });
-  step(`${c.id}: plan de inversión factible`, r.meta.feasible, `${steps} pasos × ${sc.milestone_years.length} años · ${secs} s`);
+  step(`${c.id}: óptimo económico (plan con meta de emisiones) factible`, r.meta.feasible, `${steps} pasos × ${sc.milestone_years.length} años · ${secs} s`);
   if (!r.meta.feasible) continue;
   const d = (r.kpis.npv - c.ref) / c.ref;
   step(`${c.id}: VAN a menos de ${(c.tol * 100).toFixed(1)} % de la referencia`, Math.abs(d) <= c.tol,
@@ -78,9 +91,16 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
   // 3 · situación actual (BaU): repone y crece con los equipos declarados → el caso base del cliente
   step(`${c.id}: la situación actual declara con qué equipos repone y crece`, (sc.bau_techs ?? []).length > 0, (sc.bau_techs ?? []).join(", "));
   const bau = runAs({ price_scenario: "bau" }).r;
-  step(`${c.id}: situación actual (BaU) factible y con el VAN del caso base`,
-       bau.meta.feasible && Math.abs(bau.kpis.npv - r.kpis.npv) / r.kpis.npv < 1e-4,
-       bau.meta.feasible ? fmt(bau.kpis.npv) : (bau.infeasibility?.hints ?? []).join(" | "));
+  const last = (x) => x.emissions[x.emissions.length - 1].gross;
+  step(`${c.id}: situación actual (BaU) factible; sin meta cuesta menos y emite más que el plan`,
+       bau.meta.feasible && bau.kpis.npv < r.kpis.npv && last(bau) > last(r) + 1,
+       bau.meta.feasible ? `VAN ${fmt(bau.kpis.npv)} · emisiones finales ${fmt(last(bau))} t (plan ${fmt(last(r))} t)` : (bau.infeasibility?.hints ?? []).join(" | "));
+  // el plan cumple la meta del último tramo
+  const cap = (sc.emission_caps ?? []).reduce((a, x) => (a == null || x.year >= a.year ? x : a), null);
+  step(`${c.id}: el plan cumple la meta de emisiones`, cap != null && last(r) <= cap.cap + 1e-3 * Math.max(1, cap.cap) + 0.5,
+       cap ? `${fmt(last(r))} t ≤ ${fmt(cap.cap)} t` : "sin meta");
+  step(`${c.id}: sin meta, el plan es el más barato de los tres`, nm.meta.feasible && nm.kpis.npv <= bau.kpis.npv * 1.011 && nm.kpis.npv < r.kpis.npv,
+       `sin meta ${fmt(nm.kpis.npv)} · BaU ${fmt(bau.kpis.npv)} · con meta ${fmt(r.kpis.npv)}`);
   // …y sin esos equipos es infactible, pero el diagnóstico dice por qué
   const bare = runAs({ price_scenario: "bau", bau_techs: [] }).r;
   step(`${c.id}: sin equipos para reponer, el infactible explica la causa`,

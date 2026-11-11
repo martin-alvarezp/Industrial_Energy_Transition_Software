@@ -73,11 +73,18 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const [msText, setMsText] = useState((draft.milestone_years ?? []).join(", "));
   const msParsed = msText.split(/[,;\s]+/).filter(Boolean).map(Number);
   const msBad = msParsed.filter((x) => !Number.isInteger(x) || x < by || x > lastY);
-  const milestones = msParsed.length ? [...new Set([by, ...msParsed.filter((x) => !msBad.includes(x))])].sort((a, b) => a - b) : [];
+  // …y también el año en que empieza a regir cada meta de emisiones: un tope
+  // rige en los hitos desde su año, así que sin ese hito la meta no se aplicaría
+  const capYears = analysis !== "bau" && useTarget
+    ? [...new Set((draft.emission_caps ?? []).map((c) => (Array.isArray(c) ? c[1] : c.year)).filter((x) => x > by && x <= lastY))].sort((a, b) => a - b) : [];
+  const capAdded = msParsed.length ? capYears.filter((x) => !msParsed.includes(x)) : [];
+  const milestones = msParsed.length ? [...new Set([by, ...capYears, ...msParsed.filter((x) => !msBad.includes(x))])].sort((a, b) => a - b) : [];
   const nYears = milestones.length || (draft.horizon_years ?? 1);
   // peso de la corrida: pasos por año × años optimizados (el navegador no da para todo)
   const stepsRun = res === "typical" ? nDays * 24 : res === "full" ? 8760 : steps;
-  const heavy = !apiUp && stepsRun * nYears > 25_000;
+  // …× equipos: un sistema con muchos equipos pesa más por paso (10 = un sistema chico)
+  const nTechs = Math.max(10, twin?.siteJson?.technologies?.length ?? 10);
+  const heavy = !apiUp && stepsRun * nYears * (nTechs / 10) > 25_000;
   // situación actual: lo que puede comprar (bau_techs)
   const bauBuy = (draft.bau_techs ?? []).map((id) => twin?.siteJson?.technologies?.find((x) => x.tech_id === id)?.name ?? id);
 
@@ -280,6 +287,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
           <p className="ui-hint">
             {milestones.length ? t("run.milestonesHint", { n: milestones.length, list: milestones.join(", ") }) : t("run.milestonesAll", { n: draft.horizon_years })}
             {msBad.length > 0 && <> {t("run.milestonesBad", { list: msBad.join(", ") })}</>}
+            {capAdded.length > 0 && <span data-testid="run-cap-years"> {t("run.milestonesCap", { list: capAdded.join(", ") })}</span>}
           </p>
         </div>
       )}

@@ -11,11 +11,16 @@ export function techKind(t) {
   const ins = (t.ports?.inputs?.map((p) => p.carrier) ?? [t.input_carrier]).join(" ").toLowerCase();
   if (t.type === "source") {
     if (/offset/.test(id)) return "kind.offsets";
+    // recepción de un combustible: estanque, silo, estación de regulación
+    if (/gas|gnl|lng|biomet|hidr[oó]g|hydrog|pellet|astilla|chips|biomas|di[eé]sel|estanque|silo/.test(id + " " + outs)) return "kind.fuelSupply";
     if (/grid|red|electric/.test(id + " " + outs)) return "kind.grid";
     return "kind.source";
   }
   if (t.type === "generator") {
     if (/wind|eolic|eólic/.test(id)) return "kind.wind";
+    // perfiles que no son solares: una medida de eficiencia o calor que se recupera
+    if (/eficien|efficien|ecm|ahorro/.test(id)) return "kind.efficiency";
+    if (/recuper|recover|residual|waste|hr_/.test(id)) return "kind.heatRecovery";
     if (/thermal|termic|térmic/.test(id) || /heat|water|calor/.test(outs)) return "kind.solarThermal";
     return "kind.pv";
   }
@@ -27,16 +32,23 @@ export function techKind(t) {
     return "kind.storage";
   }
   // converter
-  if (/chp|cogener/.test(id) || ((t.ports?.outputs?.length ?? 1) > 1 && /electric/.test(outs) && /gas/.test(ins)))
+  if (/transformador|transformer|empalme|acometida/.test(id)) return "kind.transformer";
+  if (/red|pipe|cañer|tuber|network/.test(id)) return "kind.network";
+  if (/tren de|gas train|regula/.test(id)) return "kind.fuelSupply";
+  if (/free.?cool|enfriamiento libre/.test(id)) return "kind.freeCooling";
+  if (/compres/.test(id) && !/chill/.test(id)) return "kind.compressor";
+  if (/chp|cogener|trigener/.test(id) || ((t.ports?.outputs?.length ?? 1) > 1 && /electric/.test(outs) && /gas/.test(ins)))
     return "kind.chp";
   if (/electroliz/.test(id) || /hydrog|h2/.test(outs)) return "kind.electrolyzer";
+  if (/heat_pump|bomba de calor|heat pump/.test(id)) return "kind.heatPump";   // antes que «chiller»: una agua-agua también enfría
   if (/absor/.test(id)) return "kind.chillerAbs";
   if (/chill|frio|frío|cool/.test(id + " " + outs)) return "kind.chiller";
   if (/heat_pump|bomba|heat pump/.test(id)) return "kind.heatPump";
   if (/diesel|diésel/.test(id + " " + ins) && /electric/.test(outs)) return "kind.diesel";
   if (/intercamb|exchang|hx/.test(id)) return "kind.hx";
   if (/electric/.test(ins)) return "kind.eboiler";
-  if (/pellet|chips|biomas/.test(id + " " + ins)) return "kind.biomassBoiler";
+  if (/pellet|chips|biomas|astilla/.test(id + " " + ins)) return "kind.biomassBoiler";
+  if (/hidr[oó]g|hydrog/.test(id + " " + ins)) return "kind.h2Boiler";
   if (/steam|vapor/.test(outs)) return "kind.steamBoiler";
   if (/boiler|calder|gas/.test(id + " " + ins)) return "kind.boiler";
   return "kind.converter";

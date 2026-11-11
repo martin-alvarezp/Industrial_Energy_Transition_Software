@@ -11,7 +11,7 @@ import {
   IcOutlineBusinessCenter, IcOutlineWorkspaces, IcDashboard,
   IcSolarPower, IcHeatPump, IcBatteryChargingFull, IcLocalFireDepartment, IcAcUnit,
   IcElectricBolt, IcWindPower, IcWaterDrop, IcPropaneTank, IcFactory, IcCo2,
-  IcOutlineSwapHoriz, IcWbSunny,
+  IcOutlineSwapHoriz, IcWbSunny, IcEco, IcOutlineCable,
 } from "./iconset.jsx";
 
 export const NAV_ICONS = {
@@ -51,7 +51,8 @@ export function componentIcon(t) {
   const id = `${t.tech_id} ${t.name ?? ""}`.toLowerCase();
   const out = (t.output_carrier ?? t.ports?.outputs?.map((p) => p.carrier).join(" ") ?? "").toLowerCase();
   if (t.tech_id === "offsets" || /offset|co2/.test(id)) return IcCo2;
-  if (t.type === "source") return IcElectricBolt;
+  if (t.type === "source") return /gas|gnl|lng|biomet|hidr[oó]g|hydrog|pellet|astilla|chips|biomas|di[eé]sel|estanque|silo/.test(id + " " + out)
+    ? IcPropaneTank : IcElectricBolt;
   if (t.type === "storage") {
     if (/h2|hidr|hydrog/.test(id)) return IcPropaneTank;
     if (/hielo|ice|frio|frío|cool/.test(id)) return IcAcUnit;
@@ -60,12 +61,18 @@ export function componentIcon(t) {
   }
   if (t.type === "generator") {
     if (/wind|eolic|eólic/.test(id)) return IcWindPower;
+    if (/eficien|efficien|ecm|ahorro/.test(id)) return IcEco;
+    if (/recuper|recover|residual|waste|hr_/.test(id)) return IcWaterDrop;
     if (/thermal|termic|térmic/.test(id)) return IcWbSunny;
     return IcSolarPower;
   }
-  if (/chp|cogener|electroliz/.test(id)) return IcFactory;
-  if (/chill|frio|frío|cool|hielo|absor/.test(id) || /cool|frio|frío|chill/.test(out)) return IcAcUnit;
-  if (/heat_pump|bomba|pump/.test(id)) return IcHeatPump;
+  if (/transformador|transformer|empalme|acometida|red|pipe|cañer|network/.test(id)) return IcOutlineCable;
+  if (/tren de|gas train|regula/.test(id)) return IcPropaneTank;
+  if (/compres/.test(id) && !/chill/.test(id)) return IcWindPower;
+  if (/chp|cogener|trigener|electroliz/.test(id)) return IcFactory;
+  if (/heat_pump|bomba de calor|heat pump/.test(id)) return IcHeatPump;
+  if (/chill|frio|frío|cool|hielo|absor|enfriamiento/.test(id) || /cool|frio|frío|chill/.test(out)) return IcAcUnit;
+  if (/bomba|pump/.test(id)) return IcHeatPump;
   if (/boiler|calder|vapor|steam|gas/.test(id)) return IcLocalFireDepartment;
   return IcOutlineSwapHoriz;
 }

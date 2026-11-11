@@ -374,7 +374,9 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
              line-height: 18px; text-align: center; }
 .sm-node-name { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap;
                 font-size: 12px; font-weight: 600; color: var(--ui-text);
-                text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; pointer-events: none; }
+                /* etiqueta sobre fondo: legible también sobre la imagen satelital */
+                background: rgba(255,255,255,0.92); padding: 1px 7px; border-radius: 9px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.25); pointer-events: none; }
 .sm-vertex { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--ui-primary); }
 .sm-arrow { font-size: 15px; line-height: 18px; text-align: center; font-weight: 700;
             text-shadow: 0 0 3px #fff, 0 0 3px #fff; }

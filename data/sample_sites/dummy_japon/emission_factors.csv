@@ -1,3 +1,6 @@
 carrier_id,scope,factor,source
-electricity,scope2,0.487,
-lng,scope1,0.205,
+biomass_pellets,scope1,0.0,
+biomass_wood_chips,scope1,0.0,
+contract_lng,scope1,0.205,
+electricity,scope2,0.0,
+hydrogen,scope1,0.0,

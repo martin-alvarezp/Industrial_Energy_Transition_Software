@@ -53,7 +53,7 @@ await p.evaluate(() => { localStorage.clear(); localStorage.setItem("ieto.lang",
 // ── México: años del modal, BaU, aviso de corrida pesada ──
 step("México: abre el modal de optimización", await openModal("dummy_mexico"));
 const ms = await p.$eval('[data-testid="run-milestones"]', (x) => x.value).catch(() => null);
-step("el modal muestra los años que se optimizan", ms === "2025, 2026, 2027, 2028, 2029, 2030, 2035, 2040", ms ?? "sin campo");
+step("el modal muestra los años que se optimizan", ms === "2025, 2030", ms ?? "sin campo");
 const bauHint = await p.$eval('[data-testid="run-analysis-bau"]', (x) => x.innerText).catch(() => "");
 step("la situación actual dice con qué equipos repone y crece", /Calderas a gas nuevas/.test(bauHint) && /Chillers/.test(bauHint), bauHint.replace(/\n/g, " · "));
 // con API (escritorio) resuelve Julia: no hay aviso de peso del navegador
@@ -73,15 +73,17 @@ step("México: la situación actual (BaU) corre y es factible", tx.includes("Inv
 await p.evaluate(() => { window.location.hash = "#/sys/dummy_mexico/kpis"; });
 await sleep(2500);
 const kpi = await text();
-step("KPIs: el VAN del caso base (27,3 M€)", /27[.,]2|27[.,]3/.test(kpi), (kpi.match(/VAN[^\n]*\n?[^\n]*/) ?? [""])[0].replace(/\n/g, " "));
+step("KPIs: el VAN de la situación actual (29,3 M€)", /29[.,]2|29[.,]3/.test(kpi), (kpi.match(/VAN[^\n]*\n?[^\n]*/) ?? [""])[0].replace(/\n/g, " "));
 
 // ── México: menos años optimizados desde el modal ──
 await openModal("dummy_mexico");
 await p.click('[data-testid="run-milestones"]');
 await p.keyboard.down("Control"); await p.keyboard.press("KeyA"); await p.keyboard.up("Control");
 await p.keyboard.press("Backspace");
-await p.type('[data-testid="run-milestones"]', "2030, 2040");
+await p.type('[data-testid="run-milestones"]', "2040");
 await sleep(300);
+// 2030 no se escribió, pero ahí empieza la meta de emisiones: se agrega sola
+step("el año en que empieza la meta de emisiones se agrega solo", /2030/.test(await p.$eval('[data-testid="run-cap-years"]', (x) => x.innerText).catch(() => "")));
 const hint = await p.evaluate(() => document.querySelector('[data-testid="run-milestones"]').parentElement.innerText);
 step("el primer año se agrega solo", /2025, 2030, 2040/.test(hint), hint.split("\n").slice(-1)[0].slice(0, 120));
 tx = await runAndWait();
@@ -96,15 +98,15 @@ const nYears = await p.evaluate(() => {
   return r.milestone_years;
 });
 step("cambiar los años en el modal no toca la configuración del sistema",
-     JSON.stringify(nYears ?? [2025, 2026, 2027, 2028, 2029, 2030, 2035, 2040]) === JSON.stringify([2025, 2026, 2027, 2028, 2029, 2030, 2035, 2040]),
+     JSON.stringify(nYears ?? [2025, 2030]) === JSON.stringify([2025, 2030]),
      JSON.stringify(nYears));
 
 // ── Japón: Parámetros → sin equipos para la situación actual → infactible con causa ──
 await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/dummy_japon/parameters`, { waitUntil: "networkidle2" });
 await p.waitForSelector('[data-testid="bau-techs"]', { timeout: 60000 });
 const checks = await p.$$eval('[data-testid="bau-techs"] input', (xs) => xs.map((x) => x.checked));
-step("Parámetros: la situación actual trae marcados sus equipos", checks.length === 3 && checks.every(Boolean), JSON.stringify(checks));
-for (const el of await p.$$('[data-testid="bau-techs"] input')) await el.click();
+step("Parámetros: la situación actual trae marcados sus equipos", checks.filter(Boolean).length === 5 && checks.length > 5, `${checks.filter(Boolean).length} de ${checks.length}`);
+for (const el of await p.$$('[data-testid="bau-techs"] input')) if (await el.evaluate((x) => x.checked)) await el.click();
 await sleep(300);
 await openModal("dummy_japon");
 await p.click('[data-testid="run-analysis-bau"]');
