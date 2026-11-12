@@ -35,7 +35,8 @@
     "verify:examples": "node scripts/verify_examples.mjs",
     "verify:examples-ui": "node scripts/verify_examples_ui.mjs",
     "verify:persistence": "node scripts/verify_persistence.mjs",
-    "verify:demands": "node scripts/verify_demands.mjs"
+    "verify:demands": "node scripts/verify_demands.mjs",
+    "verify:inputsbook": "node scripts/verify_inputsbook.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

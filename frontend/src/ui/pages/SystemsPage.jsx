@@ -1,7 +1,7 @@
 import { SLR } from "../palette.js";
 import { useEffect, useRef, useState } from "react";
-import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete, IcRefresh, IcFileDownload, IcUploadFile } from "../iconset.jsx";
-import { readProject } from "../../lib/project.js";
+import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete, IcRefresh, IcFileDownload, IcUploadFile, IcTableChart } from "../iconset.jsx";
+import { readProjectFile } from "../../lib/project.js";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { NAV_ICONS } from "../icons.jsx";
@@ -27,7 +27,11 @@ async function rewriteSite(from, to, editLayout = (l) => l) {
 
 function SystemCard({ name, onChanged, unsaved = false }) {
   const { t } = useI18n();
-  const { apiUp, removeSite, resetSite, exportProject, siteName, twin } = useStudio();
+  const { apiUp, removeSite, resetSite, exportProject, exportInputs, siteName, twin } = useStudio();
+  const doExportInputs = async () => {
+    try { const r = await exportInputs(name); setFlash(t("systems.inputsExported", { f: r.file })); }
+    catch (e) { setFlash(e.message); }
+  };
   const doExport = async () => {
     setFlash(t("systems.exporting"));
     try { const r = await exportProject(name); setFlash(t("systems.exported", { f: r.file, n: r.runs })); }
@@ -112,6 +116,7 @@ function SystemCard({ name, onChanged, unsaved = false }) {
           { label: t("systems.cover"), icon: IcImage, onClick: () => fileRef.current?.click(),
             hidden: !canWrite || name === "demo" },
           { label: t("systems.export"), icon: IcFileDownload, onClick: doExport, hidden: unsaved },
+          { label: t("systems.exportInputs"), icon: IcTableChart, onClick: doExportInputs, hidden: unsaved },
           { label: t("systems.reset"), icon: IcRefresh, onClick: doReset, hidden: !(inBrowser && isExample) },
           "-",
           { label: t("common.delete"), icon: IcDelete, danger: true, onClick: doDelete,
@@ -299,7 +304,7 @@ export default function SystemsPage() {
   const doImport = async (file) => {
     if (!file) return;
     try {
-      const p = await readProject(file);
+      const p = await readProjectFile(file);
       let name = p.name;
       if ((sites ?? []).includes(name)) {
         const ans = window.prompt(t("systems.importExists", { name: p.title || name }), `${name}_v2`);
@@ -318,7 +323,7 @@ export default function SystemsPage() {
         <button className="ui-btn" onClick={() => impRef.current?.click()} data-testid="project-import">
           <IcUploadFile /> {t("systems.import")}
         </button>
-        <input ref={impRef} type="file" accept=".ieto,.json,.gz,application/json,application/gzip" hidden
+        <input ref={impRef} type="file" accept=".ieto,.json,.gz,.xlsx,application/json,application/gzip" hidden
                data-testid="project-import-file" onChange={(e) => { doImport(e.target.files?.[0]); e.target.value = ""; }} />
         <button className="ui-btn primary" onClick={() => setCreating(true)}>
           <IcAdd /> {t("common.add")}

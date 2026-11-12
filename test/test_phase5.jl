@@ -141,6 +141,21 @@ end
         @test req("PUT", "/sites/otro", (site_payload = p_bad,)).status == 400
         @test !("otro" in JSON3.read(req("GET", "/sites").body).sites)
 
+        # un sitio nuevo SIN los vectores del demo (sin gas): su config base no
+        # puede escalar precios de un vector que no tiene — antes no recargaba
+        p_nogas = JSON3.read(JSON3.write(p), Dict{String,Any})
+        gas = [c["carrier_id"] for c in p_nogas["carriers"] if occursin("gas", c["carrier_id"])]
+        if !isempty(gas)
+            filter!(c -> !(c["carrier_id"] in gas), p_nogas["carriers"])
+            filter!(t -> !(get(t, "input_carrier", nothing) in gas) && !(get(t, "output_carrier", nothing) in gas), p_nogas["technologies"])
+            for k in ("prices", "demands"); foreach(g -> delete!(p_nogas[k], g), gas); end
+            filter!(f -> !(f["carrier_id"] in gas), p_nogas["emission_factors"])
+            haskey(p_nogas, "markets") && filter!(m -> !(m["carrier_id"] in gas), p_nogas["markets"])
+            @test req("PUT", "/sites/sin_gas", (site_payload = p_nogas,)).status == 200
+            @test req("GET", "/sites/sin_gas").status == 200
+            @test req("DELETE", "/sites/sin_gas").status == 200
+        end
+
         # DELETE: gestión de twins (crear/borrar entradas) — también sus corridas
         @test req("POST", "/runs", (site = "mi_planta", name = "una corrida", payload = run_off)).status == 200
         @test length(JSON3.read(req("GET", "/runs?site=mi_planta").body).runs) >= 1

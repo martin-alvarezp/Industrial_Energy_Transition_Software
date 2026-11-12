@@ -44,6 +44,26 @@ export async function downloadProject(project) {
   return filename;
 }
 
+/** Lee un proyecto (.ieto / .json) o un libro de entradas (.xlsx). */
+export async function readProjectFile(file) {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+  if (head[0] === 0x50 && head[1] === 0x4b) {          // «PK»: un .xlsx (ZIP)
+    const { readInputsBook } = await import("./inputsbook.js");
+    return readInputsBook(file);
+  }
+  return readProject(file);
+}
+
+/** Descarga un Blob con nombre. */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return filename;
+}
+
 /** Lee un archivo de proyecto (gzip o JSON) y lo valida. */
 export async function readProject(file) {
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());

@@ -135,6 +135,40 @@ if (proj) {
   step("el registro de cambios dice de dónde se importó", /Proyecto importado desde/.test(await text()));
 }
 
+// 6 · libro Excel de entradas: exportar y subirlo como un sistema nuevo
+await p.goto(`${APP_URL}/?r=${Date.now()}#/systems`, { waitUntil: "networkidle2" });
+await hideToast();
+await sleep(2500);
+const card2 = await p.$('[data-testid="system-dummy_mexico"]');
+if (card2) {
+  await card2.$eval(".ui-dots", (x) => x.click()).catch(() => null);
+  await sleep(400);
+  await p.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Exportar entradas (Excel)"))?.click());
+}
+let xl = null;
+for (let i = 0; i < 60 && !xl; i++) { await sleep(500); xl = readdirSync(dl).find((f) => /\.xlsx$/.test(f)); }
+step("exportar entradas descarga un libro .xlsx", !!xl, xl ? `${xl} · ${(statSync(join(dl, xl)).size / 1e6).toFixed(1)} MB` : "sin descarga");
+if (xl) {
+  p.once("dialog", (d) => d.accept("mexico_desde_excel"));
+  await (await p.$('[data-testid="project-import-file"]')).uploadFile(join(dl, xl));
+  for (let i = 0; i < 60; i++) { await sleep(500); if (/mexico_desde_excel/.test(p.url())) break; }
+  await sleep(3000);
+  await p.evaluate(() => [...document.querySelectorAll("button, [role=tab]")].find((x) => x.textContent.trim() === "Info")?.click());
+  await sleep(800);
+  step("subir el libro crea el sistema con sus entradas (nombre editado incluido)", /mexico_desde_excel/.test(p.url()) &&
+       await p.evaluate(() => [...document.querySelectorAll("input.ui-input")].some((x) => x.value === "Dummy México (editado)")));
+  await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/mexico_desde_excel/summary`, { waitUntil: "networkidle2" });
+  await hideToast();
+  await p.waitForSelector(".sum-runbar", { timeout: 60000 });
+  await p.evaluate(() => [...document.querySelectorAll(".sum-runbar button")].find((x) => x.textContent.includes("Optimización")).click());
+  await sleep(1200);
+  await p.evaluate(() => [...document.querySelectorAll(".ui-modal button")].find((x) => x.textContent.includes("Optimizar")).click());
+  let t1 = Date.now(), ok = false;
+  while (Date.now() - t1 < 300000) { const tx = await text(); if (tx.includes("Nueva optimización")) { await sleep(600); continue; }
+    if (tx.includes("Inversión total")) { ok = true; break; } if (/infactible/i.test(tx)) break; await sleep(600); }
+  step("el sistema importado desde Excel optimiza", ok);
+}
+
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 await b.close();
 if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }

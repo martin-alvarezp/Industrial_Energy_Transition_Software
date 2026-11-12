@@ -426,7 +426,30 @@ function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
         # rompería runs de un sitio con otras tecnologías. Ausente = todas las
         # del sitio permitidas (schema: default String[]).
         keep = filter(l -> !startswith(lstrip(l), "allowed_techs:"), readlines(base))
-        write(yaml, join(keep, "\n") * "\n")
+        # …ni escalamiento de precios de vectores que el sitio nuevo no tiene
+        # (el demo escala `natural_gas`: un sitio sin ese vector no volvía a cargar)
+        out = String[]
+        in_esc = false
+        for l in keep
+            if startswith(l, "price_escalation:")
+                in_esc = true
+                push!(out, l)
+                continue
+            end
+            if in_esc && startswith(l, " ")
+                c = Symbol(strip(first(split(strip(l), ":"))))
+                haskey(site.carriers, c) && push!(out, l)
+                continue
+            end
+            in_esc = false
+            push!(out, l)
+        end
+        # sin entradas, la clave queda vacía (null): se omite
+        i = findfirst(==("price_escalation:"), out)
+        if i !== nothing && (i == length(out) || !startswith(out[i + 1], " "))
+            deleteat!(out, i)
+        end
+        write(yaml, join(out, "\n") * "\n")
     end
     return _json_response(200, (saved = name, site_version = site_version(site),
                                 n_techs = length(all_tech_ids(site))))

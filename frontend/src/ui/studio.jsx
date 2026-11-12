@@ -13,7 +13,7 @@ import {
 import {
   putLocalSite, deleteLocalSite, listLocalRuns, getLocalRun, putLocalRun, deleteLocalRun, deleteLocalRunsOf,
 } from "../lib/localdb.js";
-import { buildProject, downloadProject, readProject } from "../lib/project.js";
+import { buildProject, downloadProject, readProjectFile, downloadBlob } from "../lib/project.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
@@ -222,24 +222,38 @@ export function StudioProvider({ children }) {
     return { file, runs: project.runs.length };
   }, [apiUp, localRuns, logChange]);
 
-  /** Importa un archivo de proyecto como sistema `asName` (por defecto, su nombre). */
+  /** Libro Excel con las entradas del sistema (para revisar, editar y volver a subir). */
+  const exportInputs = useCallback(async (name) => {
+    const { site } = await fetchSite(name);
+    const { layout, site_version, ...siteJson } = site;
+    const L = layout ? fromGeoJSON(layout) : { ...EMPTY_LAYOUT };
+    const cfg = { ...baseConfig(L), ...readJSON(cfgKey(name), {}) };
+    const { buildInputsBook } = await import("../lib/inputsbook.js");
+    const blob = await buildInputsBook({ name, title: L.title, site: siteJson, layout: toGeoJSON(L), config: cfg });
+    const file = downloadBlob(blob, `${name}_entradas_${new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "_")}.xlsx`);
+    logChange(`Entradas exportadas a Excel (${file})`, "save", name);
+    return { file };
+  }, [logChange]);
+
+  /** Importa un proyecto (.ieto) o un libro de entradas (.xlsx) como sistema `asName`. */
   const importProject = useCallback(async (file, asName = null) => {
-    const p = await readProject(file);
+    const p = await readProjectFile(file);
     const name = asName || p.name;
     const site = { ...p.site, name };
     delete site.site_version;
     writeJSON(cfgKey(name), p.config ?? null);
     writeJSON(logKey(name), [{ id: uid(), at: new Date().toISOString(), kind: "create",
-      text: `Proyecto importado desde ${file.name} (exportado ${String(p.exported_at ?? "").slice(0, 16).replace("T", " ")})`,
+      text: `${(p.runs ?? []).length ? "Proyecto" : "Entradas"} importad${(p.runs ?? []).length ? "o" : "as"} desde ${file.name} (exportado ${String(p.exported_at ?? "").slice(0, 16).replace("T", " ")})`,
       user: readJSON("ieto.user", { name: "" }).name || null }, ...(p.log ?? [])].slice(0, 500));
     if (apiUp) {
       await apiSaveSite(name, site, p.layout);
       // mismo nombre = reemplazar la versión: también sus corridas
-      for (const r of await listRuns(name)) await deleteRun(name, r.id).catch(() => null);
+      // un proyecto con corridas reemplaza las del sistema; un libro de entradas las conserva
+      if ((p.runs ?? []).length) for (const r of await listRuns(name)) await deleteRun(name, r.id).catch(() => null);
       for (const r of p.runs ?? []) await saveRun(name, r.name, r.bundle, r.notes ?? "").catch(() => null);
     } else {
       await putLocalSite(name, site, p.layout);
-      await deleteLocalRunsOf(name);
+      if ((p.runs ?? []).length) await deleteLocalRunsOf(name);
       for (const r of p.runs ?? [])
         await putLocalRun({ id: "local-" + uid(), site: name, name: r.name, notes: r.notes ?? "", saved_at: r.saved_at,
                             scenario: r.bundle?.result?.meta?.scenario, feasible: r.bundle?.result?.meta?.feasible,
@@ -461,7 +475,7 @@ export function StudioProvider({ children }) {
   const value = {
     apiUp, sites, refreshSites,
     siteName, twin, twinState, setTwin, loadSite, createSite, patchSite, patchLayout,
-    saveCurrentSite, removeSite, resetSite, exportProject, importProject, saveStatus, readonly,
+    saveCurrentSite, removeSite, resetSite, exportProject, exportInputs, importProject, saveStatus, readonly,
     draft, setDraft, applied, running, runError, run, evaluate,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,
