@@ -678,6 +678,8 @@ extend({
   "sum.col.net": ["Emisiones netas (t)", "Net emissions (t)"],
   "sum.col.res": ["Renovable", "Renewable"],
   "sum.mw": ["MW", "MW"],
+  "sum.newCap": ["Capacidad nueva", "New capacity"],
+  "sum.noMeasures": ["La corrida no compra equipos nuevos.", "The run buys no new equipment."],
   "sum.xlsx": ["Descargar Excel", "Download Excel"],
   "sum.memo": ["Memo ejecutivo (imprimible)", "Executive memo (printable)"],
   "sum.noFlows": ["No hay flujos para mostrar en este año.", "There are no flows to show for this year."],

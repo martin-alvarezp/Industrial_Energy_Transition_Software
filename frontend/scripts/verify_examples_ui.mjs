@@ -132,6 +132,15 @@ await sleep(1500);
 const ticks = await p.evaluate(() => [...new Set([...document.querySelectorAll(".recharts-xAxis .recharts-cartesian-axis-tick-value")]
   .map((x) => x.textContent.trim()))]);
 step("la corrida solo trae 2025, 2030 y 2040", JSON.stringify(ticks.filter((x) => /^20\d\d$/.test(x))) === JSON.stringify(["2025", "2030", "2040"]), ticks.join(","));
+// hoja de ruta de medidas: columnas = años de la corrida, ícono por compra, tarjeta al pasar
+const mtCols = await p.$$eval('[data-testid="measures-grid"] .mt-h', (xs) => xs.map((x) => x.textContent.trim()).filter(Boolean));
+const mtDots = await p.$$('[data-testid="measure-dot"]');
+step("hoja de ruta: una columna por año optimizado y compras en 2030 (no solo en 2025)",
+     JSON.stringify(mtCols) === JSON.stringify(["2025", "2030", "2040"]) && mtDots.length > 3, `${mtCols.join(",")} · ${mtDots.length} compras`);
+if (mtDots.length) { await mtDots[mtDots.length - 1].evaluate((el) => el.scrollIntoView({ block: "center" })); await mtDots[mtDots.length - 1].hover(); await sleep(400); }
+const mtTip = await p.$eval('[data-testid="measures-tip"]', (x) => x.innerText).catch(() => "");
+step("hoja de ruta: la tarjeta muestra año, inversión en EUR y capacidad nueva", /Año/.test(mtTip) && /EUR/.test(mtTip) && /MW|%/.test(mtTip),
+     mtTip.replace(/\n/g, " | ").slice(0, 160));
 const nYears = await p.evaluate(() => {
   const r = JSON.parse(localStorage.getItem("ieto.cfg.dummy_mexico") ?? "{}");
   return r.milestone_years;

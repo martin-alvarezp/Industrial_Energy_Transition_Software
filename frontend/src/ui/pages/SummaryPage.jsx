@@ -38,50 +38,85 @@ function KpiCard({ icon: I, color, value, unit, label }) {
   );
 }
 
-function MeasuresTimeline({ rows, years, t }) {
+/**
+ * Hoja de ruta de medidas: una fila por equipo (lo más reciente arriba), una
+ * columna por año optimizado, el ícono del equipo en cada compra y una tarjeta
+ * flotante con año · inversión (en la escala e impacto del Resumen) · capacidad
+ * nueva. `hidden`: nombres ocultos por el filtro de tecnologías. `compact`: sin
+ * título (para las columnas de comparación).
+ */
+export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, unitLbl = "", hidden = {}, compact = false }) {
   const [view, setView] = useState("chart");
-  const names = [...new Set(rows.map((r) => r.name))];
-  if (!rows.length) return <p className="ui-hint">—</p>;
-  const y0 = years[0], y1 = years[years.length - 1];
-  const x = (y) => (years.length <= 1 ? 50 : 3 + ((y - y0) / (y1 - y0)) * 94);
-  const ticks = years.filter((_, i) => years.length <= 12 || i % Math.ceil(years.length / 10) === 0);
+  const [tip, setTip] = useState(null);       // {name, x, y}
+  const vis = rows.filter((r) => !hidden[r.name]);
+  const head = (
+    <div className="sum-sec-head">
+      {!compact && <h3>{t("sum.measures")}</h3>}
+      <div className="ui-seg light outlined small">
+        <button className={view === "chart" ? "on" : ""} onClick={() => setView("chart")} title={t("sum.chart")}><IcBarChart /></button>
+        <button className={view === "table" ? "on" : ""} onClick={() => setView("table")} title={t("sum.table")}><IcTableChart /></button>
+      </div>
+    </div>
+  );
+  if (!vis.length) return <>{head}<p className="ui-hint">{t("sum.noMeasures")}</p></>;
+  // columnas: los años de la corrida (con hitos, solo esos) más cualquier año de compra
+  const cols = [...new Set([...years, ...vis.map((r) => r.year)])].sort((a, b) => a - b);
+  const first = {};
+  for (const r of vis) first[r.name] = Math.min(first[r.name] ?? Infinity, r.year);
+  const names = Object.keys(first).sort((a, b) => first[b] - first[a] || a.localeCompare(b));
+  const capOf = (r) => (r.measure ? `−${num(100 * r.reduction, 1)} %`
+    : `${r.units != null ? `${r.units} × ${num(r.unit, 2)} = ` : ""}${num(r.mw, 2)} MW${r.mwh != null ? ` · ${num(r.mwh, 2)} MWh` : ""}`);
+  const money = (r) => num((r.capex ?? 0) * factor(r.ry ?? 1) / scale, scale >= 1e6 ? 2 : 0);
+  const tipRows = tip ? vis.filter((r) => r.name === tip.name) : [];
+  const show = (n, el) => {
+    const box = el.closest(".mt-grid").getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    setTip({ name: n, y: r.bottom - box.top, x: Math.min(Math.max(0, r.left - box.left - 60), box.width - 320) });
+  };
   return (
     <>
-      <div className="sum-sec-head">
-        <h3>{t("sum.measures")}</h3>
-        <div className="ui-seg light outlined small">
-          <button className={view === "chart" ? "on" : ""} onClick={() => setView("chart")} title={t("sum.chart")}><IcBarChart /></button>
-          <button className={view === "table" ? "on" : ""} onClick={() => setView("table")} title={t("sum.table")}><IcTableChart /></button>
-        </div>
-      </div>
+      {head}
       {view === "table" ? (
-        <table className="ui-table" style={{ maxWidth: 900 }}>
+        <table className="ui-table" style={{ maxWidth: 900 }} data-testid="measures-table">
           <thead><tr><th>{t("sum.component")}</th><th>{t("common.year")}</th>
-            <th className="num">{t("sum.mw")}</th><th className="num">{t("sum.col.capex")} ({currency()})</th></tr></thead>
-          <tbody>{rows.map((r, i) => (
+            <th className="num">{t("sum.newCap")}</th><th className="num">{t("sum.col.capex")} [{unitLbl}]</th></tr></thead>
+          <tbody>{[...vis].sort((a, b) => a.year - b.year || a.name.localeCompare(b.name)).map((r, i) => (
             <tr key={i}><td>{r.name}</td><td>{r.year}</td>
-              <td className="num">{r.measure ? `−${num(100 * r.reduction, 1)} %`
-                : `${r.units != null ? `${r.units} × ${num(r.unit, 2)} = ` : ""}${num(r.mw, 2)}`}</td>
-              <td className="num">{num(r.capex, 0)}</td></tr>))}</tbody>
+              <td className="num">{capOf(r)}</td>
+              <td className="num">{money(r)}</td></tr>))}</tbody>
         </table>
       ) : (
-        <div className="mt-chart">
-          <div className="mt-axis">
-            {ticks.map((y) => <span key={y} style={{ left: `${x(y)}%` }}>{y}</span>)}
-          </div>
-          {names.map((n) => (
-            <div key={n} className="mt-row">
-              <div className="mt-label">{n}</div>
-              <div className="mt-track">
-                {rows.filter((r) => r.name === n).map((r, i) => {
-                  const I = componentIcon(r.t);
-                  return <span key={i} className="mt-dot" style={{ left: `${x(r.year)}%` }}
-                               title={r.measure ? `${r.name} · ${r.year} · −${num(100 * r.reduction, 1)} %`
-                                 : `${r.name} · ${r.year} · ${r.units != null ? `${r.units} × ${num(r.unit, 2)} MW = ` : ""}${num(r.mw, 2)} MW`}><I size={16} /></span>;
-                })}
-              </div>
+        <div className="mt-grid" data-testid="measures-grid" onMouseLeave={() => setTip(null)}
+             style={{ gridTemplateColumns: `minmax(110px, ${compact ? 150 : 210}px) repeat(${cols.length}, minmax(40px, 1fr))` }}>
+          <div className="mt-h" />
+          {cols.map((y) => <div key={y} className="mt-h">{y}</div>)}
+          {names.map((n) => {
+            const on = tip?.name === n;
+            return [
+              <div key={n + ":l"} className={"mt-l" + (on ? " on" : "")} title={n}
+                   onMouseEnter={(e) => show(n, e.currentTarget)}>{n}</div>,
+              ...cols.map((y) => {
+                const here = vis.filter((r) => r.name === n && r.year === y);
+                const I = here.length ? componentIcon(here[0].t ?? {}) : null;
+                return (
+                  <div key={n + ":" + y} className={"mt-c" + (on ? " on" : "")} data-testid={here.length ? "measure-dot" : undefined}
+                       onMouseEnter={(e) => show(n, e.currentTarget)}>
+                    {I && <span className={"mt-i" + (here[0].measure ? " eco" : "")}><I size={18} /></span>}
+                  </div>
+                );
+              }),
+            ];
+          })}
+          {tip && tipRows.length > 0 && (
+            <div className="mt-tip" data-testid="measures-tip" style={{ top: tip.y + 4, left: tip.x }}>
+              <div className="mt-tip-h">{tip.name}</div>
+              <table>
+                <thead><tr><th>{t("common.year")}</th><th>{t("sum.col.capex")} [{unitLbl}]</th><th>{t("sum.newCap")}</th></tr></thead>
+                <tbody>{tipRows.map((r, i) => (
+                  <tr key={i}><td>{r.year}</td><td className="num">{money(r)}</td><td className="num">{capOf(r)}</td></tr>))}</tbody>
+              </table>
             </div>
-          ))}
+          )}
         </div>
       )}
     </>
@@ -285,7 +320,8 @@ export default function SummaryPage() {
             )}
           </div>
 
-          <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} /></section>
+          <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} factor={factor}
+                    scale={prefs.scale} unitLbl={scaleLbl} hidden={hiddenTech} /></section>
 
           <ChartPanel title={t("sum.investmentCost")} menu={exportMenu}>
             <StackedBars {...st(calc.inv)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />

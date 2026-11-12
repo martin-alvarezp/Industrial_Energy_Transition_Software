@@ -239,11 +239,17 @@ export function horizonKpis(result, factor = () => 1) {
 export function measures(result, siteJson) {
   const T = techIndex(siteJson);
   const rows = [];
+  // almacenamiento con energía propia (R19): MWh nuevos y su CAPEX por MWh
+  const ecap = result?.assumptions?.scenario_config?.storage_energy_capex ?? {};
+  const mwhOf = (tech, y) => (result?.storage_energy ?? []).find((e) => e.tech === tech && e.year === y)?.new_mwh ?? 0;
   for (const c of result?.capacity ?? []) {
     if (c.new_mw > 1e-6) {
       const t = T[c.tech];
-      rows.push({ tech: c.tech, name: t?.name ?? c.tech, year: calYear(result, c.year), mw: c.new_mw,
-                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0) * capexFactor(result, c.tech, c.year), t,
+      const mwh = t?.type === "storage" ? mwhOf(c.tech, c.year) : 0;
+      rows.push({ tech: c.tech, name: t?.name ?? c.tech, year: calYear(result, c.year), ry: c.year, mw: c.new_mw,
+                  mwh: mwh > 1e-6 ? mwh : null,
+                  capex: c.new_mw * KW * (t?.capex_per_kw ?? 0) * capexFactor(result, c.tech, c.year) +
+                         (mwh > 1e-6 && ecap[c.tech] != null ? mwh * KW * ecap[c.tech] * capexFactor(result, c.tech, c.year) : 0), t,
                   // unidades enteras (3.2): cuántas unidades del tamaño fijado
                   units: t?.type === "converter" && (t.unit_size ?? 0) > 0
                     ? Math.round(c.new_mw / t.unit_size) : null, unit: t?.unit_size ?? null });
@@ -251,7 +257,7 @@ export function measures(result, siteJson) {
   }
   // medidas de eficiencia (5.3): en la hoja de ruta, sin MW
   for (const em of result?.efficiency_measures ?? [])
-    rows.push({ tech: em.id, name: em.name, year: calYear(result, em.year), mw: null,
+    rows.push({ tech: em.id, name: em.name, year: calYear(result, em.year), ry: em.year, mw: null,
                 capex: em.capex, measure: true, reduction: em.reduction, units: null });
   return rows.sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));
 }

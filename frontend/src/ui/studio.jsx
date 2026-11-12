@@ -344,7 +344,9 @@ export function StudioProvider({ children }) {
     () => [...localRuns.filter((r) => r.site === siteName), ...runs],
     [localRuns, runs, siteName]);
 
-  useEffect(() => { setCurrency(data?.result?.meta?.currency); }, [data]);
+  // moneda de display de la corrida vista: en el render (no en un efecto), para
+  // que las páginas hijas la lean ya en el primer render con la corrida nueva
+  setCurrency(data?.result?.meta?.currency);
 
   const value = {
     apiUp, sites, refreshSites,
