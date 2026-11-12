@@ -356,6 +356,21 @@ export default function SeriesEditor({ siteJson, patchSite }) {
           ))}
           <AddSeries options={demandable}
                      onAdd={(c) => setSeries("demands", c, flatSeries(nsteps, 0))} />
+          {(siteJson.demand_parts ?? []).length > 0 && (
+            <div data-testid="ts-demand-parts">
+              <h3 className="card-title" style={{ marginTop: 18 }}>{L("Demandas por nodo", "Demands per node")}</h3>
+              <p className="card-sub">{L(
+                "Cómo se reparte la demanda de cada vector entre los nodos del gemelo (se agregan en el panel de cada nodo). La demanda del vector, arriba, sigue mandando en el total; estas series definen la proporción de cada nodo hora a hora.",
+                "How each carrier's demand is split across the twin's nodes (added in each node's panel). The carrier's demand above still sets the total; these series set each node's share hour by hour.")}</p>
+              {siteJson.demand_parts.map((pt) => (
+                <SeriesRow key={pt.part_id} id={`demand_part_series:${pt.part_id}`}
+                           label={`${pt.name} (${pt.carrier} · ${siteJson.nodes?.find((n) => n.node_id === (pt.home ?? pt.node))?.name ?? pt.home ?? pt.node})`}
+                           unit="MW" values={siteJson.demand_part_series?.[pt.part_id] ?? flatSeries(nsteps, 0)} timesteps={ts} isDemand
+                           {...rawProps(`demand_part_series.${pt.part_id}`)}
+                           onChange={(nv) => setSeries("demand_part_series", pt.part_id, nv)} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card">

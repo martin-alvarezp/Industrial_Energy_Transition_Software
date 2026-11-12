@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import {
   IcArrowBack, IcExpandLess, IcExpandMore, IcOutlineInfo, IcOutlineViewInAr,
   IcOutlineWbSunny, IcLocationOn, IcAdd, IcHistory, IcEdit, IcDelete, IcPolyline,
-  IcOutlineLocationOn, IcNode, IcOutlineSchema,
+  IcOutlineLocationOn, IcNode, IcOutlineSchema, IcClose,
 } from "../iconset.jsx";
 import NodeFlow from "../map/NodeFlow.jsx";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -17,7 +17,7 @@ import { Menu, Modal } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { locationOf, polygonCentroid, nodeOf, techsInNode, nodeLocation, assignToNode } from "../layout.js";
 import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
-import { polygonAreaM2, setDemandNode } from "../../lib/twin.js";
+import { polygonAreaM2, setDemandNode, demandPartsOf, addDemandPart, removeDemandPart, renameDemandPart, partShare } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
 import { setRawSeries } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
@@ -26,6 +26,42 @@ import { COUNTRIES, INDUSTRIES, labelOf } from "../siteinfo.js";
 
 const MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Agregar una demanda final en un nodo: una fracción de la demanda de un vector. */
+function AddDemandPart({ siteJson, node, t, onAdd }) {
+  const carriers = Object.keys(siteJson.demands ?? {});
+  const [c, setC] = useState("");
+  const [name, setName] = useState("");
+  const [pct, setPct] = useState(50);
+  const [open, setOpen] = useState(false);
+  if (!open) return (
+    <button className="ui-btn ghost sm" style={{ marginTop: 6 }} onClick={() => setOpen(true)} data-testid="node-part-add">
+      <IcAdd /> {t("node.partAdd")}</button>);
+  const cName = (x) => siteJson.carriers.find((k) => k.carrier_id === x)?.name ?? x;
+  const ok = c && pct > 0 && pct <= 100;
+  return (
+    <div className="nd-part-form" data-testid="node-part-form">
+      <select className="ui-select" value={c} onChange={(e) => { setC(e.target.value); if (!name) setName(`${cName(e.target.value)} · ${node.name}`); }}
+              data-testid="node-part-carrier">
+        <option value="">{t("node.partCarrier")}</option>
+        {carriers.map((x) => <option key={x} value={x}>{cName(x)}</option>)}
+      </select>
+      <input className="ui-input" placeholder={t("node.partName")} value={name} onChange={(e) => setName(e.target.value)}
+             data-testid="node-part-name" />
+      <label className="nd-part-pct">
+        <input className="ui-input" type="number" min={1} max={100} step={1} value={pct}
+               onChange={(e) => setPct(+e.target.value)} data-testid="node-part-pct" /> %
+      </label>
+      <p className="ui-hint" style={{ margin: 0 }}>{t("node.partHint")}</p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="ui-btn primary sm" disabled={!ok} data-testid="node-part-ok"
+                onClick={() => { onAdd(c, name.trim() || cName(c), pct / 100); setOpen(false); setC(""); setName(""); }}>
+          {t("common.add")}</button>
+        <button className="ui-btn ghost sm" onClick={() => setOpen(false)}>{t("common.cancel")}</button>
+      </div>
+    </div>
+  );
+}
 
 export function SaveStatus() {
   const { t } = useI18n();
@@ -362,7 +398,8 @@ export default function SystemPanel({
                 <dt>{t("node.demands")}</dt>
                 <dd>
                   {!nodeArcs.length && <span className="ui-hint">{t("node.demandsNeedLine")}</span>}
-                  {nodeArcs.length > 0 && Object.keys(siteJson.demands ?? {}).map((c) => (
+                  {/* vectores sin repartir: la demanda entera se consume aquí o no */}
+                  {nodeArcs.length > 0 && Object.keys(siteJson.demands ?? {}).filter((c) => !demandPartsOf(siteJson, c).length).map((c) => (
                     <label key={c} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <input type="checkbox" data-testid={`node-demand-${c}`}
                              checked={siteJson.demand_nodes?.[c] === node.id}
@@ -371,6 +408,21 @@ export default function SystemPanel({
                       {siteJson.carriers.find((x) => x.carrier_id === c)?.name ?? c}
                     </label>
                   ))}
+                  {/* demandas por nodo de vectores repartidos */}
+                  {(siteJson.demand_parts ?? []).filter((p) => (p.home ?? p.node) === node.id).map((p) => (
+                    <div key={p.part_id} className="nd-part" data-testid={`node-part-${p.part_id}`}>
+                      <input className="ui-input" value={p.name} title={t("node.partName")}
+                             onChange={(e) => patchSite((sj) => renameDemandPart(sj, p.part_id, e.target.value))} />
+                      <span className="ui-hint" style={{ margin: 0, whiteSpace: "nowrap" }}>
+                        {siteJson.carriers.find((x) => x.carrier_id === p.carrier)?.name ?? p.carrier} · {num(100 * partShare(siteJson, p.part_id), 1)} %
+                      </span>
+                      <button className="ui-btn ghost icon" title={t("node.partRemove")}
+                              onClick={() => patchSite((sj) => removeDemandPart(sj, p.part_id), `Demanda '${p.name}' quitada del nodo '${node.name}'`)}><IcClose /></button>
+                    </div>
+                  ))}
+                  {nodeArcs.length > 0 && <AddDemandPart siteJson={siteJson} node={node} t={t}
+                    onAdd={(c, name, frac) => patchSite((sj) => addDemandPart(sj, c, node.id, name, frac),
+                      `Demanda '${name}' (${num(100 * frac, 1)} % de ${c}) consumida en el nodo '${node.name}'`)} />}
                 </dd>
               </dl>
             )}

@@ -5,6 +5,7 @@
 // demanda del sistema o compra en un mercado lleva una etiqueta al final.
 import { useMemo } from "react";
 import { carrierColor, carrierLabel } from "../../lib/twin.js";
+import { demandNodesOf } from "../../lib/flows.js";
 import { componentIcon } from "../icons.jsx";
 import { useI18n } from "../i18n.jsx";
 import { techKind } from "../techkind.js";
@@ -76,9 +77,9 @@ export default function NodeFlow({ siteJson, techs, name, nodeId, onSelectCompon
   const { t } = useI18n();
   const g = useMemo(() => nodeFlowLayout(siteJson, techs), [siteJson, techs]);
   const bought = new Set((siteJson.markets ?? []).filter((m) => (m.direction ?? "buy") === "buy").map((m) => m.carrier_id ?? m.carrier));
-  // con red, la demanda se consume en su nodo (demand_nodes); sin red, en todos lados
+  // con red, la demanda se consume en su(s) nodo(s) (demandas por nodo o demand_nodes); sin red, en todos lados
   const demand = new Set(Object.keys(siteJson.demands ?? {}).filter((c) =>
-    !siteJson.arcs?.length || (siteJson.demand_nodes?.[c] ?? "main") === nodeId));
+    !siteJson.arcs?.length || demandNodesOf(siteJson, c).includes(nodeId)));
   if (!techs.length) return <p className="ui-hint" style={{ padding: "12px 0" }}>{t("cc.empty")}</p>;
   return (
     <div className="nf-wrap" data-testid="node-flow">

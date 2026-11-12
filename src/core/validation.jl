@@ -344,6 +344,20 @@ function validate_site(site::Site)
         n in known_nodes || push!(problems,
             "demand_node['$c']: el nodo '$n' no existe")
     end
+    # demandas finales por nodo: vector con demanda, nodo conocido, serie válida
+    seen = Set{Symbol}()
+    for p in site.demand_parts
+        p.id in seen && push!(problems, "demand_parts: la demanda '$(p.id)' está repetida")
+        push!(seen, p.id)
+        haskey(site.demands, p.carrier) || push!(problems,
+            "demand_parts['$(p.id)']: el vector '$(p.carrier)' no tiene demanda en el sitio")
+        p.node in known_nodes || push!(problems,
+            "demand_parts['$(p.id)']: el nodo '$(p.node)' no existe")
+        length(p.values) == length(site.timesteps) || push!(problems,
+            "demand_parts['$(p.id)']: la serie tiene $(length(p.values)) pasos y el sitio $(length(site.timesteps))")
+        any(v -> !isfinite(v) || v < 0, p.values) && push!(problems,
+            "demand_parts['$(p.id)']: la serie debe ser finita y no negativa")
+    end
 
     # --- demandas cubiertas: cada carrier con demanda debe tener al menos un
     # productor (una tecnología o un mercado de compra) ---

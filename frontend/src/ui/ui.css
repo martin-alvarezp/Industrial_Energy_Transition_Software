@@ -523,6 +523,12 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .mt-tip { position: absolute; z-index: 5; width: 320px; background: #fff; border: 1px solid var(--ui-border);
           border-radius: 8px; box-shadow: var(--ui-shadow-pop); padding: 10px 14px; pointer-events: none; }
 .mt-tip-h { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+/* demandas por nodo en el panel del nodo */
+.nd-part { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.nd-part .ui-input { flex: 1; min-width: 0; height: 32px; }
+.nd-part-form { display: grid; gap: 6px; margin-top: 8px; padding: 10px; border: 1px solid var(--ui-border); border-radius: 8px; }
+.nd-part-pct { display: flex; align-items: center; gap: 6px; }
+.nd-part-pct .ui-input { width: 90px; }
 .mt-tip table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 .mt-tip th { text-align: left; font-weight: 600; color: var(--ui-text-2); padding: 2px 10px 4px 0; border-bottom: 1px solid var(--ui-border-2); }
 .mt-tip td { padding: 3px 10px 0 0; color: var(--ui-muted); }

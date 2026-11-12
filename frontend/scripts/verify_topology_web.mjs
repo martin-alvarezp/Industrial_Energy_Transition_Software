@@ -85,7 +85,7 @@ step("el VAN mostrado es el del motor Julia", await waitText(esperado, 30000), `
 await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/dummy_japon/parameters`, { waitUntil: "networkidle2" });
 const hitos = await p.waitForSelector('[data-testid="milestones"]', { timeout: 60000 })
   .then((el) => el.evaluate((x) => x.value)).catch(() => "");
-step("el ejemplo abre con sus hitos y su configuración", hitos.replace(/\s/g, "") === "2028,2030,2045", hitos);
+step("el ejemplo abre con sus hitos y su configuración", hitos.replace(/\s/g, "") === "2028,2039,2045", hitos);
 await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/dummy_japon/infrastructure`, { waitUntil: "networkidle2" });
 const nodo = await p.waitForSelector(".sm-node", { timeout: 30000 }).catch(() => null);
 step("la planta del ejemplo es un nodo en el mapa", !!nodo);

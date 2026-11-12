@@ -79,6 +79,13 @@ function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParam
         add!(arcs_out, (params.arc_from[k], c), k)
     end
 
+    # reparto de cada demanda entre nodos (demandas por nodo; sin ellas, todo al
+    # nodo de demand_node, que es el de params.demand_node)
+    shares = demand_shares(site)
+    share(c, n, s) = (sh = get(shares, c, nothing); sh === nothing ?
+                      (get(params.demand_node, c, DEFAULT_NODE) == n ? 1.0 : 0.0) :
+                      (v = get(sh, n, nothing); v === nothing ? 0.0 : v[s]))
+
     cons = Array{JuMP.ConstraintRef}(undef, length(nodes), length(balanced),
                                      length(steps), length(years))
     for (ni, n) in enumerate(nodes), (ci, c) in enumerate(balanced), s in steps, y in years
@@ -88,9 +95,10 @@ function add_carrier_balance!(m::JuMP.Model, sets::ModelSets, params::ModelParam
         arc_in     = sum(params.arc_eff[k] * arc_flow[k, s, y]
                          for k in get(arcs_in, (n, c), NOSY); init = 0.0)
 
-        demand   = (haskey(params.demand, c) &&
-                    get(params.demand_node, c, DEFAULT_NODE) == n) ?
-                   params.demand[c][s, y] + demand_adjust(m, params, c, s, y) : 0.0
+        f = haskey(params.demand, c) ? share(c, n, s) : 0.0
+        demand   = f == 0.0 ? 0.0 :
+                   f == 1.0 ? params.demand[c][s, y] + demand_adjust(m, params, c, s, y) :
+                   f * (params.demand[c][s, y] + demand_adjust(m, params, c, s, y))
         consumed = sum(k[2] * input_factor(m, k[1], c, s, y) * input_driver(m, k[1], s, y)   # 2.3 · R11
                        for k in get(consumers, (n, c), NOPT); init = 0.0)
         charged  = sum(charge[st, s, y] for st in get(stores, (n, c), NOSY); init = 0.0)

@@ -41,6 +41,20 @@ function groupKey(t) {
  * también cae al agregado si algún arco bidireccional se invirtió durante el
  * año (ver `reversed`), porque ahí el detalle por barra no sería fiel.
  */
+// ── demandas por nodo ─────────────────────────────────────────────────────
+/** Nodos donde se consume la demanda del vector c: los de sus demandas por
+ *  nodo (`demand_parts`) o, sin ellas, el de `demand_nodes` (o "main"). */
+export function demandNodesOf(siteJson, c) {
+  const parts = (siteJson.demand_parts ?? []).filter((p) => p.carrier === c);
+  return parts.length ? [...new Set(parts.map((p) => p.node))] : [siteJson.demand_nodes?.[c] ?? "main"];
+}
+/** Demandas del vector c en el nodo n: [{name, series}] (sin partes, la demanda entera). */
+export function demandsAt(siteJson, c, n) {
+  const parts = (siteJson.demand_parts ?? []).filter((p) => p.carrier === c);
+  if (!parts.length) return (siteJson.demand_nodes?.[c] ?? "main") === n ? [{ name: null, series: siteJson.demands?.[c] ?? [] }] : [];
+  return parts.filter((p) => p.node === n).map((p) => ({ name: p.name, series: siteJson.demand_part_series?.[p.part_id] ?? [] }));
+}
+
 export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
   const w = siteJson.timesteps.map((t) => t.weight_hours);
   const rows = dispatchRows.filter((r) => r.year === year);
@@ -98,7 +112,6 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
   })();
   const topo = arcs.length > 0 && arcRows && !reversed && !cyclic;
   const nodeOf = (id) => (topo ? (techById[id]?.node ?? "main") : "main");
-  const demandNodeOf = (c) => (topo ? (siteJson.demand_nodes?.[c] ?? "main") : "main");
   const busName = Object.fromEntries(
     (siteJson.nodes ?? []).map((n) => [n.node_id, n.name || n.node_id]));
   const suffix = (n) => (topo && n !== "main" ? ` · ${busName[n] ?? n}` : "");
@@ -228,12 +241,16 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
     if (carrierIdx.has(s)) outflow[s] = (outflow[s] ?? 0) + v;
   }
   for (const cid of Object.keys(siteJson.demands ?? {})) {
-    const key = `c:${demandNodeOf(cid)}:${cid}`;
-    const idx = index[key];
-    if (idx == null) continue;
-    const v = (inflow[idx] ?? 0) - (outflow[idx] ?? 0);
-    if (v > MIN_MWH)
-      link(idx, nodeId(`d:${cid}`, `Demanda ${carrierLabel(carriers[cid])}`, "#9aa39f"), v);
+    // con demandas por nodo, una salida por nodo con el nombre de sus demandas
+    for (const dn of (topo ? demandNodesOf(siteJson, cid) : ["main"])) {
+      const idx = index[`c:${dn}:${cid}`];
+      if (idx == null) continue;
+      const v = (inflow[idx] ?? 0) - (outflow[idx] ?? 0);
+      const names = topo ? demandsAt(siteJson, cid, dn).map((d) => d.name).filter(Boolean) : [];
+      if (v > MIN_MWH)
+        link(idx, nodeId(names.length ? `d:${cid}:${dn}` : `d:${cid}`,
+                         names.length ? names.join(" + ") : `Demanda ${carrierLabel(carriers[cid])}`, "#9aa39f"), v);
+    }
   }
 
   const links = Object.entries(linkAcc).map(([k, value]) => {
@@ -340,14 +357,13 @@ export function buildNodeBalances(siteJson) {
     siteJson.carriers.map((c) => [c.carrier_id, c]));
   const isFuel = (c) => carriers[c]?.category === "fuel";
   const nodeOf = (t) => t.node ?? "main";
-  const demandNodeOf = (c) => siteJson.demand_nodes?.[c] ?? "main";
   const label = (n) => (n === "main" ? "Barra común" : techById[n]?.name ?? n);
   const arcs = siteJson.arcs ?? [];
 
   const ids = new Set(["main"]);
   for (const t of siteJson.technologies) ids.add(nodeOf(t));
   for (const a of arcs) { ids.add(a.from); ids.add(a.to); }
-  for (const c of Object.keys(siteJson.demands ?? {})) ids.add(demandNodeOf(c));
+  for (const c of Object.keys(siteJson.demands ?? {})) for (const n of demandNodesOf(siteJson, c)) ids.add(n);
 
   return [...ids].map((n) => {
     const equipment = siteJson.technologies.filter((t) => nodeOf(t) === n);
@@ -381,10 +397,15 @@ export function buildNodeBalances(siteJson) {
         arcsOut.push({ other: label(other), carriers: cs });
       }
     }
+    // punta de la demanda del vector EN ESTE NODO (suma de sus demandas por nodo)
+    const peakAt = (c) => { const ds = demandsAt(siteJson, c, n); if (!ds.length) return 0;
+      const L = Math.max(...ds.map((d) => d.series.length)); let pk = 0;
+      for (let i = 0; i < L; i++) pk = Math.max(pk, ds.reduce((a, d) => a + (d.series[i] ?? 0), 0));
+      return pk; };
     const demands = Object.keys(siteJson.demands ?? {})
-      .filter((c) => demandNodeOf(c) === n && demandPeak(siteJson, c) > 0)
-      .map((c) => ({ carrier: c, mw: demandPeak(siteJson, c) }));
-    for (const d of demands) addC(d.carrier, { name: "demanda", mw: d.mw });
+      .map((c) => ({ carrier: c, mw: peakAt(c), names: demandsAt(siteJson, c, n).map((d) => d.name).filter(Boolean) }))
+      .filter((d) => d.mw > 0);
+    for (const d of demands) addC(d.carrier, { name: d.names.length ? d.names.join(" + ") : "demanda", mw: d.mw });
     // los combustibles llegan comprados desde afuera (camión/pipeline): se
     // consideran disponibles, no son islas
     for (const c of Object.keys(consumed))

@@ -285,3 +285,63 @@ end
     @test r9.feasible
     @test r9.npv > base.npv * (1 + 1e-6)     # el VAN es costo (positivo): las pérdidas lo encarecen
 end
+
+@testset "M14 · demandas finales por nodo: cada subsistema se abastece por sus líneas" begin
+    # El demo con todo en la casa de calderas y la planta unida por una línea.
+    # La electricidad se reparte en DOS demandas: 70 % en la casa de calderas y
+    # 30 % en la planta. Con la línea eléctrica holgada, el mismo VAN que con
+    # todo en un nodo (oráculo); con la línea más chica que la demanda de la
+    # planta, infactible — la demanda de la planta no puede abastecerse desde la
+    # casa de calderas por otro camino. Sin partes y con la misma línea chica,
+    # factible (toda la electricidad se consume en la casa de calderas).
+    site, cfg = load_and_validate(DEMO_DIR)
+    cfg3 = with_config(cfg; horizon_years = 3)
+    base = run_scenario(site, cfg3; verbose = false, shadow_prices = false)
+    sj = JSON3.read(JSON3.write(site_json(site)), Dict{String,Any})
+    dem = collect(keys(sj["demands"]))
+    for t in sj["technologies"]
+        t["node"] = "nodo_casa"
+    end
+    elec = only(c for c in dem if occursin("electric", c))
+    tot = Float64.(sj["demands"][elec])
+    mk(cap; parts = true) = begin
+        d = deepcopy(sj)
+        d["arcs"] = [Dict("arc_id" => "linea", "name" => "Línea", "from" => "nodo_casa", "to" => "nodo_planta",
+                          "directed" => true,
+                          "ports" => [Dict("carrier" => c, "capacity" => (c == elec ? cap : nothing), "efficiency" => 1.0)
+                                      for c in dem])]
+        d["demand_nodes"] = Dict(c => "nodo_casa" for c in dem)
+        if parts
+            d["demand_parts"] = [Dict("part_id" => "elec_casa", "name" => "Electricidad casa", "carrier" => elec, "node" => "nodo_casa"),
+                                 Dict("part_id" => "elec_planta", "name" => "Electricidad planta", "carrier" => elec, "node" => "nodo_planta")]
+            d["demand_part_series"] = Dict("elec_casa" => 0.7 .* tot, "elec_planta" => 0.3 .* tot)
+        end
+        site_from_json(JSON3.read(JSON3.write(d)))
+    end
+    s = mk(nothing)
+    @test validate_site(s)
+    @test length(s.demand_parts) == 2
+    sh = demand_shares(s)[Symbol(elec)]
+    @test sh[:nodo_planta][1] ≈ 0.3 && sh[:nodo_casa][1] ≈ 0.7
+    # ida y vuelta: JSON y disco
+    s_rt = site_from_json(JSON3.read(JSON3.write(site_json(s))))
+    @test [p.values for p in sort(s_rt.demand_parts; by = p -> p.id)] ≈ [p.values for p in sort(s.demand_parts; by = p -> p.id)]
+    dir = mktempdir()
+    save_site(dir, s)
+    s_disk = load_site(dir)
+    @test Set(p.id for p in s_disk.demand_parts) == Set([:elec_casa, :elec_planta])
+    @test only(p for p in s_disk.demand_parts if p.id == :elec_planta).node == :nodo_planta
+    # línea holgada: el mismo VAN que la placa de cobre
+    r = run_scenario(s, cfg3; verbose = false, shadow_prices = false)
+    @test r.feasible
+    @test r.npv ≈ base.npv rtol = 1e-6
+    # línea eléctrica más chica que la demanda de la planta: infactible
+    small = 0.5 * 0.3 * maximum(tot)
+    @test !run_scenario(mk(small), cfg3; verbose = false, shadow_prices = false).feasible
+    # sin partes (toda la electricidad en la casa), la misma línea chica no molesta
+    @test run_scenario(mk(small; parts = false), cfg3; verbose = false, shadow_prices = false).feasible
+    # validación: nodo inexistente o vector sin demanda
+    bad = JSON3.read(JSON3.write(site_json(s)), Dict{String,Any})
+    bad["demand_parts"][1]["node"] = "no_existe"
+    @test_throws IETO.ValidationError validate_site(site_from_json(JSON3.read(JSON3.write(bad))))
+end

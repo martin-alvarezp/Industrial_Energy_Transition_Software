@@ -897,6 +897,13 @@ export function applyTopology(siteJson, techNode = null) {
     return rest;
   });
   const out = { ...siteJson, technologies };
+  // demandas por nodo: se consumen en su nodo (`home`) mientras esté conectado
+  // por alguna línea; si no, en la barra común — igual que los equipos
+  if (siteJson.demand_parts?.length)
+    out.demand_parts = siteJson.demand_parts.map((p) => {
+      const node = endpoints.has(p.home ?? p.node) ? (p.home ?? p.node) : "main";
+      return p.node === node && p.home ? p : { ...p, home: p.home ?? p.node, node };
+    });
   if (arcs.length === 0) { delete out.arcs; delete out.demand_nodes; }
   else {
     out.arcs = arcs;
@@ -910,6 +917,7 @@ export function applyTopology(siteJson, techNode = null) {
 export function topologyDiffers(siteJson, techNode) {
   const next = applyTopology(siteJson, techNode);
   if ((next.technologies ?? []).some((t, i) => t.node !== siteJson.technologies[i]?.node)) return true;
+  if ((next.demand_parts ?? []).some((p, i) => p.node !== siteJson.demand_parts?.[i]?.node || p.home !== siteJson.demand_parts?.[i]?.home)) return true;
   return JSON.stringify(next.demand_nodes ?? null) !== JSON.stringify(siteJson.demand_nodes ?? null);
 }
 
@@ -928,6 +936,85 @@ export function setDemandNode(siteJson, carrier, node) {
   const dn = { ...(siteJson.demand_nodes ?? {}) };
   if (node) dn[carrier] = node; else delete dn[carrier];
   return { ...siteJson, demand_nodes: Object.keys(dn).length ? dn : undefined };
+}
+
+// ── demandas finales por nodo ──────────────────────────────────────────────
+// Una demanda por nodo es una PARTE de la demanda de un vector, con nombre y
+// serie propias; la suma de las partes es la demanda del vector (que es lo que
+// crece, se proyecta por año y entra a los KPIs). El motor reparte la demanda
+// del vector entre los nodos según la proporción de las partes.
+const partSlug = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "demanda";
+
+/** Partes del vector c (vacío si su demanda no está repartida). */
+export const demandPartsOf = (siteJson, c) => (siteJson.demand_parts ?? []).filter((p) => p.carrier === c);
+
+/**
+ * Agrega una demanda en el nodo `node`: la fracción `frac` (0–1) de la demanda
+ * del vector `c`, con nombre `name`. La primera vez que se reparte un vector,
+ * el resto queda como otra demanda en el nodo donde se consumía todo; después,
+ * las partes existentes ceden proporcionalmente. El total no cambia.
+ */
+export function addDemandPart(siteJson, c, node, name, frac) {
+  const total = siteJson.demands?.[c];
+  if (!total || !(frac > 0 && frac <= 1)) return siteJson;
+  const cName = siteJson.carriers?.find((x) => x.carrier_id === c)?.name ?? c;
+  const used = new Set((siteJson.demand_parts ?? []).map((p) => p.part_id));
+  const newId = (base) => { let id = `${c}__${partSlug(base)}`, k = 2; while (used.has(id)) id = `${c}__${partSlug(base)}_${k++}`; used.add(id); return id; };
+  let parts = [...(siteJson.demand_parts ?? [])];
+  const series = { ...(siteJson.demand_part_series ?? {}) };
+  const mine = parts.filter((p) => p.carrier === c);
+  if (!mine.length) {
+    // primera división: el resto, donde se consumía todo
+    const home = siteJson.demand_nodes?.[c] ?? "main";
+    const rid = newId(`resto ${cName}`);
+    parts.push({ part_id: rid, name: `${cName} (resto)`, carrier: c, node: home, home });
+    series[rid] = total.map((v) => +(v * (1 - frac)).toFixed(6));
+  } else {
+    for (const p of mine) series[p.part_id] = (series[p.part_id] ?? []).map((v) => +(v * (1 - frac)).toFixed(6));
+  }
+  const id = newId(name || cName);
+  parts.push({ part_id: id, name: name || cName, carrier: c, node, home: node });
+  series[id] = total.map((v) => +(v * frac).toFixed(6));
+  return applyTopology({ ...siteJson, demand_parts: parts, demand_part_series: series });
+}
+
+/** Quita una demanda por nodo: su serie pasa a la parte más grande del mismo
+ *  vector; si queda una sola, el vector deja de estar repartido (y se consume
+ *  entero en el nodo de esa última parte). */
+export function removeDemandPart(siteJson, id) {
+  const p = (siteJson.demand_parts ?? []).find((x) => x.part_id === id);
+  if (!p) return siteJson;
+  const series = { ...(siteJson.demand_part_series ?? {}) };
+  const rest = (siteJson.demand_parts ?? []).filter((x) => x.carrier === p.carrier && x.part_id !== id);
+  const sum = (k) => (series[k] ?? []).reduce((a, v) => a + v, 0);
+  let parts = (siteJson.demand_parts ?? []).filter((x) => x.part_id !== id);
+  if (rest.length) {
+    const big = rest.reduce((a, x) => (sum(x.part_id) > sum(a.part_id) ? x : a));
+    series[big.part_id] = (series[big.part_id] ?? []).map((v, i) => +(v + (series[id]?.[i] ?? 0)).toFixed(6));
+  }
+  delete series[id];
+  let out = { ...siteJson };
+  if (rest.length === 1) {
+    const last = rest[0];
+    parts = parts.filter((x) => x.part_id !== last.part_id);
+    delete series[last.part_id];
+    out = setDemandNode(out, p.carrier, (last.home ?? last.node) === "main" ? null : (last.home ?? last.node));
+  }
+  if (parts.length) { out.demand_parts = parts; out.demand_part_series = series; }
+  else { delete out.demand_parts; delete out.demand_part_series; }
+  return applyTopology(out);
+}
+
+/** Renombra una demanda por nodo. */
+export const renameDemandPart = (siteJson, id, name) => ({
+  ...siteJson, demand_parts: (siteJson.demand_parts ?? []).map((p) => (p.part_id === id ? { ...p, name } : p)) });
+
+/** Fracción media de la demanda del vector que lleva una parte (para mostrar). */
+export function partShare(siteJson, id) {
+  const p = (siteJson.demand_parts ?? []).find((x) => x.part_id === id);
+  const tot = (siteJson.demands?.[p?.carrier] ?? []).reduce((a, v) => a + v, 0);
+  const mine = (siteJson.demand_part_series?.[id] ?? []).reduce((a, v) => a + v, 0);
+  return tot > 0 ? mine / tot : 0;
 }
 
 /** ¿El sitio tiene topología activa (al menos un arco)? */
@@ -1125,5 +1212,7 @@ export function serializedPreview(siteJson) {
       ({ ...mk, price: short(mk.price) })),
     ...(hasTopology(siteJson) ? { arcs: siteJson.arcs,
                                   demand_nodes: siteJson.demand_nodes } : {}),
+    ...(siteJson.demand_parts?.length ? { demand_parts: siteJson.demand_parts,
+                                          demand_part_series: mapShort(siteJson.demand_part_series ?? {}) } : {}),
   };
 }

@@ -23,6 +23,7 @@ const REQUIRED_COLUMNS = Dict(
                                   :existing_capacity, :max_new_capacity, :efficiency, :investable],
     "technology_costs.csv"    => [:tech_id, :capex_per_kw, :fixed_opex, :variable_opex, :lifetime_years],
     "demands.csv"             => [:step_id, :carrier_id, :demand],
+    "demand_parts.csv"        => [:step_id, :part_id, :demand],     # opcional: demandas por nodo
     "prices.csv"              => [:step_id, :carrier_id, :price],
     "generation_profiles.csv" => [:step_id, :tech_id, :capacity_factor],
     "emission_factors.csv"    => [:carrier_id, :scope, :factor],
@@ -257,10 +258,11 @@ function load_site(dir::AbstractString; name::AbstractString = basename(abspath(
     factors = load_emission_factors(dir)
     markets = load_markets(dir, nsteps)
     nodes, arcs, node_of, demand_node = load_topology(dir)
+    parts = load_demand_parts(dir, nsteps)
 
     return Site(String(name), steps, carriers, sources, converters, generators,
                 storages, demands, prices, factors, markets,
-                nodes, arcs, node_of, demand_node)
+                nodes, arcs, node_of, demand_node, parts)
 end
 
 """
@@ -285,6 +287,21 @@ function load_topology(dir::AbstractString)
         node_of[Symbol(k)] = Symbol(v)
     end
     return nodes, arcs, node_of, demand_node
+end
+
+"""
+    load_demand_parts(dir, nsteps) -> Vector{DemandPart}
+
+Demandas finales por nodo de un sitio guardado: la ficha en `topology.json`
+(`demand_parts`) y las series en `demand_parts.csv`. Ambos opcionales.
+"""
+function load_demand_parts(dir::AbstractString, nsteps::Int)
+    path = joinpath(dir, "topology.json")
+    isfile(path) || return DemandPart[]
+    meta = get(JSON3.read(read(path, String)), :demand_parts, nothing)
+    (meta === nothing || isempty(meta)) && return DemandPart[]
+    series = _series_by_key(read_site_csv(dir, "demand_parts.csv"), :part_id, :demand, nsteps, "demand_parts.csv")
+    return _demand_parts_from_json(meta, Dict(String(k) => v for (k, v) in series), "topology.json demand_parts")
 end
 
 _get_num(d::Dict, key::String, default) = Float64(get(d, key, default))

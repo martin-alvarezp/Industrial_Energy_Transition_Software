@@ -1235,6 +1235,21 @@ end
 Node(id::Symbol) = Node(id, String(id))
 
 """
+Una DEMANDA FINAL con nombre, en un nodo del gemelo: parte de la demanda de un
+vector (p. ej. «Electricidad de naves» y «Electricidad de la central de frío»).
+Con partes, la demanda total del vector (`site.demands[c]`, con su crecimiento,
+perfiles por año y flexibilidad) se reparte entre los nodos paso a paso según
+la proporción de las partes; sin partes, va entera al nodo de `demand_node`.
+"""
+struct DemandPart
+    id::Symbol
+    name::String
+    carrier::Symbol
+    node::Symbol
+    values::Vector{Float64}       # MW por paso (misma plantilla que las demandas)
+end
+
+"""
 Puerto de un arco (roadmap M14): un vector que transita por el arco, con su
 capacidad de transporte (MW, `Inf` = sin tope) y su eficiencia (`η` en (0,1],
 1 = sin pérdidas). El caudal entregado en el nodo destino es `η · caudal`.
@@ -1290,7 +1305,17 @@ struct Site
     arcs::Dict{Symbol,Arc}                   # arcos de transporte entre nodos
     node_of::Dict{Symbol,Symbol}             # tech_id → nodo (ausente ⇒ :main)
     demand_node::Dict{Symbol,Symbol}         # carrier con demanda → nodo (ausente ⇒ :main)
+    demand_parts::Vector{DemandPart}         # demandas finales por nodo (vacío ⇒ demand_node)
 end
+
+# retro-compatibilidad (15 campos): sitio con topología, sin demandas por nodo
+Site(name, ts, carriers, sources, converters, generators, storages,
+     demands, prices, emission_factors, markets::Dict{Symbol,Market},
+     nodes::Dict{Symbol,Node}, arcs::Dict{Symbol,Arc}, node_of::Dict{Symbol,Symbol},
+     demand_node::Dict{Symbol,Symbol}) =
+    Site(name, ts, carriers, sources, converters, generators, storages,
+         demands, prices, emission_factors, markets, nodes, arcs, node_of, demand_node,
+         DemandPart[])
 
 # retro-compatibilidad (11 campos): sitio con mercados pero sin topología
 Site(name, ts, carriers, sources, converters, generators, storages,
@@ -1314,12 +1339,46 @@ tech_node(site::Site, id::Symbol) = get(site.node_of, id, DEFAULT_NODE)
 "Nodo donde se consume la demanda de un carrier (default `:main`)."
 demand_node_of(site::Site, c::Symbol) = get(site.demand_node, c, DEFAULT_NODE)
 
+"""
+    demand_shares(site) -> Dict{Symbol,Dict{Symbol,Vector{Float64}}}
+
+Reparto por nodo de la demanda de cada vector, paso a paso: `vector → nodo →
+fracción`. Con demandas por nodo (`demand_parts`) la fracción de un nodo es la
+suma de sus partes sobre la suma de todas las partes del vector (si en un paso
+todas son 0, se reparte por igual); sin partes, todo al nodo de `demand_node`.
+"""
+function demand_shares(site::Site)
+    out = Dict{Symbol,Dict{Symbol,Vector{Float64}}}()
+    S = n_steps(site)
+    for c in keys(site.demands)
+        parts = [p for p in site.demand_parts if p.carrier == c]
+        if isempty(parts)
+            out[c] = Dict(demand_node_of(site, c) => ones(S))
+            continue
+        end
+        tot = zeros(S)
+        for p in parts, s in 1:S
+            tot[s] += p.values[s]
+        end
+        shares = Dict{Symbol,Vector{Float64}}()
+        for p in parts
+            v = get!(() -> zeros(S), shares, p.node)
+            for s in 1:S
+                v[s] += tot[s] > 1e-12 ? p.values[s] / tot[s] : 1.0 / length(parts)
+            end
+        end
+        out[c] = shares
+    end
+    return out
+end
+
 "Conjunto ordenado de nodos del sitio: `:main` + declarados + referenciados."
 function site_nodes(site::Site)
     ns = Set{Symbol}((DEFAULT_NODE,))
     union!(ns, keys(site.nodes))
     union!(ns, values(site.node_of))
     union!(ns, values(site.demand_node))
+    union!(ns, (p.node for p in site.demand_parts))
     for a in values(site.arcs)
         push!(ns, a.from); push!(ns, a.to)
     end

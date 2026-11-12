@@ -79,7 +79,7 @@ export EfficiencyMeasure, GridTariff, NO_TARIFF, has_tariff, capex_factor, build
        primary_input, primary_output, reference_efficiency, is_multiport,
        CARRIER_CATEGORIES, BALANCED_CATEGORIES, is_balanced,
        Market, effective_markets,
-       Node, Arc, ArcPort, DEFAULT_NODE, tech_node, demand_node_of,
+       Node, Arc, ArcPort, DEFAULT_NODE, tech_node, demand_node_of, DemandPart, demand_shares,
        site_nodes, arc_links
 # core API
 export load_site, load_scenario_config, load_and_validate,

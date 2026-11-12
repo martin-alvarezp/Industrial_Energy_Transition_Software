@@ -945,6 +945,11 @@ extend({
   "node.lines": ["Líneas", "Lines"],
   "node.noLines": ["Sin líneas: comparte la barra común del sistema", "No lines: shares the system's common bus"],
   "node.demands": ["Demandas que se consumen aquí", "Demands consumed here"],
+  "node.partAdd": ["Agregar demanda aquí", "Add a demand here"],
+  "node.partCarrier": ["Vector…", "Carrier…"],
+  "node.partName": ["Nombre de la demanda", "Demand name"],
+  "node.partRemove": ["Quitar esta demanda (vuelve al resto del vector)", "Remove this demand (it goes back to the rest of the carrier)"],
+  "node.partHint": ["Parte de la demanda del vector que se consume en este nodo (p. ej. la electricidad de un subsistema). Solo puede abastecerse desde lo que llegue a este nodo por sus líneas. El total del vector no cambia: el resto queda donde se consumía.", "Share of the carrier's demand consumed at this node (e.g. a subsystem's electricity). It can only be supplied from what reaches this node through its lines. The carrier's total does not change: the rest stays where it was consumed."],
   "node.demandsNeedLine": ["Conecta el nodo con una línea para que una demanda se balancee en él.",
                            "Connect the node with a line so a demand can balance in it."],
 });

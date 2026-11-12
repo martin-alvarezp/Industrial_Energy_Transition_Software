@@ -293,10 +293,10 @@ export function projectSeries(values, steps) {
 // ── series del sitio ──────────────────────────────────────────────────────
 // Clave estable de cada serie por paso del sitio canónico (site_json):
 //   demands.<carrier> · prices.<carrier> · generation_profiles.<tech>
-//   markets.<market_id>
+//   demand_part_series.<part_id> (demandas por nodo) · markets.<market_id>
 export function seriesKeys(siteJson) {
   const keys = [];
-  for (const g of ["demands", "prices", "generation_profiles"])
+  for (const g of ["demands", "prices", "generation_profiles", "demand_part_series"])
     for (const k of Object.keys(siteJson[g] ?? {})) keys.push(`${g}.${k}`);
   for (const m of siteJson.markets ?? [])
     if (Array.isArray(m.price)) keys.push(`markets.${m.market_id}`);

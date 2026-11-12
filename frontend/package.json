@@ -34,7 +34,8 @@
     "verify:components": "node scripts/verify_components.mjs",
     "verify:examples": "node scripts/verify_examples.mjs",
     "verify:examples-ui": "node scripts/verify_examples_ui.mjs",
-    "verify:persistence": "node scripts/verify_persistence.mjs"
+    "verify:persistence": "node scripts/verify_persistence.mjs",
+    "verify:demands": "node scripts/verify_demands.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

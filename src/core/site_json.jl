@@ -253,7 +253,35 @@ function site_json(site::Site)
                  for k in sort!(collect(keys(site.demand_node))))...)
         result = merge(result, (demand_nodes = dn,))
     end
+    # demandas finales por nodo: la ficha de cada una y su serie por paso (un
+    # grupo de series aparte, para que las plantillas la re-expresen igual)
+    if !isempty(site.demand_parts)
+        parts = sort([(part_id = String(p.id), name = p.name, carrier = String(p.carrier), node = String(p.node))
+                      for p in site.demand_parts]; by = x -> x.part_id)
+        result = merge(result, (demand_parts = parts,
+                                demand_part_series = _sorted_series(Dict(p.id => p.values for p in site.demand_parts))))
+    end
     return result
+end
+
+"""
+    _demand_parts_from_json(meta, series, ctx) -> Vector{DemandPart}
+
+Demandas por nodo desde su ficha (`[{part_id, name, carrier, node}]`) y sus
+series (`{part_id: [...]}`).
+"""
+function _demand_parts_from_json(meta, series, ctx = "demand_parts")
+    parts = DemandPart[]
+    meta === nothing && return parts
+    for p in meta
+        id = Symbol(_twin_req(p, :part_id, ctx))
+        vals = series === nothing ? nothing : _twin_get(series, id)
+        vals === nothing && throw(SchemaError("$ctx[$id]: falta su serie en demand_part_series"))
+        push!(parts, DemandPart(id, String(something(_twin_get(p, :name), String(id))),
+                                Symbol(_twin_req(p, :carrier, "$ctx[$id]")), Symbol(_twin_req(p, :node, "$ctx[$id]")),
+                                _series_vec(vals, "demand_part_series[$id]")))
+    end
+    return parts
 end
 
 """
@@ -454,10 +482,11 @@ function site_from_json(obj; default_name::AbstractString = "twin")
 
     # ── topología de red (M14): nodos, arcos y demanda por nodo ──
     nodes, arcs, demand_node = _topology_from_json(obj)
+    parts = _demand_parts_from_json(_twin_get(obj, :demand_parts), _twin_get(obj, :demand_part_series))
 
     return Site(name, steps, carriers, sources, converters, generators,
                 storages, demands, prices, factors, markets,
-                nodes, arcs, node_of, demand_node)
+                nodes, arcs, node_of, demand_node, parts)
 end
 
 """

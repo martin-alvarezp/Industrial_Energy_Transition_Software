@@ -23,8 +23,33 @@ export function siteNodes(site) {
   for (const n of site.nodes ?? []) ns.add(n.node_id);
   for (const t of site.technologies ?? []) if (t.node) ns.add(t.node);
   for (const n of Object.values(site.demand_nodes ?? {})) ns.add(n);
+  for (const p of site.demand_parts ?? []) ns.add(p.node);
   for (const a of site.arcs ?? []) { ns.add(a.from); ns.add(a.to); }
   return [...ns].sort();
+}
+
+/** Reparto por nodo de la demanda de cada vector, paso a paso (espejo de
+ *  demand_shares en types.jl): `{vector: {nodo: [fracción por paso]}}`. Con
+ *  demandas por nodo (`demand_parts` + `demand_part_series`), la suma de las
+ *  partes del nodo sobre la de todas (en un paso con todas en 0, por igual);
+ *  sin partes, todo al nodo de `demand_nodes`. */
+export function demandShares(site) {
+  const out = {};
+  const S = site.timesteps?.length ?? 0;
+  for (const c of Object.keys(site.demands ?? {})) {
+    const parts = (site.demand_parts ?? []).filter((p) => p.carrier === c);
+    if (!parts.length) { out[c] = { [site.demand_nodes?.[c] ?? DEFAULT_NODE]: new Array(S).fill(1) }; continue; }
+    const ser = parts.map((p) => site.demand_part_series?.[p.part_id] ?? new Array(S).fill(0));
+    const tot = new Array(S).fill(0);
+    for (const v of ser) for (let i = 0; i < S; i++) tot[i] += v[i] ?? 0;
+    const sh = {};
+    parts.forEach((p, j) => {
+      const v = (sh[p.node] ??= new Array(S).fill(0));
+      for (let i = 0; i < S; i++) v[i] += tot[i] > 1e-12 ? (ser[j][i] ?? 0) / tot[i] : 1 / parts.length;
+    });
+    out[c] = sh;
+  }
+  return out;
 }
 
 /** Expande los arcos en ENLACES dirigidos por vector (espejo de arc_links en
@@ -476,6 +501,9 @@ export function buildLP(site0, cfg0, opts = {}) {
   // el mercado entra/sale en el nodo de su conexión física (parameters.jl)
   const marketNode = (mk) => (mk.connection ? nodeOf(mk.connection) : DEFAULT_NODE);
   const demandNode = (c) => site.demand_nodes?.[c] ?? DEFAULT_NODE;
+  // fracción de la demanda del vector c que se consume en el nodo n en el paso s
+  const SHARES = demandShares(site);
+  const shareOf = (c, n, s) => SHARES[c]?.[n]?.[s - 1] ?? 0;
 
   // estaciones (neteo, SOC) y períodos de facturación de la punta (meses si
   // todos los pasos traen month) — espejo de parameters.jl
@@ -789,17 +817,19 @@ export function buildLP(site0, cfg0, opts = {}) {
             if (l.to === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, l.efficiency);
             if (l.from === n) inc(t, `af_${sane(l.key)}_${s}_${y}`, -1);
           }
-          const dem = demandNode(c) === n
-            ? (dbase(c, y)[s - 1] ?? 0) * dgrow(c, y) : 0;
-          // carga desplazada (5.4): demanda efectiva = dem + sube − baja
+          // demanda del vector en este nodo: la fracción f del total (demandas por nodo)
+          const f = site.demands?.[c] ? shareOf(c, n, s) : 0;
+          const d0 = f ? (dbase(c, y)[s - 1] ?? 0) * dgrow(c, y) : 0;
+          const dem = f * d0;
+          // carga desplazada (5.4): demanda efectiva = dem + f·(sube − baja)
           if (dem && FX.includes(c)) {
-            inc(t, `fup_${sane(c)}_${s}_${y}`, -1);
-            inc(t, `fdn_${sane(c)}_${s}_${y}`, 1);
+            inc(t, `fup_${sane(c)}_${s}_${y}`, -f);
+            inc(t, `fdn_${sane(c)}_${s}_${y}`, f);
           }
-          // medidas activas reducen la demanda: r·dem·Σ_{y'≤y} em (al lado izquierdo)
+          // medidas activas reducen la demanda: f·(r·d + mín(fija, (1−r)·d))·Σ_{y'≤y} em (al lado izquierdo)
           if (dem) for (const em of EMs) if (em.carrier === c)
-            for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, em.reduction * dem +   // + absoluta (R10)
-              Math.min(cfg.measure_fixed_mw?.[em.id] ?? 0, (1 - em.reduction) * dem));
+            for (let yp = 1; yp <= y; yp++) inc(t, `em_${sane(em.id)}_${yp}`, f * (em.reduction * d0 +   // + absoluta (R10)
+              Math.min(cfg.measure_fixed_mw?.[em.id] ?? 0, (1 - em.reduction) * d0)));
           row(`bal_${sane(n)}_${sane(c)}_${s}_${y}`, t, "=", dem);
         }
       }

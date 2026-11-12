@@ -379,6 +379,16 @@ dump("demo_status_quo_reposicion_n4", s48a, c48a)
 s49, c49 = apply_scenario(s48, with_config(c48; fixed_rebuild = false), :bau)
 dump("demo_status_quo_repotenciar_n4", s49, c49)
 
+# 50 · demandas finales por nodo: la electricidad de la planta con red repartida
+# entre el tablero general y la sala de la bomba de calor (alimentada por una
+# línea de 6 MW), con una proporción que cambia de paso a paso
+tot50 = site_red.demands[:electricity].values
+b50 = [tot50[s] * (isodd(s) ? 0.2 : 0.4) for s in eachindex(tot50)]
+s50 = IETO._with(site_red; demand_parts = [
+    DemandPart(:elec_tablero, "Electricidad del tablero", :electricity, :grid_import, tot50 .- b50),
+    DemandPart(:elec_sala_bomba, "Electricidad de la sala de bombas", :electricity, :heat_pump, b50)])
+dump("planta_red_demandas_nodo_n5", s50, with_config(cfg0; horizon_years = 5))
+
 println("fixtures dorados en ", out)
 
 # Nodos con muchos componentes (como los arma la interfaz): todo el demo en el

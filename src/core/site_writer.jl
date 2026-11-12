@@ -129,14 +129,22 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
     # topología no se escribe (y se limpia uno anterior): save → load es fiel.
     topo_path = joinpath(dir, "topology.json")
     if !isempty(site.nodes) || !isempty(site.arcs) || !isempty(site.node_of) ||
-       !isempty(site.demand_node)
+       !isempty(site.demand_node) || !isempty(site.demand_parts)
         topo = (nodes = get(sj, :nodes, []), arcs = get(sj, :arcs, []),
                 demand_nodes = get(sj, :demand_nodes, (;)),
                 tech_nodes = (; (k => String(site.node_of[k])
-                                 for k in sort!(collect(keys(site.node_of))))...))
+                                 for k in sort!(collect(keys(site.node_of))))...),
+                demand_parts = get(sj, :demand_parts, []))
         open(io -> JSON3.write(io, topo), topo_path, "w")
     else
         isfile(topo_path) && rm(topo_path)
+    end
+    # demandas por nodo: sus series (la ficha va en topology.json)
+    parts_path = joinpath(dir, "demand_parts.csv")
+    if !isempty(site.demand_parts)
+        _write_series(parts_path, :demand, Dict(p.id => p.values for p in site.demand_parts); keycol = :part_id)
+    else
+        isfile(parts_path) && rm(parts_path)
     end
 
     layout !== nothing &&
