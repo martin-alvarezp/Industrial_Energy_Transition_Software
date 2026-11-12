@@ -31,8 +31,10 @@ function add_storage_constraints!(m::JuMP.Model, sets::ModelSets,
     end
     prev = Dict{Int,Int}()
     for ids in values(season_steps)
-        # orden cronológico: hour y, a igual hour (punta, cuartos), step_id
-        sort!(ids; by = i -> (site.timesteps[i].hour, i))
+        # orden cronológico (chrono_order): por hora en un período de un día;
+        # en el orden de los pasos en uno de varios días (año completo)
+        sorted = chrono_order(site, ids)
+        copyto!(ids, sorted)
         for k in eachindex(ids)
             prev[ids[k]] = ids[k == 1 ? lastindex(ids) : k - 1]
         end

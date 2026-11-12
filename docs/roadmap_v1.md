@@ -721,6 +721,24 @@ Backend: `topology.json` (la topología ya no se pierde al guardar),
 `currency` aceptado en overrides, `GET /sites/{name}/config`. 1308 tests;
 verify:e2e 15/15, verify:ui 58 vistas, verify:topology 7/7.
 
+### Revisión del usuario (11-nov-2026) — paquetes P0–P7
+
+✅ P0 sin «KPI Badge» (fc391bf). ✅ P1 Dummy México con su parque inicial como
+equipos existentes (la hoja de ruta ya no muestra 13 «compras» de 2025) y
+diagnóstico de la demanda que solo se produce desde otro vector (9dd547c).
+✅ P2 tipo de corrida «Situación actual (Status Quo)» con «Reposición fija»:
+reposición 1:1 obligada, o repotenciación a elección del optimizador
+(`fixed_rebuild`, `repower_option`); la situación actual conserva la meta
+(1593754). ✅ P3 hoja de ruta de medidas por año optimizado con tarjeta de
+inversión y capacidad (420decb). ✅ P4 comparar corridas lado a lado en el
+Resumen (d5e94da). ✅ P5 sistemas y corridas guardados en el navegador
+(IndexedDB, dee71f6); proyecto .ieto exportable/importable (d9102b2); libro
+Excel de entradas ida y vuelta (cb06c57). ✅ P6 demandas finales por nodo:
+cada subsistema se abastece solo por las líneas del gemelo (65fa662).
+⏳ P7 réplica de dos proyectos más de la herramienta de referencia (18 casos de hidrógeno y una papelera): encontró el error de
+cronología de un año completo (almacenamiento encadenado entre días a la
+misma hora) — arreglado; informe en curso.
+
 ## 8 · Riesgos técnicos a vigilar
 
 1. **Tamaño del MILP**: 8760 pasos × rampas × portafolio explota; mitigación:

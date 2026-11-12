@@ -389,6 +389,26 @@ s50 = IETO._with(site_red; demand_parts = [
     DemandPart(:elec_sala_bomba, "Electricidad de la sala de bombas", :electricity, :heat_pump, b50)])
 dump("planta_red_demandas_nodo_n5", s50, with_config(cfg0; horizon_years = 5))
 
+# 51 · varios días en un período (año completo: la hora del día se repite): la
+# cronología del almacenamiento va paso a paso — 3 días del demo (el primer día
+# tipo, con demanda y precios que cambian de un día al otro), batería candidata
+sj51 = JSON3.read(JSON3.write(site_json(site0)), Dict{String,Any})
+pick51(v) = [Float64(v[(i - 1) % 24 + 1]) * (1 + 0.15 * ((i - 1) ÷ 24)) for i in 1:72]
+sj51["timesteps"] = [Dict("step_id" => i, "season" => "all", "hour" => (i - 1) % 24,
+                          "weight_hours" => 8760 / 72, "duration_hours" => 1.0) for i in 1:72]
+for g in ("demands", "prices", "generation_profiles"), (k, v) in sj51[g]
+    sj51[g][k] = g == "generation_profiles" ? [Float64(v[(i - 1) % 24 + 1]) for i in 1:72] : pick51(v)
+end
+for mk in get(sj51, "markets", [])
+    mk["price"] = pick51(mk["price"])
+end
+for t in sj51["technologies"]          # una batería existente: el SOC recorre los 3 días
+    t["tech_id"] == "battery" && (t["existing_capacity"] = 10.0)
+end
+s51 = site_from_json(JSON3.read(JSON3.write(sj51)); default_name = "tres_dias")
+s51b, c51 = apply_scenario(s51, with_config(cfg0; horizon_years = 2), :least_cost)
+dump("tres_dias_cronologia_n2", s51b, c51)
+
 println("fixtures dorados en ", out)
 
 # Nodos con muchos componentes (como los arma la interfaz): todo el demo en el

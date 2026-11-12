@@ -402,10 +402,16 @@ export const commitmentInteger = (cfg) => cfg?.commitment === "integer" ||
 export const unitMw = (t) => (t.unit_size ?? 0) > 0 ? t.unit_size
   : (t.investable ? 0 : t.existing_capacity);
 /** Pasos de cada período en orden cronológico (hour, step_id) y prev cíclico. */
+/** Orden cronológico de un período (espejo de chrono_order): por hora en un
+ *  período de un día (el paso de punta cae en su hora); en el orden de los pasos
+ *  en uno de VARIOS días (año completo: la hora del día se repite). */
+export function chronoOrder(ts, g) {
+  const multiday = g.length > 1.5 * new Set(g.map((s) => ts[s - 1].hour)).size;
+  return multiday ? [...g].sort((a, b) => a - b) : [...g].sort((a, b) => ts[a - 1].hour - ts[b - 1].hour || a - b);
+}
 export function chronology(ts) {
   const { seasonSteps } = timeGroups(ts);
-  const periods = seasonSteps.map((g) => [...g].sort(
-    (a, b) => ts[a - 1].hour - ts[b - 1].hour || a - b));
+  const periods = seasonSteps.map((g) => chronoOrder(ts, g));
   const prev = {}, plen = {};
   for (const p of periods) p.forEach((s, k) => {
     prev[s] = p[k === 0 ? p.length - 1 : k - 1]; plen[s] = p.length;
@@ -938,8 +944,8 @@ export function buildLP(site0, cfg0, opts = {}) {
       const gname = (grp) => ts[grp[0] - 1].season;
       const ordOf = {};
       for (const grp of seasonSteps) {
-        // orden cronológico: hour y, a igual hour, step_id (sort estable)
-        const ordered = [...grp].sort((a, b) => ts[a - 1].hour - ts[b - 1].hour);
+        // orden cronológico (chronoOrder): por hora en un día; por paso en varios días
+        const ordered = chronoOrder(ts, grp);
         ordOf[gname(grp)] = ordered;
         ordered.forEach((s, k) => {
           const prev = ordered[k === 0 ? ordered.length - 1 : k - 1];

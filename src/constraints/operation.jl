@@ -56,6 +56,20 @@ function input_driver(m::JuMP.Model, t::Symbol, s::Int, y::Int)
 end
 
 """
+    chrono_order(site, ids) -> Vector{Int}
+
+Orden cronológico de los pasos de un período. Un período de UN día (estación,
+día tipo, mes) va por hora (así un paso de punta agregado al final cae en su
+hora); uno de VARIOS días (año completo: «hour» es la hora del día y se repite)
+va en el orden de los pasos. Ordenar un año completo por hora encadenaba las
+13:00 de cada día con las 13:00 del día anterior, no con las 12:00 del mismo día.
+"""
+function chrono_order(site::Site, ids::AbstractVector{<:Integer})
+    multiday = length(ids) > 1.5 * length(unique(site.timesteps[i].hour for i in ids))
+    return multiday ? sort(ids) : sort(ids; by = i -> (site.timesteps[i].hour, i))
+end
+
+"""
     period_chronology(site) -> (prev, periods)
 
 `periods`: los pasos de cada período en orden cronológico (hour, step_id);
@@ -68,7 +82,7 @@ function period_chronology(site::Site)
         haskey(groups, ts.season) || push!(order, ts.season)
         push!(get!(groups, ts.season, Int[]), ts.id)
     end
-    periods = [sort(groups[p]; by = i -> (site.timesteps[i].hour, i)) for p in order]
+    periods = [chrono_order(site, groups[p]) for p in order]
     prev = Dict{Int,Int}()
     for ids in periods, k in eachindex(ids)
         prev[ids[k]] = ids[k == 1 ? lastindex(ids) : k - 1]

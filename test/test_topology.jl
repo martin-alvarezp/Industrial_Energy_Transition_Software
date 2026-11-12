@@ -345,3 +345,23 @@ end
     bad["demand_parts"][1]["node"] = "no_existe"
     @test_throws IETO.ValidationError validate_site(site_from_json(JSON3.read(JSON3.write(bad))))
 end
+
+@testset "Cronología: un año completo va hora a hora; un día tipo con punta, por hora" begin
+    # 3 días de 24 h en un solo período (como un año completo de 8760 h): el
+    # paso anterior a las 00:00 del día 2 es las 23:00 del día 1 (antes: las
+    # 00:00 del día 1, encadenando cada hora con la misma hora del día anterior)
+    steps = [TimeStep(i, "all", (i - 1) % 24, 8760.0 / 72) for i in 1:72]
+    s3 = Site("tres_dias", steps, Dict{Symbol,Carrier}(), Dict{Symbol,Source}(), Dict{Symbol,Converter}(),
+              Dict{Symbol,Generator}(), Dict{Symbol,Storage}(), Dict{Symbol,Demand}(), Dict{Symbol,PriceSeries}(),
+              EmissionFactor[])
+    prev, periods = IETO.period_chronology(s3)
+    @test periods == [collect(1:72)]
+    @test prev[25] == 24 && prev[14] == 13 && prev[1] == 72
+    # un día de 24 h más un paso de punta agregado al final (hora 13): va en su hora
+    steps2 = [[TimeStep(i, "verano", i - 1, 1.0) for i in 1:24]; TimeStep(25, "verano", 13, 0.5)]
+    s2 = Site("punta", steps2, Dict{Symbol,Carrier}(), Dict{Symbol,Source}(), Dict{Symbol,Converter}(),
+              Dict{Symbol,Generator}(), Dict{Symbol,Storage}(), Dict{Symbol,Demand}(), Dict{Symbol,PriceSeries}(),
+              EmissionFactor[])
+    prev2, _ = IETO.period_chronology(s2)
+    @test prev2[25] == 14 && prev2[15] == 25
+end
