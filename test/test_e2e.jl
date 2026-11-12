@@ -39,9 +39,11 @@ _e2e_post(path, body) = HTTP.post(E2E * path;
         @test all(i -> i.year isa Int && i.mw > 0, p.investments)
 
         # BAU para el Δ del KPI (con carbono a 50 el plan gana al BAU)
+        # (la situación actual conserva la meta: aquí se corre sin ella, como el modal)
         bau = JSON3.read(_e2e_post("/scenario",
-            (site = "demo", scenario = "bau", config_overrides = overrides,
-             shadow_prices = false)).body)
+            (site = "demo", scenario = "bau", shadow_prices = false,
+             config_overrides = (; overrides..., emissions_cap_net_start = 1.0e12,
+                                 emissions_cap_net_end = 1.0e12, emissions_cap_gross = 1.0e12))).body)
         @test bau.meta.feasible === true
         @test p.kpis.npv < bau.kpis.npv
 

@@ -221,11 +221,14 @@ end
     c = with_config(cfg; horizon_years = 5, wacc = 0.1)
     s0, c0 = IETO.apply_scenario(site, c, :bau)
     @test !(:hp in c0.allowed_techs)
-    # toda situación actual reinstala los activos iniciales al vencer su vida
-    # útil («seguir como hoy»), aunque el config no lo pida ni liste equipos
-    @test !c.renew_existing && c0.renew_existing && isempty(c0.renew_techs)
+    # con reposición fija (default) la situación actual reinstala lo existente que
+    # vence («seguir como hoy»), aunque el config no lo pida ni liste equipos
+    @test c.fixed_rebuild && !c.renew_existing && c0.renew_existing && isempty(c0.renew_techs)
     _, cr = IETO.apply_scenario(site, with_config(c; renew_existing = true, renew_techs = [:hp]), :bau)
     @test cr.renew_existing && isempty(cr.renew_techs)
+    # la meta de emisiones se conserva (quien corre decide quitarla)
+    _, cc = IETO.apply_scenario(site, with_config(c; emissions_cap_gross = 123.0), :bau)
+    @test cc.emissions_cap_gross == 123.0
     s1, c1 = IETO.apply_scenario(site, with_config(c; bau_techs = [:hp]), :bau)
     @test :hp in c1.allowed_techs
     @test all(t -> !find_tech(site, t).investable || t == :hp, c1.allowed_techs)
@@ -233,6 +236,32 @@ end
     @test r.feasible
     @test sum(r.new_capacity.mw[r.new_capacity.tech .== :hp]) > 1
     @test_throws IETO.ValidationError validate_scenario(with_config(c; bau_techs = [:no_existe]), site)
+end
+
+@testset "Situación actual sin reposición fija: repotenciar es una opción, no una obligación" begin
+    # caldera eléctrica existente (20 MW) que vence al año 2 de un horizonte de 5:
+    # con reposición fija se reinstala (CAPEX 200/kW); sin ella el optimizador decide
+    site, cfg = discrete_case(0.0)
+    eb = IETO._with(site.converters[:eb]; remaining_life = 2, costs = TechCosts(200.0, 0.0, 0.0, 30))
+    site = IETO._with(site; converters = Dict(:hp => site.converters[:hp], :eb => eb))
+    c = with_config(cfg; horizon_years = 5, wacc = 0.1)
+    # sin reposición fija: la caldera pasa a candidata hasta su capacidad, desde el año 3
+    s2, c2 = IETO.apply_scenario(site, with_config(c; fixed_rebuild = false), :bau)
+    @test !c2.renew_existing
+    @test s2.converters[:eb].investable && s2.converters[:eb].max_new_capacity == 20.0
+    @test c2.build_window[:eb] == [3, 5]
+    @test :eb in c2.allowed_techs && !(:hp in c2.allowed_techs)
+    # la bomba (candidata, sin existente) no se toca
+    @test !s2.converters[:hp].investable || s2.converters[:hp] === site.converters[:hp]
+    # sin otra forma de cubrir el calor, repotenciar es obligado: mismo costo que con reposición fija
+    r_fix = run_scenario(site, c; scenario = :bau, verbose = false, shadow_prices = false)
+    r_opt = run_scenario(site, with_config(c; fixed_rebuild = false); scenario = :bau, verbose = false, shadow_prices = false)
+    @test r_fix.feasible && r_opt.feasible
+    @test r_opt.npv <= r_fix.npv + 1e-6
+    @test sum(r_opt.new_capacity.mw[r_opt.new_capacity.tech .== :eb]) > 1   # repotenció
+    # con la bomba declarada para crecer, repotenciar la caldera deja de ser obligatorio: no cuesta más
+    r_hp = run_scenario(site, with_config(c; fixed_rebuild = false, bau_techs = [:hp]); scenario = :bau, verbose = false, shadow_prices = false)
+    @test r_hp.feasible && r_hp.npv <= r_opt.npv + 1e-6
 end
 
 @testset "Hitos que valen por sus años: el primer año del horizonte debe ser hito" begin

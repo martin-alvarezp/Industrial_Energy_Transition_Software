@@ -50,13 +50,43 @@ function _scale_prices(site::Site, carrier::Symbol, factor::Float64)
 end
 
 """
+    repower_option(site, cfg) -> (site, build_window)
+
+Opción de repotenciación (situación actual sin reposición fija): cada equipo
+existente NO candidato que vence dentro del horizonte pasa a poder recomprarse —
+misma tecnología, hasta su capacidad existente, en una ventana que abre el año
+en que vence. Devuelve el sitio transformado y el `build_window` ampliado.
+"""
+function repower_option(site::Site, cfg::ScenarioConfig)
+    N = cfg.horizon_years
+    window = copy(cfg.build_window)
+    function rp(d)
+        out = Dict{Symbol,valtype(d)}()
+        for (id, x) in d
+            rl = x.remaining_life
+            if !x.investable && x.existing_capacity > 0 && rl > 0 && rl < N
+                window[id] = [calendar_year(cfg, rl + 1), calendar_year(cfg, N)]
+                out[id] = _with(x; investable = true, max_new_capacity = x.existing_capacity)
+            else
+                out[id] = x
+            end
+        end
+        return out
+    end
+    site2 = _with(site; converters = rp(site.converters), generators = rp(site.generators),
+                  storages = rp(site.storages))
+    return site2, window
+end
+
+"""
     apply_scenario(site, cfg, scenario::Symbol) -> (site, cfg)
 
 Transformación del caso base por escenario (SPEC §11):
 - `emissions_cap`: el config tal cual (usa la trayectoria del §8).
 - `least_cost`: sin caps de emisiones.
-- `bau`: sin caps y sin tecnologías candidatas (solo el parque existente, que
-  se reinstala al vencer su vida útil; más las `bau_techs` para crecer).
+- `bau`: situación actual (Status Quo): sin inversiones nuevas salvo conexiones,
+  compras forzadas y `bau_techs`; con `fixed_rebuild` lo existente que vence se
+  reinstala 1:1, sin él el optimizador decide si repotenciar. Conserva la meta.
 - `no_offsets`: `allow_offsets = false`.
 - `high_gas`: precio del gas × 1.5.
 - `high_carbon`: precio de carbono × 3 (150 USD/t si el base es 0).
@@ -72,14 +102,20 @@ function apply_scenario(site::Site, cfg::ScenarioConfig, scenario::Symbol)
               scope1_cap = nothing, scope2_cap = nothing)
     scenario == :least_cost && return site, with_config(cfg; nocaps...)
     if scenario == :bau
-        # el parque existente y, si el sistema las declara, las candidatas con
-        # que la situación actual repone y crece (bau_techs): mismos equipos
-        existing_only = [t for t in all_tech_ids(site) if !find_tech(site, t).investable || t in cfg.bau_techs]
-        # …y los activos iniciales se reinstalan al cumplir su vida útil (si el
-        # horizonte la supera), pagando su CAPEX: la situación actual evalúa el
-        # horizonte «si seguimos funcionando como hoy», no dejando caer el parque
-        return site, with_config(cfg; nocaps..., allowed_techs = existing_only,
-                                 renew_existing = true, renew_techs = Symbol[])
+        # SITUACIÓN ACTUAL (Status Quo): sin inversiones nuevas en generación,
+        # conversión ni almacenamiento — quedan lo existente, las conexiones
+        # (ampliables), las compras forzadas y las `bau_techs` con que crece.
+        # La meta de emisiones se mantiene: quien corre decide quitarla.
+        forced = Set(t for (t, _, _) in cfg.forced_builds)
+        allowed = [t for t in all_tech_ids(site)
+                   if (x = find_tech(site, t); !x.investable || x isa Source || t in cfg.bau_techs || t in forced)]
+        # reposición fija: lo existente que vence se reinstala 1:1 (pagando su CAPEX)
+        cfg.fixed_rebuild && return site, with_config(cfg; allowed_techs = allowed,
+                                                      renew_existing = true, renew_techs = Symbol[])
+        # sin reposición fija: al vencer, el optimizador decide si repotenciar
+        # (misma tecnología, hasta su capacidad, desde su vencimiento) o retirar
+        site2, window = repower_option(site, cfg)
+        return site2, with_config(cfg; allowed_techs = allowed, renew_existing = false, build_window = window)
     end
     scenario == :no_offsets && return site, with_config(cfg; allow_offsets = false)
     scenario == :high_gas && return _scale_prices(site, :natural_gas, 1.5), cfg

@@ -79,6 +79,7 @@ export function toConfig(cfg) {
     replace_between_milestones: !!cfg.replace_between_milestones,   // R34: reposición automática entre hitos
     build_limits: cfg.build_limits ?? {},                   // R35: tamaño de compra por tramos de años
     bau_techs: cfg.bau_techs ?? [],                         // situación actual: candidatas con que repone y crece
+    fixed_rebuild: cfg.fixed_rebuild ?? true,               // situación actual: lo que vence se reinstala 1:1
     storage_energy_fixed_opex: cfg.storage_energy_fixed_opex ?? {},   // R19: O&M por MWh
     market_availability: cfg.market_availability ?? {},     // R20: piezas del sitio B
     generator_scope1_ef: cfg.generator_scope1_ef ?? {},
@@ -110,8 +111,25 @@ export function toConfig(cfg) {
  *  sin Pareto ni escenarios de comparación (16 MILPs → 1). */
 export const isSingleRun = (uiCfg) => !!uiCfg.dispatch_only || uiCfg.analysis !== "full";   // sin comparaciones automáticas
 
-const NOCAPS = { emissions_cap_net_start: UNCAPPED, emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED,
-                 emission_caps: [], scope1_cap: null, scope2_cap: null };
+/** Sin meta de emisiones: ni trayectoria, ni topes por año (R17), ni por alcance. */
+export const NOCAPS = { emissions_cap_net_start: UNCAPPED, emissions_cap_net_end: UNCAPPED, emissions_cap_gross: UNCAPPED,
+                        emission_caps: [], scope1_cap: null, scope2_cap: null };
+/** Opción de repotenciación (situación actual sin reposición fija), espejo de
+ *  repower_option: cada existente NO candidato que vence dentro del horizonte
+ *  pasa a poder recomprarse — misma tecnología, hasta su capacidad, en una
+ *  ventana que abre el año en que vence. */
+export function repowerOption(site, cfg) {
+  const N = cfg.horizon_years ?? 1;
+  const cal = (r) => ((cfg.base_year ?? 0) > 0 ? cfg.base_year + r - 1 : r);
+  const window = { ...(cfg.build_window ?? {}) };
+  const technologies = site.technologies.map((t) => {
+    const rl = t.remaining_life ?? 0;
+    if (t.type === "source" || t.investable || !((t.existing_capacity ?? 0) > 0) || !(rl > 0 && rl < N)) return t;
+    window[t.tech_id] = [cal(rl + 1), cal(N)];
+    return { ...t, investable: true, max_new_capacity: t.existing_capacity };
+  });
+  return [{ ...site, technologies }, window];
+}
 /** Espejo de apply_scenario (run_scenario.jl). */
 export function applyScenario(site, cfg, scenario) {
   const c = { ...cfg };
@@ -120,12 +138,19 @@ export function applyScenario(site, cfg, scenario) {
     case "least_cost":   // sin meta: ni trayectoria, ni topes por año (R17), ni por alcance
       return [site, { ...c, ...NOCAPS }];
     case "bau": {
-      // el parque existente y las candidatas que la situación actual puede
-      // comprar (bau_techs: reposición y crecimiento), espejo de apply_scenario
-      const existing = site.technologies
-        .filter((t) => !t.investable || (c.bau_techs ?? []).includes(t.tech_id)).map((t) => t.tech_id);
-      // …y los activos iniciales se reinstalan al vencer su vida útil (si el horizonte la supera)
-      return [site, { ...c, ...NOCAPS, allowed_techs: existing, renew_existing: true, renew_techs: [] }];
+      // SITUACIÓN ACTUAL (Status Quo): sin inversiones nuevas en generación,
+      // conversión ni almacenamiento — quedan lo existente, las conexiones, las
+      // compras forzadas y las bau_techs con que crece. La meta de emisiones se
+      // mantiene (quien corre decide quitarla). Espejo de apply_scenario.
+      const forced = new Set((c.forced_builds ?? []).map((f) => (Array.isArray(f) ? f[0] : f.tech)));
+      const allowed = site.technologies
+        .filter((t) => !t.investable || t.type === "source" || (c.bau_techs ?? []).includes(t.tech_id) || forced.has(t.tech_id))
+        .map((t) => t.tech_id);
+      if (c.fixed_rebuild ?? true)   // reposición fija: lo existente que vence se reinstala 1:1
+        return [site, { ...c, allowed_techs: allowed, renew_existing: true, renew_techs: [] }];
+      // sin reposición fija: al vencer, el optimizador decide si repotenciar o retirar
+      const [s2, build_window] = repowerOption(site, c);
+      return [s2, { ...c, allowed_techs: allowed, renew_existing: false, build_window }];
     }
     case "no_offsets": return [site, { ...c, allow_offsets: false }];
     case "high_gas": {

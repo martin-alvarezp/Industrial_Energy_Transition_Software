@@ -39,6 +39,7 @@ export const DEFAULT_CONFIG = {
   allow_new_fossil: false,
   salvage_value: false, // valor residual al año final (fase 5)
   renew_existing: false, // BaU renovación (M5)
+  fixed_rebuild: true, // situación actual: lo existente que vence se reinstala 1:1
   repeat_investments: false, // inversiones repetibles (M5)
   forced_builds: [], // [{tech, year (calendario), mw}] (M12)
   tax_rate: 0, // impuesto corporativo (M9); 0 = sin impuestos

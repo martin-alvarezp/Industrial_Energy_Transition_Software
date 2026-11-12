@@ -643,8 +643,12 @@ struct ScenarioConfig
                                              # ese año (escalón); reemplaza a max_new_capacity y min_build en esos años
     bau_techs::Vector{Symbol}                # candidatas que la SITUACIÓN ACTUAL (escenario :bau) puede comprar
                                              # (reposición y crecimiento con los mismos equipos); vacío = solo lo existente
+    fixed_rebuild::Bool                      # situación actual: lo existente que vence se reinstala 1:1 (true) o el
+                                             # optimizador decide si repotenciarlo (false, repower_option)
 end
 
+# retro-compatibilidad: 91 campos → la situación actual reinstala lo que vence
+ScenarioConfig(a::Vararg{Any,91}) = ScenarioConfig(a..., true)
 # retro-compatibilidad: 90 campos → la situación actual no compra nada
 ScenarioConfig(a::Vararg{Any,90}) = ScenarioConfig(a..., Symbol[])
 

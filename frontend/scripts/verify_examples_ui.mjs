@@ -34,7 +34,10 @@ const openModal = async (site) => {
   await p.goto(`${APP_URL}/?r=${Date.now()}#/sys/${site}/summary`, { waitUntil: "networkidle2" });
   await p.waitForSelector(".sum-runbar", { timeout: 60000 });
   await clickBtn(".sum-runbar button", "Optimización");
-  return waitText("Nueva optimización");
+  const ok = await waitText("Nueva optimización");
+  // el aviso de bienvenida tapa el pie del modal en 1000 px: se oculta por CSS (quitar el nodo rompería React)
+  await p.evaluate(() => { if (!document.getElementById("vt")) { const st = document.createElement("style"); st.id = "vt"; st.textContent = ".ui-toast{display:none!important}"; document.head.appendChild(st); } });
+  return ok;
 };
 const runAndWait = async () => {
   await clickBtn(".ui-modal button", "Optimizar");
@@ -67,16 +70,24 @@ step(api ? "con API, el año completo no lleva aviso del navegador" : "año comp
 await p.click('[data-testid="run-res-typical"]');
 await sleep(300);
 step("con días tipo no hay aviso", !(await p.$('[data-testid="run-heavy"]')));
-// despacho: México no tiene equipos existentes → sin corridas, el modal lo avisa
+// despacho: México tiene parque existente → parte de lo existente y no avisa
 await p.select('[data-testid="run-mode"]', "dispatch");
 await sleep(300);
-// (con API puede haber corridas guardadas de antes: entonces propone una en vez de avisar)
-const src0 = await p.$eval('[data-testid="run-cap-source"]', (x) => x.value).catch(() => "existing");
-step("despacho sin parque existente: el modal lo avisa, o propone una corrida guardada",
-     src0 === "existing" ? !!(await p.$('[data-testid="run-empty-park"]')) : !(await p.$('[data-testid="run-empty-park"]')), src0);
+step("despacho con parque existente: parte de lo existente sin aviso",
+     (await p.$eval('[data-testid="run-cap-source"]', (x) => x.value).catch(() => "")) === "existing" && !(await p.$('[data-testid="run-empty-park"]')));
 await p.select('[data-testid="run-mode"]', "plan");
 await sleep(300);
+// situación actual (Status Quo): al marcarla, la meta de emisiones queda desmarcada y aparece «Reposición fija»
 await p.click('[data-testid="run-analysis-bau"]');
+await sleep(300);
+step("situación actual: desmarca la meta de emisiones y ofrece «Reposición fija» (encendida)",
+     !(await p.$eval('[data-testid="run-use-target"]', (x) => x.checked)) &&
+     !!(await p.$eval('[data-testid="run-fixed-rebuild"] input', (x) => x.checked).catch(() => false)));
+await p.click('[data-testid="run-use-target"]');
+await sleep(200);
+step("situación actual con meta: avisa que puede ser infactible", !!(await p.$('[data-testid="run-sq-target"]')));
+await p.click('[data-testid="run-use-target"]');
+await sleep(200);
 let tx = await runAndWait();
 step("México: la situación actual (BaU) corre y es factible", tx.includes("Inversión total") && !/infactible/i.test(tx));
 await p.evaluate(() => { window.location.hash = "#/sys/dummy_mexico/kpis"; });
@@ -92,8 +103,13 @@ await clickBtn(".sum-runbar button", "Optimización");
 await waitText("Nueva optimización");
 await p.select('[data-testid="run-mode"]', "dispatch");
 await sleep(300);
-const src = await p.$eval('[data-testid="run-cap-source"]', (x) => x.value).catch(() => "existing");
-step("despacho tras una corrida: propone sus capacidades", src !== "existing" && !(await p.$('[data-testid="run-empty-park"]')), src);
+const srcOpts = await p.$$eval('[data-testid="run-cap-source"] option', (xs) => xs.map((x) => x.value));
+step("despacho tras una corrida: la corrida se ofrece como origen de las capacidades", srcOpts.length >= 2, srcOpts.join(","));
+// la corrida recién hecha: la local de la sesión o, con API, la de id (fecha) más reciente
+// (con API hay corridas viejas de versiones anteriores del sitio)
+const runIds = srcOpts.filter((v) => v !== "existing");
+await p.select('[data-testid="run-cap-source"]', runIds.find((v) => v.startsWith("local-")) ?? [...runIds].sort().pop() ?? "existing");
+await sleep(300);
 const txd = await runAndWait();
 step("México: el despacho de esa corrida termina y es factible", !txd.includes("Nueva optimización") && !/infactible/i.test(txd),
      (txd.match(/[^\n]*(infactible|no tiene capacidades)[^\n]*/i) ?? [""])[0].slice(0, 200));

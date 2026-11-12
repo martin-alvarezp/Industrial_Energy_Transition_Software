@@ -368,6 +368,17 @@ dump("dias_por_anio_n2", s46, with_config(c46; horizon_years = 2, wacc = 0.05,
 nst0 = length(site0.timesteps)
 dump("demo_meses_por_anio_n3", site0, with_config(cfg0; horizon_years = 3, emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9,
      month_by_year = Dict(2 => [mod1(i, 12) for i in 1:nst0])))
+# 48 · situación actual (Status Quo) con reposición fija: lo existente que vence
+# se reinstala 1:1; sin meta (como la corre el modal)
+s48 = IETO._with(site0; converters = Dict(k => (k in ex40 ? IETO._with(v; remaining_life = 2) : v) for (k, v) in site0.converters))
+c48 = with_config(cfg0; horizon_years = 4, emissions_cap_net_start = 1e9, emissions_cap_net_end = 1e9, emissions_cap_gross = 1e9)
+s48a, c48a = apply_scenario(s48, c48, :bau)
+dump("demo_status_quo_reposicion_n4", s48a, c48a)
+# 49 · situación actual sin reposición fija: repotenciar es opción (misma
+# tecnología, hasta su capacidad, en una ventana que abre al vencer)
+s49, c49 = apply_scenario(s48, with_config(c48; fixed_rebuild = false), :bau)
+dump("demo_status_quo_repotenciar_n4", s49, c49)
+
 println("fixtures dorados en ", out)
 
 # Nodos con muchos componentes (como los arma la interfaz): todo el demo en el

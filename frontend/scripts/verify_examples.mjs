@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import highsLoader from "highs";
 import { DEFAULT_CONFIG } from "../src/lib/mockEngine.js";
 import { enginePayload, daySequence } from "../src/lib/api.js";
-import { computeViaWeb } from "../src/lib/milp/engine.js";
+import { computeViaWeb, NOCAPS } from "../src/lib/milp/engine.js";
 import { runTemplateSite, projectConfigProfiles, hasHourly } from "../src/lib/templates.js";
 import { horizonKpis, repYearCounts } from "../src/ui/results.js";
 
@@ -90,7 +90,8 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
 
   // 3 · situación actual (BaU): repone y crece con los equipos declarados → el caso base del cliente
   step(`${c.id}: la situación actual declara con qué equipos repone y crece`, (sc.bau_techs ?? []).length > 0, (sc.bau_techs ?? []).join(", "));
-  const bau = runAs({ price_scenario: "bau" }).r;
+  // situación actual como la corre el modal: reposición fija, sin meta de emisiones
+  const bau = runAs({ price_scenario: "bau", fixed_rebuild: true, ...NOCAPS }).r;
   const last = (x) => x.emissions[x.emissions.length - 1].gross;
   step(`${c.id}: situación actual (BaU) factible; sin meta cuesta menos y emite más que el plan`,
        bau.meta.feasible && bau.kpis.npv < r.kpis.npv && last(bau) > last(r) + 1,
@@ -101,8 +102,19 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
        cap ? `${fmt(last(r))} t ≤ ${fmt(cap.cap)} t` : "sin meta");
   step(`${c.id}: sin meta, el plan es el más barato de los tres`, nm.meta.feasible && nm.kpis.npv <= bau.kpis.npv * 1.011 && nm.kpis.npv < r.kpis.npv,
        `sin meta ${fmt(nm.kpis.npv)} · BaU ${fmt(bau.kpis.npv)} · con meta ${fmt(r.kpis.npv)}`);
+  // sin reposición fija el optimizador decide qué repotenciar: nunca cuesta más que reponer todo
+  const rep = runAs({ price_scenario: "bau", fixed_rebuild: false, ...NOCAPS }).r;
+  step(`${c.id}: situación actual sin reposición fija factible y no más cara que con ella`,
+       rep.meta.feasible && rep.kpis.npv <= bau.kpis.npv * 1.011,
+       rep.meta.feasible ? `${fmt(rep.kpis.npv)} vs ${fmt(bau.kpis.npv)}` : (rep.infeasibility?.hints ?? []).join(" | "));
+  // …y con la meta puesta, la situación actual la conserva: o no puede cumplirla (infactible,
+  // con aviso) o la cumple cambiando de combustible, y entonces cuesta más que sin meta
+  const sqCap = runAs({ price_scenario: "bau", fixed_rebuild: true }).r;
+  step(`${c.id}: situación actual con la meta de emisiones: infactible con aviso, o la cumple y cuesta más`,
+       sqCap.meta.feasible ? (last(sqCap) <= cap.cap + 0.5 && sqCap.kpis.npv > bau.kpis.npv) : (sqCap.infeasibility?.hints ?? []).length > 0,
+       sqCap.meta.feasible ? `cumple: ${fmt(last(sqCap))} t · VAN ${fmt(sqCap.kpis.npv)}` : (sqCap.infeasibility?.hints ?? [])[0]?.slice(0, 120));
   // …y sin esos equipos es infactible, pero el diagnóstico dice por qué
-  const bare = runAs({ price_scenario: "bau", bau_techs: [] }).r;
+  const bare = runAs({ price_scenario: "bau", bau_techs: [], fixed_rebuild: true, ...NOCAPS }).r;
   step(`${c.id}: sin equipos para reponer, el infactible explica la causa`,
        !bare.meta.feasible && (bare.infeasibility?.hints ?? []).some((h) => h.startsWith("Falta capacidad")),
        (bare.infeasibility?.hints ?? [])[0] ?? "");
@@ -117,8 +129,9 @@ for (const c of CASES.filter((x) => !only || x.id === only)) {
   // 5 · despacho del parque existente, 1 año (lo que arma el modal en modo despacho)
   const disp = runAs({ dispatch_only: true, fixed_capacity: {}, horizon_years: 1, commitment: "auto",
                        milestone_years: [], price_scenario: "base" }).r;
+  // (si falta capacidad, el diagnóstico la nombra: también la demanda que solo se produce desde otro vector)
   step(`${c.id}: despacho del parque existente corre (factible o con diagnóstico)`,
-       disp.meta.feasible || (disp.infeasibility?.hints ?? []).length > 0,
+       disp.meta.feasible || /capacidad de/.test((disp.infeasibility?.hints ?? [])[0] ?? ""),
        disp.meta.feasible ? fmt(disp.kpis.npv) : (disp.infeasibility?.hints ?? [])[0]);
 }
 if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }

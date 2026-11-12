@@ -14,6 +14,7 @@ import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { Modal } from "../kit.jsx";
 import { fetchRun } from "../../lib/api.js";
+import { NOCAPS } from "../../lib/milp/engine.js";
 import { BASE, scenarioList } from "../../lib/scenarios.js";
 import { DEFAULT_TYPICAL_DAYS, hasHourly } from "../../lib/templates.js";
 import { ScenarioChip } from "./ParamTable.jsx";
@@ -30,9 +31,17 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const scenarios = scenarioList({ scenarios: twin?.layout?.scenarios ?? [], params: twin?.layout?.params ?? [] });
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  // tipo: corrida de inversión ("plan") o situación actual / Status Quo ("bau");
+  // en la situación actual, «reposición fija» = lo existente que vence se
+  // reinstala 1:1; sin ella el optimizador decide si repotenciar
   const [analysis, setAnalysis] = useState("plan");        // bau | plan
+  const [fixedRebuild, setFixedRebuild] = useState(true);
   const [stack, setStack] = useState(initialStack);
   const [useTarget, setUseTarget] = useState(true);       // respetar la meta de emisiones
+  const targetTouched = useRef(false);
+  // la situación actual no puede construir para cumplir la meta: por defecto
+  // corre sin ella (si el usuario no eligió otra cosa)
+  const pickAnalysis = (a) => { setAnalysis(a); if (!targetTouched.current) setUseTarget(a !== "bau"); };
   const [mode, setMode] = useState("plan");                // plan | dispatch
   const [capSource, setCapSource] = useState("existing");
   const [capYear, setCapYear] = useState(1);
@@ -116,7 +125,9 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       const scenario = analysis === "bau" ? "bau" : useTarget ? "emissions_cap" : "least_cost";
       const solver2 = { ...solver, run_template: runTemplate,
                         ...(dispatch ? {} : { milestone_years: milestones }) };
-      let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver2 };
+      let extra = { analysis: "single", commitment: nCommit > 0 ? commitment : "auto", emission_cap_mode: capMode, ...solver2,
+                    // situación actual: reposición fija o repotenciación a elección; la meta se mantiene solo si se pide
+                    ...(analysis === "bau" ? { fixed_rebuild: fixedRebuild, ...(useTarget ? {} : NOCAPS) } : {}) };
       if (dispatch) {
         const fixed = capSource === "existing" ? {} : await capacitiesOf(capSource);
         // el despacho corre sobre sus propios años: los hitos y las metas de
@@ -172,14 +183,20 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
         <div className="ui-field">
           <label>{t("run.analysisType")}</label>
           <div className="ui-radio-cards">
-            {[["bau", "run.bau", "run.bauHint"], ["plan", "run.plan", "run.planHint"]].map(([v, k, h]) => (
-              <label key={v} className={"ui-radio-card" + (analysis === v ? " on" : "")} data-testid={`run-analysis-${v}`}>
-                <input type="radio" name="analysis" checked={analysis === v} onChange={() => setAnalysis(v)} />
-                <b>{t(k)}</b><span className="ui-hint" style={{ margin: 0 }}>
-                  {v === "bau" && bauBuy.length ? t("run.bauHintBuy", { list: bauBuy.join(", ") }) : t(h)}</span>
+            <label className={"ui-radio-card" + (analysis === "bau" ? " on" : "")} data-testid="run-analysis-bau">
+              <input type="checkbox" checked={analysis === "bau"} onChange={(e) => pickAnalysis(e.target.checked ? "bau" : "plan")} />
+              <b>{t("run.statusQuo")}</b><span className="ui-hint" style={{ margin: 0 }}>
+                {bauBuy.length ? t("run.statusQuoHintBuy", { list: bauBuy.join(", ") }) : t("run.statusQuoHint")}</span>
+            </label>
+            {analysis === "bau" && (
+              <label className={"ui-radio-card" + (fixedRebuild ? " on" : "")} data-testid="run-fixed-rebuild">
+                <input type="checkbox" checked={fixedRebuild} onChange={(e) => setFixedRebuild(e.target.checked)} />
+                <b>{t("run.fixedRebuild")}</b><span className="ui-hint" style={{ margin: 0 }}>
+                  {fixedRebuild ? t("run.fixedRebuildOn") : t("run.fixedRebuildOff")}</span>
               </label>
-            ))}
+            )}
           </div>
+          <p className="ui-hint">{analysis === "bau" ? t("run.statusQuoUse") : t("run.investHint")}</p>
         </div>
       )}
       {dispatch && (
@@ -246,11 +263,17 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
 
       {/* 2 · Modelado */}
       <h4 className="run-sec" ref={refs[1]}>2 · {t("run.stepModel")}</h4>
-      {!dispatch && analysis === "plan" && (
-        <label className="run-check">
-          <input type="checkbox" checked={useTarget} onChange={(e) => setUseTarget(e.target.checked)} data-testid="run-use-target" />
-          {t("run.useTarget")}
-        </label>
+      {!dispatch && (
+        <>
+          <label className="run-check">
+            <input type="checkbox" checked={useTarget} data-testid="run-use-target"
+                   onChange={(e) => { targetTouched.current = true; setUseTarget(e.target.checked); }} />
+            {t("run.useTarget")}
+          </label>
+          {analysis === "bau" && useTarget && (
+            <p className="ui-banner warn" data-testid="run-sq-target">{t("run.statusQuoTargetWarn")}</p>
+          )}
+        </>
       )}
       {!dispatch && (
         <div className="ui-field">
