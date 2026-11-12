@@ -141,6 +141,24 @@ if (mtDots.length) { await mtDots[mtDots.length - 1].evaluate((el) => el.scrollI
 const mtTip = await p.$eval('[data-testid="measures-tip"]', (x) => x.innerText).catch(() => "");
 step("hoja de ruta: la tarjeta muestra año, inversión en EUR y capacidad nueva", /Año/.test(mtTip) && /EUR/.test(mtTip) && /MW|%/.test(mtTip),
      mtTip.replace(/\n/g, " | ").slice(0, 160));
+// comparar: una segunda corrida en la misma página (situación actual) y luego dos columnas
+await p.evaluate(() => window.scrollTo(0, 0));
+await clickBtn(".sum-runbar button", "Optimización");
+await waitText("Nueva optimización");
+await p.click('[data-testid="run-analysis-bau"]');
+await sleep(300);
+await runAndWait();
+await sleep(1000);
+const canCmp = !!(await p.$('[data-testid="cmp-add"]'));
+if (canCmp) { await p.click('[data-testid="cmp-add"]'); await sleep(1500); }
+const cmpCols = await p.$$eval('[data-testid="cmp-grid"] > .sum-cmp-col', (xs) => xs.map((x) => x.innerText.split("\n").slice(0, 2).join(" ")));
+step("comparar: «Comparar» agrega una columna con otra corrida, con sus KPIs y su hoja de ruta",
+     canCmp && cmpCols.length === 2 && cmpCols[0] !== cmpCols[1] &&
+     (await p.$$('[data-testid="cmp-grid"] [data-testid="measures-grid"], [data-testid="cmp-grid"] .ui-hint')).length >= 2,
+     `botón ${canCmp} · ${cmpCols.length} columnas · ` + cmpCols.map((x) => x.slice(0, 50)).join(" ‖ ") +
+     ` · runbar: ${(await p.$eval(".sum-runbar", (x) => x.innerText).catch(() => "")).replace(/\n/g, " | ").slice(0, 160)}`);
+if (canCmp) { await p.click('[data-testid="cmp-remove-0"]'); await sleep(500); }
+step("comparar: quitar la columna vuelve a la vista de una corrida", !(await p.$('[data-testid="cmp-grid"]')));
 const nYears = await p.evaluate(() => {
   const r = JSON.parse(localStorage.getItem("ieto.cfg.dummy_mexico") ?? "{}");
   return r.milestone_years;

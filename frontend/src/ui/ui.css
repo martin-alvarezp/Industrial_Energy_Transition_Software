@@ -475,6 +475,12 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .sum-runbar { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
 .sum-run { flex: 1; height: 40px; background: var(--ui-bg); border-color: var(--ui-bg); font-size: 16px; }
 .sum-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 12px; }
+/* comparación lado a lado: una columna por corrida */
+.sum-cmp { display: grid; gap: 18px; margin-bottom: 12px; align-items: start; }
+.sum-cmp-col { min-width: 0; }
+.sum-kpis.col { grid-template-columns: 1fr; gap: 10px; }
+.sum-cmp-pick { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; }
+.sum-cmp-pick .sum-run { flex: 1; min-width: 0; }
 .sum-kpi { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border: 1px solid var(--ui-border);
            border-radius: 6px; background: #fff; min-height: 72px; }
 .sum-kpi .v { font: 400 26px var(--ui-font); color: var(--ui-text); }
@@ -507,7 +513,7 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 /* hoja de ruta de medidas: equipo × año optimizado */
 .mt-grid { position: relative; display: grid; align-items: stretch; font-size: 12.5px; }
 .mt-h { padding: 4px 0 8px; text-align: center; font-size: 12px; color: var(--ui-muted); border-bottom: 1px solid var(--ui-border-2); }
-.mt-l { padding: 0 12px 0 0; height: 30px; display: flex; align-items: center; justify-content: flex-end;
+.mt-l { padding: 0 12px 0 0; height: 30px; line-height: 30px; display: block; text-align: right;
         color: var(--ui-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         border-bottom: 1px solid var(--ui-grid); }
 .mt-c { height: 30px; display: grid; place-items: center; border-bottom: 1px solid var(--ui-grid); }

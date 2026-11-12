@@ -1,9 +1,9 @@
 import { CATEGORICAL as SLOT, STATUS } from "../palette.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   IcAdd, IcFilterAlt, IcAccountBalance, IcOutlineCurrencyExchange, IcEco, IcFunctions,
   IcExpandMore, IcExpandLess, IcBarChart, IcTableChart, IcOutlineViewInAr, IcAccountTree,
-  IcFileDownload, IcDescription, IcBolt,
+  IcFileDownload, IcDescription, IcBolt, IcClose,
 } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -87,7 +87,7 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
         </table>
       ) : (
         <div className="mt-grid" data-testid="measures-grid" onMouseLeave={() => setTip(null)}
-             style={{ gridTemplateColumns: `minmax(110px, ${compact ? 150 : 210}px) repeat(${cols.length}, minmax(40px, 1fr))` }}>
+             style={{ gridTemplateColumns: `minmax(140px, 210px) repeat(${cols.length}, minmax(40px, 1fr))` }}>
           <div className="mt-h" />
           {cols.map((y) => <div key={y} className="mt-h">{y}</div>)}
           {names.map((n) => {
@@ -123,9 +123,51 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
   );
 }
 
+/** Una columna de comparación: KPIs del horizonte y hoja de ruta de otra corrida. */
+function CompareColumn({ bundle, t, factor, scale, scaleLbl, hidden }) {
+  const result = bundle?.result;
+  if (!bundle) return <p className="ui-hint">{t("sum.loading")}</p>;
+  if (!result?.meta?.feasible) return <div className="ui-banner bad">{t("sum.infeasible")}</div>;
+  const sj = bundle.site_snapshot;
+  const k = horizonKpis(result, factor);
+  return (
+    <>
+      <div className="sum-kpis col">
+        <KpiCard icon={IcAccountBalance} color={SLOT[3]} value={num(k.investment / scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
+        <KpiCard icon={IcOutlineCurrencyExchange} color={SLOT[5]} value={num(k.opex / scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
+        <KpiCard icon={IcEco} color={STATUS.ok} value={k.reduction == null ? "—" : pct(k.reduction)}
+                 unit={t("sum.comparedTo", { a: k.lastYear, b: k.firstYear })} label={t("sum.reduction")} />
+        <KpiCard icon={IcFunctions} color={SLOT[3]} value={num(k.total / scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
+      </div>
+      <section className="rc-panel">
+        <MeasuresTimeline rows={measures(result, sj)} years={result.cost_breakdown.map((c) => calYear(result, c.year))}
+                          t={t} factor={factor} scale={scale} unitLbl={scaleLbl} hidden={hidden} compact />
+      </section>
+    </>
+  );
+}
+
 export default function SummaryPage() {
   const { t } = useI18n();
-  const { siteName, twin, data, runs, viewing, openRun, appliedSiteJson, applied, appliedPayload, appliedSite, apiUp } = useStudio();
+  const { siteName, twin, data, runs, viewing, openRun, appliedSiteJson, applied, appliedPayload, appliedSite, apiUp,
+          loadRunBundle } = useStudio();
+  // comparación lado a lado: ids de otras corridas (hasta 2) y sus bundles
+  const [cmp, setCmp] = useState([]);
+  const [cmpData, setCmpData] = useState({});
+  useEffect(() => { setCmp([]); }, [siteName]);
+  useEffect(() => {
+    for (const id of cmp) {
+      if (cmpData[id] !== undefined) continue;
+      setCmpData((d) => ({ ...d, [id]: null }));
+      loadRunBundle(id).then((rec) => setCmpData((d) => ({ ...d, [id]: rec.payload })))
+        .catch(() => setCmpData((d) => ({ ...d, [id]: { result: { meta: { feasible: false } } } })));
+    }
+  }, [cmp, cmpData, loadRunBundle]);
+  const addCmp = () => {
+    const taken = new Set([viewing?.id, ...cmp]);
+    const next = [...runs].reverse().find((r) => !taken.has(r.id)) ?? runs.find((r) => !taken.has(r.id));
+    if (next) setCmp((c) => [...c, next.id]);
+  };
   const [prefs, setPrefs] = useStored("ieto.summary.prefs", { impact: "real", scale: 1000000 });
   const [hiddenTech, setHiddenTech] = useState({});
   const [annualOpen, setAnnualOpen] = useState(false);
@@ -217,6 +259,20 @@ export default function SummaryPage() {
           {!data && <option value="">{t("sum.pickRun")}</option>}
           {runOptions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
+        {cmp.map((id, i) => (
+          <span key={i} className="sum-cmp-pick">
+            <select className="ui-select sum-run" value={id} data-testid={`cmp-run-${i}`}
+                    onChange={(e) => setCmp((c) => c.map((x, j) => (j === i ? e.target.value : x)))}>
+              {runs.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            <button className="ui-btn ghost icon" title={t("sum.cmpRemove")} data-testid={`cmp-remove-${i}`}
+                    onClick={() => setCmp((c) => c.filter((_, j) => j !== i))}><IcClose /></button>
+          </span>
+        ))}
+        {data && runs.length > (viewing?.id && runs.some((r) => r.id === viewing.id) ? 1 : 0) && cmp.length < 2 && (
+          <button className="ui-btn" onClick={addCmp} data-testid="cmp-add" title={t("sum.cmpAddHint")}>
+            <IcAdd /> {t("sum.cmpAdd")}</button>
+        )}
         <button className="ui-btn primary" onClick={() => setNewRun(true)}><IcAdd /> {t("sum.optimization")}</button>
       </div>
 
@@ -242,8 +298,19 @@ export default function SummaryPage() {
           {(result.emission_target.warnings ?? []).map((h, i) => <div key={i}>• {h}</div>)}</div>
       )}
 
+      {k && calc && cmp.length > 0 && (
+        <div className="sum-cmp" data-testid="cmp-grid" style={{ gridTemplateColumns: `repeat(${cmp.length + 1}, minmax(0, 1fr))` }}>
+          <div className="sum-cmp-col"><CompareColumn bundle={data} t={t} factor={factor} scale={prefs.scale} scaleLbl={scaleLbl} hidden={hiddenTech} /></div>
+          {cmp.map((id, i) => (
+            <div key={i} className="sum-cmp-col" data-testid={`cmp-col-${i}`}>
+              <CompareColumn bundle={cmpData[id]} t={t} factor={factor} scale={prefs.scale} scaleLbl={scaleLbl} hidden={hiddenTech} />
+            </div>
+          ))}
+        </div>
+      )}
       {k && calc && (
         <>
+          {cmp.length === 0 && (
           <div className="sum-kpis">
             <KpiCard icon={IcAccountBalance} color={SLOT[3]} value={num(k.investment / prefs.scale, 2)} unit={scaleLbl} label={t("sum.totalInvestment")} />
             <KpiCard icon={IcOutlineCurrencyExchange} color={SLOT[5]} value={num(k.opex / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalOpex")} />
@@ -251,6 +318,7 @@ export default function SummaryPage() {
                      unit={t("sum.comparedTo", { a: k.lastYear, b: k.firstYear })} label={t("sum.reduction")} />
             <KpiCard icon={IcFunctions} color={SLOT[3]} value={num(k.total / prefs.scale, 1)} unit={scaleLbl} label={t("sum.totalCost")} />
           </div>
+          )}
 
           {src && (
             <section className="rc-panel" data-testid="by-source">
@@ -320,8 +388,8 @@ export default function SummaryPage() {
             )}
           </div>
 
-          <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} factor={factor}
-                    scale={prefs.scale} unitLbl={scaleLbl} hidden={hiddenTech} /></section>
+          {cmp.length === 0 && <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} factor={factor}
+                    scale={prefs.scale} unitLbl={scaleLbl} hidden={hiddenTech} /></section>}
 
           <ChartPanel title={t("sum.investmentCost")} menu={exportMenu}>
             <StackedBars {...st(calc.inv)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />

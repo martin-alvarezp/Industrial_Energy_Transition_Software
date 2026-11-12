@@ -334,6 +334,14 @@ export function StudioProvider({ children }) {
     return p;
   }, [siteName, localRuns]);
 
+  /** El bundle de una corrida SIN abrirla (comparación lado a lado). */
+  const loadRunBundle = useCallback(async (id) => {
+    const local = localRuns.find((r) => r.id === id);
+    if (local) return { name: local.name, payload: local.bundle };
+    const rec = await fetchRun(siteName, id);
+    return { name: rec.name, payload: rec.payload };
+  }, [siteName, localRuns]);
+
   const removeRun = useCallback(async (id) => {
     if (id.startsWith("local-")) setLocalRuns((l) => l.filter((r) => r.id !== id));
     else { await deleteRun(siteName, id); await refreshRuns(); }
@@ -354,7 +362,7 @@ export function StudioProvider({ children }) {
     saveCurrentSite, removeSite, saveStatus, readonly,
     draft, setDraft, applied, running, runError, run, evaluate,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
-    runs: allRuns, refreshRuns, openRun, removeRun,
+    runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,
     log, logChange,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
