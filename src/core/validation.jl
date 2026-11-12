@@ -244,6 +244,14 @@ function validate_site(site::Site)
         _check_series!(problems, mk.price, nsteps, "$ctx.price")
         mk.max_power > 0 || push!(problems, "$ctx: max_power debe ser > 0")
         mk.max_annual > 0 || push!(problems, "$ctx: max_annual debe ser > 0")
+        # R37: potencia mínima «si se usa»: necesita un tope de potencia finito ≥ el mínimo
+        (isfinite(mk.min_power) && mk.min_power >= 0) || push!(problems, "$ctx: min_power debe ser ≥ 0")
+        mk.min_power > 0 && !isfinite(mk.max_power) && push!(problems,
+            "$ctx: la potencia mínima (min_power) necesita un tope de potencia (max_power)")
+        mk.min_power > 0 && isfinite(mk.max_power) && mk.min_power > mk.max_power && push!(problems,
+            "$ctx: min_power ($(mk.min_power) MW) supera max_power ($(mk.max_power) MW)")
+        mk.min_power > 0 && mk.scheme == :net_metering && push!(problems,
+            "$ctx: la potencia mínima no aplica a un mercado con net metering")
         mk.emission_factor === nothing ||
             _check_nonneg!(problems, mk.emission_factor, "$ctx.emission_factor")
         _check_nonneg!(problems, mk.demand_charge, "$ctx.demand_charge")
@@ -719,7 +727,7 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
                  kind == :price ? (haskey(site.markets, tg) || haskey(site.prices, tg)) :
                  kind == :demand ? haskey(site.demands, tg) :
                  kind == :emission_factor ? (haskey(site.markets, tg) || haskey(site.generators, tg)) :   # R15
-                 kind == :demand_charge ? haskey(site.markets, tg) :
+                 kind in (:demand_charge, :min_power) ? haskey(site.markets, tg) :
                  tg in techs_all
             ok || push!(problems, "year_factors.$kind: '$tg' no existe en el sitio")
             for (yr, f) in pts

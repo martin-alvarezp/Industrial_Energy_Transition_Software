@@ -297,3 +297,51 @@ end
     @test err isa ValidationError
     @test any(occursin("es de 'electricity', no de 'gas'", p) for p in err.problems)
 end
+
+"Copia de un mercado con potencia mínima «si se usa» (R37)."
+with_min(mk::Market, mp) = Market(mk.id, mk.name, mk.carrier, mk.direction, mk.price, mk.max_power,
+    mk.max_annual, mk.emission_factor, mk.connection, mk.demand_charge, mk.contracted_power,
+    mk.excess_penalty, mk.scheme, mk.netting, mk.tariff, Float64(mp))
+
+@testset "markets: potencia mínima si se usa (R37)" begin
+    # FV gratis de 12 MW, demanda 10 ⇒ sobran 2 MW; la red compra a 80
+    sold(price; minp = 0.0, yf = nothing) = begin
+        mkts = Dict(:buy => mkbuy(:buy, :electricity, 80.0),
+                    :sell => with_min(mksell(:sell, :electricity, price; max_power = 10.0), minp))
+        site, cfg = market_site(; markets = mkts, gen_cap = 12.0)
+        yf === nothing || (cfg = with_config(cfg; year_factors = Dict(:min_power => Dict(:sell => yf))))
+        im = build_model(site, cfg)
+        JuMP.optimize!(im.model)
+        @test JuMP.termination_status(im.model) == JuMP.MOI.OPTIMAL
+        [JuMP.value(im.model[:market_flow][:sell, s, 1]) for s in 1:4]
+    end
+    # sin mínimo: vende el excedente
+    @test all(isapprox.(sold(5.0), 2.0; atol = 1e-6))
+    # con mínimo 8 MW y venta barata (5): vender 8 exige comprar 6 a 80 ⇒ no se usa
+    @test all(isapprox.(sold(5.0; minp = 8.0), 0.0; atol = 1e-6))
+    # venta a 70: comprar 6 a 80 para vender 8 a 70 conviene (560 > 480) ⇒ exactamente el mínimo
+    @test all(isapprox.(sold(70.0; minp = 8.0), 8.0; atol = 1e-6))
+    # el factor del año apaga el mínimo (year_factors.min_power = 0) ⇒ vuelve al excedente
+    @test all(isapprox.(sold(70.0; minp = 8.0, yf = [(1, 0.0)]), 2.0; atol = 1e-6))
+
+    # ida y vuelta JSON y CSV
+    mkts = Dict(:buy => mkbuy(:buy, :electricity, 80.0),
+                :sell => with_min(mksell(:sell, :electricity, 70.0; max_power = 10.0), 8.0))
+    site, _ = market_site(; markets = mkts, gen_cap = 12.0)
+    site2 = site_from_json(JSON3.read(JSON3.write(site_json(site))))
+    @test site2.markets[:sell].min_power == 8.0
+    @test site2.markets[:buy].min_power == 0.0
+    dir = mktempdir()
+    save_site(dir, site)
+    @test load_site(dir).markets[:sell].min_power == 8.0
+    @test site_version(load_site(dir)) == site_version(site)
+
+    # validación: necesita tope de potencia y no puede superarlo
+    for (mk, msg) in ((with_min(mksell(:sell, :electricity, 70.0), 8.0), "necesita un tope de potencia"),
+                      (with_min(mksell(:sell, :electricity, 70.0; max_power = 5.0), 8.0), "supera max_power"))
+        s, _ = market_site(; markets = Dict(:buy => mkbuy(:buy, :electricity, 80.0), :sell => mk), gen_cap = 12.0)
+        err = try validate_site(s); nothing catch e; e end
+        @test err isa ValidationError
+        @test any(occursin(msg, p) for p in err.problems)
+    end
+end

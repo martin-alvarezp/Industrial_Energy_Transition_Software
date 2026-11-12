@@ -87,7 +87,7 @@ export default function TradePage() {
           <thead><tr>
             <th>{t("common.name")}</th><th>{t("trade.dir")}</th><th>{t("trade.carrier")}</th>
             <th className="num">{t("trade.price")}</th><th className="num">{t("trade.maxPower")}</th>
-            <th className="num">{t("trade.maxAnnual")}</th><th className="num">{t("trade.demandCharge")}</th>
+            <th className="num">{t("trade.minPower")}</th><th className="num">{t("trade.maxAnnual")}</th><th className="num">{t("trade.demandCharge")}</th>
             <th>{t("trade.scheme")}</th><th>{t("trade.via")}</th><th />
           </tr></thead>
           <tbody>
@@ -103,6 +103,7 @@ export default function TradePage() {
                   <td>{carrierName(m.carrier_id)}</td>
                   <td className="num">{lo == null ? "—" : lo === hi ? num(lo, 1) : `${num(lo, 1)}–${num(hi, 1)}`}</td>
                   <td className="num">{m.max_power ?? "—"}</td>
+                  <td className="num">{m.min_power ?? "—"}</td>
                   <td className="num">{m.max_annual ?? "—"}</td>
                   <td className="num">{m.demand_charge ?? "—"}</td>
                   <td>{m.scheme ?? "—"}</td>

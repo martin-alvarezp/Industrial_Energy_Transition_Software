@@ -105,6 +105,9 @@ function save_site(dir::AbstractString, site::Site; layout = nothing)
             scheme = [something(get(mk, :scheme, nothing), missing) for mk in mkts],
             netting = [something(get(mk, :netting, nothing), missing) for mk in mkts]) |>
             (df -> begin   # tarifa de red (4.3): columnas solo si algún contrato la usa
+                # R37: potencia mínima «si se usa», solo si algún contrato la tiene
+                any(mk -> haskey(mk, :min_power), mkts) &&
+                    (df[!, :min_power] = [something(get(mk, :min_power, nothing), missing) for mk in mkts])
                 for k in TARIFF_KEYS
                     any(mk -> haskey(mk, k), mkts) &&
                         (df[!, k] = [something(get(mk, k, nothing), missing) for mk in mkts])

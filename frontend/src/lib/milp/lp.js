@@ -1101,6 +1101,20 @@ export function buildLP(site0, cfg0, opts = {}) {
         if (av) for (const s of steps) if ((av[s - 1] ?? 1) <= 0)
           row(`mp_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1 }, "<=", 0);
       }
+      // R37: potencia mínima «si se usa» — una entera 0/1 por mercado y año (espejo de grid.jl)
+      const minp = (mk.min_power ?? 0) * yearFactor(cfg, "min_power", mk.market_id, yr(y));
+      if (minp > 0 && mk.max_power != null) {
+        const u = `mu_${id}_${y}`;
+        const av = byYearAt(cfg, cfg.market_availability_by_year?.[mk.market_id], yr(y)) ??
+                   cfg.market_availability?.[mk.market_id];
+        integers.push(u);
+        row(`mub_${id}_${y}`, { [u]: 1 }, "<=", 1);
+        for (const s of steps) {
+          const c = mk.max_power * (av?.[s - 1] ?? 1);
+          row(`mmin_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1, [u]: -Math.min(minp, c) }, ">=", 0);
+          row(`mmax_${id}_${s}_${y}`, { [`mf_${id}_${s}_${y}`]: 1, [u]: -c }, "<=", 0);
+        }
+      }
       if (mk.max_annual != null) {
         const t = T();
         steps.forEach((s) => inc(t, `mf_${id}_${s}_${y}`, W(s, y)));

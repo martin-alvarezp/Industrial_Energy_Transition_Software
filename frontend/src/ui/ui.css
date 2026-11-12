@@ -512,6 +512,8 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .rc-tip-row.tot { border-top: 1px solid var(--ui-border-2); margin-top: 4px; padding-top: 4px; }
 /* hoja de ruta de medidas: equipo × año optimizado */
 .mt-grid { position: relative; display: grid; align-items: stretch; font-size: 12.5px; }
+/* pantallas angostas: muchos hitos no caben → la grilla se desplaza dentro de su tarjeta */
+@media (max-width: 760px) { .mt-grid { overflow-x: auto; } }
 .mt-h { padding: 4px 0 8px; text-align: center; font-size: 12px; color: var(--ui-muted); border-bottom: 1px solid var(--ui-border-2); }
 .mt-l { padding: 0 12px 0 0; height: 30px; line-height: 30px; display: block; text-align: right;
         color: var(--ui-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

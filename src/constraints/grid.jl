@@ -69,6 +69,27 @@ function add_grid_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelPara
     m[:market_power_cap] = power_cap
     m[:market_annual_cap] = annual_cap
 
+    # R37: potencia mínima «si se usa». Una binaria por mercado y año: el año que
+    # el mercado se usa, cada paso lleva al menos el mínimo (acotado por el tope
+    # disponible de ese paso); el año que no, no pasa nada por él. Es el «o no
+    # vendes, o vendes al menos X MW» de un contrato con piso.
+    used = Dict{Symbol,Any}()
+    for mk in sets.markets
+        mins = get(params.market_min_power, mk, nothing)
+        mins === nothing && continue
+        ys = [y for y in years if mins[y] > 0]
+        isempty(ys) && continue
+        av = get(cfg.market_availability, mk, nothing)
+        avy = get(cfg.market_availability_by_year, mk, nothing)
+        cap(s, y) = params.market_power_cap[mk] *
+            (a = by_year_at(cfg, avy, sets.year_of[y]); a !== nothing ? a[s] : av === nothing ? 1.0 : av[s])
+        u = JuMP.@variable(m, [y in ys], Bin, base_name = "market_used_$(mk)")
+        JuMP.@constraint(m, [s in steps, y in ys], market_flow[mk, s, y] >= min(mins[y], cap(s, y)) * u[y])
+        JuMP.@constraint(m, [s in steps, y in ys], market_flow[mk, s, y] <= cap(s, y) * u[y])
+        used[mk] = u
+    end
+    m[:market_used] = used
+
     # cargo por demanda máxima (M2): peak[mk, estación, año] ≥ flujo en cada
     # paso de la estación — el costo (USD/kW·mes) va en el objetivo. Solo se
     # crean variables para mercados con cargo o penalización por exceso.

@@ -744,6 +744,7 @@ extend({
   "trade.price": ["Precio (USD/MWh)", "Price (USD/MWh)"],
   "trade.maxPower": ["Tope (MW)", "Cap (MW)"],
   "trade.maxAnnual": ["Volumen máx. (MWh/año)", "Max volume (MWh/yr)"],
+  "trade.minPower": ["Mín. si se usa (MW)", "Min. if used (MW)"],
   "trade.demandCharge": ["Cargo potencia (USD/kW·mes)", "Demand charge (USD/kW·mo)"],
   "trade.scheme": ["Esquema", "Scheme"],
   "trade.via": ["Conexión", "Connection"],

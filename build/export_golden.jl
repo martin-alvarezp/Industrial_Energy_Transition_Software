@@ -414,6 +414,16 @@ s52, c52 = apply_scenario(site0, with_config(cfg0; horizon_years = 5, ets_free_a
                                              ets_price_by_year = [20.0, 40.0, 60.0, 80.0, 100.0]), :least_cost)
 dump("demo_ets_por_anio_n5", s52, c52)
 
+# 53 · R37: potencia mínima «si se usa» de un mercado de venta (4 MW con tope 6),
+# la disponibilidad nocturna (50 %) recorta el mínimo al tope del paso y el factor
+# del año 2 lo apaga
+s53, c53 = mt_site()
+s53 = IETO._with(s53; markets = Dict(:buy => s53.markets[:buy],
+    :sell => IETO._with(s53.markets[:sell]; price = fill(95.0, 24), max_power = 6.0, min_power = 4.0)))
+dump("venta_minima_si_se_usa_n2", s53, with_config(c53; horizon_years = 2,
+     market_availability = Dict(:sell => [fill(1.0, 12); fill(0.5, 12)]),
+     year_factors = Dict(:min_power => Dict(:sell => [(2, 0.0)]))))
+
 println("fixtures dorados en ", out)
 
 # Nodos con muchos componentes (como los arma la interfaz): todo el demo en el

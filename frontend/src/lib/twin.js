@@ -754,7 +754,7 @@ export function blankMarket(siteJson) {
   const carrier_id = carrier?.carrier_id ?? "";
   return {
     market_id: "", name: "", carrier_id, direction: "buy",
-    price_flat: 80, max_power: null, max_annual: null,
+    price_flat: 80, max_power: null, max_annual: null, min_power: null,
     emission_factor: null, demand_charge: null,
     contracted_power: null, excess_penalty: null, scheme: null, netting: null,
     connection: connectionsFor(siteJson, carrier_id)[0]?.tech_id ?? null,
@@ -791,10 +791,11 @@ export function upsertMarket(siteJson, draft) {
   const { price_flat, ...row } = draft;
   const nsteps = siteJson.timesteps?.length ?? 96;
   if (!row.price) row.price = Array(nsteps).fill(price_flat ?? 0);
-  ["max_power", "max_annual", "emission_factor", "connection", "demand_charge",
+  ["max_power", "max_annual", "min_power", "emission_factor", "connection", "demand_charge",
    "contracted_power", "excess_penalty", "scheme", "netting"].forEach((k) => {
     if (row[k] == null || row[k] === "") row[k] = null;
   });
+  if (!(+row.min_power > 0)) delete row.min_power;   // R37: sin mínimo, sin clave (como en Julia)
   const base = (siteJson.markets ?? []).length > 0
     ? siteJson.markets : legacyMarkets(siteJson);
   const markets = base.filter((mk) => mk.market_id !== row.market_id);
@@ -831,10 +832,20 @@ export function marketProblems(draft, siteJson, isNew) {
   }
   for (const [k, label] of [["max_power", "tope de potencia"],
                             ["max_annual", "tope anual"],
+                            ["min_power", "mínimo si se usa"],
                             ["emission_factor", "factor de emisión"],
                             ["demand_charge", "cargo por demanda"]]) {
     if (draft[k] != null && draft[k] !== "" && !(+draft[k] >= 0))
       p.push(`el ${label} debe ser ≥ 0`);
+  }
+  // R37: el mínimo «si se usa» necesita un tope de potencia ≥ el mínimo (espejo de validation.jl)
+  if (+draft.min_power > 0) {
+    if (draft.max_power == null || draft.max_power === "")
+      p.push("el mínimo si se usa necesita un tope de potencia");
+    else if (+draft.min_power > +draft.max_power)
+      p.push("el mínimo si se usa supera el tope de potencia");
+    if (draft.scheme === "net_metering")
+      p.push("el mínimo si se usa no aplica con net metering");
   }
   if (draft.price_flat != null && !(+draft.price_flat >= 0) && !draft.price)
     p.push("el precio debe ser ≥ 0");

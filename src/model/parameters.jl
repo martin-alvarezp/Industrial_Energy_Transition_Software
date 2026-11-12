@@ -68,6 +68,7 @@ struct ModelParameters
     arc_cap::Dict{Symbol,Float64}                    # key → MW (Inf = sin tope)
     arc_eff::Dict{Symbol,Float64}                    # key → η de transporte en (0,1]
     renewal_capex_by::Dict{Symbol,Vector{Float64}}   # [y] renovaciones por tecnología (R27: su plazo)
+    market_min_power::Dict{Symbol,Vector{Float64}}   # R37: mercado → [y] MW mínimos si se usa (× factor del año)
 end
 
 # ry[y] = año relativo real del índice y (R6: años hito)
@@ -418,5 +419,7 @@ function build_parameters(site::Site, cfg::ScenarioConfig)
                            cfg.repeat_investments, renewal_capex, forced,
                            nm_periods, nm_retail, nm_buys,
                            node_of, demand_node, market_node,
-                           arc_carrier, arc_from, arc_to, arc_cap, arc_eff, renewal_capex_by)
+                           arc_carrier, arc_from, arc_to, arc_cap, arc_eff, renewal_capex_by,
+                           Dict{Symbol,Vector{Float64}}(id => [mk.min_power * year_factor(cfg, :min_power, id, r) for r in ry]
+                                                        for (id, mk) in mkts if mk.min_power > 0))
 end

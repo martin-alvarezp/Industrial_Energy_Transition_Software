@@ -173,7 +173,16 @@ struct Market
     netting::Symbol                         # período de neteo del net metering:
                                             # :season | :year
     tariff::GridTariff                      # tarifa de red (4.3); default: ninguna
+    min_power::Float64                      # R37: MW mínimos «si se usa»: el año que el
+                                            # mercado se usa, cada paso lleva ≥ min_power;
+                                            # el que no, nada (0 = sin mínimo)
 end
+
+# retro-compatibilidad: 15 campos (pre-R37) → sin potencia mínima
+Market(id::Symbol, name::String, c::Symbol, dir::Symbol, price::Vector{Float64},
+       mp::Float64, ma::Float64, ef::Union{Float64,Nothing}, conn::Symbol,
+       dc::Float64, cp::Float64, pen::Float64, sch::Symbol, net::Symbol, t::GridTariff) =
+    Market(id, name, c, dir, price, mp, ma, ef, conn, dc, cp, pen, sch, net, t, 0.0)
 
 # retro-compatibilidad: 14 campos (pre-4.3) → sin tarifa de red
 Market(id::Symbol, name::String, c::Symbol, dir::Symbol, price::Vector{Float64},
@@ -990,7 +999,8 @@ ScenarioConfig(a::Vararg{Any,51}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol
 "Tipos de factor por año (R3) y a qué apuntan."
 const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex,
                            :input_ratio,   # R11: entradas de un conversor por año (eficiencia)
-                           :offset_price)  # R20: precio de la compensación por año (objetivo "offsets")
+                           :offset_price,  # R20: precio de la compensación por año (objetivo "offsets")
+                           :min_power)     # R37: potencia mínima «si se usa» de un mercado por año
 
 """
     year_factor(cfg, kind, target, y) -> Float64

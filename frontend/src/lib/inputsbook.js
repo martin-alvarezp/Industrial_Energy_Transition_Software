@@ -84,7 +84,7 @@ export async function buildInputsBook({ name, title, site, layout, config }) {
      "investable", "capex_per_kw", "fixed_opex", "variable_opex", "lifetime_years", "remaining_life", "storage_hours", "ports"]) });
   sheets.push({ name: "Vectores", rows: table(core.carriers ?? [], ["carrier_id", "name", "unit", "category"]) });
   sheets.push({ name: "Mercados", rows: table((core.markets ?? []).map(({ price, ...m }) => m),
-    ["market_id", "name", "carrier_id", "direction", "connection", "max_power", "emission_factor"]) });
+    ["market_id", "name", "carrier_id", "direction", "connection", "max_power", "min_power", "max_annual", "emission_factor"]) });
   sheets.push({ name: "Emisiones", rows: table(core.emission_factors ?? [], ["carrier_id", "scope", "factor"]) });
   sheets.push({ name: "Pasos", rows: table(core.timesteps ?? [], ["step_id", "season", "hour", "weight_hours"]) });
 

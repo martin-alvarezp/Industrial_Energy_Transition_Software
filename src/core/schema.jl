@@ -218,7 +218,8 @@ function load_markets(dir::AbstractString, nsteps::Int)
                              grid_tariff(k -> k == :blocks ?
                                  (hasproperty(r, :blocks) && !ismissing(r.blocks) &&
                                   !isempty(strip(String(r.blocks))) ? JSON3.read(String(r.blocks)) : nothing) :
-                                 opt_num(k)))
+                                 opt_num(k)),
+                             something(opt_num(:min_power), 0.0))   # R37
     end
     return markets
 end

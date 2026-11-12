@@ -107,14 +107,19 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
         ) : (
           <Field label={L("Precio plano (USD/MWh)", "Flat price (USD/MWh)")}
                  hint={L("crea la serie de partida; luego editable por paso en Series de tiempo", "creates the starting series; editable per step later in Timeseries")}>
-            <OptNum value={draft.price_flat} step={1}
+            <OptNum value={draft.price_flat} step={1} data-testid="market-price-flat"
                     onChange={(v) => set({ price_flat: v ?? 0 })} />
           </Field>
         )}
         <Field label={L("Tope de potencia (MW por paso, opcional)", "Power cap (MW per step, optional)")}
                hint={L("capacidad máxima del contrato — además del límite físico de la conexión", "contract maximum — on top of the connection's physical limit")}>
-          <OptNum value={draft.max_power} step={1} min={0} placeholder={L("sin tope", "no cap")}
+          <OptNum value={draft.max_power} step={1} min={0} placeholder={L("sin tope", "no cap")} data-testid="market-max-power"
                   onChange={(v) => set({ max_power: v })} />
+        </Field>
+        <Field label={L("Mínimo si se usa (MW por paso, opcional)", "Minimum if used (MW per step, optional)")}
+               hint={L("o no pasa nada por el contrato ese año, o cada paso lleva al menos este mínimo (necesita tope de potencia; por año con year_factors.min_power)", "either nothing flows through the contract that year, or every step carries at least this minimum (needs a power cap; per year via year_factors.min_power)")}>
+          <OptNum value={draft.min_power} step={1} min={0} placeholder={L("sin mínimo", "no minimum")} data-testid="market-min-power"
+                  onChange={(v) => set({ min_power: v })} />
         </Field>
         <Field label={L("Tope anual (MWh/año, opcional)", "Annual cap (MWh/yr, optional)")}
                hint={L("volumen máximo del contrato por año", "maximum contract volume per year")}>

@@ -225,7 +225,9 @@ function site_json(site::Site)
                  excess_penalty = mk.excess_penalty == 0.0 ? nothing : mk.excess_penalty,
                  scheme = mk.scheme == :billing ? nothing : String(mk.scheme),
                  netting = mk.netting == :year ? nothing : String(mk.netting)) |>
-                (nt -> _tariff_json(nt, mk.tariff))
+                (nt -> _tariff_json(nt, mk.tariff)) |>
+                # R37: la clave solo si hay mínimo (la huella de los sitios sin él no cambia)
+                (nt -> mk.min_power > 0 ? merge(nt, (min_power = mk.min_power,)) : nt)
                 for mk in values(site.markets)]
         sort!(mkts; by = x -> x.market_id)
         result = merge(result, (markets = mkts,))
@@ -476,7 +478,8 @@ function site_from_json(obj; default_name::AbstractString = "twin")
                 grid_tariff(k -> begin
                     v = _twin_get(mk, k)
                     v === nothing || k == :blocks ? v : _twin_num(v, k, ctx)
-                end))
+                end),
+                (v -> v === nothing ? 0.0 : _twin_num(v, :min_power, ctx))(_twin_get(mk, :min_power)))   # R37
         end
     end
 
