@@ -165,7 +165,9 @@ export default function SummaryPage() {
   }, [cmp, cmpData, loadRunBundle]);
   const addCmp = () => {
     const taken = new Set([viewing?.id, ...cmp]);
-    const next = [...runs].reverse().find((r) => !taken.has(r.id)) ?? runs.find((r) => !taken.has(r.id));
+    // la corrida más reciente que no esté ya en pantalla
+    const next = [...runs].sort((a, b) => String(b.saved_at ?? "").localeCompare(String(a.saved_at ?? "")))
+      .find((r) => !taken.has(r.id));
     if (next) setCmp((c) => [...c, next.id]);
   };
   const [prefs, setPrefs] = useStored("ieto.summary.prefs", { impact: "real", scale: 1000000 });

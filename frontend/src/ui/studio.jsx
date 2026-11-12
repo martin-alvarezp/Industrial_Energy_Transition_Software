@@ -8,8 +8,11 @@ import { DEFAULT_CONFIG } from "../lib/mockEngine.js";
 import {
   compute, fetchSite, apiAvailable, listSites, saveSite as apiSaveSite,
   deleteSite as apiDeleteSite, listRuns, fetchRun, saveRun, deleteRun, enginePayload,
-  daySequence,
+  daySequence, BUNDLED_SITES,
 } from "../lib/api.js";
+import {
+  putLocalSite, deleteLocalSite, listLocalRuns, getLocalRun, putLocalRun, deleteLocalRun, deleteLocalRunsOf,
+} from "../lib/localdb.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
@@ -147,9 +150,12 @@ export function StudioProvider({ children }) {
       await refreshSites();
       await loadSite(name, { force: true });
     } else {
+      // sin API nace en este navegador (IndexedDB): sobrevive a recargar
+      await putLocalSite(name, siteJson, toGeoJSON(layout));
       setSiteName(name);
-      setTwin({ siteJson, layout, source: "local", dirty: true, saved: false });
+      setTwin({ siteJson, layout, source: "local", dirty: false, saved: false });
       setDraftState(cfg);
+      await refreshSites();
     }
     return name;
   }, [apiUp, logChange, refreshSites, loadSite]);
@@ -183,22 +189,45 @@ export function StudioProvider({ children }) {
   }, [siteName, twin, logChange, refreshSites, loadSite]);
 
   const removeSite = useCallback(async (name) => {
-    await apiDeleteSite(name);
+    // sin API: el sistema (o la copia editada de un ejemplo) vive en este navegador
+    if (!apiUp) { await deleteLocalSite(name); await deleteLocalRunsOf(name); }
+    else await apiDeleteSite(name);
     logChange(`Sistema '${name}' eliminado`, "delete", null);
     if (name === siteName) { setSiteName(null); setTwin(null); setData(null); }
     await refreshSites();
-  }, [siteName, logChange, refreshSites]);
+  }, [siteName, logChange, refreshSites, apiUp]);
+
+  /** Sin API: vuelve un sistema de ejemplo a su versión original (borra la copia local). */
+  const resetSite = useCallback(async (name) => {
+    await deleteLocalSite(name);
+    await deleteLocalRunsOf(name);
+    writeJSON(cfgKey(name), null);
+    logChange(`Sistema '${name}' vuelto a su versión original`, "delete", name);
+    if (name === siteName) { setData(null); setViewing(null); setLocalRuns((l) => l.filter((r) => r.site !== name)); await loadSite(name, { force: true }); }
+    await refreshSites();
+  }, [siteName, logChange, refreshSites, loadSite]);
 
   // ── guardado automático: un sistema en disco se guarda solo tras cada
   // edición (con pausa de 1,2 s). El demo es la referencia y es de solo
-  // lectura; un sistema sin API vive en memoria.
+  // lectura. Sin API, el sistema se guarda en este navegador (IndexedDB).
   const [saveStatus, setSaveStatus] = useState({ state: "idle" });
   const saveTimer = useRef(null);
   const readonly = siteName === "demo";
   useEffect(() => {
     if (!twin?.dirty) return;
-    if (!apiUp || !twin.saved) { setSaveStatus({ state: "local" }); return; }
     if (readonly) { setSaveStatus({ state: "readonly" }); return; }
+    if (!apiUp) {
+      clearTimeout(saveTimer.current);
+      setSaveStatus({ state: "pending" });
+      const snap = twin;
+      saveTimer.current = setTimeout(async () => {
+        const ok = await putLocalSite(siteName, snap.siteJson, toGeoJSON(snap.layout));
+        if (ok) setTwin((t) => (t === snap ? { ...t, dirty: false, source: "local" } : t));
+        setSaveStatus(ok ? { state: "browser", at: new Date() } : { state: "local" });
+      }, 1200);
+      return () => clearTimeout(saveTimer.current);
+    }
+    if (!twin.saved) { setSaveStatus({ state: "local" }); return; }
     clearTimeout(saveTimer.current);
     setSaveStatus({ state: "pending" });
     const snap = twin;
@@ -229,12 +258,24 @@ export function StudioProvider({ children }) {
   const dataRef = useRef(data);
   dataRef.current = data;
   useEffect(() => {
-    refreshRuns().then(async (l) => {
+    // sin API: las corridas guardadas en este navegador para el sistema
+    const offline = async () => {
+      if (apiUp !== false || !siteName) return [];
+      const l = await listLocalRuns(siteName);
+      setLocalRuns((prev) => [...prev.filter((r) => r.site !== siteName || !l.some((x) => x.id === r.id)),
+                              ...l.filter((x) => !prev.some((r) => r.id === x.id))]);
+      return l;
+    };
+    Promise.all([refreshRuns(), offline()]).then(async ([api, loc]) => {
+      const l = [...(api ?? []), ...(loc ?? [])];
       if (!siteName || autoOpened.current === siteName || !l?.length || dataRef.current) return;
       autoOpened.current = siteName;
       const last = [...l].sort((a, b) => (b.saved_at ?? "").localeCompare(a.saved_at ?? ""))[0];
       try {
-        const rec = await fetchRun(siteName, last.id);
+        const rec = last.id.startsWith("local-")
+          ? { name: last.name, payload: (await getLocalRun(last.id))?.bundle }
+          : await fetchRun(siteName, last.id);
+        if (!rec.payload) return;
         if (dataRef.current) return;   // el usuario corrió algo mientras tanto
         const p = rec.payload;
         setData({ ...p, source: p.source ?? "saved" });
@@ -308,9 +349,12 @@ export function StudioProvider({ children }) {
         await refreshRuns(siteName);
       } else {
         id = "local-" + uid();
-        setLocalRuns((l) => [{ id, name: runName, notes, saved_at: stamp.toISOString(),
+        const rec = { id, name: runName, notes, saved_at: stamp.toISOString(),
           scenario: d.result?.meta?.scenario, feasible: d.result?.meta?.feasible,
-          npv: d.result?.kpis?.npv ?? null, site: siteName, bundle }, ...l]);
+          npv: d.result?.kpis?.npv ?? null, site: siteName, bundle };
+        setLocalRuns((l) => [rec, ...l]);
+        // sin API la corrida se guarda en este navegador (sobrevive a recargar)
+        if (!apiUp) putLocalRun(rec);
       }
       setViewing({ id, name: runName, site: siteName });
       logChange(`Optimización '${runName}' ${d.result?.meta?.feasible ? "factible" : "infactible"}`, "run");
@@ -323,9 +367,11 @@ export function StudioProvider({ children }) {
     }
   }, [twin, draft, siteName, apiUp, refreshRuns, logChange, prepare]);
 
+  // bundle de una corrida local: en memoria o, tras recargar, en IndexedDB
+  const localBundle = async (local) => local.bundle ?? (await getLocalRun(local.id))?.bundle;
   const openRun = useCallback(async (id) => {
     const local = localRuns.find((r) => r.id === id);
-    const rec = local ? { name: local.name, payload: local.bundle } : await fetchRun(siteName, id);
+    const rec = local ? { name: local.name, payload: await localBundle(local) } : await fetchRun(siteName, id);
     const p = rec.payload;
     setData({ ...p, source: p.source ?? "saved" });
     if (p.site_snapshot) setAppliedSiteJson(p.site_snapshot);
@@ -337,13 +383,13 @@ export function StudioProvider({ children }) {
   /** El bundle de una corrida SIN abrirla (comparación lado a lado). */
   const loadRunBundle = useCallback(async (id) => {
     const local = localRuns.find((r) => r.id === id);
-    if (local) return { name: local.name, payload: local.bundle };
+    if (local) return { name: local.name, payload: await localBundle(local) };
     const rec = await fetchRun(siteName, id);
     return { name: rec.name, payload: rec.payload };
   }, [siteName, localRuns]);
 
   const removeRun = useCallback(async (id) => {
-    if (id.startsWith("local-")) setLocalRuns((l) => l.filter((r) => r.id !== id));
+    if (id.startsWith("local-")) { setLocalRuns((l) => l.filter((r) => r.id !== id)); deleteLocalRun(id); }
     else { await deleteRun(siteName, id); await refreshRuns(); }
     if (viewing?.id === id) { setViewing(null); }
   }, [siteName, refreshRuns, viewing]);
@@ -359,7 +405,7 @@ export function StudioProvider({ children }) {
   const value = {
     apiUp, sites, refreshSites,
     siteName, twin, twinState, setTwin, loadSite, createSite, patchSite, patchLayout,
-    saveCurrentSite, removeSite, saveStatus, readonly,
+    saveCurrentSite, removeSite, resetSite, saveStatus, readonly,
     draft, setDraft, applied, running, runError, run, evaluate,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,

@@ -33,7 +33,7 @@ export function SaveStatus() {
   const s = saveStatus?.state;
   if (!s || s === "idle") return null;
   const label = { saved: "save.saved", saving: "save.saving", pending: "save.pending",
-                  readonly: "save.readonly", local: "save.local", error: "save.error" }[s];
+                  readonly: "save.readonly", local: "save.local", error: "save.error", browser: "save.browser" }[s];
   return <span className={"ip-save" + (s === "error" ? " err" : "")}
                title={saveStatus.message ?? ""}>{t(label)}</span>;
 }

@@ -341,6 +341,11 @@ extend({
   "save.pending": ["Cambios pendientes…", "Pending changes…"],
   "save.readonly": ["Demo de solo lectura", "Read-only demo"],
   "save.local": ["Sin guardar (sólo en esta sesión)", "Not saved (this session only)"],
+  "save.browser": ["Guardado en este navegador", "Saved in this browser"],
+  "systems.browser": ["En este navegador", "In this browser"],
+  "systems.reset": ["Volver al original", "Back to the original"],
+  "systems.resetConfirm": ["¿Volver «{name}» a su versión original? Se borran las ediciones y las corridas guardadas en este navegador.", "Reset «{name}» to its original version? Edits and runs saved in this browser are deleted."],
+  "systems.resetDone": ["Volvió a la versión original", "Back to the original version"],
   "save.error": ["No se pudo guardar", "Could not save"],
   "save.copy": ["Guardar una copia", "Save a copy"],
   "save.copyName": ["Nombre de la copia", "Copy name"],
@@ -488,8 +493,8 @@ extend({
   "opt.deleteConfirm": ["¿Eliminar la corrida '{name}'?", "Delete run '{name}'?"],
   "opt.empty": ["Aún no hay optimizaciones en este sistema.", "There are no optimizations in this system yet."],
   "opt.running": ["Optimizando con HiGHS…", "Optimizing with HiGHS…"],
-  "opt.localOnly": ["Sin API o sistema sin guardar: las corridas viven sólo en esta sesión.",
-                    "No API or unsaved system: runs live only in this session."],
+  "opt.localOnly": ["Versión web: las corridas se guardan en este navegador (sobreviven a recargar, no viajan a otro equipo). Para llevarlas a otro lado, exporta el proyecto desde Sistemas.",
+                    "Web version: runs are saved in this browser (they survive a reload, not other devices). To take them elsewhere, export the project from Systems."],
   "opt.compare": ["Comparar corridas", "Compare runs"],
 });
 

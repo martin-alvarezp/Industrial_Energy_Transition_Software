@@ -1,13 +1,13 @@
 import { SLR } from "../palette.js";
 import { useEffect, useRef, useState } from "react";
-import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete } from "../iconset.jsx";
+import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete, IcRefresh } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { NAV_ICONS } from "../icons.jsx";
 import { Menu, Modal, PageHead, Empty, useFlash } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { siteMeta, invalidateSiteMeta, satelliteTile, fileToCover } from "../sitemeta.js";
-import { fetchSite, saveSite, HIDDEN_SITES } from "../../lib/api.js";
+import { fetchSite, saveSite, HIDDEN_SITES, BUNDLED_SITES } from "../../lib/api.js";
 import { fromGeoJSON, toGeoJSON } from "../layout.js";
 import { MapContainer, TileLayer, Polygon, CircleMarker, useMap, useMapEvents } from "react-leaflet";
 import AddressSearch from "../../components/twin/AddressSearch.jsx";
@@ -26,7 +26,7 @@ async function rewriteSite(from, to, editLayout = (l) => l) {
 
 function SystemCard({ name, onChanged, unsaved = false }) {
   const { t } = useI18n();
-  const { apiUp, removeSite, siteName, twin } = useStudio();
+  const { apiUp, removeSite, resetSite, siteName, twin } = useStudio();
   const [meta, setMeta] = useState(null);
   const [rename, setRename] = useState(null);
   const [flash, setFlash] = useFlash();
@@ -44,6 +44,13 @@ function SystemCard({ name, onChanged, unsaved = false }) {
     : `linear-gradient(135deg, ${SLR.limeDark}, ${SLR.green100})`;
   const open = () => navigate(hrefFor({ site: name, page: "infrastructure" }));
   const canWrite = apiUp && !unsaved;
+  // sin API: guardado en este navegador (creado aquí, o la copia editada de un ejemplo)
+  const inBrowser = !apiUp && meta?.source === "local";
+  const isExample = !!BUNDLED_SITES[name];
+  const doReset = async () => {
+    if (!window.confirm(t("systems.resetConfirm", { name: meta?.title ?? name }))) return;
+    await resetSite(name); invalidateSiteMeta(name); onChanged(); setFlash(t("systems.resetDone"));
+  };
   const doDuplicate = async () => {
     const to = slug(`${name}_copia`);
     try { await rewriteSite(name, to); invalidateSiteMeta(to); onChanged(); setFlash(`✓ ${to}`); }
@@ -78,7 +85,7 @@ function SystemCard({ name, onChanged, unsaved = false }) {
          onKeyDown={(e) => e.key === "Enter" && open()} data-testid={`system-${name}`}>
       <div className="ui-sys-cover" style={{ backgroundImage: cover }}>
         <span className="ui-sys-badge">
-          {unsaved ? t("systems.local") : name === "demo" ? t("systems.example") : t("common.admin")}
+          {unsaved ? t("systems.local") : inBrowser ? t("systems.browser") : name === "demo" ? t("systems.example") : t("common.admin")}
         </span>
       </div>
       <div className="ui-sys-body">
@@ -98,9 +105,10 @@ function SystemCard({ name, onChanged, unsaved = false }) {
             hidden: !canWrite || name === "demo" },
           { label: t("systems.cover"), icon: IcImage, onClick: () => fileRef.current?.click(),
             hidden: !canWrite || name === "demo" },
+          { label: t("systems.reset"), icon: IcRefresh, onClick: doReset, hidden: !(inBrowser && isExample) },
           "-",
           { label: t("common.delete"), icon: IcDelete, danger: true, onClick: doDelete,
-            hidden: !canWrite || name === "demo" },
+            hidden: !(canWrite || (inBrowser && !isExample)) || name === "demo" },
         ]} />
       </div>
       <input ref={fileRef} type="file" accept="image/*" hidden

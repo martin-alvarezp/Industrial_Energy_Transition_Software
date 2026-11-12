@@ -6,6 +6,7 @@ import {
   runPareto as mockPareto, runBatch as mockBatch, mockSiteJson,
 } from "./mockEngine.js";
 import { tornadoLevers, buildTornado } from "./sensitivity.js";
+import { getLocalSite, listLocalSites } from "./localdb.js";
 
 /** ¿Solo la corrida pedida? Modo despacho o "solo esta corrida" del modal:
  *  sin Pareto ni escenarios de comparación (misma regla que milp/engine.js). */
@@ -25,7 +26,7 @@ export const enginePayload = (sj) => {
 //   con su configuración por defecto en layout.siteConfig.
 // · planta_red: planta con topología de red (M14), anclada a Julia por los
 //   fixtures dorados planta_red_n5/n10 (verify:wasm); oculta de la lista.
-const BUNDLED_SITES = {
+export const BUNDLED_SITES = {
   dummy_mexico: () => import("../demo/dummy_mexico.json"),
   dummy_japon: () => import("../demo/dummy_japon.json"),
   planta_red: () => import("../demo/planta_red.json"),
@@ -397,12 +398,14 @@ export const runParetoSweep = (cfg, sitePayload, siteName, points = 9, capEndMin
 /** GET /sites: sitios guardados disponibles. Sin API van los sitios embebidos:
  * la planta con red (topología M14) y el demo de placa de cobre. */
 export async function listSites() {
-  if (!(await apiAvailable())) return [...Object.keys(BUNDLED_SITES), "demo"];
+  // sin API: los embebidos más los guardados en este navegador (IndexedDB)
+  const offline = async () => [...new Set([...(await listLocalSites()), ...Object.keys(BUNDLED_SITES), "demo"])];
+  if (!(await apiAvailable())) return offline();
   try {
     const resp = await fetch(API_BASE + "/sites");
     if (resp.ok) return (await resp.json()).sites;
   } catch { /* fallthrough */ }
-  return [...Object.keys(BUNDLED_SITES), "demo"];
+  return offline();
 }
 
 /** PUT /sites/{name}: persiste el twin (CSVs + layout.geojson). */
@@ -452,6 +455,10 @@ export async function fetchSite(name = "demo") {
       console.warn("GET /sites falló, usando mock:", err);
     }
   }
+  // guardado en este navegador (sin API): un sistema creado aquí, o la copia
+  // editada de un sistema de ejemplo, manda sobre el embebido
+  const local = await getLocalSite(name);
+  if (local?.site) return { source: "local", site: { ...local.site, layout: local.layout } };
   // sitio embebido: viaja completo (incluido el layout del mapa) y el motor
   // del navegador lo resuelve de verdad — no es un mock de resultados
   if (BUNDLED_SITES[name])
