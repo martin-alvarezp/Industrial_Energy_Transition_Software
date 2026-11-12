@@ -250,6 +250,31 @@ end
     end
 end
 
+@testset "edge: diagnóstico cuenta la demanda que solo se produce desde otro vector" begin
+    # caldera a gas de 10 MW; el agua caliente (8 MW) solo sale del intercambiador
+    # vapor → agua caliente (15 MW). El vapor directo (6 MW) cabe, el agua caliente
+    # también, pero juntos piden 14 MW de vapor: el diagnóstico debe decirlo así
+    steps = [TimeStep(i, "all", i - 1, 8760.0 / 4) for i in 1:4]
+    carriers = Dict(:gas => Carrier(:gas, "Gas", "MWh", :fuel),
+                    :steam => Carrier(:steam, "Vapor", "MWh", :heat),
+                    :hot_water => Carrier(:hot_water, "Agua caliente", "MWh", :heat))
+    sources = Dict(:gas_in => Source(:gas_in, "Gas", :gas, 100.0, 0.0, false, TechCosts(0.0, 0.0, 0.0, 40)))
+    convs = Dict(:boiler => Converter(:boiler, "Caldera", :gas, :steam, 0.9, 10.0, 0.0, false, TechCosts(0.0, 0.0, 0.0, 25)),
+                 :hx => Converter(:hx, "Intercambiador", :steam, :hot_water, 1.0, 15.0, 0.0, false, TechCosts(0.0, 0.0, 0.0, 25)))
+    site = Site("edge_captive", steps, carriers, sources, convs, Dict{Symbol,Generator}(), Dict{Symbol,Storage}(),
+                Dict(:steam => Demand(:steam, fill(6.0, 4)), :hot_water => Demand(:hot_water, fill(8.0, 4))),
+                Dict(:gas => PriceSeries(:gas, fill(30.0, 4))), [EmissionFactor(:gas, :scope1, 0.2)])
+    r = _solve(site, edge_cfg(horizon = 1))
+    @test !r.feasible
+    @test any(h -> occursin("falta capacidad de Vapor", h) && occursin("contando Agua caliente", h), r.diagnostics)
+    @test !any(h -> occursin("falta capacidad de Agua caliente", h), r.diagnostics)
+    # con una caldera de 15 MW alcanza
+    convs[:boiler] = Converter(:boiler, "Caldera", :gas, :steam, 0.9, 15.0, 0.0, false, TechCosts(0.0, 0.0, 0.0, 25))
+    r2 = _solve(Site("edge_captive", steps, carriers, sources, convs, Dict{Symbol,Generator}(), Dict{Symbol,Storage}(),
+                     site.demands, site.prices, site.emission_factors), edge_cfg(horizon = 1))
+    @test r2.feasible
+end
+
 @testset "edge: allowed_techs excluye la red (isla eléctrica)" begin
     site, cfg = load_and_validate(DEMO_DIR)
     no_grid = [t for t in cfg.allowed_techs if t != :grid_import]

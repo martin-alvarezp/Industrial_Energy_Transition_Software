@@ -101,10 +101,8 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         return mw
     end
     EMK = effective_markets(site)
-    for c in sets.demand_carriers, k in 1:N
-        r = ry[k]
-        base = something(demand_profile_at(cfg, c, r), site.demands[c].values)
-        peak = maximum(base) * grow(k) * year_factor(cfg, :demand, c, r)
+    # lo máximo que los equipos permitidos pueden entregar del vector c en el año r
+    function supply_of(c, r)
         supply = 0.0
         who = String[]
         add!(name, mw) = mw > 1e-9 && (supply += mw; push!(who, "$name $(_r1(mw))"))
@@ -130,15 +128,67 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
             supply += cap
             push!(who, "compra $(mk.name)" * (isfinite(cap) ? " $(_r1(cap))" : ""))
         end
-        if peak > supply + 1e-6
-            push!(findings, InfeasibilityFinding(:capacity,
-                "falta capacidad de $(cname(c)) en $(calendar_year(cfg, r)): la punta de la demanda es " *
+        return supply, who
+    end
+    # vectores CAUTIVOS de c: toda su oferta permitida en el año r son conversores
+    # de una sola entrada que parten de c (p. ej. agua caliente que solo sale del
+    # intercambiador de vapor). Su demanda pesa sobre c, dividida por la mejor
+    # eficiencia. Devuelve [(vector, eficiencia)].
+    function captives_of(c, r)
+        out = Tuple{Symbol,Float64}[]
+        for d in sets.demand_carriers
+            d == c && continue
+            eff, other = 0.0, false
+            for id in sets.converters
+                cv = site.converters[id]
+                po = findfirst(p -> p.carrier == d, cv.outputs)
+                (po === nothing || cap_at(id, r) <= 1e-9) && continue
+                pi = findfirst(p -> p.carrier == c, cv.inputs)
+                (pi === nothing || length(cv.inputs) > 1) && (other = true; break)
+                eff = max(eff, cv.outputs[po].ratio / cv.inputs[pi].ratio)
+            end
+            (other || eff <= 0) && continue
+            any(id -> site.generators[id].output_carrier == d && cap_at(id, r) > 1e-9, sets.generators) && continue
+            any(id -> site.storages[id].carrier == d && cap_at(id, r) > 1e-9, sets.storages) && continue
+            any(mk -> mk.direction == :buy && mk.carrier == d, values(EMK)) && continue
+            push!(out, (d, eff))
+        end
+        return out
+    end
+    demand_at(c, k) = (r = ry[k]; something(demand_profile_at(cfg, c, r), site.demands[c].values) .*
+                                  (grow(k) * year_factor(cfg, :demand, c, r)))
+    for c in sets.demand_carriers
+        for k in 1:N
+            r = ry[k]
+            dem = demand_at(c, k)
+            supply, who = supply_of(c, r)
+            lack(peak, extra) = InfeasibilityFinding(:capacity,
+                "falta capacidad de $(cname(c)) en $(calendar_year(cfg, r))$(extra): la punta de la demanda es " *
                 "$(_r1(peak)) MW y lo máximo que pueden entregar los equipos permitidos es " *
                 "$(_r1(supply)) MW" * (isempty(who) ? " (ninguno)" : " ($(join(who, ", ")))") *
                 ", déficit $(_r1(peak - supply)) MW" *
                 " — permite comprar más (capacidad máxima, ventana de compra) o, en la situación " *
-                "actual, declara con qué equipos repone y crece"))
-            break
+                "actual, declara con qué equipos repone y crece")
+            peak = maximum(dem)
+            if peak > supply + 1e-6
+                push!(findings, lack(peak, ""))
+                break
+            end
+            # la demanda directa cabe, pero no junto con la de los vectores que
+            # solo se producen desde este (hora a hora, con su eficiencia)
+            caps = captives_of(c, r)
+            isempty(caps) && continue
+            tot = copy(dem)
+            for (d, eff) in caps
+                dd = demand_at(d, k)
+                length(dd) == length(tot) && (tot .+= dd ./ eff)
+            end
+            cpeak = maximum(tot)
+            if cpeak > supply + 1e-6
+                push!(findings, lack(cpeak, " (contando " * join([cname(d) for (d, _) in caps], ", ") *
+                                             ", que solo se produce desde $(cname(c)))"))
+                break
+            end
         end
     end
 

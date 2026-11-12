@@ -36,25 +36,71 @@ export function diagnoseWeb(site, cfg, scenario = "") {
     return mw;
   };
   const growth = (c, r) => Math.pow(1 + (cfg.demand_growth ?? 0), r - 1) * yearFactor(cfg, "demand", c, r);
+  const inputs = (t) => (t.ports?.inputs?.length ? t.ports.inputs
+    : t.input_carrier ? [{ carrier: t.input_carrier, ratio: 1 / (t.efficiency || 1) }] : []);
+  const demandAt = (c, r) => (demandProfileAt(cfg, c, r) ?? site.demands[c]).map((v) => v * growth(c, r));
+  // lo máximo que los equipos permitidos pueden entregar del vector c en el año r
+  const supplyOf = (c, r) => {
+    let supply = 0;
+    const who = [];
+    for (const t of techs) {
+      const out = outputs(t).find((p) => p.carrier === c);
+      if (!out || t.type === "source") continue;
+      const mw = capAt(t, r) * (out.ratio ?? 1);
+      if (mw > 1e-9) { supply += mw; who.push(`${nameOf(t.tech_id)} ${r1(mw)}`); }
+    }
+    for (const m of site.markets ?? [])
+      if (m.direction === "buy" && m.carrier_id === c) { supply += m.max_power ?? Infinity; who.push(`compra ${m.name ?? m.market_id}`); }
+    return [supply, who];
+  };
+  // vectores CAUTIVOS de c: toda su oferta permitida en el año r son conversores de
+  // una sola entrada que parten de c (agua caliente que solo sale del intercambiador
+  // de vapor); su demanda pesa sobre c dividida por la mejor eficiencia
+  const captivesOf = (c, r) => {
+    const out = [];
+    for (const d of Object.keys(site.demands ?? {})) {
+      if (d === c) continue;
+      let eff = 0, other = false;
+      for (const t of techs) {
+        if (t.type === "source") continue;
+        const po = outputs(t).find((p) => p.carrier === d);
+        if (!po || capAt(t, r) <= 1e-9) continue;
+        if (t.type !== "converter") { other = true; break; }
+        const ins = inputs(t);
+        const pi = ins.find((p) => p.carrier === c);
+        if (!pi || ins.length > 1) { other = true; break; }
+        eff = Math.max(eff, (po.ratio ?? 1) / (pi.ratio ?? 1));
+      }
+      if (other || !(eff > 0)) continue;
+      if ((site.markets ?? []).some((m) => m.direction === "buy" && m.carrier_id === d)) continue;
+      out.push([d, eff]);
+    }
+    return out;
+  };
   for (const c of Object.keys(site.demands ?? {})) {
     for (const r of yo) {
-      const base = demandProfileAt(cfg, c, r) ?? site.demands[c];
-      const peak = Math.max(...base) * growth(c, r);
+      const dem = demandAt(c, r);
+      const peak = Math.max(...dem);
       if (!(peak > 0)) continue;
-      let supply = 0;
-      const who = [];
-      for (const t of techs) {
-        const out = outputs(t).find((p) => p.carrier === c);
-        if (!out || t.type === "source") continue;
-        const mw = capAt(t, r) * (out.ratio ?? 1);
-        if (mw > 1e-9) { supply += mw; who.push(`${nameOf(t.tech_id)} ${r1(mw)}`); }
-      }
-      for (const m of site.markets ?? [])
-        if (m.direction === "buy" && m.carrier_id === c) { supply += m.max_power ?? Infinity; who.push(`compra ${m.name ?? m.market_id}`); }
+      const [supply, who] = supplyOf(c, r);
+      const lack = (pk, extra) => `Falta capacidad de ${cName(c)} en ${cal(r)}${extra}: la punta de la demanda es ${r1(pk)} MW y lo máximo que ` +
+        `pueden entregar los equipos permitidos es ${r1(supply)} MW${who.length ? ` (${who.join(", ")})` : " (ninguno)"}.`;
       if (peak > supply + 1e-6) {
-        hints.push(`Falta capacidad de ${cName(c)} en ${cal(r)}: la punta de la demanda es ${r1(peak)} MW y lo máximo que ` +
-          `pueden entregar los equipos permitidos es ${r1(supply)} MW${who.length ? ` (${who.join(", ")})` : " (ninguno)"}.`);
+        hints.push(lack(peak, ""));
         break;   // un aviso por vector: el primer año en que falta
+      }
+      // la demanda directa cabe, pero no junto con la de los vectores que solo se producen desde este
+      const caps = captivesOf(c, r);
+      if (!caps.length) continue;
+      const tot = [...dem];
+      for (const [d, eff] of caps) {
+        const dd = demandAt(d, r);
+        if (dd.length === tot.length) for (let i = 0; i < tot.length; i++) tot[i] += dd[i] / eff;
+      }
+      const cpeak = Math.max(...tot);
+      if (cpeak > supply + 1e-6) {
+        hints.push(lack(cpeak, ` (contando ${caps.map(([d]) => cName(d)).join(", ")}, que solo se produce desde ${cName(c)})`));
+        break;
       }
     }
   }
