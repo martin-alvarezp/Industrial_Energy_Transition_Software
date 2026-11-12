@@ -2,7 +2,9 @@
 // corridas sobreviven a recargar la página; «Volver al original» borra la copia.
 // Uso: npm run build && npx vite preview --port 4173  →  npm run verify:persistence
 import puppeteer from "puppeteer-core";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const APP_URL = (process.env.IETO_URL ?? "http://localhost:4173").replace(/\/$/, "");
 const BROWSER = process.env.IETO_BROWSER ?? [
@@ -77,11 +79,22 @@ await p.evaluate(() => [...document.querySelectorAll("button, [role=tab]")].find
 await sleep(800);
 step("tras recargar, la edición del sistema sigue", await p.evaluate(() => [...document.querySelectorAll("input.ui-input")].some((x) => x.value === "Dummy México (editado)")));
 
-// 4 · Sistemas: la tarjeta dice «En este navegador»; «Volver al original» borra la copia
+// 4 · Sistemas: la tarjeta dice «En este navegador»; exportar el proyecto; «Volver al original» borra la copia
+const dl = mkdtempSync(join(tmpdir(), "ieto-proj-"));
+const cdp = await p.createCDPSession();
+await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dl });
 await go("/systems");
 await sleep(2500);
 const card = await p.$('[data-testid="system-dummy_mexico"]');
 step("Sistemas: el ejemplo editado dice «En este navegador»", card && /En este navegador/.test(await card.evaluate((x) => x.innerText)));
+if (card) {
+  await card.$eval(".ui-dots", (x) => x.click()).catch(() => null);
+  await sleep(500);
+  await p.evaluate(() => [...document.querySelectorAll("button, [role=menuitem]")].find((x) => x.textContent.includes("Exportar proyecto"))?.click());
+}
+let proj = null;
+for (let i = 0; i < 60 && !proj; i++) { await sleep(500); proj = readdirSync(dl).find((f) => /\.ieto(\.json)?$/.test(f)); }
+step("exportar proyecto descarga un archivo .ieto", !!proj, proj ? `${proj} · ${(statSync(join(dl, proj)).size / 1e6).toFixed(1)} MB` : "sin descarga");
 if (card) {
   p.once("dialog", (d) => d.accept());
   await card.$eval(".ui-dots", (x) => x.click()).catch(() => null);
@@ -99,6 +112,28 @@ step("tras volver al original, el sistema tiene su nombre de fábrica",
 await go("/sys/dummy_mexico/optimizations");
 await sleep(2000);
 step("tras volver al original, las corridas del navegador se borraron", !(await text()).includes("Corrida persistente"));
+
+// 5 · importar el proyecto exportado (mismo nombre: reemplaza) → vuelven la edición y la corrida
+if (proj) {
+  await go("/systems");
+  await sleep(2000);
+  p.once("dialog", (d) => d.accept("dummy_mexico"));
+  const inp = await p.$('[data-testid="project-import-file"]');
+  await inp.uploadFile(join(dl, proj));
+  for (let i = 0; i < 40; i++) { await sleep(500); if (/infrastructure/.test(p.url())) break; }
+  await sleep(3000);
+  await p.evaluate(() => [...document.querySelectorAll("button, [role=tab]")].find((x) => x.textContent.trim() === "Info")?.click());
+  await sleep(800);
+  step("importar el proyecto devuelve la edición del sistema",
+       await p.evaluate(() => [...document.querySelectorAll("input.ui-input")].some((x) => x.value === "Dummy México (editado)")));
+  await go("/sys/dummy_mexico/summary");
+  let ok = false;
+  for (let i = 0; i < 40 && !ok; i++) { await sleep(500); ok = (await text()).includes("Corrida persistente") && (await text()).includes("Inversión total"); }
+  step("importar el proyecto devuelve la corrida, que se abre en el Resumen", ok);
+  await go("/sys/dummy_mexico/changelog");
+  await sleep(1500);
+  step("el registro de cambios dice de dónde se importó", /Proyecto importado desde/.test(await text()));
+}
 
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
 await b.close();

@@ -13,6 +13,7 @@ import {
 import {
   putLocalSite, deleteLocalSite, listLocalRuns, getLocalRun, putLocalRun, deleteLocalRun, deleteLocalRunsOf,
 } from "../lib/localdb.js";
+import { buildProject, downloadProject, readProject } from "../lib/project.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
 import { resolveScenarios } from "../lib/scenarios.js";
@@ -196,6 +197,61 @@ export function StudioProvider({ children }) {
     if (name === siteName) { setSiteName(null); setTwin(null); setData(null); }
     await refreshSites();
   }, [siteName, logChange, refreshSites, apiUp]);
+
+  /** Proyecto completo de un sistema (entradas + mapa + configuración + registro + corridas). */
+  const exportProject = useCallback(async (name, { withRuns = true } = {}) => {
+    const { site } = await fetchSite(name);
+    const { layout, site_version, ...siteJson } = site;
+    const L = layout ? fromGeoJSON(layout) : { ...EMPTY_LAYOUT };
+    const cfg = { ...baseConfig(L), ...readJSON(cfgKey(name), {}) };
+    let runsOut = [];
+    if (withRuns) {
+      const api = apiUp ? await listRuns(name) : [];
+      const loc = await listLocalRuns(name);
+      const mem = localRuns.filter((r) => r.site === name && r.bundle && !loc.some((x) => x.id === r.id));
+      runsOut = [
+        ...(await Promise.all(api.map(async (r) => ({ ...r, bundle: (await fetchRun(name, r.id).catch(() => null))?.payload })))),
+        ...(await Promise.all(loc.map(async (r) => ({ ...r, bundle: (await getLocalRun(r.id))?.bundle })))),
+        ...mem,
+      ];
+    }
+    const project = buildProject({ name, title: L.title, site: siteJson, layout: toGeoJSON(L), config: cfg,
+                                   log: readJSON(logKey(name), []), runs: runsOut });
+    const file = await downloadProject(project);
+    logChange(`Proyecto exportado (${file}, ${project.runs.length} corridas)`, "save", name);
+    return { file, runs: project.runs.length };
+  }, [apiUp, localRuns, logChange]);
+
+  /** Importa un archivo de proyecto como sistema `asName` (por defecto, su nombre). */
+  const importProject = useCallback(async (file, asName = null) => {
+    const p = await readProject(file);
+    const name = asName || p.name;
+    const site = { ...p.site, name };
+    delete site.site_version;
+    writeJSON(cfgKey(name), p.config ?? null);
+    writeJSON(logKey(name), [{ id: uid(), at: new Date().toISOString(), kind: "create",
+      text: `Proyecto importado desde ${file.name} (exportado ${String(p.exported_at ?? "").slice(0, 16).replace("T", " ")})`,
+      user: readJSON("ieto.user", { name: "" }).name || null }, ...(p.log ?? [])].slice(0, 500));
+    if (apiUp) {
+      await apiSaveSite(name, site, p.layout);
+      // mismo nombre = reemplazar la versión: también sus corridas
+      for (const r of await listRuns(name)) await deleteRun(name, r.id).catch(() => null);
+      for (const r of p.runs ?? []) await saveRun(name, r.name, r.bundle, r.notes ?? "").catch(() => null);
+    } else {
+      await putLocalSite(name, site, p.layout);
+      await deleteLocalRunsOf(name);
+      for (const r of p.runs ?? [])
+        await putLocalRun({ id: "local-" + uid(), site: name, name: r.name, notes: r.notes ?? "", saved_at: r.saved_at,
+                            scenario: r.bundle?.result?.meta?.scenario, feasible: r.bundle?.result?.meta?.feasible,
+                            npv: r.bundle?.result?.kpis?.npv ?? null, bundle: r.bundle });
+      setLocalRuns((l) => l.filter((r) => r.site !== name));
+    }
+    autoOpened.current = null;
+    if (name === siteName) { setData(null); setViewing(null); }
+    await refreshSites();
+    await loadSite(name, { force: true });
+    return { name, runs: (p.runs ?? []).length };
+  }, [apiUp, siteName, refreshSites, loadSite]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Sin API: vuelve un sistema de ejemplo a su versión original (borra la copia local). */
   const resetSite = useCallback(async (name) => {
@@ -405,7 +461,7 @@ export function StudioProvider({ children }) {
   const value = {
     apiUp, sites, refreshSites,
     siteName, twin, twinState, setTwin, loadSite, createSite, patchSite, patchLayout,
-    saveCurrentSite, removeSite, resetSite, saveStatus, readonly,
+    saveCurrentSite, removeSite, resetSite, exportProject, importProject, saveStatus, readonly,
     draft, setDraft, applied, running, runError, run, evaluate,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,

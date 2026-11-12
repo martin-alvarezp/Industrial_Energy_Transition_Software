@@ -141,8 +141,11 @@ end
         @test req("PUT", "/sites/otro", (site_payload = p_bad,)).status == 400
         @test !("otro" in JSON3.read(req("GET", "/sites").body).sites)
 
-        # DELETE: gestión de twins (crear/borrar entradas)
+        # DELETE: gestión de twins (crear/borrar entradas) — también sus corridas
+        @test req("POST", "/runs", (site = "mi_planta", name = "una corrida", payload = run_off)).status == 200
+        @test length(JSON3.read(req("GET", "/runs?site=mi_planta").body).runs) >= 1
         @test req("DELETE", "/sites/mi_planta").status == 200
+        @test isempty(JSON3.read(req("GET", "/runs?site=mi_planta").body).runs)
         @test !("mi_planta" in JSON3.read(req("GET", "/sites").body).sites)
         @test req("GET", "/sites/mi_planta").status == 404
         @test req("DELETE", "/sites/mi_planta").status == 404

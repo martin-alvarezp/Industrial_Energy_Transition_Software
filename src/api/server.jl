@@ -98,7 +98,7 @@ function build_router(data_dir::AbstractString;
     HTTP.register!(router, "PUT", "/sites/{name}",
                    req -> handle_put_site(req, data_dir))
     HTTP.register!(router, "DELETE", "/sites/{name}",
-                   req -> handle_delete_site(req, data_dir))
+                   req -> handle_delete_site(req, data_dir, runs_dir))
     HTTP.register!(router, "POST", "/scenario",
                    req -> handle_scenario(req, data_dir))
     HTTP.register!(router, "POST", "/portfolio",

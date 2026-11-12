@@ -1,6 +1,7 @@
 import { SLR } from "../palette.js";
 import { useEffect, useRef, useState } from "react";
-import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete, IcRefresh } from "../iconset.jsx";
+import { IcAdd, IcOpenInNew, IcContentCopy, IcEdit, IcImage, IcDelete, IcRefresh, IcFileDownload, IcUploadFile } from "../iconset.jsx";
+import { readProject } from "../../lib/project.js";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { NAV_ICONS } from "../icons.jsx";
@@ -26,7 +27,12 @@ async function rewriteSite(from, to, editLayout = (l) => l) {
 
 function SystemCard({ name, onChanged, unsaved = false }) {
   const { t } = useI18n();
-  const { apiUp, removeSite, resetSite, siteName, twin } = useStudio();
+  const { apiUp, removeSite, resetSite, exportProject, siteName, twin } = useStudio();
+  const doExport = async () => {
+    setFlash(t("systems.exporting"));
+    try { const r = await exportProject(name); setFlash(t("systems.exported", { f: r.file, n: r.runs })); }
+    catch (e) { setFlash(e.message); }
+  };
   const [meta, setMeta] = useState(null);
   const [rename, setRename] = useState(null);
   const [flash, setFlash] = useFlash();
@@ -105,6 +111,7 @@ function SystemCard({ name, onChanged, unsaved = false }) {
             hidden: !canWrite || name === "demo" },
           { label: t("systems.cover"), icon: IcImage, onClick: () => fileRef.current?.click(),
             hidden: !canWrite || name === "demo" },
+          { label: t("systems.export"), icon: IcFileDownload, onClick: doExport, hidden: unsaved },
           { label: t("systems.reset"), icon: IcRefresh, onClick: doReset, hidden: !(inBrowser && isExample) },
           "-",
           { label: t("common.delete"), icon: IcDelete, danger: true, onClick: doDelete,
@@ -284,16 +291,41 @@ function NewSystemModal({ onClose }) {
 
 export default function SystemsPage() {
   const { t } = useI18n();
-  const { sites, refreshSites, siteName, twin } = useStudio();
+  const { sites, refreshSites, siteName, twin, importProject } = useStudio();
   const [creating, setCreating] = useState(false);
+  const [imp, setImp] = useState(null);       // {state, text}
+  const impRef = useRef(null);
   const unsaved = twin && !twin.saved && siteName && !(sites ?? []).includes(siteName);
+  const doImport = async (file) => {
+    if (!file) return;
+    try {
+      const p = await readProject(file);
+      let name = p.name;
+      if ((sites ?? []).includes(name)) {
+        const ans = window.prompt(t("systems.importExists", { name: p.title || name }), `${name}_v2`);
+        if (ans == null) return;
+        name = slug(ans) || name;
+      }
+      setImp({ state: "busy", text: t("systems.importing") });
+      const r = await importProject(file, name);
+      setImp({ state: "ok", text: t("systems.imported", { name: r.name, n: r.runs }) });
+      navigate(hrefFor({ site: r.name, page: "infrastructure" }));
+    } catch (e) { setImp({ state: "bad", text: e.message }); }
+  };
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.systems} title={t("systems.title")} help={t("systems.help")}>
+        <button className="ui-btn" onClick={() => impRef.current?.click()} data-testid="project-import">
+          <IcUploadFile /> {t("systems.import")}
+        </button>
+        <input ref={impRef} type="file" accept=".ieto,.json,.gz,application/json,application/gzip" hidden
+               data-testid="project-import-file" onChange={(e) => { doImport(e.target.files?.[0]); e.target.value = ""; }} />
         <button className="ui-btn primary" onClick={() => setCreating(true)}>
           <IcAdd /> {t("common.add")}
         </button>
       </PageHead>
+      {imp && <div className={"ui-banner " + (imp.state === "bad" ? "bad" : imp.state === "ok" ? "" : "warn")}>{imp.text}</div>}
+      <p className="ui-hint">{t("systems.projectHint")}</p>
       {sites == null ? <p className="ui-hint">{t("common.loading")}</p>
         : sites.length === 0 && !unsaved ? <Empty icon={NAV_ICONS.systems} title={t("systems.empty")} />
         : (

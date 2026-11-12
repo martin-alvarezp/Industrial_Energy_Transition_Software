@@ -433,10 +433,11 @@ function handle_put_site(req::HTTP.Request, data_dir::AbstractString)
 end
 
 """
-DELETE /sites/{name} — elimina un sitio guardado (sus CSVs + layout).
+DELETE /sites/{name} — elimina un sitio guardado (sus CSVs + layout) y sus
+corridas guardadas (si no, reaparecerían en un sitio nuevo con el mismo nombre).
 `demo` es el dataset de referencia y no se puede borrar.
 """
-function handle_delete_site(req::HTTP.Request, data_dir::AbstractString)
+function handle_delete_site(req::HTTP.Request, data_dir::AbstractString, runs_dir::Union{Nothing,AbstractString} = nothing)
     name = get(HTTP.getparams(req), "name", "")
     occursin(r"^[A-Za-z0-9_\-]+$", name) ||
         throw(ApiError(400, "nombre de sitio inválido '$name'"))
@@ -445,6 +446,10 @@ function handle_delete_site(req::HTTP.Request, data_dir::AbstractString)
     dir = joinpath(data_dir, name)
     isdir(dir) || throw(ApiError(404, "sitio '$name' no encontrado"))
     rm(dir; recursive = true, force = true)
+    if runs_dir !== nothing
+        rdir = _runs_site_dir(runs_dir, name)
+        isdir(rdir) && rm(rdir; recursive = true, force = true)
+    end
     return _json_response(200, (deleted = name,))
 end
 
