@@ -205,6 +205,8 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
   const nse = billingSteps.length, monthsSe = 12 / Math.max(nse, 1);
   const cprice = (y) => milestoneMean((r) => (cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[r - 1] : cfg.carbon_price), cfg, yo, y);
+  const etsPrice = (y) => milestoneMean((r) => (cfg.ets_price_by_year?.length
+    ? cfg.ets_price_by_year[r - 1] ?? 0 : cfg.ets_price ?? 0), cfg, yo, y);   // R36
   const capNet = (y) => H === 1 ? cfg.emissions_cap_net_start :
     cfg.emissions_cap_net_start +
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
@@ -424,7 +426,7 @@ export function extractPayload(site0, cfg0, sol, constant, scenario = "web") {
 
     // + ETS (4.2) sobre el alcance 1 por encima de la asignación gratuita
     const carbon = cprice(y) * ge +
-      ((cfg.ets_price ?? 0) > 0 ? cfg.ets_price * (s1 - (cfg.ets_free_allowance ?? 0)) : 0);
+      (etsPrice(y) > 0 ? etsPrice(y) * (s1 - (cfg.ets_free_allowance ?? 0)) : 0);
     const offCost = cfg.offset_price * costFactor(cfg, "offset_price", "offsets", yo, y) * off;
     // ajuste fiscal (M9): −t·deducibles − t·depreciación de inversiones nuevas
     let tax = 0;

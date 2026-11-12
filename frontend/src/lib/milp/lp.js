@@ -626,6 +626,9 @@ export function buildLP(site0, cfg0, opts = {}) {
     (cfg.emissions_cap_net_end - cfg.emissions_cap_net_start) * (yr(y) - 1) / (H - 1);
   const cprice = (y) => milestoneMean((r) => (cfg.carbon_price_by_year?.length
     ? cfg.carbon_price_by_year[r - 1] : cfg.carbon_price), cfg, yo, y);
+  // R36: precio del alcance 1 (ETS) por año; vacío = ets_price constante
+  const etsPrice = (y) => milestoneMean((r) => (cfg.ets_price_by_year?.length
+    ? cfg.ets_price_by_year[r - 1] ?? 0 : cfg.ets_price ?? 0), cfg, yo, y);
   // valor residual: se mide al fin del horizonte (el completo si los hitos
   // valen por sus años) y, con R34, sobre el ÚLTIMO eslabón de cada compra
   const NA = salvageEnd(cfg, yo), salvDisc = 1 / Math.pow(1 + cfg.wacc, NA);
@@ -733,9 +736,10 @@ export function buildLP(site0, cfg0, opts = {}) {
     // CAPEX de las medidas de eficiencia del año (5.3; no deducible, como el CAPEX)
     for (const em of EMs) add(`em_${sane(em.id)}_${y}`, capexPv(cfg, yo, y, em.id) * em.capex * capexFactor(cfg, em.id, yr(y)));
     // ETS (4.2): derechos sobre el alcance 1 sobre la asignación gratuita
-    if ((cfg.ets_price ?? 0) > 0) {
-      for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * cfg.ets_price * c);
-      constDed(-D * cfg.ets_price * (cfg.ets_free_allowance ?? 0));
+    const ets = etsPrice(y);
+    if (ets > 0) {
+      for (const [v, c] of Object.entries(scope1Terms(y))) addDed(v, D * ets * c);
+      constDed(-D * ets * (cfg.ets_free_allowance ?? 0));
     }
     addDed(`off_${y}`, D * cfg.offset_price * costFactor(cfg, "offset_price", "offsets", yo, y));   // R20
     // cargos por demanda (M2/M2b)

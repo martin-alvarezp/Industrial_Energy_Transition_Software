@@ -272,3 +272,22 @@ end
     # con hitos que no ponderan años (cada hito es solo su año) se sigue permitiendo
     validate_scenario(with_config(ok; milestone_years = [2, 4], milestone_weighting = :none), site)
 end
+
+
+@testset "R36: precio del alcance 1 por año" begin
+    # caldera a gas (alcance 1) vs caldera eléctrica (alcance 2): con el alcance 1
+    # caro en los últimos años, el gas se usa menos ahí; vacío = ets_price constante
+    site, cfg = carbon_site()
+    c = with_config(cfg; horizon_years = 3, wacc = 0.0)
+    r0 = run_scenario(site, c; scenario = :least_cost, verbose = false, shadow_prices = false)
+    r1 = run_scenario(site, with_config(c; ets_price_by_year = [0.0, 0.0, 500.0]); scenario = :least_cost,
+                      verbose = false, shadow_prices = false)
+    rc = run_scenario(site, with_config(c; ets_price = 500.0); scenario = :least_cost, verbose = false, shadow_prices = false)
+    @test r0.feasible && r1.feasible && rc.feasible
+    @test r1.npv > r0.npv                 # el precio cuesta
+    @test r1.npv < rc.npv                 # solo un año caro, no los tres
+    s1(r, y) = r.emissions.scope1[y]
+    @test s1(r1, 3) < s1(r0, 3) - 1e-6     # el año caro emite menos alcance 1
+    @test isapprox(s1(r1, 1), s1(r0, 1); rtol = 1e-6)
+    @test_throws IETO.ValidationError validate_scenario(with_config(c; ets_price_by_year = [1.0, 2.0]), site)
+end

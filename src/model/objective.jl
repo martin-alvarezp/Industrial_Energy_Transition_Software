@@ -114,8 +114,11 @@ function set_objective!(m::JuMP.Model, sets::ModelSets, params::ModelParameters,
                                     cfg.carbon_price_by_year[r], cfg, ry, y)   # trayectoria (M7); R28: del tramo
     # ETS (4.2): derechos sobre el alcance 1 por encima de la asignación
     # gratuita; el excedente se vende (término negativo). Suma al costo de carbono.
+    # R36: el precio del alcance 1 puede ir por año (vacío = ets_price constante)
+    eprice(y) = milestone_mean(r -> isempty(cfg.ets_price_by_year) ? cfg.ets_price :
+                                    get(cfg.ets_price_by_year, r, 0.0), cfg, ry, y)
     JuMP.@expression(m, carbon_cost_y[y in years], cprice(y) * gross_emissions[y] +
-        (cfg.ets_price > 0 ? cfg.ets_price * (m[:scope1_y][y] - cfg.ets_free_allowance) : 0.0))
+        (eprice(y) > 0 ? eprice(y) * (m[:scope1_y][y] - cfg.ets_free_allowance) : 0.0))
     JuMP.@expression(m, offset_cost_y[y in years],   # R20: precio por año
         cfg.offset_price * cost_factor(cfg, :offset_price, :offsets, ry, y) * offset_buy[y])
     # ventas :billing pagan su precio de inyección; las :net_metering (M2b)

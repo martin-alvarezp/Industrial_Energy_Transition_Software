@@ -116,6 +116,7 @@ export function toOverrides(cfg) {
     scope1_cap: cfg.scope1_cap ?? null,        // 4.2: topes por alcance y ETS
     scope2_cap: cfg.scope2_cap ?? null,
     ets_price: cfg.ets_price ?? 0,
+    ets_price_by_year: cfg.ets_price_by_year ?? [],          // R36: precio del alcance 1 por año
     ets_free_allowance: cfg.ets_free_allowance ?? 0,
     exclusive_groups: cfg.exclusive_groups ?? [],   // 5.2: relaciones entre medidas
     requires: (cfg.requires ?? []).map((r) => (Array.isArray(r) ? { tech: r[0], needs: r[1] } : r)),

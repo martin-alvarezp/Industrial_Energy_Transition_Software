@@ -409,6 +409,11 @@ s51 = site_from_json(JSON3.read(JSON3.write(sj51)); default_name = "tres_dias")
 s51b, c51 = apply_scenario(s51, with_config(cfg0; horizon_years = 2), :least_cost)
 dump("tres_dias_cronologia_n2", s51b, c51)
 
+# 52 · R36: precio del alcance 1 por año (ETS sin asignación gratuita), que sube
+s52, c52 = apply_scenario(site0, with_config(cfg0; horizon_years = 5, ets_free_allowance = 0.0,
+                                             ets_price_by_year = [20.0, 40.0, 60.0, 80.0, 100.0]), :least_cost)
+dump("demo_ets_por_anio_n5", s52, c52)
+
 println("fixtures dorados en ", out)
 
 # Nodos con muchos componentes (como los arma la interfaz): todo el demo en el

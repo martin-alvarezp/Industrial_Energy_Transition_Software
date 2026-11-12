@@ -455,5 +455,6 @@ function load_scenario_config(path::AbstractString)
             for (k, pts) in get(d, "build_limits", Dict())),
         Symbol[Symbol(t) for t in get(d, "bau_techs", String[])],
         Bool(get(d, "fixed_rebuild", true)),
+        Float64[Float64(x) for x in get(d, "ets_price_by_year", Float64[])],
     )
 end

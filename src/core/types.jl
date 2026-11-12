@@ -645,9 +645,12 @@ struct ScenarioConfig
                                              # (reposición y crecimiento con los mismos equipos); vacío = solo lo existente
     fixed_rebuild::Bool                      # situación actual: lo existente que vence se reinstala 1:1 (true) o el
                                              # optimizador decide si repotenciarlo (false, repower_option)
+    ets_price_by_year::Vector{Float64}       # R36: precio del alcance 1 (ETS) por año relativo; vacío = ets_price
 end
 
 # retro-compatibilidad: 91 campos → la situación actual reinstala lo que vence
+ScenarioConfig(a::Vararg{Any,92}) = ScenarioConfig(a..., Float64[])
+# retro-compatibilidad: 92 campos → precio del alcance 1 constante
 ScenarioConfig(a::Vararg{Any,91}) = ScenarioConfig(a..., true)
 # retro-compatibilidad: 90 campos → la situación actual no compra nada
 ScenarioConfig(a::Vararg{Any,90}) = ScenarioConfig(a..., Symbol[])

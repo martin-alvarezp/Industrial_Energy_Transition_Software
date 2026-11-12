@@ -475,6 +475,10 @@ function validate_scenario(cfg::ScenarioConfig, site::Site)
         v === nothing || v >= 0 || push!(problems, "scenario_config.yaml: $k debe ser ≥ 0 (valor: $v)")
     end
     cfg.ets_price >= 0 || push!(problems, "scenario_config.yaml: ets_price debe ser ≥ 0")
+    all(x -> isfinite(x) && x >= 0, cfg.ets_price_by_year) ||
+        push!(problems, "ets_price_by_year: los precios deben ser finitos y ≥ 0")
+    length(cfg.ets_price_by_year) in (0, cfg.horizon_years) || push!(problems,
+        "ets_price_by_year: debe traer un precio por año del horizonte ($(cfg.horizon_years)), trae $(length(cfg.ets_price_by_year))")
     cfg.ets_free_allowance >= 0 || push!(problems, "scenario_config.yaml: ets_free_allowance debe ser ≥ 0")
     cfg.capex_budget_annual === nothing || cfg.capex_budget_annual >= 0 || push!(problems,
         "scenario_config.yaml: capex_budget_annual debe ser ≥ 0 (valor: $(cfg.capex_budget_annual))")
