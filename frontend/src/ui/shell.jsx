@@ -1,7 +1,7 @@
 // Armazón de la aplicación: barra superior, barra lateral y área de contenido.
 import { useEffect, useMemo, useState } from "react";
 import {
-  IcSearch, IcLink, IcHelpOutline, IcAdd, IcClose, IcChevronLeft, IcChevronRight,
+  IcSearch, IcLink, IcHelpOutline, IcChevronLeft, IcChevronRight,
   IcExpandLess, IcExpandMore, IcCheck, IcMenu,
 } from "./iconset.jsx";
 import { useI18n } from "./i18n.jsx";
@@ -11,7 +11,7 @@ import { LIBRARY_NAV, SYSTEM_SECTIONS, ALL_SYSTEM_PAGES } from "./nav.js";
 import { NAV_ICONS, componentIcon } from "./icons.jsx";
 import { Menu, Modal, useClickOutside, useFlash } from "./kit.jsx";
 import { readJSON, writeJSON, useStored } from "./storage.js";
-import { musd, pct, tons, setNumberLocale } from "../lib/format.js";
+import { setNumberLocale } from "../lib/format.js";
 import ModelDoc from "../components/ModelDoc.jsx";
 
 export function Logo() {
@@ -25,62 +25,6 @@ export function Logo() {
       </svg>
       IETO
     </a>
-  );
-}
-
-// ── indicadores KPI fijables en la barra superior ──
-export function kpiCatalog(t, data) {
-  const r = data?.result;
-  const k = r?.kpis;
-  const em = r?.emissions ?? [];
-  const red = em.length > 1 && em[0].net > 0 ? 1 - em[em.length - 1].net / em[0].net : null;
-  const opex = (r?.cost_breakdown ?? []).reduce((s, c) => s + (c.total - c.capex), 0);
-  return [
-    { id: "npv", label: t("kpi.npv"), value: k ? musd(k.npv) : "—" },
-    { id: "capex", label: t("kpi.capex"), value: k ? musd(k.total_capex) : "—" },
-    { id: "opex", label: t("kpi.opex"), value: r ? musd(opex) : "—" },
-    { id: "net", label: t("kpi.netFinal"), value: k ? tons(k.final_net_emissions) : "—" },
-    { id: "reduction", label: t("kpi.reduction"), value: red == null ? "—" : pct(red) },
-    { id: "res", label: t("kpi.res"), value: k ? pct(k.res_share_final) : "—" },
-  ];
-}
-
-function KpiBadges() {
-  const { t } = useI18n();
-  const { data, siteName } = useStudio();
-  const [pinned, setPinned] = useStored("ieto.kpibadges", []);
-  const cat = kpiCatalog(t, data);
-  if (!siteName) return null;
-  return (
-    <div className="ui-top-center">
-      {pinned.map((id) => {
-        const k = cat.find((x) => x.id === id);
-        if (!k) return null;
-        return (
-          <span key={id} className="ui-kpi-badge" title={k.label}>
-            {k.label}: <span className="v">{k.value}</span>
-            <button aria-label={t("kpi.remove")}
-                    onClick={() => setPinned((p) => p.filter((x) => x !== id))}>
-              <IcClose size={16} />
-            </button>
-          </span>
-        );
-      })}
-      <Menu align="left" label={t("top.kpiBadge")}
-            trigger={({ toggle }) => (
-              <button className="ui-pill-btn" onClick={toggle}>
-                <IcAdd size={20} /> {t("top.kpiBadge")}
-              </button>)}
-            items={[
-              { header: data ? t("kpi.pick") : t("kpi.noRun") },
-              ...cat.map((k) => ({
-                label: `${k.label} · ${k.value}`,
-                icon: pinned.includes(k.id) ? IcCheck : undefined,
-                onClick: () => setPinned((p) => p.includes(k.id)
-                  ? p.filter((x) => x !== k.id) : [...p, k.id]),
-              })),
-            ]} />
-    </div>
   );
 }
 
@@ -207,7 +151,6 @@ export function TopBar({ route, onMenu }) {
           <><span className="sep"><IcChevronRight size={20} /></span><span>{t(libItem.key)}</span></>
         )}
       </nav>
-      {route.scope === "system" && <KpiBadges />}
       <div className="ui-top-right">
         <button className="ui-search" onClick={() => setCmd(true)} aria-label={t("top.search")}>
           <IcSearch size={20} /> <span className="ui-kbd">Ctrl K</span>

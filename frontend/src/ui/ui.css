@@ -90,22 +90,7 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .ui-crumbs a:hover { text-decoration: underline; }
 .ui-crumbs .sep { color: var(--ui-text-2); font-weight: 400; }
 .ui-crumbs .here { color: var(--ui-accent); }
-.ui-top-center { position: absolute; left: 50%; transform: translateX(-50%);
-                 display: flex; gap: 8px; align-items: center; }
 .ui-top-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-
-.ui-pill-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px;
-               padding: 0 14px; border-radius: 17px; border: 0; background: #fff;
-               color: var(--ui-text); font: 500 15px var(--ui-font); cursor: pointer;
-               box-shadow: 0 0 0 1px rgba(0,0,0,0.02); }
-.ui-pill-btn:hover { background: var(--ui-primary-wash); }
-.ui-kpi-badge { display: inline-flex; align-items: center; gap: 8px; height: 34px;
-                padding: 0 6px 0 12px; border-radius: 17px; background: #fff;
-                font: 500 14px var(--ui-font); color: var(--ui-text); }
-.ui-kpi-badge .v { font-weight: 700; }
-.ui-kpi-badge button { border: 0; background: transparent; cursor: pointer;
-                       color: var(--ui-muted); display: flex; padding: 4px; border-radius: 50%; }
-.ui-kpi-badge button:hover { background: var(--ui-pill); color: var(--ui-text); }
 
 .ui-search { display: inline-flex; align-items: center; gap: 8px; height: 36px;
              padding: 0 12px; border-radius: 10px; background: var(--ui-pill);
@@ -616,7 +601,6 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
   .ui-topbar { gap: 6px; padding: 0 8px; }
   .ui-crumbs { margin-left: 4px; font-size: 13px; gap: 4px; overflow: hidden; }
   .ui-crumbs a, .ui-crumbs .here { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ui-top-center { display: none; }
   .ui-top-right { gap: 4px; flex: none; }
   .ui-search { padding: 0 9px; }
   .ui-search .ui-kbd { display: none; }

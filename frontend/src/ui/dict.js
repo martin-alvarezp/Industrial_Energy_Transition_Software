@@ -32,7 +32,6 @@ const E = {
   "nav.menu": ["Menú", "Menu"],
 
   // ── barra superior ──
-  "top.kpiBadge": ["Indicador KPI", "KPI Badge"],
   "top.search": ["Buscar", "Search"],
   "top.copyLink": ["Copiar enlace de esta vista", "Copy link to this view"],
   "top.linkCopied": ["Enlace copiado", "Link copied"],
@@ -46,9 +45,6 @@ const E = {
   "user.engineApi": ["API · HiGHS", "API · HiGHS"],
   "user.engineWeb": ["HiGHS en el navegador", "HiGHS in the browser"],
   "user.connecting": ["conectando…", "connecting…"],
-  "kpi.pick": ["Elige un KPI para fijarlo arriba", "Pick a KPI to pin to the top bar"],
-  "kpi.noRun": ["Ejecuta una optimización para fijar KPIs", "Run an optimization to pin KPIs"],
-  "kpi.remove": ["Quitar", "Remove"],
   "cmd.placeholder": ["Buscar vistas, componentes, ubicaciones…", "Search views, components, locations…"],
   "cmd.views": ["Vistas", "Views"],
   "cmd.none": ["Sin resultados", "No results"],
@@ -85,12 +81,6 @@ const E = {
 
 
   // ── KPI ──
-  "kpi.npv": ["VAN", "NPV"],
-  "kpi.capex": ["Inversión total", "Total investment"],
-  "kpi.opex": ["OPEX total", "Total OPEX"],
-  "kpi.netFinal": ["Emisiones netas finales", "Final net emissions"],
-  "kpi.reduction": ["Reducción de emisiones", "Emission reduction"],
-  "kpi.res": ["Participación renovable", "Renewable share"],
   "kpi.totalCost": ["Costo total", "Total cost"],
 
   // ── sistemas ──

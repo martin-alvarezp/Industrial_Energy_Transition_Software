@@ -24,3 +24,6 @@ build/IETO-app/
 build/IETO-win64.zip
 launcher/srv-err.log
 build/Manifest.toml
+
+# scripts de trabajo del asistente (no van al repo)
+frontend/scripts/_*.mjs
