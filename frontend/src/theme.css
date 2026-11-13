@@ -591,3 +591,7 @@ select { cursor: pointer; }
 .series-meter-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
 .series-meter-notes { margin: 6px 0 0 18px; padding: 0; font-size: 12px; font-weight: 400; }
 .series-meter-notes li { margin: 1px 0; }
+
+/* WP-10: búsqueda de direcciones opcional */
+.addr-allow { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
+.addr-allow input { margin-top: 2px; }

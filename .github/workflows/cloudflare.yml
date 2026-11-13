@@ -1,0 +1,35 @@
+# WP-10 · publica la app en Cloudflare Pages (detrás de Cloudflare Access:
+# solo entran los correos autorizados). Inerte hasta que el repositorio tenga
+# la variable CF_PAGES_PROJECT y los secretos CLOUDFLARE_API_TOKEN y
+# CLOUDFLARE_ACCOUNT_ID — ver docs/deploy_cloudflare.md.
+name: cloudflare
+on:
+  push: { branches: [master, main] }
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: cloudflare, cancel-in-progress: true }
+jobs:
+  deploy:
+    if: ${{ vars.CF_PAGES_PROJECT != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      # el proyecto se crea la primera vez (si ya existe, el error se ignora)
+      - name: crear el proyecto de Pages (una vez)
+        run: npx --yes wrangler@3 pages project create "$CF_PAGES_PROJECT" --production-branch=master || true
+        env:
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: publicar
+        run: npx --yes wrangler@3 pages deploy frontend/dist --project-name="$CF_PAGES_PROJECT" --branch=master --commit-dirty=true
+        env:
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
