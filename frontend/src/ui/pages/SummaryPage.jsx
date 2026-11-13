@@ -8,7 +8,7 @@ import {
 import { useI18n } from "../i18n.jsx";
 import { useStudio, HEAVY_CFG } from "../studio.jsx";
 import { useStored, readJSON } from "../storage.js";
-import { Menu, LabeledSelect, Empty } from "../kit.jsx";
+import { Menu, LabeledSelect, Empty, Modal } from "../kit.jsx";
 import { NAV_ICONS, componentIcon } from "../icons.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { ChartPanel, StackedBars, Waterfall, SankeyFlow } from "../charts.jsx";
@@ -46,7 +46,7 @@ function KpiCard({ icon: I, color, value, unit, label }) {
  * nueva. `hidden`: nombres ocultos por el filtro de tecnologías. `compact`: sin
  * título (para las columnas de comparación).
  */
-export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, unitLbl = "", hidden = {}, compact = false }) {
+export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, unitLbl = "", hidden = {}, compact = false, onWhy = null }) {
   const [view, setView] = useState("chart");
   const [tip, setTip] = useState(null);       // {name, x, y}
   const vis = rows.filter((r) => !hidden[r.name]);
@@ -80,11 +80,12 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
       {view === "table" ? (
         <table className="ui-table" style={{ maxWidth: 900 }} data-testid="measures-table">
           <thead><tr><th>{t("sum.component")}</th><th>{t("common.year")}</th>
-            <th className="num">{t("sum.newCap")}</th><th className="num">{t("sum.col.capex")} [{unitLbl}]</th></tr></thead>
+            <th className="num">{t("sum.newCap")}</th><th className="num">{t("sum.col.capex")} [{unitLbl}]</th>{onWhy && <th />}</tr></thead>
           <tbody>{[...vis].sort((a, b) => a.year - b.year || a.name.localeCompare(b.name)).map((r, i) => (
             <tr key={i}><td>{r.name}</td><td>{r.year}</td>
               <td className="num">{capOf(r)}</td>
-              <td className="num">{money(r)}</td></tr>))}</tbody>
+              <td className="num">{money(r)}</td>
+              {onWhy && <td><button className="ui-btn ghost sm" onClick={() => onWhy(r)} data-testid="why-row">{t("why.btn")}</button></td>}</tr>))}</tbody>
         </table>
       ) : (
         <div className="mt-grid" data-testid="measures-grid" onMouseLeave={() => setTip(null)}
@@ -111,7 +112,9 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
           })}
           {tip && tipRows.length > 0 && (
             <div className="mt-tip" data-testid="measures-tip" style={{ top: tip.y + 4, left: tip.x }}>
-              <div className="mt-tip-h">{tip.name}</div>
+              <div className="mt-tip-h">{tip.name}
+                {onWhy && <button className="ui-btn ghost sm" style={{ float: "right" }} data-testid="why-tip"
+                                  onClick={() => { const r = tipRows[0]; setTip(null); onWhy(r); }}>{t("why.btn")}</button>}</div>
               <table>
                 <thead><tr><th>{t("common.year")}</th><th>{t("sum.col.capex")} [{unitLbl}]</th><th>{t("sum.newCap")}</th></tr></thead>
                 <tbody>{tipRows.map((r, i) => (
@@ -122,6 +125,64 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * WP-8 · «¿Por qué compró X?»: el mismo caso con esa compra PROHIBIDA
+ * (pin_builds en 0 solo para ella; lo demás se re-optimiza). Dice cuánto sube
+ * el VAN y qué se compraría en su lugar, o que sin ella no hay solución.
+ */
+function WhyModal({ row, data, onClose, t, scale, scaleLbl }) {
+  const { evaluate } = useStudio();
+  const [st, setSt] = useState({ state: "busy" });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = data.result;
+        const N = new Set((res.capacity ?? []).map((c) => c.year)).size || 1;
+        const key = row.measure ? `measure:${row.tech}` : row.tech;
+        const base = Object.fromEntries(Object.entries(data.config ?? {}).filter(([k]) => !HEAVY_CFG.includes(k) && k !== "pin_builds"));
+        const d = await evaluate({ cfg: { ...base, pin_builds: { [key]: new Array(N).fill(0) } },
+                                   stack: data.config?.scenario_stack ?? [] });
+        if (alive) setSt({ state: "done", r: d?.result });
+      } catch (e) { if (alive) setSt({ state: "error", msg: e.message ?? String(e) }); }
+    })();
+    return () => { alive = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const r0 = data.result, r1 = st.r;
+  const nameOf = (id) => data.site_snapshot?.technologies?.find((x) => x.tech_id === id)?.name ?? id;
+  const invOf = (r) => Object.fromEntries((r?.investments ?? []).map((x) => [x.tech, x.mw]));
+  let body = null;
+  if (st.state === "busy") body = <p className="ui-hint" data-testid="why-busy">{t("why.busy", { name: row.name })}</p>;
+  else if (st.state === "error") body = <div className="ui-banner bad">{st.msg}</div>;
+  else if (!r1?.meta?.feasible) body = (
+    <div data-testid="why-result">
+      <p><b>{t("why.needed", { name: row.name })}</b></p>
+      {(r1?.infeasibility?.hints ?? []).filter((h) => h.startsWith("Falta")).slice(0, 3).map((h, i) => <p key={i} className="ui-hint">• {h}</p>)}
+    </div>);
+  else {
+    const dNpv = r1.kpis.npv - r0.kpis.npv;
+    const i0 = invOf(r0), i1 = invOf(r1);
+    const instead = Object.entries(i1).filter(([k, mw]) => mw > (i0[k] ?? 0) + 1e-3).map(([k, mw]) => `${nameOf(k)} ${num(mw - (i0[k] ?? 0), 2)} MW`);
+    const em0 = r0.kpis.final_net_emissions, em1 = r1.kpis.final_net_emissions;
+    body = (
+      <div data-testid="why-result">
+        <p><b>{dNpv > 1e-6 * Math.abs(r0.kpis.npv)
+          ? t("why.saves", { name: row.name, v: num(dNpv / scale, 2), u: scaleLbl, p: num(100 * dNpv / Math.abs(r0.kpis.npv), 1) })
+          : t("why.neutral", { name: row.name, v: num(Math.abs(dNpv) / scale, 2), u: scaleLbl })}</b></p>
+        <p>{instead.length ? t("why.instead", { list: instead.join(", ") }) : t("why.noInstead")}</p>
+        {em0 != null && em1 != null && Math.abs(em1 - em0) > 0.5 &&
+          <p className="ui-hint">{t("why.emis", { a: num(em0, 0), b: num(em1, 0) })}</p>}
+      </div>);
+  }
+  return (
+    <Modal title={t("why.title", { name: row.name })} onClose={st.state === "busy" ? undefined : onClose}
+           footer={<button className="ui-btn" onClick={onClose} disabled={st.state === "busy"}>{t("common.close")}</button>}>
+      {body}
+      <p className="ui-hint" style={{ marginTop: 10 }}>{t("why.how")}</p>
+    </Modal>
   );
 }
 
@@ -155,6 +216,7 @@ export default function SummaryPage() {
           loadRunBundle, run, running } = useStudio();
   // comparación lado a lado: ids de otras corridas (hasta 2) y sus bundles
   const [cmp, setCmp] = useState([]);
+  const [why, setWhy] = useState(null);         // WP-8: «¿por qué compró X?»
   const [cmpData, setCmpData] = useState({});
   useEffect(() => { setCmp([]); }, [siteName]);
   useEffect(() => {
@@ -426,7 +488,9 @@ export default function SummaryPage() {
           </div>
 
           {cmp.length === 0 && <section className="rc-panel"><MeasuresTimeline rows={calc.meas} years={calc.years} t={t} factor={factor}
-                    scale={prefs.scale} unitLbl={scaleLbl} hidden={hiddenTech} /></section>}
+                    scale={prefs.scale} unitLbl={scaleLbl} hidden={hiddenTech}
+                    onWhy={data?.config?.dispatch_only || data?.config?.pin_builds ? null : setWhy} /></section>}
+          {why && <WhyModal row={why} data={data} t={t} scale={prefs.scale} scaleLbl={scaleLbl} onClose={() => setWhy(null)} />}
 
           <ChartPanel title={t("sum.investmentCost")} menu={exportMenu}>
             <StackedBars {...st(calc.inv)} prefs={entPrefs} domain={allKeys} unit={scaleLbl} />

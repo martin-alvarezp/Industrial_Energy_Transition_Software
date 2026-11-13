@@ -35,7 +35,7 @@ const WEB = `http://127.0.0.1:${WEB_PORT}`;
 const MODE = {
   flows: "node", wasm: "node", templates: "node", layers: "node", breakeven: "node", runres: "node",
   finance: "node", catalog: "node", examples: "node", inputsbook: "node", configspec: "node", meterclean: "node", pins: "node", preflight: "node",
-  topology: "web", persistence: "web", demands: "web", demandsmap: "web", deck: "web", versions: "web", newdemand: "web",
+  topology: "web", persistence: "web", demands: "web", demandsmap: "web", deck: "web", versions: "web", newdemand: "web", why: "web",
 };
 const SMOKE = ["configspec", "meterclean", "pins", "preflight", "wasm", "flows", "templates", "layers", "finance", "examples", "ui", "solver", "newsystem",
                "topology", "demandsmap", "newdemand", "deck", "versions", "minmarket", "e2e"];
