@@ -83,6 +83,24 @@ for (const id of ["dummy_mexico", "dummy_japon"]) {
     const edited = await readInputsBook(await writeXlsx(sheetsOut));
     step(`${id}: un libro editado trae los cambios (capacidad máxima y tasa)`,
          edited.site.technologies.find((t) => t.tech_id === "electric_boiler")?.max_new_capacity === 3.5 && edited.config.wacc === 0.1);
+    // WP-6 · un número escrito como texto con coma decimal se lee como número
+    row[iM] = "4,5";
+    const asText = await readInputsBook(await writeXlsx(Object.entries(book).map(([name, rows]) => ({ name, rows, hidden: name === "_ieto" }))));
+    step(`${id}: «4,5» escrito como texto se lee como 4.5`, asText.site.technologies.find((t) => t.tech_id === "electric_boiler")?.max_new_capacity === 4.5);
+    // WP-6 · errores típicos de un libro editado a mano: rechazado, con hoja y fila
+    const iO = h.indexOf("output_carrier"), iTy = h.indexOf("type");
+    const rowIdx = comp.indexOf(row) + 1;               // fila de Excel
+    row[iO] = "vapor_inexistente";
+    const r2 = comp.find((r, k) => k > 0 && r !== row);
+    const r2Idx = comp.indexOf(r2) + 1;
+    const oldType = r2[iTy]; r2[iTy] = "caldera";
+    let msg = "";
+    try { await readInputsBook(await writeXlsx(Object.entries(book).map(([name, rows]) => ({ name, rows, hidden: name === "_ieto" })))); }
+    catch (e) { msg = e.message; }
+    step(`${id}: un libro con errores se rechaza nombrando hoja y fila`,
+         msg.includes(`Componentes, fila ${rowIdx}`) && msg.includes("vapor_inexistente") && msg.includes(`Componentes, fila ${r2Idx}`) && msg.includes("caldera"),
+         msg.split("\n").slice(0, 3).join(" | "));
+    r2[iTy] = oldType;
   }
 }
 if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }

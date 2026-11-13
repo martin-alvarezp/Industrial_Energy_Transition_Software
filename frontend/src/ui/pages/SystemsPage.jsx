@@ -313,8 +313,11 @@ export default function SystemsPage() {
       }
       setImp({ state: "busy", text: t("systems.importing") });
       const r = await importProject(file, name);
-      setImp({ state: "ok", text: t("systems.imported", { name: r.name, n: r.runs }) });
-      navigate(hrefFor({ site: r.name, page: "infrastructure" }));
+      setImp({ state: r.warnings?.length ? "warn" : "ok",
+                text: t("systems.imported", { name: r.name, n: r.runs }) +
+                  (r.warnings?.length ? `\n${t("systems.importWarn")}\n· ${r.warnings.slice(0, 8).join("\n· ")}` : "") });
+      // con avisos se queda aquí para leerlos (el sistema ya está en la lista)
+      if (!r.warnings?.length) navigate(hrefFor({ site: r.name, page: "infrastructure" }));
     } catch (e) { setImp({ state: "bad", text: e.message }); }
   };
   return (
@@ -329,7 +332,8 @@ export default function SystemsPage() {
           <IcAdd /> {t("common.add")}
         </button>
       </PageHead>
-      {imp && <div className={"ui-banner " + (imp.state === "bad" ? "bad" : imp.state === "ok" ? "" : "warn")}>{imp.text}</div>}
+      {imp && <div className={"ui-banner " + (imp.state === "bad" ? "bad" : imp.state === "ok" ? "" : "warn")}
+                   style={{ whiteSpace: "pre-line" }} data-testid="import-banner">{imp.text}</div>}
       <p className="ui-hint">{t("systems.projectHint")}</p>
       {sites == null ? <p className="ui-hint">{t("common.loading")}</p>
         : sites.length === 0 && !unsaved ? <Empty icon={NAV_ICONS.systems} title={t("systems.empty")} />

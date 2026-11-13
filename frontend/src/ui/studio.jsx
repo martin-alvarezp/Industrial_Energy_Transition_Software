@@ -277,7 +277,7 @@ export function StudioProvider({ children }) {
     if (name === siteName) { setData(null); setViewing(null); }
     await refreshSites();
     await loadSite(name, { force: true });
-    return { name, runs: (p.runs ?? []).length };
+    return { name, runs: (p.runs ?? []).length, warnings: p.warnings ?? [] };
   }, [apiUp, siteName, refreshSites, loadSite]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Sin API: vuelve un sistema de ejemplo a su versión original (borra la copia local). */

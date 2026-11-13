@@ -123,6 +123,102 @@ export async function buildInputsBook({ name, title, site, layout, config }) {
 
 const num = (v) => (typeof v === "number" ? v : v == null || v === "" ? null : Number(String(v).replace(",", ".")));
 
+// ── validación del libro (WP-6): errores con hoja y fila, en palabras ────────
+const TECH_TYPES = ["source", "converter", "generator", "storage"];
+const CATEGORIES = ["energy", "fuel", "heat", "cooling", "emissions", "offset"];
+const TECH_NUM = ["existing_capacity", "max_new_capacity", "efficiency", "capex_per_kw", "fixed_opex", "variable_opex",
+                  "lifetime_years", "remaining_life", "storage_hours", "min_load", "unit_size"];
+const MARKET_NUM = ["max_power", "min_power", "max_annual", "emission_factor"];
+
+/** Números escritos como texto («1,5») → número; lo que no es número queda como está. */
+function coerceNums(objs, fields) {
+  for (const o of objs) for (const k of fields) {
+    if (typeof o[k] === "string" && o[k].trim() !== "") {
+      const n = num(o[k]);
+      if (Number.isFinite(n)) o[k] = n;
+    }
+  }
+  return objs;
+}
+
+/**
+ * Revisa un sitio armado desde el libro. Devuelve {errors, warnings}: cada uno
+ * {sheet, row, msg} con la fila de Excel (encabezado = fila 1).
+ */
+export function bookProblems(site) {
+  const errors = [], warnings = [];
+  const E = (sheet, row, msg) => errors.push({ sheet, row, msg });
+  const W = (sheet, row, msg) => warnings.push({ sheet, row, msg });
+  const carriers = new Set();
+  (site.carriers ?? []).forEach((c, i) => {
+    const r = i + 2;
+    if (!c.carrier_id) E("Vectores", r, "falta carrier_id");
+    else if (carriers.has(c.carrier_id)) E("Vectores", r, `carrier_id «${c.carrier_id}» repetido`);
+    carriers.add(c.carrier_id);
+    if (c.category && !CATEGORIES.includes(c.category)) E("Vectores", r, `categoría «${c.category}» inválida (${CATEGORIES.join(", ")})`);
+  });
+  const nodes = new Set((site.nodes ?? []).map((n) => n.node_id));
+  const known = (c) => c == null || c === "" || carriers.has(c);
+  const techIds = new Set();
+  (site.technologies ?? []).forEach((t, i) => {
+    const r = i + 2, id = t.tech_id;
+    if (!id) E("Componentes", r, "falta tech_id");
+    else if (techIds.has(id)) E("Componentes", r, `tech_id «${id}» repetido`);
+    techIds.add(id);
+    if (!TECH_TYPES.includes(t.type)) E("Componentes", r, `«${id}»: tipo «${t.type ?? ""}» inválido (${TECH_TYPES.join(", ")})`);
+    for (const k of TECH_NUM)
+      if (t[k] != null && t[k] !== "" && typeof t[k] !== "number") E("Componentes", r, `«${id}»: ${k} = «${t[k]}» no es un número`);
+    for (const k of ["input_carrier", "output_carrier"])
+      if (!known(t[k])) E("Componentes", r, `«${id}»: el vector «${t[k]}» (${k}) no está en «Vectores»`);
+    if (typeof t.ports === "string") E("Componentes", r, `«${id}»: ports no es JSON válido`);
+    else if (t.ports && typeof t.ports === "object") {
+      const ps = Array.isArray(t.ports) ? t.ports : [...(t.ports.inputs ?? []), ...(t.ports.outputs ?? [])];
+      for (const pt of ps) if (pt?.carrier && !carriers.has(pt.carrier)) E("Componentes", r, `«${id}»: el puerto usa el vector «${pt.carrier}», que no está en «Vectores»`);
+    }
+    if ((t.existing_capacity ?? 0) < 0 || (t.max_new_capacity ?? 0) < 0) E("Componentes", r, `«${id}»: capacidades negativas`);
+    if (t.investable === true && !((t.max_new_capacity ?? 0) > 0)) W("Componentes", r, `«${id}»: es invertible pero max_new_capacity es 0 (no se podrá comprar)`);
+    if (typeof t.efficiency === "number" && t.efficiency <= 0) E("Componentes", r, `«${id}»: eficiencia ≤ 0`);
+    else if (typeof t.efficiency === "number" && t.efficiency > 8) W("Componentes", r, `«${id}»: eficiencia/COP ${t.efficiency} muy alta (¿porcentaje en vez de fracción?)`);
+    if (t.node && nodes.size && !nodes.has(t.node)) E("Componentes", r, `«${id}»: el nodo «${t.node}» no está en «Nodos»`);
+    if (typeof t.lifetime_years === "number" && t.lifetime_years <= 0) E("Componentes", r, `«${id}»: vida útil ≤ 0`);
+  });
+  if (!(site.technologies ?? []).length) E("Componentes", 2, "no hay equipos");
+  const mids = new Set();
+  (site.markets ?? []).forEach((m, i) => {
+    const r = i + 2;
+    if (!m.market_id) E("Mercados", r, "falta market_id");
+    else if (mids.has(m.market_id)) E("Mercados", r, `market_id «${m.market_id}» repetido`);
+    mids.add(m.market_id);
+    if (!m.carrier_id || !carriers.has(m.carrier_id)) E("Mercados", r, `«${m.market_id}»: el vector «${m.carrier_id ?? ""}» no está en «Vectores»`);
+    if (!["buy", "sell"].includes(m.direction)) E("Mercados", r, `«${m.market_id}»: direction «${m.direction ?? ""}» inválida (buy, sell)`);
+    for (const k of MARKET_NUM)
+      if (m[k] != null && m[k] !== "" && typeof m[k] !== "number") E("Mercados", r, `«${m.market_id}»: ${k} = «${m[k]}» no es un número`);
+  });
+  (site.emission_factors ?? []).forEach((f, i) => {
+    const r = i + 2;
+    if (!known(f.carrier_id)) E("Emisiones", r, `el vector «${f.carrier_id}» no está en «Vectores»`);
+    if (typeof f.factor !== "number" || f.factor < 0) E("Emisiones", r, `factor «${f.factor ?? ""}» debe ser un número ≥ 0`);
+  });
+  const ts = site.timesteps ?? [];
+  if (!ts.length) E("Pasos", 2, "no hay pasos de tiempo");
+  ts.forEach((t, i) => { if (!(typeof t.weight_hours === "number" && t.weight_hours > 0)) E("Pasos", i + 2, `weight_hours «${t.weight_hours ?? ""}» debe ser un número > 0`); });
+  const hours = ts.reduce((a, t) => a + (typeof t.weight_hours === "number" ? t.weight_hours : 0), 0);
+  if (ts.length && Math.abs(hours - 8760) > 1) W("Pasos", null, `los pesos suman ${Math.round(hours)} h (un año son 8760)`);
+  for (const k of Object.keys(site.demands ?? {}))
+    if (!carriers.has(k)) E("Series", 1, `la columna demands.${k} no corresponde a ningún vector de «Vectores»`);
+  (site.arcs ?? []).forEach((a, i) => {
+    for (const end of ["from", "to"]) if (!nodes.has(a[end])) E("Líneas", i + 2, `«${a.arc_id}»: el nodo «${a[end] ?? ""}» (${end}) no está en «Nodos»`);
+  });
+  (site.demand_parts ?? []).forEach((d, i) => {
+    if (!carriers.has(d.carrier)) E("Demandas por nodo", i + 2, `«${d.part_id}»: el vector «${d.carrier ?? ""}» no está en «Vectores»`);
+    if (nodes.size && !nodes.has(d.node)) E("Demandas por nodo", i + 2, `«${d.part_id}»: el nodo «${d.node ?? ""}» no está en «Nodos»`);
+  });
+  return { errors, warnings };
+}
+
+/** «Componentes, fila 7: …» */
+export const problemLine = (p) => `${p.sheet}${p.row ? `, fila ${p.row}` : ""}: ${p.msg}`;
+
 /**
  * Lee un libro de entradas → objeto con la forma de un proyecto de IETO
  * ({format: "ieto-project", name, title, site, layout, config, runs: []}).
@@ -148,17 +244,17 @@ export async function readInputsBook(file) {
       if (v === IN_IETO) continue;            // queda el de _ieto
       config[k] = v == null || v === "" ? null : parseCell(v);
     }
-  if (has("Componentes")) site.technologies = untable(book.Componentes);
+  if (has("Componentes")) site.technologies = coerceNums(untable(book.Componentes), TECH_NUM);
   if (has("Vectores")) site.carriers = untable(book.Vectores);
-  if (has("Emisiones")) site.emission_factors = untable(book.Emisiones);
-  if (has("Pasos")) site.timesteps = untable(book.Pasos);
+  if (has("Emisiones")) site.emission_factors = coerceNums(untable(book.Emisiones), ["factor"]);
+  if (has("Pasos")) site.timesteps = coerceNums(untable(book.Pasos), ["step_id", "hour", "weight_hours", "duration_hours", "month"]);
   if (has("Nodos")) { const n = untable(book.Nodos); if (n.length) site.nodes = n; else delete site.nodes; }
   if (has("Líneas")) { const a = untable(book["Líneas"]); if (a.length) site.arcs = a; else delete site.arcs; }
   if (has("Demandas por nodo")) {
     const d = untable(book["Demandas por nodo"]);
     if (d.length) site.demand_parts = d; else delete site.demand_parts;
   }
-  const markets = has("Mercados") ? untable(book.Mercados) : (site.markets ?? []);
+  const markets = has("Mercados") ? coerceNums(untable(book.Mercados), MARKET_NUM) : (site.markets ?? []);
 
   // series por paso: columnas «grupo.id»
   const S = site.timesteps?.length ?? 0;
@@ -193,7 +289,17 @@ export async function readInputsBook(file) {
     site.hourly = { ...(base?.hourly_meta ?? {}), series };
   } else if (base?.hourly_meta) site.hourly = { ...base.hourly_meta, series: {} };
 
+  // validación: con errores no se importa (cada uno con hoja y fila); los
+  // avisos viajan con el proyecto y la interfaz los muestra
+  const { errors, warnings } = bookProblems(site);
+  if (errors.length) {
+    const more = errors.length > 12 ? `\n… y ${errors.length - 12} más` : "";
+    const err = new Error(`el libro tiene ${errors.length} error${errors.length === 1 ? "" : "es"}:\n` +
+                          errors.slice(0, 12).map(problemLine).join("\n") + more);
+    err.problems = errors;
+    throw err;
+  }
   const name = base?.name ?? "sistema_importado";
   return { format: "ieto-project", version: 1, exported_at: new Date().toISOString(), name, title: base?.title ?? name,
-           site, layout: base?.layout ?? null, config, log: [], runs: [] };
+           site, layout: base?.layout ?? null, config, log: [], runs: [], warnings: warnings.map(problemLine) };
 }
