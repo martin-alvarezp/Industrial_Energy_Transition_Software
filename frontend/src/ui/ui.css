@@ -173,7 +173,8 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
                  font: 500 16px var(--ui-font); cursor: pointer; }
 .ui-seg button svg { font-size: 20px; }
 .ui-seg button.on { background: var(--ui-primary); color: #fff; }
-.ui-seg.light button.on { background: var(--ui-accent-wash); color: var(--ui-accent); }
+/* elegido: verde oscuro sobre el lavado lima (el texto lima sobre lima no se leía) */
+.ui-seg.light button.on { background: var(--ui-accent-wash); color: var(--ui-primary); font-weight: 600; }
 .ui-seg.small button { height: 34px; padding: 0 12px; font-size: 14px; }
 .ui-seg.outlined { box-shadow: none; border: 1px solid var(--ui-border); }
 .ui-seg.outlined button + button { border-left: 1px solid var(--ui-border); }
@@ -263,7 +264,7 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .ui-radio-card { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px;
                  border: 1px solid var(--ui-border-2); border-radius: 10px; cursor: pointer; }
 .ui-radio-card.on { border-color: var(--ui-primary); background: var(--ui-primary-wash); }
-.ui-radio-card b { display: block; font-weight: 600; }
+.ui-radio-card b { display: block; font-weight: 600; flex: 0 0 auto; max-width: 42%; }
 .ui-radio-card small { color: var(--ui-muted); }
 
 /* labeled select (estilo "Impact / Scale") */

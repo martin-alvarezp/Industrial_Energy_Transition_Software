@@ -25,7 +25,7 @@ export const SCENARIOS = ["emissions_cap", "least_cost", "high_gas", "high_carbo
 const STEPS = ["run.stepBasic", "run.stepModel", "run.stepTime", "run.stepSolver"];
 
 export default function RunModal({ onClose, onDone, initialStack = [] }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { draft, run, running, runError, runs = [], twin, siteName, apiUp } = useStudio();
   const techIds = new Set((twin?.siteJson?.technologies ?? []).map((x) => x.tech_id));
   const scenarios = scenarioList({ scenarios: twin?.layout?.scenarios ?? [], params: twin?.layout?.params ?? [] });
@@ -117,6 +117,12 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   };
   const move = (i, d) => setStack((s) => { const x = [...s]; [x[i], x[i + d]] = [x[i + d], x[i]]; return x; });
 
+  // vista previa del nombre automático (el mismo que pone studio.run si se deja vacío)
+  const draftCapped = [draft.emissions_cap_net_start, draft.emissions_cap_net_end, draft.emissions_cap_gross]
+    .some((x) => x != null && +x < 1e11) || (draft.emission_caps ?? []).length > 0;
+  const autoName = `${dispatch ? t("run.dispatchName") : analysis === "bau" ? t("scn.bau")
+    : useTarget && draftCapped ? t("scn.emissions_cap") : t("scn.least_cost")} · ${new Date().toLocaleString(lang === "en" ? "en-GB" : "es-CL",
+      { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "")}`;
   const go = async () => {
     setCapError(null);
     try {
@@ -169,7 +175,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
       <h4 className="run-sec" ref={refs[0]}>1 · {t("run.stepBasic")}</h4>
       <div className="ui-field">
         <label>{t("run.name")}</label>
-        <input className="ui-input" autoFocus value={name} placeholder={`${new Date().toISOString().slice(0, 10)} · …`}
+        <input className="ui-input" autoFocus value={name} placeholder={autoName}
                onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="ui-field">
