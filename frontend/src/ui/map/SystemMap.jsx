@@ -105,6 +105,19 @@ export function arcPath(arc, geometry, positions) {
   return a && b ? [a, b] : null;
 }
 
+// con el mapa lejos (zoom < 17) los nombres de las demandas se esconden: en
+// pantalla chica se pisaban con los de los nodos (siguen en el tooltip)
+function ZoomClass() {
+  const map = useMap();
+  useEffect(() => {
+    const set = () => map.getContainer().classList.toggle("sm-far", map.getZoom() < 17);
+    set();
+    map.on("zoomend", set);
+    return () => { map.off("zoomend", set); };
+  }, [map]);
+  return null;
+}
+
 function Events({ onClick, onMove }) {
   useMapEvents({
     click: (e) => onClick?.([e.latlng.lat, e.latlng.lng]),
@@ -162,6 +175,7 @@ export default function SystemMap({
                  maxZoom={B.maxZoom} className={B.className} />
       <FitOnce points={pts} fitKey={fitKey} fallbackCenter={layout.center} />
       <Events onClick={(p) => onMapClick?.(p)} onMove={onCursor} />
+      <ZoomClass />
 
       {filters.boundary !== false && layout.boundary?.length >= 3 && (
         <Polygon positions={layout.boundary} interactive={false}

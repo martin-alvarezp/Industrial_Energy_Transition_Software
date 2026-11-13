@@ -370,6 +370,7 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
                  display: grid; place-items: center; border: 3px solid var(--dc, var(--ui-text));
                  box-shadow: 0 1px 4px rgba(0,0,0,0.28); transition: transform 0.12s; }
 .sm-demand.loose .sm-demand-ico { border-style: dashed; }
+.sm-far .sm-demand-name { display: none; }
 .sm-demand:hover .sm-demand-ico { transform: scale(1.1); }
 .sm-demand.selected .sm-demand-ico { box-shadow: 0 0 0 3px var(--ui-text), 0 1px 6px rgba(0,0,0,0.35); }
 .sm-demand-name { position: absolute; top: 38px; left: 50%; transform: translateX(-50%); white-space: nowrap;
