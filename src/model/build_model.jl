@@ -17,14 +17,18 @@ Construye el MILP multi-año del MVP: 96 pasos del año-plantilla × horizon_yea
 variables según SPEC §5, restricciones §7-8 y objetivo VAN según SPEC §6.
 """
 function build_model(site::Site, cfg::ScenarioConfig;
-                     optimizer = HiGHS.Optimizer, silent::Bool = true)
+                     optimizer = HiGHS.Optimizer, silent::Bool = true,
+                     direct::Bool = get(ENV, "IETO_DIRECT_MODEL", "0") == "1")
     # modo despacho (1.3): infraestructura fija — el modelo y los resultados
     # usan el sitio transformado
     cfg.dispatch_only && ((site, cfg) = fix_infrastructure(site, cfg))
     sets = build_sets(site, cfg)
     params = build_parameters(site, cfg)
 
-    m = JuMP.Model(optimizer)
+    # WP-2: `direct` construye sobre el solver sin la copia intermedia de JuMP
+    # (CachingOptimizer): menos memoria en modelos grandes (8760 h × hitos)
+    m = direct ? JuMP.direct_model(JuMP.MOI.Bridges.full_bridge_optimizer(optimizer(), Float64)) :
+                 JuMP.Model(optimizer)
     silent && JuMP.set_silent(m)
 
     add_variables!(m, sets, params, cfg)

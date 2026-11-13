@@ -127,10 +127,10 @@ function Events({ onClick, onMove }) {
 }
 
 /** Ajusta la vista al sistema la primera vez (y cuando cambia `fitKey`). */
-function FitOnce({ points, fitKey, fallbackCenter }) {
+function FitOnce({ points, fitKey, fallbackCenter, padding = 70 }) {
   const map = useMap();
   useEffect(() => {
-    if (points.length >= 2) map.fitBounds(L.latLngBounds(points), { padding: [70, 70], maxZoom: 18 });
+    if (points.length >= 2) map.fitBounds(L.latLngBounds(points), { padding: [padding, padding], maxZoom: 18 });
     else if (points.length === 1) map.setView(points[0], 17);
     else if (fallbackCenter) map.setView(fallbackCenter, 17);
   }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -151,6 +151,7 @@ export default function SystemMap({
   editing = false, mode = null, draft = [], cursor = null, draftArc = null,
   onMapClick, onCursor, onSelectComponent, onSelectLocation, onSelectArc, onMoveComponent,
   onSelectNode, onMoveNode, selectedDemand, onSelectDemand, onMoveDemand,
+  zoomSnap = 1, fitPadding = 70,   // la presentación (WP-7) usa zoom fraccionario y menos margen
 }) {
   const { t } = useI18n();
   const techs = siteJson.technologies ?? [];
@@ -168,12 +169,12 @@ export default function SystemMap({
   const hiddenCarrier = (c) => filters.carriers && filters.carriers[c] === false;
 
   return (
-    <MapContainer center={layout.center ?? [-33.45, -70.66]} zoom={layout.center ? 16 : 5}
+    <MapContainer center={layout.center ?? [-33.45, -70.66]} zoom={layout.center ? 16 : 5} zoomSnap={zoomSnap}
                   className="sm-map" ref={mapRef} zoomControl={false} attributionControl={false}
                   scrollWheelZoom doubleClickZoom={!drawing}>
       <TileLayer key={base} url={B.url} attribution={B.attribution}
                  maxZoom={B.maxZoom} className={B.className} />
-      <FitOnce points={pts} fitKey={fitKey} fallbackCenter={layout.center} />
+      <FitOnce points={pts} fitKey={fitKey} fallbackCenter={layout.center} padding={fitPadding} />
       <Events onClick={(p) => onMapClick?.(p)} onMove={onCursor} />
       <ZoomClass />
 

@@ -27,6 +27,7 @@ const SYSTEM_PAGES = {
   changelog: ChangeLogPage,
   optimizations: lazy(() => import("./pages/OptimizationsPage.jsx")),
   summary: lazy(() => import("./pages/SummaryPage.jsx")),
+  deck: lazy(() => import("./pages/DeckPage.jsx")),   // presentación para el cliente (WP-7)
   kpis: results("KpisPage"),
   capacities: results("CapacitiesPage"),
   costs: results("CostsPage"),

@@ -234,6 +234,7 @@ export default function SummaryPage() {
   const exportMenu = [
     { label: t("sum.xlsx"), icon: IcFileDownload, hidden: !apiUp,
       onClick: () => downloadXlsx(applied, appliedPayload, appliedSite) },
+    { label: t("sum.deck"), icon: IcDescription, onClick: () => navigate(hrefFor({ site: siteName, page: "deck" })) },
     { label: t("sum.memo"), icon: IcDescription,
       onClick: () => openMemo({ ...data, site_snapshot: siteJson }, twin?.layout?.title || siteName, viewing?.name) },
   ];
