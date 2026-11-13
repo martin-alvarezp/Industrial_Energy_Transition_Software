@@ -346,6 +346,10 @@ extend({
   "save.browser": ["Guardado en este navegador", "Saved in this browser"],
   "systems.browser": ["En este navegador", "In this browser"],
   "dem.layer": ["Demandas finales", "Final demands"],
+  "dem.add": ["Demanda", "Demand"],
+  "dem.addNew": ["Nueva demanda", "New demand"],
+  "dem.modePlace": ["Haz clic en el mapa donde está la demanda", "Click on the map where the demand is"],
+  "dem.deleteConfirm": ["¿Eliminar la demanda «{name}» y su consumo? (Para conservar el total, usa «Juntar con el resto».)", "Delete demand “{name}” and its consumption? (To keep the total, use “Merge into the rest”.)"],
   "dem.wired": ["Recibe energía por sus líneas", "Gets energy through its lines"],
   "dem.loose": ["Sin líneas: barra común del sitio", "No lines: site common bus"],
   "dem.atNode": ["Se consume en «{name}»", "Consumed at “{name}”"],
@@ -1019,8 +1023,9 @@ extend({
   "node.partName": ["Nombre de la demanda", "Demand name"],
   "node.partRemove": ["Quitar esta demanda (vuelve al resto del vector)", "Remove this demand (it goes back to the rest of the carrier)"],
   "node.partHint": ["Parte de la demanda del vector que se consume en este nodo (p. ej. la electricidad de un subsistema). Solo puede abastecerse desde lo que llegue a este nodo por sus líneas. El total del vector no cambia: el resto queda donde se consumía.", "Share of the carrier's demand consumed at this node (e.g. a subsystem's electricity). It can only be supplied from what reaches this node through its lines. The carrier's total does not change: the rest stays where it was consumed."],
-  "node.demandsNeedLine": ["Conecta el nodo con una línea para que una demanda se balancee en él.",
-                           "Connect the node with a line so a demand can balance in it."],
+  "node.demandsNeedLine": ["Mientras el nodo no tenga líneas, sus demandas se abastecen desde la barra común; repartir una demanda existente entre nodos requiere líneas.",
+                           "While the node has no lines, its demands are supplied from the common bus; splitting an existing demand across nodes needs lines."],
+  "node.noDemands": ["Este nodo no tiene demandas finales.", "This node has no final demands."],
 });
 
 // ── menú Componentes de resultados ──

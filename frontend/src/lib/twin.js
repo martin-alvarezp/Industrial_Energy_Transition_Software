@@ -1122,6 +1122,140 @@ export function removeDemandOnMap(siteJson, partId) {
   return { siteJson: removeDemandPart(sj, partId), renamed: null };
 }
 
+/** Nodo (del mapa) al que pertenece una demanda, esté o no conectado por líneas:
+ *  `home` de la parte, o el nodo de la demanda entera; "main" si ninguno. */
+export function demandHomeOf(siteJson, d) {
+  if (d.part) { const p = (siteJson.demand_parts ?? []).find((x) => x.part_id === d.id); return p?.home ?? p?.node ?? "main"; }
+  return siteJson.demand_nodes?.[d.carrier] ?? "main";
+}
+
+/** Vectores que pueden tener demanda final (llevan balance por paso). */
+export const demandCarrierOptions = (siteJson) =>
+  (siteJson.carriers ?? []).filter((c) => ["energy", "heat", "cooling"].includes(c.category));
+
+/**
+ * El vector `c` pasa de demanda entera a repartida en partes: la demanda que
+ * ya había queda como una parte con su nombre (y sus líneas, si las tenía).
+ * Devuelve { siteJson, restId, renamed: [viejo, nuevo] | null }.
+ */
+function wholeToPart(siteJson, c, name, used) {
+  const cur = siteJson.demands?.[c];
+  if (!cur?.some((v) => v > 0) || (siteJson.demand_parts ?? []).some((p) => p.carrier === c))
+    return { siteJson, restId: null, renamed: null };
+  const wholeId = demandEndpointId(c);
+  let id = `${c}__${partSlug(name)}`, k = 2;
+  while (used.has(id)) id = `${c}__${partSlug(name)}_${k++}`;
+  used.add(id);
+  let sj = { ...siteJson };
+  let home = sj.demand_nodes?.[c] ?? "main";
+  if (home === wholeId) {   // la demanda entera tenía líneas propias: pasan a la parte
+    sj = renameEndpoint(sj, wholeId, id);
+    home = id;
+  }
+  const dn = { ...(sj.demand_nodes ?? {}) };
+  delete dn[c];
+  sj.demand_nodes = Object.keys(dn).length ? dn : undefined;
+  sj.demand_parts = [...(sj.demand_parts ?? []), { part_id: id, name, carrier: c, node: home, home }];
+  sj.demand_part_series = { ...(sj.demand_part_series ?? {}), [id]: [...cur] };
+  return { siteJson: sj, restId: id, renamed: [wholeId, id] };
+}
+
+/**
+ * Agrega una demanda final NUEVA, como cualquier componente: un consumo
+ * ADICIONAL de `mw` MW promedio (plano; luego se le carga su serie) en el
+ * vector `carrier`, con nombre propio y, si se indica, en el nodo `node`.
+ * Si el vector ya tenía demanda, esa queda como otra parte («existente») y el
+ * total del vector crece en lo nuevo (también su serie horaria cruda).
+ * Devuelve { siteJson, id, renamed: [viejo, nuevo] | null }.
+ */
+export function addNewDemand(siteJson, { carrier, name, mw, node = null }) {
+  const S = siteJson.timesteps?.length ?? 0;
+  const v = Math.max(0, +mw || 0);
+  const cName = siteJson.carriers?.find((x) => x.carrier_id === carrier)?.name ?? carrier;
+  const used = new Set((siteJson.demand_parts ?? []).map((p) => p.part_id));
+  const { siteJson: sj0, renamed } = wholeToPart(siteJson, carrier, `${cName} (existente)`, used);
+  let id = `${carrier}__${partSlug(name || cName)}`, k = 2;
+  while (used.has(id)) id = `${carrier}__${partSlug(name || cName)}_${k++}`;
+  const home = node || "main";
+  const flat = new Array(S).fill(+v.toFixed(6));
+  const cur = sj0.demands?.[carrier];
+  const had = cur?.some((x) => x > 0);
+  const sj = {
+    ...sj0,
+    demands: { ...(sj0.demands ?? {}), [carrier]: had ? cur.map((x) => +(x + v).toFixed(6)) : flat },
+    demand_parts: [...(sj0.demand_parts ?? []), { part_id: id, name: name || cName, carrier, node: home, home }],
+    demand_part_series: { ...(sj0.demand_part_series ?? {}), [id]: flat },
+  };
+  // la serie horaria cruda del vector (si la hay) crece igual: si no, al cambiar
+  // la resolución temporal la demanda nueva desaparecería del total
+  const rawKey = `demands.${carrier}`;
+  const raw = sj.hourly?.series?.[rawKey];
+  if (raw) sj.hourly = { ...sj.hourly, series: { ...sj.hourly.series, [rawKey]: had ? raw.map((x) => +(x + v).toFixed(6)) : raw.map(() => v) } };
+  return { siteJson: applyTopology(sj), id, renamed };
+}
+
+/**
+ * Lleva una demanda del mapa a un nodo (o la saca de los nodos con node =
+ * null): queda dibujada junto al nodo y se consume en él cuando el nodo tiene
+ * líneas. Una demanda entera pasa a ser una parte con nombre (el total no
+ * cambia). Devuelve { siteJson, id, renamed }.
+ */
+export function setDemandHome(siteJson, endpointId, node) {
+  const d = demandEndpoints(siteJson).find((x) => x.id === endpointId);
+  if (!d) return { siteJson, id: endpointId, renamed: null };
+  const home = node || "main";
+  if (!d.part) {
+    if (!node) return { siteJson: applyTopology(setDemandNode(siteJson, d.carrier, null)), id: endpointId, renamed: null };
+    const used = new Set((siteJson.demand_parts ?? []).map((p) => p.part_id));
+    const r = wholeToPart(siteJson, d.carrier, d.name, used);
+    if (!r.restId) return { siteJson, id: endpointId, renamed: null };
+    const sj = { ...r.siteJson, demand_parts: r.siteJson.demand_parts.map((p) => (p.part_id === r.restId ? { ...p, home } : p)) };
+    return { siteJson: applyTopology(sj), id: r.restId, renamed: r.renamed };
+  }
+  const sj = { ...siteJson, demand_parts: siteJson.demand_parts.map((p) => (p.part_id === d.id ? { ...p, home } : p)) };
+  return { siteJson: applyTopology(sj), id: d.id, renamed: null };
+}
+
+/**
+ * Elimina una demanda del mapa CON su consumo (a diferencia de quitar una
+ * parte, que la devuelve al resto del vector): el total del vector baja en
+ * lo que consumía. Sus líneas se van con ella. Si el vector queda sin
+ * consumo, deja de tener demanda.
+ */
+export function deleteDemand(siteJson, endpointId) {
+  const d = demandEndpoints(siteJson).find((x) => x.id === endpointId);
+  if (!d) return siteJson;
+  const c = d.carrier;
+  let sj = { ...siteJson, arcs: (siteJson.arcs ?? []).filter((a) => a.from !== d.id && a.to !== d.id) };
+  const rawKey = `demands.${c}`;
+  const dropCarrier = (x) => {
+    const { [c]: _d, ...demands } = x.demands ?? {};
+    const out = { ...x, demands };
+    const dn = { ...(x.demand_nodes ?? {}) }; delete dn[c];
+    out.demand_nodes = Object.keys(dn).length ? dn : undefined;
+    if (x.hourly?.series?.[rawKey]) { const { [rawKey]: _r, ...series } = x.hourly.series; out.hourly = { ...x.hourly, series }; }
+    return out;
+  };
+  if (!d.part) return applyTopology(dropCarrier(sj));
+  const w = sj.timesteps.map((t) => t.weight_hours ?? 1);
+  const mine = sj.demand_part_series?.[d.id] ?? [];
+  const cur = sj.demands?.[c] ?? [];
+  const next = cur.map((v, i) => Math.max(0, +(v - (mine[i] ?? 0)).toFixed(6)));
+  const E = (s) => s.reduce((a, v, i) => a + v * (w[i] ?? 0), 0);
+  const parts = (sj.demand_parts ?? []).filter((p) => p.part_id !== d.id);
+  const { [d.id]: _s, ...series } = sj.demand_part_series ?? {};
+  sj = { ...sj, demand_parts: parts.length ? parts : undefined, demand_part_series: parts.length ? series : undefined };
+  if (!parts.some((p) => p.carrier === c) || !(E(next) > 1e-9)) return applyTopology(dropCarrier(sj));
+  sj.demands = { ...sj.demands, [c]: next };
+  // la serie horaria cruda se escala a la nueva energía anual (conserva su forma)
+  const raw = sj.hourly?.series?.[rawKey];
+  if (raw && E(cur) > 0) {
+    const f = E(next) / E(cur);
+    sj.hourly = { ...sj.hourly, series: { ...sj.hourly.series, [rawKey]: raw.map((x) => +(x * f).toFixed(6)) } };
+  }
+  return applyTopology(sj);
+}
+
 /** Renombra una demanda por nodo. */
 export const renameDemandPart = (siteJson, id, name) => ({
   ...siteJson, demand_parts: (siteJson.demand_parts ?? []).map((p) => (p.part_id === id ? { ...p, name } : p)) });

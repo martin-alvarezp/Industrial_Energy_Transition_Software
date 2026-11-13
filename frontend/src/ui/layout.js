@@ -4,7 +4,7 @@
 // imagen de portada y una descripción. Todo es presentación: el optimizador
 // sigue viendo sólo site_json. El backend guarda el GeoJSON tal cual, así que
 // las extensiones viajan sin tocar la API.
-import { layoutToGeoJSON, geoJSONToLayout, demandEndpoints, demandNodeOf } from "../lib/twin.js";
+import { layoutToGeoJSON, geoJSONToLayout, demandEndpoints, demandHomeOf } from "../lib/twin.js";
 
 export const EMPTY_LAYOUT = {
   address: null, center: null, boundary: null, equipment: {}, arcs: {}, demands: {},
@@ -176,7 +176,8 @@ export function demandPositions(siteJson, layout) {
   const byHome = {};
   for (const d of dems) {
     if (layout.demands?.[d.id]) { out[d.id] = layout.demands[d.id]; continue; }
-    const home = demandNodeOf(siteJson, d);
+    // junto a su nodo aunque el nodo todavía no tenga líneas
+    const home = demandHomeOf(siteJson, d);
     if (home !== "main" && home !== d.id && ends[home]) (byHome[home] ??= []).push(d.id);
     else free.push(d.id);
   }

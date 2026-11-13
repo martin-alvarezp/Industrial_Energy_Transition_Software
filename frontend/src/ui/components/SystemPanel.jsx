@@ -17,7 +17,8 @@ import { Menu, Modal } from "../kit.jsx";
 import { hrefFor, navigate } from "../router.js";
 import { locationOf, polygonCentroid, nodeOf, techsInNode, nodeLocation, assignToNode } from "../layout.js";
 import ComponentCollection, { ViewToggle, countLabel } from "./ComponentCollection.jsx";
-import { polygonAreaM2, setDemandNode, demandPartsOf, addDemandPart, removeDemandPart, renameDemandPart, partShare } from "../../lib/twin.js";
+import { polygonAreaM2, setDemandNode, demandPartsOf, addDemandPart, removeDemandPart, renameDemandPart, partShare,
+         demandEndpoints, demandHomeOf, demandSeriesOf, carrierColor } from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
 import { setRawSeries } from "../../lib/templates.js";
 import { num } from "../../lib/format.js";
@@ -250,7 +251,7 @@ function WeatherTab({ loc, techs, at }) {
 export default function SystemPanel({
   route, collapsed, setCollapsed, compView, setCompView, builtYears,
   onOpenComponent, onAddComponent, onDrawLocation, onRedrawLocation, onLocateComponent,
-  onDeleteComponent, onAddNode,
+  onDeleteComponent, onAddNode, onAddDemand, onOpenDemand,
 }) {
   const { t, lang } = useI18n();
   const { siteName, twin, patchLayout, patchSite, readonly } = useStudio();
@@ -298,6 +299,13 @@ export default function SystemPanel({
     setNode(null);
   };
   const nodeArcs = node ? (siteJson.arcs ?? []).filter((a) => a.from === node.id || a.to === node.id) : [];
+  // demandas finales que pertenecen al nodo (con o sin líneas)
+  const nodeDemands = useMemo(() => {
+    if (!node) return [];
+    const w = siteJson.timesteps.map((x) => x.weight_hours ?? 0);
+    return demandEndpoints(siteJson).filter((d) => demandHomeOf(siteJson, d) === node.id)
+      .map((d) => ({ ...d, mwh: demandSeriesOf(siteJson, d).reduce((a, v, i) => a + v * (w[i] ?? 0), 0) }));
+  }, [node, siteJson]);
   const nodeLocName = node ? layout.locations?.find((l) => l.id === nodeLocation(layout, node))?.name : null;
   const renameLoc = (name) => patchLayout((l) => ({
     locations: l.locations.map((x) => (x.id === loc.id ? { ...x, name } : x)) }));
@@ -397,7 +405,11 @@ export default function SystemPanel({
                 <dd>{nodeArcs.length ? nodeArcs.map((a) => a.name || a.arc_id).join(", ") : t("node.noLines")}</dd>
                 <dt>{t("node.demands")}</dt>
                 <dd>
-                  {!nodeArcs.length && <span className="ui-hint">{t("node.demandsNeedLine")}</span>}
+                  {onAddDemand && (
+                    <button className="ui-btn outline" style={{ marginBottom: 6 }} data-testid="node-info-add-demand"
+                            onClick={() => onAddDemand(node.id)}><IcAdd /> {t("dem.addNew")}</button>
+                  )}
+                  {!nodeArcs.length && <span className="ui-hint" style={{ display: "block" }}>{t("node.demandsNeedLine")}</span>}
                   {/* vectores sin repartir: la demanda entera se consume aquí o no */}
                   {nodeArcs.length > 0 && Object.keys(siteJson.demands ?? {}).filter((c) => !demandPartsOf(siteJson, c).length).map((c) => (
                     <label key={c} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -503,6 +515,27 @@ export default function SystemPanel({
                                      onOpen={onOpenComponent} onLocate={onLocateComponent}
                                      onDelete={onDeleteComponent}
                                      onMoveNode={(layout.nodes ?? []).length ? setMoving : undefined} />
+                {/* demandas finales: viven en el nodo como sus componentes */}
+                {node && (
+                  <div className="nd-demands" data-testid="node-demands">
+                    <div className="ip-panel-bar" style={{ marginTop: 14 }}>
+                      <h4 style={{ margin: 0 }}>{t("dem.layer")}</h4>
+                      {onAddDemand && (
+                        <button className="ui-btn outline" data-testid="node-add-demand" style={{ marginLeft: "auto" }}
+                                onClick={() => onAddDemand(node.id)}><IcAdd /> {t("dem.add")}</button>
+                      )}
+                    </div>
+                    {nodeDemands.length === 0 && <p className="ui-hint">{t("node.noDemands")}</p>}
+                    {nodeDemands.map((d) => (
+                      <button key={d.id} className="ip-loc-row" data-testid={`node-dem-${d.id}`}
+                              onClick={() => onOpenDemand?.(d.id)}>
+                        <span className="sw" style={{ background: carrierColor(siteJson.carriers.find((c) => c.carrier_id === d.carrier)),
+                                                      width: 10, height: 10, borderRadius: 3, display: "inline-block" }} />
+                        {d.name} <small>{siteJson.carriers.find((c) => c.carrier_id === d.carrier)?.name ?? d.carrier} · {num(d.mwh, 0)} MWh</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
             {curTab === "weather" && loc && <WeatherTab loc={loc} techs={inLoc} />}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { demandEndpoints, demandSeriesOf, arcEndpointLabel, carrierColor, demandNodeOf } from "../../lib/twin.js";
+import { demandEndpoints, demandSeriesOf, arcEndpointLabel, carrierColor, demandNodeOf, demandHomeOf } from "../../lib/twin.js";
 import { useL } from "../../ui/i18n.jsx";
 import { num } from "../../lib/format.js";
 
@@ -9,7 +9,7 @@ import { num } from "../../lib/format.js";
  * que viven en otros lugares del sitio (subsistemas).
  */
 export default function DemandDrawer({ id, siteJson, nodes = [], onConnect, onSplit, onRemovePart,
-                                       onRename, onSeries, onClose }) {
+                                       onRename, onSeries, onClose, onSetNode, onDelete }) {
   const L = useL();
   const d = demandEndpoints(siteJson).find((x) => x.id === id);
   const [name, setName] = useState(d?.name ?? "");
@@ -34,6 +34,9 @@ export default function DemandDrawer({ id, siteJson, nodes = [], onConnect, onSp
   const outArcs = (siteJson.arcs ?? []).filter((a) => a.from === id && a.directed);
   const label = (x) => arcEndpointLabel(siteJson, x, nodes);
   const splitOk = splitName.trim() && pct > 0 && pct < 100;
+  // nodo del mapa al que pertenece (aunque todavía no tenga líneas)
+  const homeNode = demandHomeOf(siteJson, d);
+  const inNode = nodes.some((n) => n.id === homeNode) ? homeNode : "";
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
@@ -52,6 +55,23 @@ export default function DemandDrawer({ id, siteJson, nodes = [], onConnect, onSp
           <div><span>{L("Potencia máxima", "Peak power")}</span><b>{num(peak, 2)} MW</b></div>
         </div>
         <button className="chart-toggle" onClick={onSeries}>{L("Ver y editar la serie →", "View and edit the series →")}</button>
+
+        {onSetNode && (
+          <>
+            <p className="drawer-section">{L("Nodo", "Node")}</p>
+            <select className="ui-select" value={inNode} data-testid="demand-node"
+                    disabled={homeNode === id}
+                    onChange={(e) => onSetNode(e.target.value || null)}>
+              <option value="">{L("Ninguno (punto propio en el mapa)", "None (own point on the map)")}</option>
+              {nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+            </select>
+            <p className="hint">{homeNode === id
+              ? L("Conectada por líneas propias: para pasarla a un nodo, borra primero sus líneas.", "Connected by its own lines: to move it into a node, delete its lines first.")
+              : inNode && !(siteJson.arcs ?? []).some((a) => a.from === inNode || a.to === inNode)
+                ? L("El nodo aún no tiene líneas: mientras tanto se abastece desde la barra común.", "The node has no lines yet: meanwhile it is supplied from the common bus.")
+                : L("En un nodo, la demanda se dibuja junto a él y consume lo que llega al nodo.", "In a node, the demand is drawn next to it and consumes what reaches the node.")}</p>
+          </>
+        )}
 
         <p className="drawer-section">{L("De dónde recibe energía", "Where it gets energy from")}</p>
         {bus && bus !== id && (
@@ -107,13 +127,18 @@ export default function DemandDrawer({ id, siteJson, nodes = [], onConnect, onSp
         <button className="chart-toggle" disabled={!splitOk} data-testid="demand-split"
                 onClick={() => onSplit(splitName.trim(), pct / 100)}>{L("Dividir", "Split")}</button>
 
-        {d.part && (
-          <div className="drawer-actions">
-            <button className="chart-toggle danger" onClick={onRemovePart} data-testid="demand-remove">
-              {L("Quitar esta parte (vuelve al resto del vector)", "Remove this part (merges back into the carrier)")}
+        <div className="drawer-actions" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {d.part && (siteJson.demand_parts ?? []).filter((p) => p.carrier === d.carrier).length > 1 && (
+            <button className="chart-toggle" onClick={onRemovePart} data-testid="demand-remove">
+              {L("Juntar con el resto del vector (el total no cambia)", "Merge into the rest of the carrier (total unchanged)")}
             </button>
-          </div>
-        )}
+          )}
+          {onDelete && (
+            <button className="chart-toggle danger" onClick={onDelete} data-testid="demand-delete">
+              {L("Eliminar demanda (y su consumo)", "Delete demand (and its consumption)")}
+            </button>
+          )}
+        </div>
       </aside>
     </div>
   );

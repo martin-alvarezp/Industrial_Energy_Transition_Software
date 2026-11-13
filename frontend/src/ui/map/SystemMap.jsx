@@ -185,7 +185,13 @@ export default function SystemMap({
 
       {filters.locations !== false && (layout.locations ?? []).map((loc) => loc.polygon?.length >= 3 && (
         <Polygon key={loc.id} positions={loc.polygon}
-                 eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); if (!drawing && !connecting && !mode) onSelectLocation?.(loc.id); } }}
+                 eventHandlers={{ click: (e) => {
+                   L.DomEvent.stopPropagation(e);
+                   // en un modo (ubicar, dibujar, conectar) el clic dentro de una
+                   // ubicación es un clic en el mapa; sin modo, abre la ubicación
+                   if (mode) onMapClick?.([e.latlng.lat, e.latlng.lng]);
+                   else onSelectLocation?.(loc.id);
+                 } }}
                  pathOptions={{
                    color: loc.id === selectedLocation ? SLR.darkGreen : SLR.grayText,
                    weight: loc.id === selectedLocation ? 2.6 : 2,

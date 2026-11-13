@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IcFilterAlt, IcAdd, IcEdit, IcCheck, IcMap, IcLan, IcLayers, IcNearMe, IcRemove,
   IcOutlineViewInAr, IcOutlineLocationOn, IcOutlineCable, IcBolt, IcOutlineHandshake,
-  IcPolyline, IcOutlineCropFree, IcPinDrop, IcClose, IcSatelliteAlt, IcNode,
+  IcPolyline, IcOutlineCropFree, IcPinDrop, IcClose, IcSatelliteAlt, IcNode, IcShowChart,
 } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
@@ -21,11 +21,12 @@ import MarketDrawer from "../../components/twin/MarketDrawer.jsx";
 import ArcDrawer from "../../components/twin/ArcDrawer.jsx";
 import AddressSearch from "../../components/twin/AddressSearch.jsx";
 import DemandDrawer from "../../components/twin/DemandDrawer.jsx";
+import NewDemandModal from "../../components/twin/NewDemandModal.jsx";
 import {
   upsertTech, removeTech, isMultiport, upsertCarrier, removeCarrier, upsertMarket,
   removeMarket, blankMarket, blankArc, upsertArc, removeArc, CARRIER_PRESETS, blankCarrier,
   carrierColor, TECH_TYPE_META, arcEndpointLabel, splitDemandOnMap, removeDemandOnMap,
-  renameDemandPart,
+  renameDemandPart, addNewDemand, setDemandHome, deleteDemand,
 } from "../../lib/twin.js";
 import L from "leaflet";
 
@@ -68,6 +69,7 @@ export default function InfrastructurePage({ route }) {
   const [marketDrawer, setMarketDrawer] = useState(null);
   const [arcDrawer, setArcDrawer] = useState(null);
   const [demandSel, setDemandSel] = useState(null);   // demanda final abierta en su panel
+  const [newDemand, setNewDemand] = useState(null);   // {node}: ventana de demanda nueva
   const [catalog, setCatalog] = useState(null);
   const [carrierPick, setCarrierPick] = useState(false);
   const [newLoc, setNewLoc] = useState(null);
@@ -132,6 +134,11 @@ export default function InfrastructurePage({ route }) {
     } else if (mode === "place-node") {
       setNewNode({ pos: p, name: "" });
       setMode(null); setCursor(null);
+    } else if (mode?.startsWith("place-demand:")) {
+      const id = mode.slice(13);
+      patchLayout((l) => ({ demands: { ...(l.demands ?? {}), [id]: p }, center: l.center ?? p }));
+      cancelMode();
+      setDemandSel(id);
     } else if (mode?.startsWith("place:")) {
       const id = mode.slice(6);
       patchLayout((l) => ({
@@ -171,6 +178,39 @@ export default function InfrastructurePage({ route }) {
     setArcDrawer({ draft: blankArc(draftArc.from, id, siteJson), isNew: true,
                    geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
     cancelMode();
+  };
+  // ── demandas finales: crear como un componente, mover a un nodo, eliminar ──
+  const renameInLayout = (renamed) => renamed && patchLayout((l) => {
+    const dm = { ...(l.demands ?? {}) };
+    if (dm[renamed[0]]) { dm[renamed[1]] = dm[renamed[0]]; delete dm[renamed[0]]; }
+    return { demands: dm };
+  });
+  const createDemand = ({ name, carrier, mw, node }) => {
+    const r = addNewDemand(siteJson, { carrier, name, mw, node });
+    patchSite(() => r.siteJson, `Demanda '${name}' agregada${node ? ` en el nodo '${layout.nodes?.find((n) => n.id === node)?.name ?? node}'` : ""}`);
+    renameInLayout(r.renamed);
+    setNewDemand(null);
+    if (node) setDemandSel(r.id);
+    else { setView("map"); cancelMode(); setMode("place-demand:" + r.id); }
+  };
+  const moveDemandToNode = (id, node) => {
+    const r = setDemandHome(siteJson, id, node);
+    patchSite(() => r.siteJson, node ? `Demanda movida al nodo '${layout.nodes?.find((n) => n.id === node)?.name ?? node}'` : "Demanda fuera de los nodos");
+    // dentro de un nodo se dibuja junto a él: se olvida la posición suelta
+    patchLayout((l) => {
+      const dm = { ...(l.demands ?? {}) };
+      if (r.renamed) { if (dm[r.renamed[0]]) dm[r.renamed[1]] = dm[r.renamed[0]]; delete dm[r.renamed[0]]; }
+      if (node) delete dm[r.id];
+      return { demands: dm };
+    });
+    setDemandSel(r.id);
+  };
+  const removeDemand = (id) => {
+    const name = arcEndpointLabel(siteJson, id, layout.nodes ?? []);
+    if (!window.confirm(t("dem.deleteConfirm", { name }))) return;
+    patchSite((sj) => deleteDemand(sj, id), `Demanda '${name}' eliminada`);
+    patchLayout((l) => { const { [id]: _x, ...demands } = l.demands ?? {}; return { demands }; });
+    setDemandSel(null);
   };
   // una demanda sin posición guardada se dibuja en una automática: al usarla, se fija
   const pinDemand = (id, pos) => { if (!layout.demands?.[id] && pos) patchLayout((l) => ({ demands: { ...(l.demands ?? {}), [id]: pos } })); };
@@ -274,6 +314,7 @@ export default function InfrastructurePage({ route }) {
     if (mode?.startsWith("redraw:")) return t("infra.modeRedraw", { n: draft.length,
       name: layout.locations?.find((l) => l.id === mode.slice(7))?.name ?? "" });
     if (mode === "place-node") return t("node.modePlace");
+    if (mode?.startsWith("place-demand:")) return t("dem.modePlace");
     if (mode?.startsWith("place:")) return t("infra.modePlace",
       { name: siteJson.technologies.find((x) => x.tech_id === mode.slice(6))?.name ?? "" });
     if (mode === "connect") return draftArc?.from
@@ -314,6 +355,7 @@ export default function InfrastructurePage({ route }) {
                 <button className="ui-btn primary" onClick={toggle}><IcAdd /> {t("common.add")}</button>)}
               items={[
                 { label: t("infra.addComponent"), icon: IcOutlineViewInAr, onClick: () => addComponent(selLoc, selNode) },
+                { label: t("dem.add"), icon: IcShowChart, onClick: () => setNewDemand({ node: selNode }) },
                 { label: t("node.add"), icon: IcNode, onClick: () => { setView("map"); cancelMode(); setMode("place-node"); } },
                 { label: t("infra.addLocation"), icon: IcOutlineLocationOn, onClick: () => { setView("map"); setMode("draw-location"); setDraft([]); } },
                 { label: t("infra.addConnection"), icon: IcOutlineCable, onClick: () => { setView("map"); setMode("connect"); setDraftArc({ from: null, waypoints: [] }); } },
@@ -389,6 +431,7 @@ export default function InfrastructurePage({ route }) {
       <SystemPanel route={route} collapsed={collapsed} setCollapsed={setCollapsed}
                    compView={compView} setCompView={setCompView} builtYears={builtYears}
                    onOpenComponent={openComponent} onAddComponent={addComponent}
+                   onAddDemand={(node) => setNewDemand({ node })} onOpenDemand={setDemandSel}
                    onAddNode={() => { setView("map"); cancelMode(); setMode("place-node"); }}
                    onDrawLocation={() => { setView("map"); setMode("draw-location"); setDraft([]); }}
                    onRedrawLocation={(id) => { setView("map"); setMode("redraw:" + id); setDraft([]); }}
@@ -430,6 +473,10 @@ export default function InfrastructurePage({ route }) {
         </div>
       )}
 
+      {newDemand && (
+        <NewDemandModal siteJson={siteJson} nodes={layout.nodes ?? []} node={newDemand.node}
+                        onCreate={createDemand} onClose={() => setNewDemand(null)} />
+      )}
       {catalog && <CatalogModal siteJson={siteJson} onPick={onCatalogPick} onClose={() => setCatalog(null)} />}
       {carrierPick && (
         <CarrierPresetModal onClose={() => setCarrierPick(false)}
@@ -485,6 +532,8 @@ export default function InfrastructurePage({ route }) {
       {demandSel && (
         <DemandDrawer key={demandSel} id={demandSel} siteJson={siteJson} nodes={layout.nodes ?? []}
                       onClose={() => setDemandSel(null)}
+                      onSetNode={(node) => moveDemandToNode(demandSel, node)}
+                      onDelete={() => removeDemand(demandSel)}
                       onSeries={() => navigate(hrefFor({ site: siteName, page: "timeseries" }))}
                       onConnect={() => {
                         pinDemand(demandSel, demandPositions(siteJson, layout)[demandSel]);
