@@ -1,0 +1,49 @@
+# Pruebas de navegador (WP-1): verify:smoke en cada push (~10 min) y la
+# batería completa (verify:all) cada semana o a mano. Las dos levantan su
+# propia API sobre una COPIA de los sitios de ejemplo (nunca los modifican).
+name: e2e
+on:
+  push: { branches: [master, main] }
+  schedule:
+    - cron: "0 6 * * 1"        # lunes 06:00 UTC: batería completa
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "smoke | all"
+        default: "all"
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      IETO_BROWSER: /usr/bin/google-chrome
+      JULIA: julia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with: { version: "1.12" }
+      - uses: julia-actions/cache@v2
+      - run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: frontend
+      # Chrome sin sandbox de espacios de nombres en Ubuntu 24.04 (AppArmor)
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: batería
+        working-directory: frontend
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.suite }}" = "all" ]; then
+            node scripts/verify_all.mjs
+          else
+            node scripts/verify_all.mjs --smoke
+          fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs
+          path: frontend/.verify/
+          retention-days: 14

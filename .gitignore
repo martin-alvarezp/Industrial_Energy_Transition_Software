@@ -27,3 +27,6 @@ build/Manifest.toml
 
 # scripts de trabajo del asistente (no van al repo)
 frontend/scripts/_*.mjs
+
+# resultados de verify:all / verify:smoke (WP-1)
+/frontend/.verify/

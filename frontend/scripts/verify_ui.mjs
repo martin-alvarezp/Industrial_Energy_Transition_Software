@@ -42,7 +42,7 @@ for (const lang of ["es", "en"]) {
   const views = [["home", "#/systems"],
     ...LIBRARY.map((v) => [`lib/${v}`, `#/library/${v}`]),
     ...SYSTEM.map((v) => [v, `#/sys/${SITE}/${v}`])];
-  await p.goto(`${URL}/?r=${Date.now()}${views[0][1]}`, { waitUntil: "networkidle2" });
+  await p.goto(`${URL}/?r=${Date.now()}${views[0][1]}`, { waitUntil: "networkidle2", timeout: 120000 });
   // La app TIENE que estar montada antes de buscar claves crudas. Sin esto el
   // `?.` de abajo devuelve "" cuando no hay app (p. ej. el server corriendo sin
   // static_dir, que sirve sólo la API) y el recorrido pasa en verde sin haber
