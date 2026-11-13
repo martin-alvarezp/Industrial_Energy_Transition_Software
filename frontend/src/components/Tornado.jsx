@@ -53,7 +53,7 @@ export default function Tornado({ config, siteJson, siteName, baselineNpv, sourc
           </div>
         </div>
         <p className="footnote" style={{ marginTop: 0 }}>
-          {L("disponible con la API real levantada — re-optimiza el plan para cada supuesto perturbado.", "available with the real API running — re-optimizes the plan for each perturbed assumption.")}
+          {L("Disponible en la versión instalada de IETO, con el motor en servidor: re-optimiza el plan para cada supuesto perturbado.", "Available in the installed version of IETO, with the server engine: it re-optimizes the plan for each perturbed assumption.")}
         </p>
       </div>
     );

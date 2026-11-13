@@ -10,7 +10,7 @@ import { useI18n } from "../i18n.jsx";
 import { useStudio } from "../studio.jsx";
 import { uid } from "../storage.js";
 import { SCENARIO_COLORS } from "../../lib/scenarios.js";
-import { num, pct } from "../../lib/format.js";
+import { num, pct, currency } from "../../lib/format.js";
 import { ScenarioChip } from "./ParamTable.jsx";
 
 export const fuelCarriers = (sj) => (sj?.carriers ?? []).filter((c) => c.category === "fuel");
@@ -20,9 +20,9 @@ const sign = (v) => (v > 0 ? `+${v}` : `${v}`);
 
 /** Plantillas: número por defecto, a qué se aplica y qué filas genera. */
 export const TEMPLATES = [
-  { id: "carbon", es: "Precio del carbono", en: "Carbon price", unit: "USD/tCO₂e", def: 100, yearable: true,
+  { id: "carbon", es: "Precio del carbono", en: "Carbon price", get unit() { return `${currency()}/tCO₂e`; }, def: 100, yearable: true,
     q: ["¿Desde qué precio del CO₂ conviene invertir?", "From what CO₂ price does investing pay off?"],
-    name: (v) => `Carbono ${v} USD/t`, rows: (v) => [{ target: "system", param: "carbon_price", value: v }] },
+    name: (v) => `Carbono ${v} ${currency()}/t`, rows: (v) => [{ target: "system", param: "carbon_price", value: v }] },
   { id: "gas", es: "Precio del gas y combustibles", en: "Gas and fuel price", unit: "× precio base", def: 1.5, pick: fuelCarriers, yearable: true,
     q: ["¿Cuánto me expone el gas si no invierto?", "How exposed am I to gas if I don't invest?"],
     name: (v, x) => `${x?.name ?? "Combustible"} ×${v}`, rows: (v, x) => [{ target: x.carrier_id, param: "carrier_price_pct", value: +((v - 1) * 100).toFixed(4) }] },
@@ -48,9 +48,9 @@ export const TEMPLATES = [
   { id: "target", es: "Meta de emisiones del año final", en: "Final-year emissions target", unit: "tCO₂e", def: 0,
     q: ["¿Cuánto cuesta una meta más exigente?", "What does a tougher target cost?"],
     name: (v) => `Meta ${num(v, 0)} t`, rows: (v) => [{ target: "system", param: "cap_end", value: v }] },
-  { id: "offsets", es: "Precio de compensaciones", en: "Offset price", unit: "USD/tCO₂e", def: 30, yearable: true,
+  { id: "offsets", es: "Precio de compensaciones", en: "Offset price", get unit() { return `${currency()}/tCO₂e`; }, def: 30, yearable: true,
     q: ["¿Comprar compensaciones o invertir?", "Buy offsets or invest?"],
-    name: (v) => `Compensación ${v} USD/t`, rows: (v) => [{ target: "system", param: "offset_price", value: v }] },
+    name: (v) => `Compensación ${v} ${currency()}/t`, rows: (v) => [{ target: "system", param: "offset_price", value: v }] },
   { id: "export", es: "Precio de venta de excedentes", en: "Surplus sale price", unit: "%", def: -50, yearable: true,
     q: ["¿Vale sobredimensionar la generación propia?", "Is oversizing own generation worth it?"],
     name: (v) => `Venta ${sign(v)} %`, sellRows: true },

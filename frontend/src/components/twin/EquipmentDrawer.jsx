@@ -3,7 +3,7 @@ import { TECH_TYPE_META, slugId, techProblems, carrierLabel, techRefs }
   from "../../lib/twin.js";
 import { fetchSolarProfile } from "../../lib/api.js";
 import { projectRaw } from "../../lib/templates.js";
-import { num } from "../../lib/format.js";
+import { num, currency } from "../../lib/format.js";
 import { useL } from "../../ui/i18n.jsx";
 import ParamTable, { AssetScenario } from "../../ui/components/ParamTable.jsx";
 
@@ -266,7 +266,7 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
                      onChange={(e) => set({ export_capacity:
                        e.target.value === "" ? null : +e.target.value })} />
             </Field>
-            <Field label={L("Cargos fijos de conexión (USD/año)", "Fixed connection charges (USD/yr)")}
+            <Field label={L(`Cargos fijos de conexión (${currency()}/año)`, `Fixed connection charges (${currency()}/yr)`)}
                    hint={L("peajes, potencia contratada, arriendo de empalme — entran al OPEX fijo anual", "tolls, contracted power, connection lease — added to annual fixed OPEX")}>
               <input type="number" step={100} min={0}
                      value={draft.fixed_charge ?? ""}
@@ -310,7 +310,7 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
               <Num value={+((draft.min_load ?? 0) * 100).toFixed(2)} step={5} min={0} max={100} data-ops="min_load"
                    onChange={(v) => set({ min_load: v / 100 })} />
             </Field>
-            <Field label={L("Costo de arranque (USD por arranque)", "Start-up cost (USD per start)")}>
+            <Field label={L(`Costo de arranque (${currency()} por arranque)`, `Start-up cost (${currency()} per start)`)}>
               <Num value={draft.startup_cost ?? 0} step={50} min={0} data-ops="startup_cost"
                    onChange={(v) => set({ startup_cost: v })} />
             </Field>
@@ -418,15 +418,15 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
         </div>
 
         <p className="drawer-section">{L("Parámetros económicos", "Economic parameters")}</p>
-        <Field label="CAPEX (USD/kW)">
+        <Field label={`CAPEX (${currency()}/kW)`}>
           <Num value={draft.capex_per_kw} step={10} min={0}
                onChange={(v) => set({ capex_per_kw: v })} />
         </Field>
-        <Field label={L("OPEX fijo (USD/MW·año)", "Fixed OPEX (USD/MW·yr)")}>
+        <Field label={L(`OPEX fijo (${currency()}/MW·año)`, `Fixed OPEX (${currency()}/MW·yr)`)}>
           <Num value={draft.fixed_opex} step={100} min={0}
                onChange={(v) => set({ fixed_opex: v })} />
         </Field>
-        <Field label={L("OPEX variable (USD/MWh)", "Variable OPEX (USD/MWh)")}>
+        <Field label={L(`OPEX variable (${currency()}/MWh)`, `Variable OPEX (${currency()}/MWh)`)}>
           <Num value={draft.variable_opex} step={0.1} min={0}
                onChange={(v) => set({ variable_opex: v })} />
         </Field>

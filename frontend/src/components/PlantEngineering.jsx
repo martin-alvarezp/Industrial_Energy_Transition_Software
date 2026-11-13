@@ -5,7 +5,7 @@ import {
 import ChartCard, { VizTooltip } from "./ChartCard.jsx";
 import KpiTile from "./KpiTile.jsx";
 import { operableTechs, metricsFor, loadDuration } from "../lib/operations.js";
-import { num, pct, calYear } from "../lib/format.js";
+import { num, pct, calYear, currency } from "../lib/format.js";
 import { useL } from "../ui/i18n.jsx";
 
 const TYPE_LABEL = { storage: ["Almacenamiento", "Storage"], generator: ["Generador", "Generator"],
@@ -22,7 +22,7 @@ function MetricTiles({ m }) {
         <KpiTile label={L("Ciclos equivalentes", "Equivalent cycles")} value={num(m.equivalent_cycles, 0)}
                  note={L("plenos por año", "full cycles per year")} />
         <KpiTile label={L("Spread realizado", "Realized spread")}
-                 value={m.spread == null ? "—" : `${num(m.spread, 1)} USD/MWh`}
+                 value={m.spread == null ? "—" : `${num(m.spread, 1)} ${currency()}/MWh`}
                  note={L("precio medio de descarga − de carga", "mean discharge − charge price")} />
         <KpiTile label="Throughput" value={`${num(m.throughput_mwh / 1000, 1)} GWh`}
                  note={L("energía descargada/año", "energy discharged/yr")} />
@@ -69,7 +69,14 @@ export default function PlantEngineering({ result, siteJson, year }) {
     () => operableTechs(result.dispatch, siteJson),
     [result.dispatch, siteJson]
   );
-  const [sel, setSel] = useState(techs[0]?.id ?? null);
+  // por defecto, el equipo que más produce ese año (no el primero: podía estar en 0 MW)
+  const top = useMemo(() => {
+    const out = {};
+    for (const r of result.dispatch ?? [])
+      if (r.year === year && r.flow === "output") out[r.tech] = (out[r.tech] ?? 0) + Math.abs(r.value);
+    return [...techs].sort((a, b) => (out[b.id] ?? 0) - (out[a.id] ?? 0))[0]?.id ?? techs[0]?.id ?? null;
+  }, [result.dispatch, techs, year]);
+  const [sel, setSel] = useState(null);
 
   if (!result.dispatch) {
     return (
@@ -78,7 +85,7 @@ export default function PlantEngineering({ result, siteJson, year }) {
       </p>
     );
   }
-  const tech = techs.find((t) => t.id === sel) ?? techs[0];
+  const tech = techs.find((t) => t.id === (sel ?? top)) ?? techs[0];
   if (!tech) return null;
 
   const m = metricsFor(tech.type, result.dispatch, result.capacity, siteJson,

@@ -156,7 +156,17 @@ export function OperationPage() {
   const [carrier, setCarrier] = useState(null);
   const [dayIdx, setDayIdx] = useState(0);   // período largo (año completo): qué día
   const s = season ?? seasons[0];
-  const c = carrier ?? carriers[0]?.carrier_id;
+  // por defecto, el vector con más demanda (no el primero de la lista: podía ser uno sin flujo)
+  const bigDemand = useMemo(() => {
+    const w = (siteJson?.timesteps ?? []).map((x) => x.weight_hours);
+    let best = null, hi = -1;
+    for (const x of carriers) {
+      const e = (siteJson?.demands?.[x.carrier_id] ?? []).reduce((a, v, i) => a + v * (w[i] ?? 0), 0);
+      if (e > hi) { hi = e; best = x.carrier_id; }
+    }
+    return hi > 0 ? best : carriers[0]?.carrier_id;
+  }, [siteJson, carriers]);
+  const c = carrier ?? bigDemand;
   const day = useMemo(() => (result && siteJson && c
     ? operationDay(result, siteJson, yv, s, c, {
         import: t("res.import"), export: t("res.export"), charge: t("res.charge"),
@@ -342,7 +352,7 @@ export function DashboardsPage() {
         </section>
         <section className="ui-card ui-card-pad">
           <h3 className="ui-card-title">{t("res.emissions")}</h3>
-          <EmissionsChart emissions={result.emissions} baseYear={result.meta.base_year ?? 0} />
+          <EmissionsChart emissions={result.emissions} baseYear={result.meta.base_year ?? 0} caps={applied?.emission_caps ?? result.assumptions?.scenario_config?.emission_caps} />
         </section>
         {data.pareto?.length > 0 && <section className="ui-card ui-card-pad">
           <h3 className="ui-card-title">{t("res.pareto")}</h3>

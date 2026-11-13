@@ -282,6 +282,16 @@ const byName = (a, b) => String(a).localeCompare(String(b));
 // colores que no son identidad: pueden repetirse sin "gastar" un slot
 const shared = (c) => c === SLR.grayText || c.startsWith("var(");
 
+// paleta extendida: los 8 tonos categóricos, luego su variante clara y su
+// variante oscura (24 colores distinguibles) antes de caer en el gris «Otros»
+// (con 9+ equipos en un apilado, el gris repetido no se podía leer)
+const mixHex = (hex, to, f) => {
+  const n = parseInt(hex.slice(1), 16), [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
+  const m = (x) => Math.round(x + (to - x) * f);
+  return "#" + [m(r), m(g), m(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+};
+const EXTENDED = [...CATEGORICAL, ...CATEGORICAL.map((c) => mixHex(c, 255, 0.45)), ...CATEGORICAL.map((c) => mixHex(c, 0, 0.35))];
+
 export function seriesColors(keys, prefs = new Map()) {
   const sorted = [...new Set(keys)].sort(byName);
   const out = new Map(), used = new Set();
@@ -293,7 +303,7 @@ export function seriesColors(keys, prefs = new Map()) {
     const c = prefs.get(k);
     if (c && (shared(c) || !used.has(c))) { out.set(k, c); used.add(c); }
   }
-  const free = CATEGORICAL.filter((c) => !used.has(c));
+  const free = EXTENDED.filter((c) => !used.has(c));
   for (const k of sorted) if (!out.has(k)) out.set(k, free.shift() ?? SLR.grayText);
   return out;
 }

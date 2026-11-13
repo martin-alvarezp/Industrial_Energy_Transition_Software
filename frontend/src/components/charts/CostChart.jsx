@@ -2,7 +2,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import ChartCard, { Legend, VizTooltip } from "../ChartCard.jsx";
-import { musd, num, calYear } from "../../lib/format.js";
+import { musd, num, calYear, currency } from "../../lib/format.js";
 import { useL } from "../../ui/i18n.jsx";
 
 // Componentes de costo (identidad → categórico, orden fijo por slot)
@@ -29,7 +29,7 @@ export default function CostChart({ costs, baseYear = 0 }) {
   return (
     <ChartCard
       title={L("Costo anual por componente", "Annual cost by component")}
-      sub={L("USD del año (sin descontar) — el ingreso por venta se descuenta del total", "USD of the year (undiscounted) — sales revenue is subtracted from the total")}
+      sub={L(`${currency()} del año (sin descontar) — el ingreso por venta se descuenta del total`, `${currency()} of the year (undiscounted) — sales revenue is subtracted from the total`)}
       table={{
         columns: [
           { key: "year", label: L("Año", "Year") },

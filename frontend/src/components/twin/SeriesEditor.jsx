@@ -6,7 +6,7 @@ import { VizTooltip } from "../ChartCard.jsx";
 import {
   parseHourlyCsv, flatSeries, seriesStats, seasonAverages,
 } from "../../lib/series.js";
-import { num } from "../../lib/format.js";
+import { num, currency } from "../../lib/format.js";
 import { hasPeakSteps, addPeakSteps, removePeakSteps, PEAK_HOURS }
   from "../../lib/twin.js";
 import { useL } from "../../ui/i18n.jsx";
@@ -374,11 +374,11 @@ export default function SeriesEditor({ siteJson, patchSite }) {
         </div>
 
         <div className="card">
-          <h3 className="card-title">{L("Mercados — precios (USD/MWh)", "Markets — prices (USD/MWh)")}</h3>
+          <h3 className="card-title">{L(`Mercados — precios (${currency()}/MWh)`, `Markets — prices (${currency()}/MWh)`)}</h3>
           {Object.entries(siteJson.prices).map(([c, v]) => (
             <SeriesRow key={c} id={`prices:${c}`}
                        label={c === "grid_export" ? L("grid_export (precio de venta)", "grid_export (sale price)") : c}
-                       unit="USD/MWh" values={v} timesteps={ts} {...rawProps(`prices.${c}`)}
+                       unit={`${currency()}/MWh`} values={v} timesteps={ts} {...rawProps(`prices.${c}`)}
                        onChange={(nv) => setSeries("prices", c, nv)}
                        onRemove={() => dropSeries("prices", c)} />
           ))}
@@ -393,7 +393,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
               {siteJson.markets.map((mk) => (
                 <SeriesRow key={mk.market_id} id={`markets:${mk.market_id}`}
                            label={`${mk.name} (${mk.direction === "buy" ? L("compra", "buy") : L("venta", "sell")} · ${mk.carrier_id})`}
-                           unit="USD/MWh" values={mk.price} timesteps={ts}
+                           unit={`${currency()}/MWh`} values={mk.price} timesteps={ts}
                            {...rawProps(`markets.${mk.market_id}`)}
                            onChange={(nv) => patchSite((sj) => clearRaw({
                              ...sj,

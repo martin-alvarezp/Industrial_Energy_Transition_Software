@@ -9,7 +9,7 @@ import { ChartLegend } from "../charts.jsx";
 import MarketDrawer from "../../components/twin/MarketDrawer.jsx";
 import EquipmentDrawer from "../../components/twin/EquipmentDrawer.jsx";
 import { blankMarket, upsertMarket, removeMarket, legacyMarkets, upsertTech, isMultiport } from "../../lib/twin.js";
-import { num } from "../../lib/format.js";
+import { num, currency } from "../../lib/format.js";
 import { seriesColors } from "../results.js";
 import { templateKind, expandTo8760 } from "../../lib/templates.js";
 
@@ -73,7 +73,7 @@ export default function TradePage() {
               <div className="ui-hint" style={{ margin: 0 }}>
                 {carrierName(s.output_carrier)} · {t("trade.import")} {num(s.existing_capacity, 1)} MW
                 {s.export_capacity != null ? ` · ${t("trade.export")} ${num(s.export_capacity, 1)} MW` : ""}
-                {s.fixed_charge ? ` · ${t("trade.fixed")} ${num(s.fixed_charge, 0)} USD/año` : ""}
+                {s.fixed_charge ? ` · ${t("trade.fixed")} ${num(s.fixed_charge, 0)} ${currency()}/año` : ""}
               </div>
             </div>
           </button>

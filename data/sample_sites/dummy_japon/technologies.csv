@@ -2,7 +2,7 @@ tech_id,name,type,input_carrier,output_carrier,existing_capacity,max_new_capacit
 air_sourced_heat_pump,Bomba de calor aire-agua,converter,electricity,central_hot_water,0.0,999.999,3.0,true,,,,,
 carpark_solar_pv,Solar FV en estacionamiento,generator,,electricity,0.0,0.565,1.0,true,,,,,
 central_heat_exchanger,Intercambiador central vapor → agua,converter,steam,central_hot_water,0.0,999.999,1.0,true,,,,,
-central_hw_pipe,Red central de agua caliente,converter,central_hot_water,final_hot_water,0.0,999.999,1.0,true,,,,,
+central_hw_pipe,Red central de agua caliente,converter,central_hot_water,final_hot_water,0.0,4.0,1.0,true,,,,,
 conn_biomass_pellets,Silo de pellets,source,,biomass_pellets,100.0,0.0,1.0,false,,,,,
 conn_biomass_wood_chips,Silo de astillas,source,,biomass_wood_chips,100.0,0.0,1.0,false,,,,,
 conn_contract_lng,Estanque de GNL,source,,contract_lng,100.0,0.0,1.0,false,,,,,
@@ -13,7 +13,7 @@ contract_abs_chillers,Chillers de absorción existentes,converter,contract_lng,c
 contract_cogens,Cogeneración existente,converter,contract_lng,electricity,1.4,0.0,0.4180000869440181,false,,"{""inputs"":[{""carrier"":""contract_lng"",""ratio"":2.392344}],""outputs"":[{""carrier"":""electricity"",""ratio"":1.0},{""carrier"":""steam"",""ratio"":0.3157895}]}",,,25
 contract_steam_boilers,Calderas de vapor existentes,converter,contract_lng,steam,5.636,0.0,0.98,false,,,,,25
 decentral_heat_exchangers,Intercambiadores locales vapor → agua,converter,steam,decentral_hot_water,0.0,999.999,1.0,true,,,,,
-decentral_hw_pipe,Red local de agua caliente,converter,decentral_hot_water,final_hot_water,0.0,999.999,1.0,true,,,,,
+decentral_hw_pipe,Red local de agua caliente,converter,decentral_hot_water,final_hot_water,0.0,4.0,1.0,true,,,,,
 free_cooling_ecm,Enfriamiento libre,converter,electricity,chilled_water,0.0,999.999,31.870000000000005,true,,,,,
 ground_sourced_heat_pump,Bomba de calor geotérmica,converter,electricity,central_hot_water,0.0,999.999,4.41,true,,,,,
 hydrogen_chp_hot_water,Cogeneración de hidrógeno (agua caliente),converter,hydrogen,electricity,0.0,999.999,0.37999999240000015,true,,"{""inputs"":[{""carrier"":""hydrogen"",""ratio"":2.631579}],""outputs"":[{""carrier"":""electricity"",""ratio"":1.0},{""carrier"":""central_hot_water"",""ratio"":1.236842}]}",,,

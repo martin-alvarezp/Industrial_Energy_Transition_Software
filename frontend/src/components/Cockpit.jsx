@@ -55,8 +55,15 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
   // reducción contra el contrafactual (mismo año final): "sin meta" en API,
   // BAU en mock
   const refLast = reference?.emissions?.[reference.emissions.length - 1];
-  const grossRed = refLast ? 1 - last.gross / refLast.gross : null;
-  const netRed = refLast ? 1 - last.net / refLast.gross : null;
+  // sin caso de comparación: contra el primer año de esta misma corrida
+  const first = em[0];
+  const vsRef = !!refLast;
+  const baseRow = refLast ?? first;
+  const grossRed = baseRow?.gross > 0 ? 1 - last.gross / baseRow.gross : null;
+  const netRed = baseRow?.gross > 0 ? 1 - last.net / baseRow.gross : null;
+  const built = new Set(result.investments.filter((i) => i.mw >= 0.05).map((i) => i.tech)).size;
+  const hasCap = [config?.emissions_cap_net_start, config?.emissions_cap_net_end].some((x) => x != null && +x < 1e11)
+    || (config?.emission_caps ?? []).length > 0;
   const offsetShare = last.gross > 0 ? last.offsets / last.gross : 0;
   const npvDelta = reference?.kpis ? (k.npv - reference.kpis.npv) / reference.kpis.npv : null;
   const resDelta = k.res_share_final - result.res_share[0];
@@ -73,12 +80,14 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
         <KpiTile
           label={L("CAPEX total", "Total CAPEX")}
           value={musd(k.total_capex)}
-          note={L(`${result.investments.length} tecnología(s) nuevas`, `${result.investments.length} new technolog${result.investments.length === 1 ? "y" : "ies"}`)}
+          note={L(`${built} tecnología${built === 1 ? "" : "s"} nueva${built === 1 ? "" : "s"}`, `${built} new technolog${built === 1 ? "y" : "ies"}`)}
         />
         <KpiTile
           label={L("Reducción de emisiones", "Emissions reduction")}
           value={pct(netRed, 0)}
-          note={L(`netas vs ${referenceLabel} en ${calYear(baseYear, result.meta.horizon_years)} · brutas ${pct(grossRed, 0)}`, `net vs ${referenceLabel} in ${calYear(baseYear, result.meta.horizon_years)} · gross ${pct(grossRed, 0)}`)}
+          note={vsRef
+            ? L(`netas vs ${referenceLabel} en ${calYear(baseYear, last.year)} · brutas ${pct(grossRed, 0)}`, `net vs ${referenceLabel} in ${calYear(baseYear, last.year)} · gross ${pct(grossRed, 0)}`)
+            : L(`netas, ${calYear(baseYear, last.year)} vs ${calYear(baseYear, first.year)} · brutas ${pct(grossRed, 0)}`, `net, ${calYear(baseYear, last.year)} vs ${calYear(baseYear, first.year)} · gross ${pct(grossRed, 0)}`)}
         />
         <KpiTile
           label={L("Dependencia de compensaciones", "Offset dependence")}
@@ -87,8 +96,8 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
         />
         <KpiTile
           label={L("MACC año final", "Final-year MACC")}
-          value={usdPerTon(last.macc)}
-          note={L("precio sombra del cap neto", "shadow price of the net cap")}
+          value={hasCap ? usdPerTon(last.macc) : "—"}
+          note={hasCap ? L("precio sombra del cap neto", "shadow price of the net cap") : L("sin meta: no hay precio sombra", "no target: no shadow price")}
         />
         <KpiTile
           label={L("Participación renovable final", "Final renewable share")}
@@ -114,7 +123,7 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
 
       <p className="section-label">{L("Trayectoria y costos", "Trajectory and costs")}</p>
       <div className="grid cols-2">
-        <EmissionsChart emissions={em} baseYear={baseYear} />
+        <EmissionsChart emissions={em} baseYear={baseYear} caps={config?.emission_caps ?? result.assumptions?.scenario_config?.emission_caps} />
         <CostChart costs={result.cost_breakdown} baseYear={baseYear} />
       </div>
 
@@ -127,7 +136,7 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
         </button>
         {source !== "api" && (
           <span className="footnote" style={{ margin: 0 }}>
-            {L("disponible con la API real levantada (libro con resumen, VAN, capacidades, despacho, emisiones y supuestos)", "available with the real API running (workbook with summary, NPV, capacities, dispatch, emissions and assumptions)")}
+            {L("Disponible en la versión instalada de IETO, con el motor en servidor (libro con resumen, VAN, capacidades, despacho, emisiones y supuestos)", "Available in the installed version of IETO, with the server engine (workbook with summary, NPV, capacities, dispatch, emissions and assumptions)")}
           </span>
         )}
       </div>

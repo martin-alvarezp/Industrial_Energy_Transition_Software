@@ -3,6 +3,7 @@ import {
   MARKET_DIR_META, connectionsFor, marketProblems, carrierLabel, slugId,
 } from "../../lib/twin.js";
 import { useL } from "../../ui/i18n.jsx";
+import { currency } from "../../lib/format.js";
 
 function Field({ label, hint, children }) {
   return (
@@ -105,7 +106,7 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
             {L("serie de precios cargada — editable en Series de tiempo (CSV horario 8760 o valor plano)", "price series loaded — editable in Timeseries (hourly 8760 CSV or flat value)")}
           </p>
         ) : (
-          <Field label={L("Precio plano (USD/MWh)", "Flat price (USD/MWh)")}
+          <Field label={L(`Precio plano (${currency()}/MWh)`, `Flat price (${currency()}/MWh)`)}
                  hint={L("crea la serie de partida; luego editable por paso en Series de tiempo", "creates the starting series; editable per step later in Timeseries")}>
             <OptNum value={draft.price_flat} step={1} data-testid="market-price-flat"
                     onChange={(v) => set({ price_flat: v ?? 0 })} />
@@ -158,14 +159,14 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
           </Field>
         )}
         {draft.direction === "buy" && draft.contracted_power != null && (
-          <Field label={L("Penalización por exceso (USD/kW·mes)", "Excess penalty (USD/kW·month)")}>
+          <Field label={L(`Penalización por exceso (${currency()}/kW·mes)`, `Excess penalty (${currency()}/kW·month)`)}>
             <OptNum value={draft.excess_penalty} step={0.5} min={0}
                     placeholder="0"
                     onChange={(v) => set({ excess_penalty: v })} />
           </Field>
         )}
         {draft.direction === "buy" && (
-          <Field label={L("Cargo por demanda máxima (USD/kW·mes, opcional)", "Peak demand charge (USD/kW·month, optional)")}
+          <Field label={L(`Cargo por demanda máxima (${currency()}/kW·mes, opcional)`, `Peak demand charge (${currency()}/kW·month, optional)`)}
                  hint={L("paga la punta de compra de cada estación — en clientes industriales suele ser 20-40% de la factura. El año tipo de días promedio subestima puntas: usa pasos de punta en Series de tiempo", "pays each season's purchase peak — often 20-40% of an industrial bill. The average-day template year underestimates peaks: use peak steps in Timeseries")}>
             <OptNum value={draft.demand_charge} step={0.5} min={0}
                     placeholder={L("sin cargo", "no charge")}
@@ -181,7 +182,7 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
                       data-tariff="uh_threshold" onChange={(v) => set({ uh_threshold: v })} />
             </Field>
             {(draft.uh_threshold ?? 0) > 0 && (
-              <Field label={L("Bajo: potencia (USD/kW·año) · energía (USD/MWh)", "Low: capacity (USD/kW·yr) · energy (USD/MWh)")}>
+              <Field label={L(`Bajo: potencia (${currency()}/kW·año) · energía (${currency()}/MWh)`, `Low: capacity (${currency()}/kW·yr) · energy (${currency()}/MWh)`)}>
                 <div className="range-row">
                   <OptNum value={draft.uh_low_capacity} step={1} min={0} data-tariff="uh_low_capacity"
                           onChange={(v) => set({ uh_low_capacity: v })} />
@@ -191,7 +192,7 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
               </Field>
             )}
             {(draft.uh_threshold ?? 0) > 0 && (
-              <Field label={L("Alto: potencia (USD/kW·año) · energía (USD/MWh)", "High: capacity (USD/kW·yr) · energy (USD/MWh)")}>
+              <Field label={L(`Alto: potencia (${currency()}/kW·año) · energía (${currency()}/MWh)`, `High: capacity (${currency()}/kW·yr) · energy (${currency()}/MWh)`)}>
                 <div className="range-row">
                   <OptNum value={draft.uh_high_capacity} step={1} min={0} data-tariff="uh_high_capacity"
                           onChange={(v) => set({ uh_high_capacity: v })} />
@@ -200,7 +201,7 @@ export default function MarketDrawer({ draft: initial, isNew, siteJson,
                 </div>
               </Field>
             )}
-            <Field label={L("Bloques de energía (MWh/año : USD/MWh)", "Energy blocks (MWh/yr : USD/MWh)")}
+            <Field label={L(`Bloques de energía (MWh/año : ${currency()}/MWh)`, `Energy blocks (MWh/yr : ${currency()}/MWh)`)}
                    hint={L("p. ej. «50000:8, inf:5»: sobre la energía anual, en orden; el último puede ser «inf». Precios decrecientes = descuento por volumen", "e.g. '50000:8, inf:5': over the annual energy, in order; the last one can be 'inf'. Decreasing prices = volume discount")}>
               <input defaultValue={(draft.blocks ?? []).map(([sz, pr]) => `${sz == null ? "inf" : sz}:${pr}`).join(", ")}
                      placeholder={L("sin bloques", "no blocks")} data-tariff="blocks"

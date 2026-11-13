@@ -5,6 +5,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef,
          useState } from "react";
 import { DEFAULT_CONFIG } from "../lib/mockEngine.js";
+import { useI18n } from "./i18n.jsx";
 import {
   compute, fetchSite, apiAvailable, listSites, saveSite as apiSaveSite,
   deleteSite as apiDeleteSite, listRuns, fetchRun, saveRun, deleteRun, enginePayload,
@@ -53,6 +54,7 @@ function siteFromApi({ source, site }) {
 
 
 export function StudioProvider({ children }) {
+  const { t, lang } = useI18n();
   const [apiUp, setApiUp] = useState(null);
   const [sites, setSites] = useState(null);           // nombres en disco / embebidos
   const [siteName, setSiteName] = useState(null);
@@ -410,8 +412,16 @@ export function StudioProvider({ children }) {
       setAppliedSite(apiSite);
       setAppliedSiteJson(snapshot);
       const stamp = new Date();
+      // nombre por defecto legible: el escenario en palabras y la fecha («Óptimo
+      // económico (sin meta) · 13 nov 21:41»); sin meta real no se llama «meta»
+      const capped = [cfg.emissions_cap_net_start, cfg.emissions_cap_net_end, cfg.emissions_cap_gross]
+        .some((x) => x != null && +x < 1e11) || (cfg.emission_caps ?? []).length > 0;
+      let scn = d.result?.meta?.scenario ?? "";
+      if (scn === "emissions_cap" && !capped) scn = "least_cost";
+      const when = stamp.toLocaleString(lang === "en" ? "en-GB" : "es-CL",
+        { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
       const runName = name?.trim() ||
-        `${stamp.toISOString().slice(0, 10)} ${stamp.toTimeString().slice(0, 5)} · ${d.result?.meta?.scenario ?? ""}`;
+        `${cfg.dispatch_only ? t("run.dispatchName") : t("scn." + scn) !== "scn." + scn ? t("scn." + scn) : scn} · ${when}`;
       let id = null;
       if (apiUp && twin.saved) {
         try { id = (await saveRun(siteName, runName, bundle, notes)).saved; }
@@ -435,7 +445,7 @@ export function StudioProvider({ children }) {
     } finally {
       setRunning(false);
     }
-  }, [twin, draft, siteName, apiUp, refreshRuns, logChange, prepare]);
+  }, [twin, draft, siteName, apiUp, refreshRuns, logChange, prepare, t, lang]);
 
   // bundle de una corrida local: en memoria o, tras recargar, en IndexedDB
   const localBundle = async (local) => local.bundle ?? (await getLocalRun(local.id))?.bundle;
@@ -470,7 +480,8 @@ export function StudioProvider({ children }) {
 
   // moneda de display de la corrida vista: en el render (no en un efecto), para
   // que las páginas hijas la lean ya en el primer render con la corrida nueva
-  setCurrency(data?.result?.meta?.currency);
+  // sin corrida a la vista: la moneda del sistema (parámetros o ficha del sitio), no USD
+  setCurrency(data?.result?.meta?.currency ?? draft?.currency ?? twin?.layout?.meta?.currency);
 
   const value = {
     apiUp, sites, refreshSites,

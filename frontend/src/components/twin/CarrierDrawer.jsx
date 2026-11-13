@@ -4,6 +4,7 @@ import {
 } from "../../lib/twin.js";
 import { GRID_FACTORS, gridFactorLabel } from "../../lib/gridFactors.js";
 import { useL } from "../../ui/i18n.jsx";
+import { currency } from "../../lib/format.js";
 
 function Field({ label, hint, children }) {
   return (
@@ -134,7 +135,7 @@ export default function CarrierDrawer({ draft: initial, isNew, siteJson,
         {showFlatPrice && (
           <>
             <p className="drawer-section">{L("Precio de compra", "Purchase price")}</p>
-            <Field label={L("Precio plano (USD/MWh)", "Flat price (USD/MWh)")}
+            <Field label={L(`Precio plano (${currency()}/MWh)`, `Flat price (${currency()}/MWh)`)}
                    hint={L("crea una serie plana de partida — luego editable por paso en Series de tiempo", "creates a flat starting series — editable per step later in Timeseries")}>
               <input type="number" step={1} min={0} value={draft.price ?? 0}
                      onChange={(e) => setDraft((d) => ({ ...d, price: +e.target.value || 0 }))} />

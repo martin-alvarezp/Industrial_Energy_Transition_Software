@@ -35,7 +35,7 @@ export const num = (x, digits = 1) =>
     ? "—"
     : x.toLocaleString(LOC, { maximumFractionDigits: digits });
 
-export const usdPerTon = (x) => (x == null ? "—" : `${num(x, 0)} USD/t`);
+export const usdPerTon = (x) => (x == null ? "—" : `${num(x, 0)} ${CUR}/t`);
 
 /** Año relativo (1..N) → calendario cuando hay base_year (M13). */
 export const calYear = (base, y) => (base > 0 ? base + y - 1 : y);

@@ -3,7 +3,7 @@ import {
   Tooltip, LabelList,
 } from "recharts";
 import ChartCard, { VizTooltip } from "./ChartCard.jsx";
-import { musd, tons, num } from "../lib/format.js";
+import { musd, tons, num, currency } from "../lib/format.js";
 import { useL } from "../ui/i18n.jsx";
 
 const SCENARIO_LABELS = {
@@ -50,7 +50,7 @@ export default function ScenarioCompare({ batch }) {
     >
       <div className="grid cols-2">
         <MiniBars
-          title={L("VAN del horizonte (MUSD)", "Horizon NPV (MUSD)")}
+          title={L(`VAN del horizonte (M${currency()})`, `Horizon NPV (M${currency()})`)}
           rows={rows} dataKey="npvM"
           fmt={(v) => (v == null ? "—" : num(v, 1))}
         />

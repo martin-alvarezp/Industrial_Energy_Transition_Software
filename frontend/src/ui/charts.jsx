@@ -67,6 +67,19 @@ export function ChartPanel({ title, unit, menu = [], children, toolbar }) {
  * gráfico PODRÍA mostrar, si la página filtra `keys` por fuera (así filtrar no
  * repinta a las que quedan).
  */
+/** Ancho del eje Y según la etiqueta más larga (antes 48 px fijos: «100.000» se cortaba). */
+function yAxisWidth(data, keys, fmt) {
+  let hi = 0;
+  for (const row of data ?? []) {
+    let pos = 0, neg = 0;
+    for (const k of keys) { const v = +row[k] || 0; if (v > 0) pos += v; else neg += v; }
+    hi = Math.max(hi, pos, -neg);
+  }
+  // el eje redondea hacia arriba: una cifra más de margen
+  const label = fmt(hi * 1.25);
+  return Math.max(40, Math.min(96, 7.5 * String(label).length + 14));
+}
+
 export function StackedBars({ data, keys, unit, height = 440, digits = 2, prefs, domain }) {
   const [hidden, setHidden] = useState({});
   const shown = keys.filter((k) => !hidden[k]);
@@ -80,7 +93,8 @@ export function StackedBars({ data, keys, unit, height = 440, digits = 2, prefs,
         <BarChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 4 }} barCategoryGap="22%">
           <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={{ stroke: "var(--ui-border)" }} tickLine={false} />
-          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false} width={48}
+          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false}
+                 width={yAxisWidth(data, shown, (v) => num(v, Math.abs(v) < 10 ? 1 : 0))}
                  tickFormatter={(v) => num(v, Math.abs(v) < 10 ? 1 : 0)} />
           <Tooltip content={<TipBox unit={unit} digits={digits} />} cursor={{ fill: "rgba(0,0,255,0.04)" }} />
           {shown.map((k) => (
@@ -108,7 +122,8 @@ export function Waterfall({ rows, unit, labels, height = 440 }) {
         <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 4 }} barCategoryGap="30%">
           <CartesianGrid stroke="var(--ui-grid)" vertical={false} />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={{ stroke: "var(--ui-border)" }} tickLine={false} />
-          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false} width={48}
+          <YAxis tick={{ fontSize: 12, fill: "var(--ui-muted)" }} axisLine={false} tickLine={false}
+                 width={yAxisWidth(data, ["top", "base"], (v) => num(v, 1))}
                  tickFormatter={(v) => num(v, 1)} />
           <Tooltip cursor={{ fill: "rgba(0,0,255,0.04)" }}
                    content={({ active, payload, label }) => {

@@ -302,7 +302,8 @@ extend({
   "run.single": ["Solo esta corrida (rápido)", "This run only (fast)"],
   "run.heavyHint": ["Plantilla de {n} pasos: el análisis completo son 16 optimizaciones en serie (minutos).", "{n}-step template: the full analysis is 16 optimizations in a row (minutes)."],
   "run.dispatchHint": ["Nada se invierte ni se retira: se optimiza la operación del parque elegido. Es un LP sin binarias, así que corre a resolución completa en segundos. El año 1 es el año base de Parámetros.", "Nothing is built or retired: the operation of the chosen assets is optimized. It is an LP with no binaries, so it runs at full resolution in seconds. Year 1 is the base year from Parameters."],
-  "scn.emissions_cap": ["Meta de emisiones (base)", "Emissions target (base)"],
+  "scn.emissions_cap": ["Plan con meta de emisiones", "Plan with emissions target"],
+  "run.dispatchName": ["Despacho", "Dispatch"],
   "scn.least_cost": ["Óptimo económico (sin meta)", "Economic optimum (no target)"],
   "scn.bau": ["Situación actual (Status Quo)", "Status Quo (current situation)"],
   "scn.no_offsets": ["Sin compensaciones", "No offsets"],
@@ -360,7 +361,7 @@ extend({
   "systems.importing": ["Importando el proyecto…", "Importing the project…"],
   "systems.imported": ["Proyecto importado como «{name}» con {n} corridas", "Project imported as «{name}» with {n} runs"],
   "systems.importExists": ["Ya hay un sistema «{name}». ¿Con qué nombre importo esta versión? (el mismo nombre la reemplaza)", "A system «{name}» already exists. What name should this version be imported as? (the same name replaces it)"],
-  "systems.projectHint": ["Un proyecto (.ieto) es una versión completa de un sistema: entradas, mapa, configuración, escenarios, registro de cambios y corridas. Expórtalo desde el menú de cada sistema para guardarlo junto a los entregables o llevarlo a otro equipo, e impórtalo aquí para seguir trabajando donde quedaste. «Exportar entradas (Excel)» da un libro con las tablas y series de entrada para revisarlas o editarlas en Excel; súbelo aquí mismo y el sistema se precarga con ellas (las corridas se conservan).", "A project (.ieto) is a full version of a system: inputs, map, configuration, scenarios, change log and runs. Export it from each system's menu to keep it with the deliverables or take it to another computer, and import it here to continue where you left off. «Export inputs (Excel)» gives a workbook with the input tables and series to review or edit in Excel; upload it here and the system is preloaded with them (runs are kept)."],
+  "systems.projectHint": ["Un proyecto (.ieto) es una versión completa de un sistema: entradas, mapa, configuración, escenarios, registro de cambios y corridas. Expórtalo con el botón «Exportar» de la barra superior (dentro del sistema) o desde el menú ⋮ de su tarjeta, para guardarlo junto a los entregables o llevarlo a otro equipo, e impórtalo aquí para seguir trabajando donde quedaste. «Exportar entradas (Excel)» da un libro con las tablas y series de entrada para revisarlas o editarlas en Excel; súbelo aquí mismo y el sistema se precarga con ellas (las corridas se conservan).", "A project (.ieto) is a full version of a system: inputs, map, configuration, scenarios, change log and runs. Export it with the «Export» button in the top bar (inside the system) or from the ⋮ menu of its card to keep it with the deliverables or take it to another computer, and import it here to continue where you left off. «Export inputs (Excel)» gives a workbook with the input tables and series to review or edit in Excel; upload it here and the system is preloaded with them (runs are kept)."],
   "systems.reset": ["Volver al original", "Back to the original"],
   "systems.resetConfirm": ["¿Volver «{name}» a su versión original? Se borran las ediciones y las corridas guardadas en este navegador.", "Reset «{name}» to its original version? Edits and runs saved in this browser are deleted."],
   "systems.resetDone": ["Volvió a la versión original", "Back to the original version"],
@@ -782,7 +783,7 @@ extend({
   "wf.exports": ["Exportar resultados", "Export results"],
   "wf.exportsDesc": ["Excel con todas las hojas del motor y un memo ejecutivo imprimible de la corrida en pantalla.",
                      "Excel with every engine sheet and a printable executive memo of the run on screen."],
-  "wf.needApi": ["Requiere la API.", "Requires the API."],
+  "wf.needApi": ["Disponible en la versión instalada de IETO (motor en servidor).", "Available in the installed version of IETO (server engine)."],
 });
 
 // ── techkind.js ──

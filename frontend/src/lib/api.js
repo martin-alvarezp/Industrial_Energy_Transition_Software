@@ -430,7 +430,7 @@ export async function deleteSite(name) {
  */
 export async function validateTwin(sitePayload, cfg, siteName = "demo") {
   if (!(await apiAvailable()))
-    return { ok: null, problems: ["la validación del twin requiere la API real"] };
+    return { ok: null, problems: ["la validación completa del sistema está en la versión instalada de IETO (motor en servidor)"] };
   try {
     const out = await post("/validate", {
       site: siteName,
