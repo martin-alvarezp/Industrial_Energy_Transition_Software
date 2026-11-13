@@ -20,6 +20,7 @@ import XLSX
 # core: tipos, contrato de datos, validación, unidades
 include("core/units.jl")
 include("core/types.jl")
+include("core/coerce.jl")
 include("core/schema.jl")
 include("core/validation.jl")
 include("core/site_json.jl")

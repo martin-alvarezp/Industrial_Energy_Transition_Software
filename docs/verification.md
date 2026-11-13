@@ -114,3 +114,17 @@ Cada corrida queda sellada con dos huellas de 12 hex: `site_version` (el
 contenido físico del sitio) y `scenario_version` (todos los supuestos del
 escenario). Mismos supuestos ⇒ mismas huellas ⇒ mismos resultados (B4); las
 huellas viajan en el JSON, el XLSX y el memo ejecutivo.
+
+
+## Agregar un campo de configuración (WP-4)
+
+1. `src/core/types.jl`: el campo al final del `struct ScenarioConfig` y su
+   default en `SCENARIO_DEFAULTS` (si falta, el paquete no carga). Las
+   llamadas posicionales viejas se completan solas con ese default.
+2. Si su tipo es nuevo, un método `_coerce` en `src/core/coerce.jl`: con eso lo
+   leen tanto `scenario_config.yaml` como los overrides de la API.
+3. Validación en `src/core/validation.jl` y el modelo donde corresponda.
+4. Espejo en el motor web (`frontend/src/lib/milp/*.js`, `api.js`):
+   `npm run verify:configspec` falla mientras falte.
+5. Fixture dorado en `build/export_golden.jl` y `npm run verify:wasm`.
+6. Antes de subir: `npm run verify:smoke` (o `verify:all` para todo).

@@ -305,7 +305,6 @@ function load_demand_parts(dir::AbstractString, nsteps::Int)
     return _demand_parts_from_json(meta, Dict(String(k) => v for (k, v) in series), "topology.json demand_parts")
 end
 
-_get_num(d::Dict, key::String, default) = Float64(get(d, key, default))
 
 """
     load_scenario_config(path) -> ScenarioConfig
@@ -323,139 +322,25 @@ function load_scenario_config(path::AbstractString)
                 "emissions_cap_net_end", "emissions_cap_gross")
         haskey(d, key) || throw(SchemaError("scenario_config.yaml: falta el campo '$key'"))
     end
-
-    esc_raw = get(d, "price_escalation", Dict())
-    esc = Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in pairs(esc_raw))
-
-    budget_raw = get(d, "capex_budget", nothing)
-    budget = budget_raw === nothing ? nothing : Float64(budget_raw)
-
-    allowed = Symbol[Symbol(t) for t in get(d, "allowed_techs", String[])]
-
-    return ScenarioConfig(
-        Int(d["horizon_years"]),
-        Float64(d["wacc"]),
-        esc,
-        _get_num(d, "demand_growth", 0.0),
-        Float64(d["emissions_cap_net_start"]),
-        Float64(d["emissions_cap_net_end"]),
-        Float64(d["emissions_cap_gross"]),
-        Bool(get(d, "allow_offsets", true)),
-        _get_num(d, "max_offset_share", 0.0),
-        _get_num(d, "offset_price", 0.0),
-        _get_num(d, "offset_availability", 0.0),
-        _get_num(d, "carbon_price", 0.0),
-        budget,
-        Bool(get(d, "allow_new_fossil", false)),
-        allowed,
-        Bool(get(d, "salvage_value", false)),
-        Int(get(d, "base_year", 0)),
-        Bool(get(d, "renew_existing", false)),
-        Bool(get(d, "repeat_investments", false)),
-        Tuple{Symbol,Int,Float64}[
-            (Symbol(f["tech"]), Int(f["year"]), Float64(f["mw"]))
-            for f in get(d, "forced_builds", [])],
-        Float64[Float64(x) for x in get(d, "carbon_price_by_year", [])],
-        Float64[Float64(x) for x in get(d, "grid_ef_by_year", [])],
-        _get_num(d, "tax_rate", 0.0),
-        Int(get(d, "depreciation_years", 0)),
-        String(get(d, "currency", "USD")),
-        Bool(get(d, "dispatch_only", false)),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v)
-                             for (k, v) in get(d, "fixed_capacity", Dict())),
-        Symbol(get(d, "commitment", "auto")),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v)
-                             for (k, v) in get(d, "capex_learning", Dict())),
-        Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
-                                     for (k, v) in get(d, "capex_by_year", Dict())),
-        get(d, "capex_budget_annual", nothing) === nothing ? nothing :
-            Float64(d["capex_budget_annual"]),
-        get(d, "scope1_cap", nothing) === nothing ? nothing : Float64(d["scope1_cap"]),
-        get(d, "scope2_cap", nothing) === nothing ? nothing : Float64(d["scope2_cap"]),
-        _get_num(d, "ets_price", 0.0),
-        _get_num(d, "ets_free_allowance", 0.0),
-        Vector{Symbol}[Symbol[Symbol(x) for x in g] for g in get(d, "exclusive_groups", [])],
-        Tuple{Symbol,Symbol}[(Symbol(r["tech"]), Symbol(r["needs"]))
-                             for r in get(d, "requires", [])],
-        EfficiencyMeasure[EfficiencyMeasure(Symbol(e["id"]), String(get(e, "name", e["id"])),
-                                            Symbol(e["carrier"]), Float64(e["reduction"]),
-                                            Float64(e["capex"]))
-                          for e in get(d, "efficiency_measures", [])],
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "demand_flexibility", Dict())),
-        _get_num(d, "flex_cost", 0.0),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "backup_share", Dict())),
-        Bool(get(d, "backup_without_grid", false)),
-        Symbol[Symbol(x) for x in get(d, "afrr_participants", [])],
-        _get_num(d, "afrr_price_up", 0.0),
-        _get_num(d, "afrr_price_down", 0.0),
-        _get_num(d, "afrr_max_share", 0.5),
-        Dict{Symbol,Vector{Int}}(Symbol(k) => Int[Int(x) for x in v]
-                                 for (k, v) in get(d, "build_window", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "min_build", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_capex", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_capex", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_max", Dict())),
-        Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}(
-            Symbol(kind) => Dict{Symbol,Vector{Tuple{Int,Float64}}}(
-                Symbol(tg) => Tuple{Int,Float64}[(Int(p[1]), Float64(p[2])) for p in pts]
-                for (tg, pts) in targets)
-            for (kind, targets) in get(d, "year_factors", Dict())),
-        _get_num(d, "financing_rate", 0.0),
-        Int(get(d, "financing_years", 0)),
-        Int[Int(x) for x in get(d, "milestone_years", [])],
-        String[String(x) for x in get(d, "day_sequence", [])],
-        Tuple{Symbol,Symbol,Float64,Symbol}[(Symbol(c["a"]), Symbol(c["b"]), Float64(get(c, "k", 1.0)),
-                                             Symbol(get(c, "mode", "eq"))) for c in get(d, "coupling", [])],
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_mw", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "measure_fixed_opex", Dict())),
-        Dict{Symbol,Dict{Symbol,Vector{Float64}}}(Symbol(t) => Dict{Symbol,Vector{Float64}}(Symbol(c) => Float64[Float64(x) for x in v]
-                                                                for (c, v) in cs)
-                                    for (t, cs) in get(d, "input_profiles", Dict())),
-        Symbol[Symbol(x) for x in get(d, "must_take", [])],
-        Bool(get(d, "export_emission_credit", false)),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_ef", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_min", Dict())),
-        Tuple{Symbol,Int,Float64}[(Symbol(c["kind"]), Int(c["year"]), Float64(c["cap"]))
-                                  for c in get(d, "emission_caps", [])],
-        Symbol(get(d, "milestone_weighting", "years")),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "storage_energy_fixed_opex", Dict())),
-        Dict{Symbol,Vector{Float64}}(Symbol(k) => Float64[Float64(x) for x in v]
-                                     for (k, v) in get(d, "market_availability", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "generator_scope1_ef", Dict())),
-        Symbol[Symbol(x) for x in get(d, "renew_techs", [])],
-        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(c) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v]
-                                                   for (y, v) in ys)
-                       for (c, ys) in get(d, "demand_profiles", Dict())),
-        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(t) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v]
-                                                   for (y, v) in ys)
-                       for (t, ys) in get(d, "profiles_by_year", Dict())),
-        Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}(Symbol(t) => Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(c) =>
-                           Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
-                           for (c, ys) in cs)
-                       for (t, cs) in get(d, "input_profiles_by_year", Dict())),
-        Symbol(get(d, "emission_cap_mode", "hard")),
-        Symbol(get(d, "capex_accounting", "annuity")),
-        Dict{Symbol,Int}(Symbol(k) => Int(v) for (k, v) in get(d, "financing_period_tech", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "financing_rate_tech", Dict())),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "debt_share", Dict())),
-        Dict{Symbol,Vector{Tuple{Int,Bool}}}(Symbol(k) => Tuple{Int,Bool}[(Int(p[1]), Bool(p[2])) for p in v]
-                                            for (k, v) in get(d, "build_permission", Dict())),
-        Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in get(d, "weight_by_year", Dict())),
-        Dict{Int,Vector{Int}}(parse(Int, string(y)) => Int[Int(x) for x in v] for (y, v) in get(d, "month_by_year", Dict())),
-        Dict{Int,Vector{String}}(parse(Int, string(y)) => String[String(x) for x in v] for (y, v) in get(d, "day_sequence_by_year", Dict())),
-        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(k) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
-                       for (k, ys) in get(d, "price_profiles_by_year", Dict())),
-        Dict{Symbol,Dict{Int,Vector{Float64}}}(Symbol(k) => Dict{Int,Vector{Float64}}(parse(Int, string(y)) => Float64[Float64(x) for x in v] for (y, v) in ys)
-                       for (k, ys) in get(d, "market_availability_by_year", Dict())),
-        Symbol(get(d, "intermediate_prices", "milestone")),
-        Int(get(d, "investment_lead_years", 0)),
-        Dict{Symbol,Float64}(Symbol(k) => Float64(v) for (k, v) in get(d, "fixed_opex_per_build", Dict())),
-        Symbol(get(d, "max_new_mode", "per_build")),
-        Bool(get(d, "replace_between_milestones", false)),
-        Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}(Symbol(k) => Tuple{Int,Float64,Float64}[(Int(p[1]), Float64(p[2]), Float64(p[3])) for p in pts]
-            for (k, pts) in get(d, "build_limits", Dict())),
-        Symbol[Symbol(t) for t in get(d, "bau_techs", String[])],
-        Bool(get(d, "fixed_rebuild", true)),
-        Float64[Float64(x) for x in get(d, "ets_price_by_year", Float64[])],
-    )
+    # los 5 obligatorios; el resto parte de su default (SCENARIO_DEFAULTS)
+    cfg = ScenarioConfig(Int(d["horizon_years"]), Float64(d["wacc"]), Dict{Symbol,Float64}(), 0.0,
+                         Float64(d["emissions_cap_net_start"]), Float64(d["emissions_cap_net_end"]),
+                         Float64(d["emissions_cap_gross"]), true, 0.0, 0.0, 0.0, 0.0, nothing, false, Symbol[])
+    # WP-4: cada campo presente se convierte con el MISMO `_coerce` que los
+    # overrides de la API (el YAML pasa por JSON para tener sus mismas formas);
+    # las claves que no son campos se ignoran, como siempre
+    j = JSON3.read(JSON3.write(d))
+    kw = Pair{Symbol,Any}[]
+    for (k, v) in pairs(j)
+        f = Symbol(k)
+        f in fieldnames(ScenarioConfig) || continue
+        v === nothing && fieldtype(ScenarioConfig, f) !== Union{Float64,Nothing} && continue
+        val = try
+            _coerce(fieldtype(ScenarioConfig, f), v)
+        catch
+            throw(SchemaError("scenario_config.yaml: valor inválido para '$f' (se esperaba $(fieldtype(ScenarioConfig, f)))"))
+        end
+        push!(kw, f => val)
+    end
+    return with_config(cfg; kw...)
 end

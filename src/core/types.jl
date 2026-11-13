@@ -657,15 +657,101 @@ struct ScenarioConfig
     ets_price_by_year::Vector{Float64}       # R36: precio del alcance 1 (ETS) por año relativo; vacío = ets_price
 end
 
-# retro-compatibilidad: 91 campos → la situación actual reinstala lo que vence
-ScenarioConfig(a::Vararg{Any,92}) = ScenarioConfig(a..., Float64[])
-# retro-compatibilidad: 92 campos → precio del alcance 1 constante
-ScenarioConfig(a::Vararg{Any,91}) = ScenarioConfig(a..., true)
-# retro-compatibilidad: 90 campos → la situación actual no compra nada
-ScenarioConfig(a::Vararg{Any,90}) = ScenarioConfig(a..., Symbol[])
+"""
+Valor por defecto de cada campo de `ScenarioConfig` desde el 16.º (los 15
+primeros son los del contrato v0.2 y se dan siempre). Es la ÚNICA lista de
+defaults (WP-4): las llamadas posicionales cortas —código y pruebas de antes
+de cada campo nuevo— se completan con ella. Un campo nuevo se agrega al
+`struct` y aquí; si falta aquí, el paquete no carga (ver el `@assert`).
+"""
+const SCENARIO_DEFAULTS = (
+    salvage_value = () -> false,
+    base_year = () -> 0,
+    renew_existing = () -> false,
+    repeat_investments = () -> false,
+    forced_builds = () -> Tuple{Symbol, Int64, Float64}[],
+    carbon_price_by_year = () -> Float64[],
+    grid_ef_by_year = () -> Float64[],
+    tax_rate = () -> 0.0,
+    depreciation_years = () -> 0,
+    currency = () -> "USD",
+    dispatch_only = () -> false,
+    fixed_capacity = () -> Dict{Symbol, Float64}(),
+    commitment = () -> :auto,
+    capex_learning = () -> Dict{Symbol, Float64}(),
+    capex_by_year = () -> Dict{Symbol, Vector{Float64}}(),
+    capex_budget_annual = () -> nothing,
+    scope1_cap = () -> nothing,
+    scope2_cap = () -> nothing,
+    ets_price = () -> 0.0,
+    ets_free_allowance = () -> 0.0,
+    exclusive_groups = () -> Vector{Symbol}[],
+    requires = () -> Tuple{Symbol, Symbol}[],
+    efficiency_measures = () -> EfficiencyMeasure[],
+    demand_flexibility = () -> Dict{Symbol, Float64}(),
+    flex_cost = () -> 0.0,
+    backup_share = () -> Dict{Symbol, Float64}(),
+    backup_without_grid = () -> false,
+    afrr_participants = () -> Symbol[],
+    afrr_price_up = () -> 0.0,
+    afrr_price_down = () -> 0.0,
+    afrr_max_share = () -> 0.5,
+    build_window = () -> Dict{Symbol, Vector{Int64}}(),
+    min_build = () -> Dict{Symbol, Float64}(),
+    fixed_capex = () -> Dict{Symbol, Float64}(),
+    storage_energy_capex = () -> Dict{Symbol, Float64}(),
+    storage_energy_max = () -> Dict{Symbol, Float64}(),
+    year_factors = () -> Dict{Symbol, Dict{Symbol, Vector{Tuple{Int64, Float64}}}}(),
+    financing_rate = () -> 0.0,
+    financing_years = () -> 0,
+    milestone_years = () -> Int64[],
+    day_sequence = () -> String[],
+    coupling = () -> Tuple{Symbol, Symbol, Float64, Symbol}[],
+    measure_fixed_mw = () -> Dict{Symbol, Float64}(),
+    measure_fixed_opex = () -> Dict{Symbol, Float64}(),
+    input_profiles = () -> Dict{Symbol, Dict{Symbol, Vector{Float64}}}(),
+    must_take = () -> Symbol[],
+    export_emission_credit = () -> false,
+    generator_ef = () -> Dict{Symbol, Float64}(),
+    storage_energy_min = () -> Dict{Symbol, Float64}(),
+    emission_caps = () -> Tuple{Symbol, Int64, Float64}[],
+    milestone_weighting = () -> :years,
+    storage_energy_fixed_opex = () -> Dict{Symbol, Float64}(),
+    market_availability = () -> Dict{Symbol, Vector{Float64}}(),
+    generator_scope1_ef = () -> Dict{Symbol, Float64}(),
+    renew_techs = () -> Symbol[],
+    demand_profiles = () -> Dict{Symbol, Dict{Int64, Vector{Float64}}}(),
+    profiles_by_year = () -> Dict{Symbol, Dict{Int64, Vector{Float64}}}(),
+    input_profiles_by_year = () -> Dict{Symbol, Dict{Symbol, Dict{Int64, Vector{Float64}}}}(),
+    emission_cap_mode = () -> :hard,
+    capex_accounting = () -> :annuity,
+    financing_period_tech = () -> Dict{Symbol, Int64}(),
+    financing_rate_tech = () -> Dict{Symbol, Float64}(),
+    debt_share = () -> Dict{Symbol, Float64}(),
+    build_permission = () -> Dict{Symbol, Vector{Tuple{Int64, Bool}}}(),
+    weight_by_year = () -> Dict{Int64, Vector{Float64}}(),
+    month_by_year = () -> Dict{Int64, Vector{Int64}}(),
+    day_sequence_by_year = () -> Dict{Int64, Vector{String}}(),
+    price_profiles_by_year = () -> Dict{Symbol, Dict{Int64, Vector{Float64}}}(),
+    market_availability_by_year = () -> Dict{Symbol, Dict{Int64, Vector{Float64}}}(),
+    intermediate_prices = () -> :milestone,
+    investment_lead_years = () -> 0,
+    fixed_opex_per_build = () -> Dict{Symbol, Float64}(),
+    max_new_mode = () -> :per_build,
+    replace_between_milestones = () -> false,
+    build_limits = () -> Dict{Symbol, Vector{Tuple{Int64, Float64, Float64}}}(),
+    bau_techs = () -> Symbol[],
+    fixed_rebuild = () -> true,
+    ets_price_by_year = () -> Float64[],
+)
+@assert collect(keys(SCENARIO_DEFAULTS)) == collect(fieldnames(ScenarioConfig)[16:end]) "SCENARIO_DEFAULTS no coincide con los campos de ScenarioConfig"
 
-# retro-compatibilidad: 89 campos → tamaño de compra igual todos los años
-ScenarioConfig(a::Vararg{Any,89}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Float64,Float64}}}())
+# retro-compatibilidad: N campos (15 ≤ N < total) → el resto con su default
+for N in 15:(fieldcount(ScenarioConfig) - 1)
+    f = fieldname(ScenarioConfig, N + 1)
+    @eval ScenarioConfig(a::Vararg{Any,$N}) = ScenarioConfig(a..., SCENARIO_DEFAULTS.$f())
+end
+
 
 """
 Límites (mín, máx) en MW de una compra de `t` en el año relativo `y` (R35): el
@@ -683,14 +769,6 @@ function build_limit_at(cfg::ScenarioConfig, t::Symbol, y::Integer)
     return best
 end
 
-# retro-compatibilidad: 88 campos → sin reposición automática entre hitos
-ScenarioConfig(a::Vararg{Any,88}) = ScenarioConfig(a..., false)
-
-# retro-compatibilidad: 87 campos → tope de capacidad nueva por compra
-ScenarioConfig(a::Vararg{Any,87}) = ScenarioConfig(a..., :per_build)
-
-# retro-compatibilidad: 84 campos → inversión en el año del hito y sin O&M por instalación
-ScenarioConfig(a::Vararg{Any,84}) = ScenarioConfig(a..., :milestone, 0, Dict{Symbol,Float64}())
 
 "Años relativos que representa el hito k (R18): de ry[k] al anterior al próximo; el último, hasta el horizonte."
 rep_years(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, k::Integer) =
@@ -752,9 +830,6 @@ end
 cost_factor(cfg::ScenarioConfig, kind::Symbol, id, ry::AbstractVector{<:Integer}, k::Integer) =
     milestone_mean(r -> year_factor(cfg, kind, id, r), cfg, ry, k)
 
-# retro-compatibilidad: 79 campos → la misma plantilla de días todos los años
-ScenarioConfig(a::Vararg{Any,79}) = ScenarioConfig(a..., Dict{Int,Vector{Float64}}(), Dict{Int,Vector{Int}}(), Dict{Int,Vector{String}}(),
-                                                   Dict{Symbol,Dict{Int,Vector{Float64}}}(), Dict{Symbol,Dict{Int,Vector{Float64}}}())
 
 "Peso (horas) del paso de cada año relativo de `ry` (R26): matriz [paso, año]."
 function weight_matrix(cfg::ScenarioConfig, site_weights::Vector{Float64}, ry::AbstractVector{<:Integer})
@@ -764,8 +839,6 @@ end
 "Secuencia de días tipo vigente en el año relativo `r` (R26), o la del escenario."
 day_sequence_at(cfg::ScenarioConfig, r::Integer) = something(by_year_at(cfg, cfg.day_sequence_by_year, r), cfg.day_sequence)
 
-# retro-compatibilidad: 78 campos → sin permisos por tramos
-ScenarioConfig(a::Vararg{Any,78}) = ScenarioConfig(a..., Dict{Symbol,Vector{Tuple{Int,Bool}}}())
 
 """
     permission_at(cfg, key, r) -> Bool
@@ -790,9 +863,6 @@ end
 permitted(cfg::ScenarioConfig, tech::Symbol, r::Integer) =
     permission_at(cfg, tech, r) && permission_at(cfg, :site, r)
 
-# retro-compatibilidad: 74 campos → CAPEX anualizado con los parámetros globales
-ScenarioConfig(a::Vararg{Any,74}) = ScenarioConfig(a..., :annuity, Dict{Symbol,Int}(),
-                                                   Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
 
 """
     capex_pv(cfg, ry, k, id; life=typemax(Int)) -> Float64
@@ -839,11 +909,6 @@ function capex_charge(cfg::ScenarioConfig, ry::AbstractVector{<:Integer}, capex_
     return out
 end
 
-# retro-compatibilidad: 73 campos → topes duros
-ScenarioConfig(a::Vararg{Any,73}) = ScenarioConfig(a..., :hard)
-
-# retro-compatibilidad: 71 campos → sin perfiles horarios por año
-ScenarioConfig(a::Vararg{Any,71}) = ScenarioConfig(a..., Dict{Symbol,Dict{Int,Vector{Float64}}}(), Dict{Symbol,Dict{Symbol,Dict{Int,Vector{Float64}}}}())
 
 "Valor en escalón de un mapa año → serie para el año relativo `y` (R22/R23), o `nothing`."
 function by_year_at(cfg::ScenarioConfig, d, y::Integer)
@@ -856,8 +921,6 @@ function by_year_at(cfg::ScenarioConfig, d, y::Integer)
     return best
 end
 
-# retro-compatibilidad: 70 campos → sin perfiles por año
-ScenarioConfig(a::Vararg{Any,70}) = ScenarioConfig(a..., Dict{Symbol,Dict{Int,Vector{Float64}}}())
 
 "Serie base de la demanda de `c` vigente en el año relativo `y` (R22), o `nothing`."
 function demand_profile_at(cfg::ScenarioConfig, c::Symbol, y::Integer)
@@ -871,19 +934,10 @@ function demand_profile_at(cfg::ScenarioConfig, c::Symbol, y::Integer)
     return best
 end
 
-# retro-compatibilidad: 69 campos → renovación de todas
-ScenarioConfig(a::Vararg{Any,69}) = ScenarioConfig(a..., Symbol[])
 
 "¿Se renueva el existente `t` al vencer? (M5 + R21)"
 renews(cfg::ScenarioConfig, t::Symbol) = cfg.renew_existing && (isempty(cfg.renew_techs) || t in cfg.renew_techs)
 
-# retro-compatibilidad: 67 campos → sin piezas del sitio B
-ScenarioConfig(a::Vararg{Any,67}) = ScenarioConfig(a..., Dict{Symbol,Vector{Float64}}(), Dict{Symbol,Float64}())
-
-# retro-compatibilidad: 65 campos → hitos sin peso
-ScenarioConfig(a::Vararg{Any,65}) = ScenarioConfig(a..., :years)   # default como la referencia
-# retro-compatibilidad: 66 campos → sin O&M por MWh
-ScenarioConfig(a::Vararg{Any,66}) = ScenarioConfig(a..., Dict{Symbol,Float64}())
 
 """
     opex_weights(cfg, ry) -> Vector{Float64}
@@ -899,8 +953,6 @@ function opex_weights(cfg::ScenarioConfig, ry::AbstractVector{<:Integer})
             for k in eachindex(ry)]
 end
 
-# retro-compatibilidad: 64 campos → sin topes por año
-ScenarioConfig(a::Vararg{Any,64}) = ScenarioConfig(a..., Vector{Tuple{Symbol,Int,Float64}}())
 
 "Tope del tipo `kind` vigente en el año relativo `y` (R17), o `nothing`."
 function emission_cap_at(cfg::ScenarioConfig, kind::Symbol, y::Integer)
@@ -912,31 +964,6 @@ function emission_cap_at(cfg::ScenarioConfig, kind::Symbol, y::Integer)
     return v
 end
 
-# retro-compatibilidad: 63 campos → sin energía mínima
-ScenarioConfig(a::Vararg{Any,63}) = ScenarioConfig(a..., Dict{Symbol,Float64}())
-
-# retro-compatibilidad: 61 campos → sin crédito por ventas ni factor de generadores
-ScenarioConfig(a::Vararg{Any,61}) = ScenarioConfig(a..., false, Dict{Symbol,Float64}())
-
-# retro-compatibilidad: 60 campos → sin toma obligatoria
-ScenarioConfig(a::Vararg{Any,60}) = ScenarioConfig(a..., Symbol[])
-
-# retro-compatibilidad: 59 campos → sin perfiles de entrada
-ScenarioConfig(a::Vararg{Any,59}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Float64}}}())
-
-# retro-compatibilidad: 57 campos → sin reducción absoluta ni O&M de medidas
-ScenarioConfig(a::Vararg{Any,57}) = ScenarioConfig(a..., Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
-
-# retro-compatibilidad: 56 campos → sin acoplamientos
-ScenarioConfig(a::Vararg{Any,56}) = ScenarioConfig(a..., Vector{Tuple{Symbol,Symbol,Float64,Symbol}}())
-
-# retro-compatibilidad: 55 campos → sin días enlazados
-ScenarioConfig(a::Vararg{Any,55}) = ScenarioConfig(a..., String[])
-
-# retro-compatibilidad: 52 campos → sin financiamiento
-ScenarioConfig(a::Vararg{Any,52}) = ScenarioConfig(a..., 0.0, 0)
-# retro-compatibilidad: 54 campos → sin años hito
-ScenarioConfig(a::Vararg{Any,54}) = ScenarioConfig(a..., Int[])
 
 """
     model_years(cfg) -> Vector{Int}
@@ -993,8 +1020,6 @@ function capex_annuity(capex::AbstractVector{<:Real}, rate::Real, n::Integer;
     return [sum((capex[yp] * a for yp in 1:y if years[y] - years[yp] < n); init = 0.0) for y in 1:N]
 end
 
-# retro-compatibilidad: 51 campos → sin factores por año
-ScenarioConfig(a::Vararg{Any,51}) = ScenarioConfig(a..., Dict{Symbol,Dict{Symbol,Vector{Tuple{Int,Float64}}}}())
 
 "Tipos de factor por año (R3) y a qué apuntan."
 const YEAR_FACTOR_KINDS = (:price, :demand, :emission_factor, :demand_charge, :fixed_opex, :variable_opex,
@@ -1021,12 +1046,6 @@ function year_factor(cfg::ScenarioConfig, kind::Symbol, target::Symbol, y::Integ
     return v
 end
 
-# retro-compatibilidad: 49 campos → sin almacenamiento con energía propia
-ScenarioConfig(a::Vararg{Any,49}) = ScenarioConfig(a..., Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
-
-# retro-compatibilidad: 46 campos → sin reglas de construcción por tecnología
-ScenarioConfig(a::Vararg{Any,46}) =
-    ScenarioConfig(a..., Dict{Symbol,Vector{Int}}(), Dict{Symbol,Float64}(), Dict{Symbol,Float64}())
 
 "Año relativo (1..N) de un año de configuración: calendario si hay base_year."
 rel_year(cfg::ScenarioConfig, yr::Integer) = cfg.base_year > 0 && yr > 1900 ? yr - cfg.base_year + 1 : Int(yr)
@@ -1048,177 +1067,11 @@ function capex_factor(cfg::ScenarioConfig, tech::Symbol, y::Integer)
     return (1 - get(cfg.capex_learning, tech, 0.0))^(y - 1)
 end
 
-# retro-compatibilidad: 42 campos → sin servicios de balance
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
-               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real,
-               exg::Vector, req::Vector, em::Vector, dfx::AbstractDict, fxc::Real,
-               bks::AbstractDict, bng::Bool) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba),
-                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[exg...],
-                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
-                   Dict{Symbol,Float64}(dfx), Float64(fxc), Dict{Symbol,Float64}(bks), bng,
-                   Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 40 campos → sin exigencias de respaldo
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
-               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real,
-               exg::Vector, req::Vector, em::Vector, dfx::AbstractDict, fxc::Real) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba),
-                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[exg...],
-                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
-                   Dict{Symbol,Float64}(dfx), Float64(fxc), Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 38 campos → sin flexibilidad de carga
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
-               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real,
-               exg::Vector, req::Vector, em::Vector) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba),
-                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[exg...],
-                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[em...],
-                   Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 37 campos → sin medidas de eficiencia
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
-               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real,
-               exg::Vector, req::Vector) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba),
-                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[exg...],
-                   Tuple{Symbol,Symbol}[req...], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 35 campos → sin relaciones entre medidas
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing},
-               s1::Union{Real,Nothing}, s2::Union{Real,Nothing}, ep::Real, ef::Real) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba),
-                   s1 === nothing ? nothing : Float64(s1), s2 === nothing ? nothing : Float64(s2),
-                   Float64(ep), Float64(ef), Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 31 campos → sin topes por alcance ni ETS
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict, cba::Union{Real,Nothing}) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby),
-                   cba === nothing ? nothing : Float64(cba), nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 30 campos → sin tope anual de CAPEX
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol,
-               cl::AbstractDict, cby::AbstractDict) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm, Dict{Symbol,Float64}(cl),
-                   Dict{Symbol,Vector{Float64}}(cby), nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 28 campos → CAPEX constante en el tiempo
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict, cm::Symbol) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), cm,
-                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
 
 "¿El unit commitment va con variables enteras? (:auto ⇒ solo en despacho)"
 commitment_integer(cfg::ScenarioConfig) =
     cfg.commitment == :integer || (cfg.commitment == :auto && cfg.dispatch_only)
 
-# retro-compatibilidad: 27 campos → commitment automático
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString, dso::Bool, fc::AbstractDict) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   dso, Dict{Symbol,Float64}(fc), :auto,
-                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 25 campos → sin modo despacho
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}, tr::Real, dy::Integer,
-               cur::AbstractString) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, Float64(tr), Int(dy), String(cur),
-                   false, Dict{Symbol,Float64}(), :auto,
-                   Dict{Symbol,Float64}(), Dict{Symbol,Vector{Float64}}(),
-                   nothing, nothing, nothing, 0.0, 0.0, Vector{Symbol}[], Tuple{Symbol,Symbol}[], EfficiencyMeasure[], Dict{Symbol,Float64}(), 0.0, Dict{Symbol,Float64}(), false, Symbol[], 0.0, 0.0, 0.5)
-
-# retro-compatibilidad: 15/16/17 campos → sin políticas M5/M12
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   false, 0, false, false, Tuple{Symbol,Int,Float64}[],
-                   Float64[], Float64[], 0.0, 0, "USD")
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at, sv::Bool) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, 0, false, false, Tuple{Symbol,Int,Float64}[],
-                   Float64[], Float64[], 0.0, 0, "USD")
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), false, false, Tuple{Symbol,Int,Float64}[],
-                   Float64[], Float64[], 0.0, 0, "USD")
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, Float64[], Float64[], 0.0, 0, "USD")
-ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-               sv::Bool, by::Integer, re::Bool, ri::Bool, fb::Vector,
-               cpy::Vector{Float64}, gey::Vector{Float64}) =
-    ScenarioConfig(h, w, esc, g, ns, ne, gc, ao, mos, op, oa, cp, cb, anf, at,
-                   sv, Int(by), re, ri, fb, cpy, gey, 0.0, 0, "USD")
 
 "Año calendario del año relativo y (y=1 es base_year); y si no hay calendario."
 calendar_year(cfg::ScenarioConfig, y::Integer) =

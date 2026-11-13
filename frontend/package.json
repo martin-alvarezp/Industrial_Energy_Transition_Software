@@ -40,7 +40,8 @@
     "verify:minmarket": "node scripts/verify_minmarket.mjs",
     "verify:demandsmap": "node scripts/verify_demandsmap.mjs",
     "verify:all": "node scripts/verify_all.mjs",
-    "verify:smoke": "node scripts/verify_all.mjs --smoke"
+    "verify:smoke": "node scripts/verify_all.mjs --smoke",
+    "verify:configspec": "node scripts/verify_configspec.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

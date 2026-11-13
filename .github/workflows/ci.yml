@@ -20,6 +20,8 @@ jobs:
         with: { node-version: 22 }
       - run: npm ci
         working-directory: frontend
+      - run: npm run verify:configspec   # los dos motores conocen los mismos campos (WP-4)
+        working-directory: frontend
       - run: npm run verify:wasm   # motor JS ≡ motor Julia (fixtures dorados)
         working-directory: frontend
       - run: npm run verify:flows  # Sankey por barra ≡ convención del motor
