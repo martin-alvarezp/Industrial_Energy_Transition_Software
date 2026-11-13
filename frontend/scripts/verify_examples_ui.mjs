@@ -52,6 +52,14 @@ const runAndWait = async () => {
 
 await p.goto(APP_URL + "/", { waitUntil: "networkidle2", timeout: 60000 });
 await p.evaluate(() => { localStorage.clear(); localStorage.setItem("ieto.lang", "es"); });
+// con API, las corridas de esta prueba se guardan en los ejemplos: se anotan las
+// que ya había para borrar al final solo las nuevas (los ejemplos quedan limpios)
+const EXAMPLES = ["dummy_mexico", "dummy_japon"];
+const apiRunIds = (site) => p.evaluate(async (u, s) => {
+  try { const r = await fetch(`${u}/runs?site=${s}`); if (!r.headers.get("content-type")?.includes("json")) return null;
+        return ((await r.json()).runs ?? []).map((x) => x.id); } catch { return null; }
+}, APP_URL, site);
+const before = Object.fromEntries(await Promise.all(EXAMPLES.map(async (s) => [s, await apiRunIds(s)])));
 
 // ── México: años del modal, BaU, aviso de corrida pesada ──
 step("México: abre el modal de optimización", await openModal("dummy_mexico"));
@@ -189,6 +197,12 @@ await p.click('[data-testid="run-analysis-bau"]');
 tx = await runAndWait();
 step("Japón: con su configuración, la situación actual es factible", tx.includes("Inversión total") && !/infactible/i.test(tx));
 step("sin errores de página", errors.length === 0, errors.slice(0, 2).join(" | "));
+for (const site of EXAMPLES) {
+  if (!before[site]) continue;   // sin API: las corridas viven en el navegador de la prueba
+  const now = (await apiRunIds(site)) ?? [];
+  for (const id of now.filter((x) => !before[site].includes(x)))
+    await p.evaluate(async (u, s, i) => { await fetch(`${u}/runs/${i}?site=${s}`, { method: "DELETE" }); }, APP_URL, site, id);
+}
 await b.close();
 if (fails) { console.error(`\n${fails} paso(s) fallaron`); process.exit(1); }
 console.log("\nEJEMPLOS EN EL NAVEGADOR OK: años, situación actual, aviso de peso y diagnóstico.");

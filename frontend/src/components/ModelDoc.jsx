@@ -237,6 +237,14 @@ v∈V_n
               <strong> infactible</strong> — así emergen solas las islas mal cableadas,
               sin necesidad de detectarlas aparte.
             </p>
+            <p className="mdoc-small">
+              <strong>Demandas finales en el mapa.</strong> Cada demanda final es un marcador del
+              gemelo, como un equipo. Sin líneas propias se consume en su nodo (o en la barra
+              común); conectada por líneas, tiene su propia barra y solo recibe lo que llega por
+              ellas. Una demanda se puede dividir en partes (subsistemas): la suma de las partes es
+              la demanda del vector y cada parte se reparte por su serie — en la igualdad de
+              arriba, D[c,s] se multiplica por la fracción de la parte que vive en n.
+            </p>
 
             <h4 className="mdoc-h4">6.2 · Capacidad y disponibilidad</h4>
             <M>{`d[v,s,y]  ≤  α[v,s] · A[v,y]        conversores (α = disponibilidad, def. 1)
@@ -652,6 +660,14 @@ v∈V_n
               with no local source and no incoming arc makes the problem
               <strong> infeasible</strong> — badly wired islands show up on their own,
               with no separate detection needed.
+            </p>
+            <p className="mdoc-small">
+              <strong>Final demands on the map.</strong> Each final demand is a marker of the
+              twin, like a piece of equipment. Without its own lines it is consumed at its node
+              (or the common bus); connected by lines, it gets its own bus and only receives what
+              arrives through them. A demand can be split into parts (subsystems): the parts add
+              up to the carrier's demand and each one follows its own series — in the equality
+              above, D[c,s] is multiplied by the share of the part that lives at n.
             </p>
 
             <h4 className="mdoc-h4">6.2 · Capacity and availability</h4>
