@@ -462,3 +462,15 @@ dump("demo_reposicion_entre_hitos_n30", site0, with_config(cfg0; horizon_years =
 # R35 · tamaño de cada compra por tramos de años (con compras repetibles)
 dump("demo_compra_por_tramos_n6", site0, with_config(cfg0; horizon_years = 6, repeat_investments = true,
      build_limits = Dict(:pv => [(1, 0.0, 5.0), (4, 2.0, 30.0)], :heat_pump => [(1, 3.0, 3.0), (3, 0.0, 15.0)])))
+# WP-3 · degradación anual de un generador: cada cohorte de FV entrega
+# (1−d)^antigüedad de su capacidad (el existente desde el año 1)
+dump("demo_degradacion_fv_n6", site0, with_config(cfg0; horizon_years = 6,
+     generator_degradation = Dict(:pv => 0.05)))
+# WP-2 · compras fijadas por hito (validar a año completo): las compras del
+# óptimo de 5 años fijadas (MW por hito; la batería, si no se compró, en 0)
+let c = with_config(cfg0; horizon_years = 5), im = build_model(site0, c)
+    solve!(im)
+    pins = Dict{Symbol,Vector{Float64}}(t => [round(IETO.JuMP.value(im.model[:new_capacity][t, y]); digits = 6)
+                                             for y in im.sets.years] for t in im.sets.candidates)
+    dump("demo_compras_fijadas_n5", site0, with_config(c; pin_builds = pins))
+end

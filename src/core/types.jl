@@ -655,6 +655,8 @@ struct ScenarioConfig
     fixed_rebuild::Bool                      # situación actual: lo existente que vence se reinstala 1:1 (true) o el
                                              # optimizador decide si repotenciarlo (false, repower_option)
     ets_price_by_year::Vector{Float64}       # R36: precio del alcance 1 (ETS) por año relativo; vacío = ets_price
+    generator_degradation::Dict{Symbol,Float64}  # WP-3: generador → fracción de su capacidad que pierde por año de
+                                             # antigüedad (solar ~0,005); el existente cuenta desde el año 1
     pin_builds::Dict{Symbol,Vector{Float64}} # WP-2: inversiones fijadas por hito (validar a año completo una corrida
                                              # de días tipo): :tech → MW nuevos, Symbol("energy:tech") → MWh,
                                              # Symbol("measure:id") → 0/1 (constraints/pins.jl)
@@ -746,6 +748,7 @@ const SCENARIO_DEFAULTS = (
     bau_techs = () -> Symbol[],
     fixed_rebuild = () -> true,
     ets_price_by_year = () -> Float64[],
+    generator_degradation = () -> Dict{Symbol, Float64}(),
     pin_builds = () -> Dict{Symbol, Vector{Float64}}(),
 )
 @assert collect(keys(SCENARIO_DEFAULTS)) == collect(fieldnames(ScenarioConfig)[16:end]) "SCENARIO_DEFAULTS no coincide con los campos de ScenarioConfig"

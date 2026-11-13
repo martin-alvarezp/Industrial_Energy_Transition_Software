@@ -486,7 +486,12 @@ export function StudioProvider({ children }) {
     // R31: los perfiles por año de la configuración siguen a la plantilla de la corrida
     const resolved = { ...resolved0, cfg: projectConfigProfiles(resolved0.cfg, twin.siteJson, site0) };
     const scen = resolved.rows.length > 0 || (resolved.off ?? []).length > 0;
-    const cfg0 = { ...resolved.cfg, scenario_stack: stack0 };
+    // WP-3: la degradación anual de cada generador vive en el equipo
+    // (campo `degradation`, como el almacenamiento); al motor va por config
+    const gdeg = Object.fromEntries((resolved.siteJson.technologies ?? [])
+      .filter((x) => x.type === "generator" && +x.degradation > 0).map((x) => [x.tech_id, +x.degradation]));
+    const cfg0 = { ...resolved.cfg, scenario_stack: stack0,
+                   ...(Object.keys(gdeg).length ? { generator_degradation: { ...gdeg, ...(resolved.cfg.generator_degradation ?? {}) } } : {}) };
     // días tipo enlazados (R8): la secuencia sale del mapa de la plantilla del
     // twin (el payload al motor va sin `hourly`)
     const seq = daySequence(cfg0, site0);

@@ -407,6 +407,13 @@ export default function EquipmentDrawer({ tech, isNew, siteJson, onSave,
             )}
           </Field>
         )}
+        {draft.type === "generator" && (
+          <Field label={L("Degradación (% de la capacidad por año)", "Degradation (% of capacity per year)")}
+                 hint={L("cuánto pierde cada año de antigüedad (solar FV: ~0,5 %); el existente cuenta desde el primer año", "how much it loses per year of age (solar PV: ~0.5%); existing capacity counts from the first year")}>
+            <Num value={+((draft.degradation ?? 0) * 100).toFixed(2)} step={0.1} min={0} max={20} data-testid="gen-degradation"
+                 onChange={(v) => set({ degradation: v / 100 })} />
+          </Field>
+        )}
         <div className="switch-row">
           <div>
             <div className="sw-label">{L("Candidata a inversión", "Investment candidate")}</div>

@@ -922,15 +922,19 @@ export function buildLP(site0, cfg0, opts = {}) {
         }
       }
     }
-    // generadores: dispatch ≤ cf·capacidad
+    // generadores: dispatch ≤ cf·capacidad efectiva; con degradación anual
+    // (WP-3) cada cohorte entrega (1−d)^antigüedad (espejo de generators.jl)
     for (const g of gens) {
       const cf = profAt(g.tech_id, y) ?? steps.map(() => 0);
+      const f = 1 - (cfg.generator_degradation?.[g.tech_id] ?? 0);
+      const a = avail(g, y);
+      const k = a.k * Math.pow(f, yr(y) - 1);
+      const ncs = a.ncs.map((v) => [v, Math.pow(f, yr(y) - yr(+v.split("_").pop()))]);
       for (const s of steps) {
-        const a = avail(g, y);
         const t = { [`d_${sane(g.tech_id)}_${s}_${y}`]: 1 };
-        for (const v of a.ncs) inc(t, v, -cf[s - 1]);
+        for (const [v, w] of ncs) inc(t, v, -cf[s - 1] * w);
         row(`gcap_${sane(g.tech_id)}_${s}_${y}`, t,
-            (cfg.must_take ?? []).includes(g.tech_id) ? "=" : "<=", cf[s - 1] * a.k);   // R12
+            (cfg.must_take ?? []).includes(g.tech_id) ? "=" : "<=", cf[s - 1] * k);   // R12
       }
     }
     // storage: SOC cíclico por estación (hora anterior con wrap), límites
