@@ -47,7 +47,8 @@
     "verify:meterclean": "node scripts/verify_meterclean.mjs",
     "verify:newdemand": "node scripts/verify_newdemand.mjs",
     "verify:pins": "node scripts/verify_pins.mjs",
-    "verify:validate": "node scripts/verify_validate.mjs"
+    "verify:validate": "node scripts/verify_validate.mjs",
+    "verify:preflight": "node scripts/verify_preflight.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

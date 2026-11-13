@@ -26,7 +26,7 @@ const STEPS = ["run.stepBasic", "run.stepModel", "run.stepTime", "run.stepSolver
 
 export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const { t, lang } = useI18n();
-  const { draft, run, running, runError, runs = [], twin, siteName, apiUp } = useStudio();
+  const { draft, run, running, runError, runs = [], twin, siteName, apiUp, preflight } = useStudio();
   const techIds = new Set((twin?.siteJson?.technologies ?? []).map((x) => x.tech_id));
   const scenarios = scenarioList({ scenarios: twin?.layout?.scenarios ?? [], params: twin?.layout?.params ?? [] });
   const [name, setName] = useState("");
@@ -47,6 +47,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const [capYear, setCapYear] = useState(1);
   const [years, setYears] = useState(1);
   const [capError, setCapError] = useState(null);
+  const [pre, setPre] = useState(null);        // WP-8: faltas seguras de capacidad antes de resolver
   // equipos con operación detallada (2.1): misma regla que el motor
   const nCommit = (twin?.siteJson?.technologies ?? []).filter((x) => x.type === "converter" &&
     ((x.min_load ?? 0) > 0 || (x.startup_cost ?? 0) > 0 || (x.min_up_hours ?? 0) > 0 ||
@@ -123,7 +124,7 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
   const autoName = `${dispatch ? t("run.dispatchName") : analysis === "bau" ? t("scn.bau")
     : useTarget && draftCapped ? t("scn.emissions_cap") : t("scn.least_cost")} · ${new Date().toLocaleString(lang === "en" ? "en-GB" : "es-CL",
       { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "")}`;
-  const go = async () => {
+  const go = async (force = false) => {
     setCapError(null);
     try {
       const solver = { solver_time_limit_min: +limitMin > 0 ? +limitMin : null,
@@ -147,6 +148,12 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
                   emission_caps: (draft.emission_caps ?? []).filter((c) => inDisp(Array.isArray(c) ? c[1] : c.year)) };
       }
       const cfg = { ...draft, price_scenario: scenario === "emissions_cap" ? "base" : scenario, ...extra };
+      // WP-8: antes de gastar la corrida, las faltas de capacidad seguras
+      if (!force) {
+        const hints = preflight?.({ cfg, stack }) ?? [];
+        if (hints.length) { setPre(hints); return; }
+      }
+      setPre(null);
       const b = await run({ name, notes, cfg, stack });
       onDone?.(b);
       onClose();
@@ -159,7 +166,10 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
     <Modal title={t("run.title")} onClose={running ? undefined : onClose} wide
            footer={<>
              <button className="ui-btn ghost" onClick={onClose} disabled={running}>{t("common.cancel")}</button>
-             <button className="ui-btn primary" onClick={go} disabled={running}>
+             {pre && !running && (
+               <button className="ui-btn" onClick={() => go(true)} data-testid="run-force">{t("run.preForce")}</button>
+             )}
+             <button className="ui-btn primary" onClick={() => go(false)} disabled={running} data-testid="run-go">
                {running ? t("run.running") : t("run.go")}
              </button>
            </>}>
@@ -337,6 +347,13 @@ export default function RunModal({ onClose, onDone, initialStack = [] }) {
             {msBad.length > 0 && <> {t("run.milestonesBad", { list: msBad.join(", ") })}</>}
             {capAdded.length > 0 && <span data-testid="run-cap-years"> {t("run.milestonesCap", { list: capAdded.join(", ") })}</span>}
           </p>
+        </div>
+      )}
+      {pre && (
+        <div className="ui-banner bad" data-testid="run-preflight">
+          <b>{t("run.preTitle")}</b>
+          {pre.map((h, i) => <div key={i}>• {h}</div>)}
+          <div style={{ marginTop: 6 }}>{t("run.preHelp")}</div>
         </div>
       )}
       {heavy && <p className="ui-banner warn" data-testid="run-heavy">{t("run.heavy", { n: (stepsRun * nYears).toLocaleString() })}</p>}

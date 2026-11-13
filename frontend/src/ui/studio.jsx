@@ -16,6 +16,7 @@ import {
   listVersions, putVersion, deleteVersion, getBlob, gcBlobs,
 } from "../lib/localdb.js";
 import { splitSnapshot, joinSnapshot, fingerprint, blobRefs } from "../lib/versions.js";
+import { preflightHints } from "../lib/preflight.js";
 import { buildProject, downloadProject, readProjectFile, downloadBlob } from "../lib/project.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
@@ -498,6 +499,24 @@ export function StudioProvider({ children }) {
     return { cfg, apiSite, payload, snapshot };
   }, [twin, siteName]);
 
+  /**
+   * WP-8 · avisos ANTES de resolver: cotas optimistas de capacidad (por vector
+   * y por nodo, las mismas del diagnóstico de infactibilidad) sobre el sitio
+   * con la pila de escenarios aplicada, sin plantilla ni solver (milisegundos).
+   * Solo devuelve faltas seguras: si aparece una, la corrida será infactible.
+   */
+  const preflight = useCallback(({ cfg: cfgIn0, stack = [] } = {}) => {
+    if (!twin) return [];
+    try {
+      const store = { scenarios: twin.layout?.scenarios ?? [], params: twin.layout?.params ?? [],
+                      techScenario: twin.layout?.techScenario ?? {}, meta: twin.layout?.meta ?? {} };
+      return preflightHints(twin.siteJson, { ...siteCfgHeavy(twin.layout?.siteConfig), ...cfgIn0 }, store, stack);
+    } catch (e) {
+      console.warn("preflight:", e);
+      return [];
+    }
+  }, [twin]);
+
   /** Evalúa una pila sin guardarla como corrida (sensibilidades). */
   const evaluate = useCallback(async ({ cfg: cfgIn, stack = [], extraRows = null } = {}) => {
     if (!twin) return null;
@@ -595,7 +614,7 @@ export function StudioProvider({ children }) {
     apiUp, sites, refreshSites,
     siteName, twin, twinState, setTwin, loadSite, createSite, patchSite, patchLayout,
     saveCurrentSite, removeSite, resetSite, exportProject, exportInputs, importProject, saveStatus, readonly,
-    draft, setDraft, applied, running, runError, run, evaluate,
+    draft, setDraft, applied, running, runError, run, evaluate, preflight,
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,
     log, logChange,
