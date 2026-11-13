@@ -34,10 +34,10 @@ const WEB = `http://127.0.0.1:${WEB_PORT}`;
 // api: navegador contra la API real (la de prueba)
 const MODE = {
   flows: "node", wasm: "node", templates: "node", layers: "node", breakeven: "node", runres: "node",
-  finance: "node", catalog: "node", examples: "node", inputsbook: "node", configspec: "node",
+  finance: "node", catalog: "node", examples: "node", inputsbook: "node", configspec: "node", meterclean: "node",
   topology: "web", persistence: "web", demands: "web", demandsmap: "web", deck: "web", versions: "web",
 };
-const SMOKE = ["configspec", "wasm", "flows", "templates", "layers", "finance", "examples", "ui", "solver", "newsystem",
+const SMOKE = ["configspec", "meterclean", "wasm", "flows", "templates", "layers", "finance", "examples", "ui", "solver", "newsystem",
                "topology", "demandsmap", "deck", "versions", "minmarket", "e2e"];
 const pkg = JSON.parse(readFileSync(join(FRONT, "package.json"), "utf8"));
 const ALL = Object.keys(pkg.scripts).filter((k) => k.startsWith("verify:") && k !== "verify:all" && k !== "verify:smoke")

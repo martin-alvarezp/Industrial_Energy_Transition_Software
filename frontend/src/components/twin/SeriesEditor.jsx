@@ -3,9 +3,8 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
 } from "recharts";
 import { VizTooltip } from "../ChartCard.jsx";
-import {
-  parseHourlyCsv, flatSeries, seriesStats, seasonAverages,
-} from "../../lib/series.js";
+import { flatSeries, seriesStats, seasonAverages } from "../../lib/series.js";
+import { cleanMeterCsv, describeClean } from "../../lib/meterclean.js";
 import { num, currency } from "../../lib/format.js";
 import { hasPeakSteps, addPeakSteps, removePeakSteps, PEAK_HOURS }
   from "../../lib/twin.js";
@@ -82,24 +81,37 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
   const [flat, setFlat] = useState("");
   const [hemisphere, setHemisphere] = useState(defHemi);
   const [csvInfo, setCsvInfo] = useState(null);
+  // datos de medidor (WP-6): el archivo se limpia con estas opciones; cambiarlas
+  // vuelve a procesar el último archivo sin subirlo de nuevo
+  const [meter, setMeter] = useState({ measure: "power", scale: 1, clipSpikes: false, column: null });
+  const lastFile = useRef(null);
   const fileRef = useRef(null);
   const st = seriesStats(values, timesteps, { isDemand });
 
-  const onCsv = async (file) => {
-    if (!file) return;
-    const parsed = parseHourlyCsv(await file.text());
-    if (parsed.error) { setCsvInfo({ error: parsed.error }); return; }
+  const ingest = (text, name, opts) => {
+    const r = cleanMeterCsv(text, { ...opts, demand: isDemand });
+    if (r.error) { setCsvInfo({ error: r.error, name }); return; }
     // el crudo se GUARDA (bloque 1.2) y se re-expresa en la plantilla vigente;
     // cambiar la resolución después lo vuelve a usar
-    const n = parsed.values.length;
-    const total = parsed.values.reduce((a, b) => a + b, 0) * (n === 35040 ? 0.25 : 1);
-    onRaw(parsed.values, hemisphere);
+    const n = r.values.length;
+    onRaw(r.values, hemisphere);
     setCsvInfo({
-      name: file.name,
-      msg: L(`${n === 35040 ? "35 040 cuartos de hora" : "8760 h"} guardadas · total anual ${num(total, 0)} · plantilla de ${timesteps.length} pasos`,
-             `${n === 35040 ? "35,040 quarter hours" : "8760 h"} stored · annual total ${num(total, 0)} · ${timesteps.length}-step template`),
+      name, report: r.report,
+      msg: L(`${n === 35040 ? "35 040 cuartos de hora" : "8760 h"} guardadas · ${num(r.report.total, 0)} ${unit}h/año · máx ${num(r.report.peak, 2)} ${unit} · plantilla de ${timesteps.length} pasos`,
+             `${n === 35040 ? "35,040 quarter hours" : "8760 h"} stored · ${num(r.report.total, 0)} ${unit}h/yr · max ${num(r.report.peak, 2)} ${unit} · ${timesteps.length}-step template`),
     });
+  };
+  const onCsv = async (file) => {
+    if (!file) return;
+    const text = await file.text();
+    lastFile.current = { text, name: file.name };
+    ingest(text, file.name, meter);
     if (fileRef.current) fileRef.current.value = "";
+  };
+  const setOpt = (patch) => {
+    const next = { ...meter, ...patch };
+    setMeter(next);
+    if (lastFile.current) ingest(lastFile.current.text, lastFile.current.name, next);
   };
 
   return (
@@ -148,7 +160,7 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
               </div>
             </div>
             <div className="series-mode">
-              <label>{L("CSV horario o de 15 min (8760 / 35 040 valores, parte en enero)", "Hourly or 15-min CSV (8760 / 35,040 values, starting in January)")}</label>
+              <label>{L("Datos de medidor (CSV con fecha y valor, cualquier intervalo; o 8760 valores desde enero)", "Meter data (CSV with timestamp and value, any interval; or 8760 values from January)")}</label>
               <div className="range-row">
                 <select value={hemisphere}
                         onChange={(e) => setHemisphere(e.target.value)}
@@ -162,9 +174,37 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
               </div>
             </div>
           </div>
-          {csvInfo?.error && <div className="drawer-problems">• {csvInfo.error}</div>}
+          <div className="series-meter-opts range-row">
+            <select value={meter.measure} onChange={(e) => setOpt({ measure: e.target.value })}
+                    title={L("qué mide cada valor del archivo", "what each value in the file measures")} data-testid="meter-measure">
+              <option value="power">{L("Potencia promedio (kW, MW)", "Average power (kW, MW)")}</option>
+              <option value="energy">{L("Energía por intervalo (kWh, MWh)", "Energy per interval (kWh, MWh)")}</option>
+            </select>
+            <select value={meter.scale} onChange={(e) => setOpt({ scale: +e.target.value })}
+                    title={L("unidad del archivo respecto de la serie", "file unit relative to the series")} data-testid="meter-scale">
+              <option value={1}>{L(`ya en ${unit}`, `already in ${unit}`)}</option>
+              <option value={0.001}>{L(`k → ${unit} (×0,001)`, `k → ${unit} (×0.001)`)}</option>
+              <option value={1000}>{L(`× 1000`, `× 1000`)}</option>
+            </select>
+            {(csvInfo?.report?.columns?.length ?? 0) > 1 && (
+              <select value={meter.column ?? ""} onChange={(e) => setOpt({ column: e.target.value === "" ? null : +e.target.value })}
+                      title={L("columna con los valores", "column with the values")} data-testid="meter-column">
+                <option value="">{L("columna: automática", "column: automatic")}</option>
+                {csvInfo.report.columns.map((c) => <option key={c.index} value={c.index}>{c.name}</option>)}
+              </select>
+            )}
+            <label className="series-meter-check">
+              <input type="checkbox" checked={meter.clipSpikes} onChange={(e) => setOpt({ clipSpikes: e.target.checked })} />
+              {L("recortar picos atípicos", "clip atypical spikes")}
+            </label>
+          </div>
+          {csvInfo?.error && <div className="drawer-problems">• {csvInfo.name ? `${csvInfo.name}: ` : ""}{csvInfo.error}</div>}
           {csvInfo?.msg && (
-            <div className="twin-valid series-csv-ok">✓ {csvInfo.name}: {csvInfo.msg}</div>
+            <div className="twin-valid series-csv-ok" data-testid="meter-ok">✓ {csvInfo.name}: {csvInfo.msg}
+              <ul className="series-meter-notes">
+                {describeClean(csvInfo.report, L("es", "en")).map((x) => <li key={x}>{x}</li>)}
+              </ul>
+            </div>
           )}
         </div>
       )}

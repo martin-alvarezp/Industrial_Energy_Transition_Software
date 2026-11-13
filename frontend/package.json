@@ -43,7 +43,8 @@
     "verify:smoke": "node scripts/verify_all.mjs --smoke",
     "verify:configspec": "node scripts/verify_configspec.mjs",
     "verify:deck": "node scripts/verify_deck.mjs",
-    "verify:versions": "node scripts/verify_versions.mjs"
+    "verify:versions": "node scripts/verify_versions.mjs",
+    "verify:meterclean": "node scripts/verify_meterclean.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",
