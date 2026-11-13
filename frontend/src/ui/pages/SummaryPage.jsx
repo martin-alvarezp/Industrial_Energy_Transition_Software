@@ -217,6 +217,7 @@ export default function SummaryPage() {
   // comparación lado a lado: ids de otras corridas (hasta 2) y sus bundles
   const [cmp, setCmp] = useState([]);
   const [why, setWhy] = useState(null);         // WP-8: «¿por qué compró X?»
+  const [valError, setValError] = useState(null); // la validación a año completo falló (se muestra, no se inventa)
   const [cmpData, setCmpData] = useState({});
   useEffect(() => { setCmp([]); }, [siteName]);
   useEffect(() => {
@@ -356,8 +357,8 @@ export default function SummaryPage() {
        data.config?.run_template?.method && data.config.run_template.method !== "full" && (
         <div className="ui-banner" data-testid="validate-full">
           <span>{t("val.hint")}</span>
-          <button className="ui-btn" style={{ marginLeft: 12 }} disabled={running || !apiUp} data-testid="validate-full-go"
-                  title={apiUp ? t("val.help") : t("val.needsApi")}
+          <button className="ui-btn" style={{ marginLeft: 12 }} disabled={running} data-testid="validate-full-go"
+                  title={apiUp ? t("val.help") : t("val.helpWeb")}
                   onClick={() => {
                     // los perfiles por paso de la corrida están en SU plantilla (días
                     // tipo): fuera, para que se rearmen desde el sistema a 8760 h
@@ -366,11 +367,14 @@ export default function SummaryPage() {
                     if (!cfg) return;
                     // misma pila de escenarios (re-aplicarla es inocuo: solo agrega
                     // puntos iguales y compras forzadas que caben en lo fijado)
+                    setValError(null);
                     run({ name: t("val.name", { name: viewing?.name ?? "" }), stack: data.config?.scenario_stack ?? [],
                           cfg: { ...cfg, validates: { id: viewing?.id ?? null, name: viewing?.name ?? "", npv: result.kpis?.npv ?? null,
-                                                      emissions: result.kpis?.final_net_emissions ?? null } } }).catch(() => {});
+                                                      emissions: result.kpis?.final_net_emissions ?? null } } })
+                      .catch((e) => setValError(e?.message ?? String(e)));
                   }}>{running ? t("run.running") : t("val.go")}</button>
-          {!apiUp && <span className="ui-hint" style={{ margin: "0 0 0 10px" }}>{t("val.needsApi")}</span>}
+          {!apiUp && <span className="ui-hint" style={{ margin: "0 0 0 10px" }}>{t("val.helpWeb")}</span>}
+          {valError && <div className="ui-error" data-testid="validate-error" style={{ marginTop: 8 }}>{valError}</div>}
         </div>
       )}
       {data && data.config?.validates && (

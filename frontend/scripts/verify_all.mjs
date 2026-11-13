@@ -45,7 +45,7 @@ const ALL = Object.keys(pkg.scripts).filter((k) => k.startsWith("verify:") && k 
 const only = opt("--only")?.split(",").map((s) => s.trim()).filter(Boolean);
 const names = only ?? (flag("--smoke") ? SMOKE : ALL);
 // examples-ui corre en los dos modos en la batería completa
-const jobs = names.flatMap((n) => (n === "examples-ui" && !only && !flag("--smoke")
+const jobs = names.flatMap((n) => ((n === "examples-ui" || n === "validate") && !only && !flag("--smoke")
   ? [[n, "web"], [n, "api"]] : [[n, MODE[n] ?? "api"]]));
 const needApi = jobs.some(([, m]) => m === "api");
 const needWeb = jobs.some(([, m]) => m === "web");

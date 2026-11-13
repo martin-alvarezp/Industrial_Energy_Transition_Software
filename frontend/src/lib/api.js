@@ -381,7 +381,14 @@ export async function compute(cfg, sitePayload = null, siteName = "demo",
     try {
       return await computeViaWebEngine(cfg, webSite, onProgress);
     } catch (err) {
-      console.warn("motor web falló, usando mock:", err);
+      // NUNCA caer al mock con un sistema real: presentaría como resultado del
+      // sistema un número inventado (pasaba con el año completo: memoria
+      // agotada en el navegador y el Resumen mostraba un VAN +173 %)
+      console.warn("motor web falló:", err);
+      const why = (err?.message ?? String(err)).slice(0, 200);
+      throw new Error(`El motor del navegador no pudo resolver este caso (${why}). ` +
+        "Un año completo o muchos hitos pueden superar la memoria del navegador: " +
+        "usa días tipo o menos años, o la versión de escritorio (motor Julia).");
     }
   }
   // el mock no consume ediciones del twin: se marca para que la UI lo diga
