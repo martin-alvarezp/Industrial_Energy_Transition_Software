@@ -13,7 +13,9 @@ import {
 } from "../lib/api.js";
 import {
   putLocalSite, deleteLocalSite, listLocalRuns, getLocalRun, putLocalRun, deleteLocalRun, deleteLocalRunsOf,
+  listVersions, putVersion, deleteVersion, getBlob, gcBlobs,
 } from "../lib/localdb.js";
+import { splitSnapshot, joinSnapshot, fingerprint, blobRefs } from "../lib/versions.js";
 import { buildProject, downloadProject, readProjectFile, downloadBlob } from "../lib/project.js";
 import { setCurrency } from "../lib/format.js";
 import { blankSite, applyTopology, topologyDiffers } from "../lib/twin.js";
@@ -42,6 +44,10 @@ export const siteCfgHeavy = (sc) => Object.fromEntries(
 export const baseConfig = (layout) => ({ ...DEFAULT_CONFIG, ...readJSON("ieto.cfg._default", {}),
   ...siteCfgLight(layout?.siteConfig) });
 const logKey = (site) => `ieto.log.${site ?? "_global"}`;
+// historial de versiones (WP-5a): automáticas cada ≥ 10 min de edición (se
+// conservan las últimas 25); las que el usuario nombra no se borran solas
+const AUTO_EVERY_MS = 10 * 60_000;
+const AUTO_KEEP = 25;
 
 function siteFromApi({ source, site }) {
   const { layout, site_version, ...siteJson } = site;
@@ -195,6 +201,9 @@ export function StudioProvider({ children }) {
     // sin API: el sistema (o la copia editada de un ejemplo) vive en este navegador
     if (!apiUp) { await deleteLocalSite(name); await deleteLocalRunsOf(name); }
     else await apiDeleteSite(name);
+    // su historial de versiones se va con él
+    for (const v of await listVersions(name)) await deleteVersion(v.id);
+    await gcBlobs(blobRefs);
     logChange(`Sistema '${name}' eliminado`, "delete", null);
     if (name === siteName) { setSiteName(null); setTwin(null); setData(null); }
     await refreshSites();
@@ -241,6 +250,8 @@ export function StudioProvider({ children }) {
   const importProject = useCallback(async (file, asName = null) => {
     const p = await readProjectFile(file);
     const name = asName || p.name;
+    // reemplazar el sistema abierto: antes, una versión para poder volver
+    if (name === siteName) await saveVersionRef.current?.("", { kind: "before-import" });
     const site = { ...p.site, name };
     delete site.site_version;
     writeJSON(cfgKey(name), p.config ?? null);
@@ -271,6 +282,7 @@ export function StudioProvider({ children }) {
 
   /** Sin API: vuelve un sistema de ejemplo a su versión original (borra la copia local). */
   const resetSite = useCallback(async (name) => {
+    if (name === siteName) await saveVersionRef.current?.("", { kind: "before-reset" });
     await deleteLocalSite(name);
     await deleteLocalRunsOf(name);
     writeJSON(cfgKey(name), null);
@@ -317,6 +329,102 @@ export function StudioProvider({ children }) {
     }, 1200);
     return () => clearTimeout(saveTimer.current);
   }, [twin, apiUp, siteName, readonly]);
+
+  // ── historial de versiones (WP-5a) ──
+  // se guardan en este navegador (IndexedDB) con o sin API; las series largas
+  // una sola vez por contenido (lib/versions.js)
+  const twinRef = useRef(twin); twinRef.current = twin;
+  const draftRef = useRef(draft); draftRef.current = draft;
+  const [versions, setVersions] = useState([]);
+  const refreshVersions = useCallback(async (site = siteName) => {
+    const l = site ? await listVersions(site) : [];
+    if (site === siteName) setVersions(l);
+    return l;
+  }, [siteName]);
+  useEffect(() => { refreshVersions(); }, [refreshVersions]);
+  /** Foto del sistema abierto: entradas + mapa + configuración del escenario. */
+  const currentSnapshot = () => {
+    const tw = twinRef.current;
+    if (!tw) return null;
+    const { site_version, ...site } = tw.siteJson;
+    return { site, layout: toGeoJSON(tw.layout), config: draftRef.current };
+  };
+  const versionBusy = useRef(false);
+  const saveVersionRef = useRef(null);
+  /** Guarda una versión. auto: automática (se poda); devuelve la versión o null si no había cambios. */
+  const saveVersion = useCallback(async (label = "", { auto = false, kind = auto ? "auto" : "named" } = {}) => {
+    const site = siteName;
+    const snap = currentSnapshot();
+    if (!site || !snap || versionBusy.current) return null;
+    versionBusy.current = true;
+    try {
+      const { light, blobs } = splitSnapshot(snap);
+      const fp = fingerprint(light);
+      const list = await listVersions(site);
+      const last = list[0];
+      let rec;
+      if (last && last.fp === fp) {
+        // sin cambios desde la última: una automática no se repite; una con
+        // nombre le pone nombre a la última
+        if (auto) return null;
+        rec = { ...last, label: label || last.label, auto: false, kind };
+        await putVersion(rec, {});
+      } else {
+        rec = { id: uid(), site, at: new Date().toISOString(), label, auto, kind, fp, light,
+                user: readJSON("ieto.user", { name: "" }).name || null };
+        if (!(await putVersion(rec, blobs))) return null;
+      }
+      // poda: solo automáticas, las más viejas
+      const autos = (await listVersions(site)).filter((v) => v.auto);
+      if (autos.length > AUTO_KEEP) {
+        for (const v of autos.slice(AUTO_KEEP)) await deleteVersion(v.id);
+        await gcBlobs(blobRefs);
+      }
+      await refreshVersions(site);
+      return rec;
+    } finally {
+      versionBusy.current = false;
+    }
+  }, [siteName, refreshVersions]); // eslint-disable-line react-hooks/exhaustive-deps
+  saveVersionRef.current = saveVersion;
+  /** Instantánea completa de una versión (con sus series). */
+  const loadVersion = useCallback(async (id) => {
+    const v = versions.find((x) => x.id === id) ?? (await listVersions(siteName)).find((x) => x.id === id);
+    if (!v) throw new Error("versión no encontrada");
+    return joinSnapshot(v.light, getBlob);
+  }, [versions, siteName]);
+  /** Vuelve el sistema a una versión; antes guarda el estado actual (reversible). */
+  const restoreVersion = useCallback(async (id) => {
+    if (readonly) throw new Error("el sistema es de solo lectura");
+    const v = versions.find((x) => x.id === id);
+    const snap = await loadVersion(id);
+    await saveVersion("", { auto: false, kind: "before-restore" });
+    setTwin((tw) => tw && ({
+      ...tw, dirty: true,
+      siteJson: { ...snap.site, site_version: tw.siteJson.site_version },
+      layout: snap.layout ? fromGeoJSON(snap.layout) : { ...EMPTY_LAYOUT },
+    }));
+    if (snap.config) setDraft(snap.config);
+    const when = new Date(v?.at ?? Date.now()).toLocaleString(lang === "en" ? "en-GB" : "es-CL");
+    logChange(`Versión restaurada: ${v?.label || when}`, "save");
+  }, [versions, loadVersion, saveVersion, readonly, setDraft, logChange, lang]);
+  const removeVersion = useCallback(async (id) => {
+    await deleteVersion(id);
+    await gcBlobs(blobRefs);
+    await refreshVersions();
+  }, [refreshVersions]);
+  // versión inicial al abrir (punto de retorno antes de la primera edición) y
+  // automáticas tras guardar, como mucho cada 10 min
+  useEffect(() => {
+    if (!siteName || !twin || readonly) return;
+    if (twin.dirty) return;
+    const id = setTimeout(async () => {
+      const l = await listVersions(siteName);
+      if (!l.length || Date.now() - new Date(l[0].at).getTime() > AUTO_EVERY_MS)
+        await saveVersion("", { auto: true });
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [siteName, twin, readonly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── corridas ──
   const refreshRuns = useCallback(async (site = siteName) => {
@@ -491,6 +599,7 @@ export function StudioProvider({ children }) {
     data, appliedPayload, appliedSite, appliedSiteJson, viewing,
     runs: allRuns, refreshRuns, openRun, removeRun, loadRunBundle,
     log, logChange,
+    versions, saveVersion, loadVersion, restoreVersion, removeVersion, currentSnapshot,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

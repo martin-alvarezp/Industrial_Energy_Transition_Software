@@ -5,11 +5,13 @@
 // Almacenes:
 //   sites: {name, site (JSON del sitio, sin layout), layout (GeoJSON), saved_at}
 //   runs:  {id, site, name, notes, saved_at, scenario, feasible, npv, bundle}
+//   versions: {id, site, at, label, auto, fp, light}  historial (WP-5a; ver lib/versions.js)
+//   blobs: {h, data}  series largas de las versiones, una vez por contenido
 //
 // Todo falla en silencio (navegador privado, cuota): la app sigue en memoria.
 
 const DB = "ieto";
-const VERSION = 1;
+const VERSION = 2;
 let dbp = null;
 
 function open() {
@@ -21,6 +23,8 @@ function open() {
       const db = req.result;
       if (!db.objectStoreNames.contains("sites")) db.createObjectStore("sites", { keyPath: "name" });
       if (!db.objectStoreNames.contains("runs")) db.createObjectStore("runs", { keyPath: "id" }).createIndex("site", "site");
+      if (!db.objectStoreNames.contains("versions")) db.createObjectStore("versions", { keyPath: "id" }).createIndex("site", "site");
+      if (!db.objectStoreNames.contains("blobs")) db.createObjectStore("blobs", { keyPath: "h" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -60,3 +64,34 @@ export const getLocalRun = (id) => safe(run("runs", "readonly", (s) => s.get(id)
 export const putLocalRun = (rec) => safe(run("runs", "readwrite", (s) => s.put(rec)).then(() => true), false);
 export const deleteLocalRun = (id) => safe(run("runs", "readwrite", (s) => s.delete(id)).then(() => true), false);
 export const deleteLocalRunsOf = (site) => listLocalRuns(site).then((l) => Promise.all(l.map((r) => deleteLocalRun(r.id))));
+
+// ── historial de versiones (WP-5a) ──
+/** Versiones del sistema, la más reciente primero (con su parte liviana). */
+export const listVersions = (site) => safe(run("versions", "readonly", (s) => s.index("site").getAll(site))
+  .then((rows) => (rows ?? []).sort((a, b) => String(b.at).localeCompare(String(a.at)))), []);
+export const getBlob = (h) => safe(run("blobs", "readonly", (s) => s.get(h)).then((r) => r?.data ?? null), null);
+/** Guarda una versión y sus series (las que ya existen se sobrescriben iguales). */
+export const putVersion = (rec, blobs) => safe(open().then((db) => new Promise((resolve, reject) => {
+  const tx = db.transaction(["versions", "blobs"], "readwrite");
+  const bs = tx.objectStore("blobs");
+  for (const [h, data] of Object.entries(blobs ?? {})) bs.put({ h, data });
+  tx.objectStore("versions").put(rec);
+  tx.oncomplete = () => resolve(true);
+  tx.onerror = () => reject(tx.error);
+  tx.onabort = () => reject(tx.error);
+})), false);
+export const deleteVersion = (id) => safe(run("versions", "readwrite", (s) => s.delete(id)).then(() => true), false);
+/** Borra las series que ya no usa ninguna versión. `refsOf(light)` → Set de hashes. */
+export const gcBlobs = (refsOf) => safe(open().then((db) => new Promise((resolve, reject) => {
+  const tx = db.transaction(["versions", "blobs"], "readwrite");
+  const used = new Set();
+  let removed = 0;
+  tx.objectStore("versions").getAll().onsuccess = (e) => {
+    for (const v of e.target.result ?? []) for (const h of refsOf(v.light)) used.add(h);
+    tx.objectStore("blobs").getAllKeys().onsuccess = (e2) => {
+      for (const h of e2.target.result ?? []) if (!used.has(h)) { tx.objectStore("blobs").delete(h); removed++; }
+    };
+  };
+  tx.oncomplete = () => resolve(removed);
+  tx.onerror = () => reject(tx.error);
+})), 0);

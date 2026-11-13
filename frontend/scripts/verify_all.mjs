@@ -7,7 +7,7 @@
 // prueba usa la copia; sus corridas quedan en la carpeta temporal) y al final
 // comprueba con git que los ejemplos no cambiaron.
 //
-// Uso:  npm run verify:all              (las 32 pruebas, ~1,5 h)
+// Uso:  npm run verify:all              (todas las verify:*, ~1,5 h)
 //       npm run verify:smoke            (subconjunto rápido, ~10 min)
 //       node scripts/verify_all.mjs --only ui,minmarket [--no-build] [--keep]
 // Variables: JULIA (ruta a julia), IETO_BROWSER (Chrome/Edge),
@@ -35,10 +35,10 @@ const WEB = `http://127.0.0.1:${WEB_PORT}`;
 const MODE = {
   flows: "node", wasm: "node", templates: "node", layers: "node", breakeven: "node", runres: "node",
   finance: "node", catalog: "node", examples: "node", inputsbook: "node", configspec: "node",
-  topology: "web", persistence: "web", demands: "web", demandsmap: "web", deck: "web",
+  topology: "web", persistence: "web", demands: "web", demandsmap: "web", deck: "web", versions: "web",
 };
 const SMOKE = ["configspec", "wasm", "flows", "templates", "layers", "finance", "examples", "ui", "solver", "newsystem",
-               "topology", "demandsmap", "deck", "minmarket", "e2e"];
+               "topology", "demandsmap", "deck", "versions", "minmarket", "e2e"];
 const pkg = JSON.parse(readFileSync(join(FRONT, "package.json"), "utf8"));
 const ALL = Object.keys(pkg.scripts).filter((k) => k.startsWith("verify:") && k !== "verify:all" && k !== "verify:smoke")
   .map((k) => k.slice(7));

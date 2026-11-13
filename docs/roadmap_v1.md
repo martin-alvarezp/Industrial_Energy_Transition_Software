@@ -761,6 +761,23 @@ que administra el dueño (ver WP-10); **solver solo de código abierto** (HiGHS)
 Orden: WP-1 → WP-4 → WP-2 y WP-7 → WP-5 → WP-6/WP-9/WP-10 según clientes →
 WP-3/WP-8 caso a caso.
 
+Avance:
+- ✅ WP-1 (02f4751) `npm run verify:all` / `verify:smoke` con servidores
+  propios sobre una copia de los ejemplos; CI de humo por push y batería
+  completa semanal.
+- ✅ WP-4 (7be96da) `SCENARIO_DEFAULTS` + `verify:configspec`.
+- ✅ WP-7 (b194709) presentación de 8 láminas lista para PDF.
+- ✅ WP-5a historial de versiones en el navegador (con o sin API), en
+  Registro de cambios › Versiones:
+  - Hay una versión inicial al abrir el sistema y automáticas cada ≥ 10 min
+    de edición (se guardan las últimas 25).
+  - Las versiones con nombre nunca se podan.
+  - Cada versión se diferencia contra el estado actual o contra la anterior
+    (equipos y campos, demandas, mercados, nodos, mapa y configuración).
+  - Restaurar es reversible: antes se guarda «Antes de restaurar».
+  - Las series largas se guardan una vez por contenido: unos 31 KB por
+    versión en lugar de 5 MB (`lib/versions.js`, `verify:versions`).
+
 ## 8 · Riesgos técnicos a vigilar
 
 1. **Tamaño del MILP**: 8760 pasos × rampas × portafolio explota; mitigación:

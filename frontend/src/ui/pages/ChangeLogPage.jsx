@@ -7,6 +7,7 @@ import { readJSON, writeJSON } from "../storage.js";
 import { PageHead, Empty } from "../kit.jsx";
 import { NAV_ICONS } from "../icons.jsx";
 import { hrefFor } from "../router.js";
+import VersionsPanel from "../components/VersionsPanel.jsx";
 
 
 const KIND_ICON = { edit: IcEdit, create: IcAddCircleOutline, save: IcSave, delete: IcDelete,
@@ -19,6 +20,8 @@ export default function ChangeLogPage({ route }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState("");
   const [tick, setTick] = useState(0);
+  // en un sistema: pestaña Registro | Versiones (WP-5a); se abre directo con #…/changelog?tab=versions
+  const [tab, setTab] = useState(() => (route?.query?.tab === "versions" ? "versions" : "log"));
   const entries = useMemo(() => {
     if (!isLibrary) return log;
     const out = [];
@@ -55,8 +58,17 @@ export default function ChangeLogPage({ route }) {
   return (
     <div className="ui-page" style={{ maxWidth: 1100 }}>
       <PageHead icon={NAV_ICONS.changelog} title={t("nav.changelog")} help={t("log.help")}>
-        {entries.length > 0 && <button className="ui-btn ghost" onClick={clear}><IcDelete /> {t("log.clear")}</button>}
+        {tab === "log" && entries.length > 0 && <button className="ui-btn ghost" onClick={clear}><IcDelete /> {t("log.clear")}</button>}
       </PageHead>
+      {!isLibrary && (
+        <div className="ui-seg light outlined" role="tablist" style={{ marginBottom: 14 }}>
+          {["log", "versions"].map((k) => (
+            <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)} data-testid={`log-tab-${k}`}>
+              {t("log.tab." + k)}</button>
+          ))}
+        </div>
+      )}
+      {!isLibrary && tab === "versions" ? <VersionsPanel /> : <>
       <div className="pg-toolbar">
         <div className="pg-search"><IcSearch size={20} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("log.search")} /></div>
@@ -89,6 +101,7 @@ export default function ChangeLogPage({ route }) {
           </div>
         </section>
       ))}
+      </>}
     </div>
   );
 }

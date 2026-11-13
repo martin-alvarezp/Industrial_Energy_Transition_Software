@@ -847,3 +847,18 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
   .deck-slide { box-shadow: none; break-after: page; page-break-after: always; }
   .deck-slide:last-child { break-after: auto; page-break-after: auto; }
 }
+
+/* ── historial de versiones (WP-5a) ── */
+.ver-row .ui-btn.small { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.ver-row .ui-btn.small.icon { width: 32px; padding: 0; }
+.ver-toggle { display: inline-flex; align-items: center; gap: 4px; text-align: left; white-space: normal; }
+.ver-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.ver-diff { margin: 8px 0 4px; border-left: 2px solid var(--ui-border); padding-left: 12px; }
+.ver-diff-group h5 { margin: 8px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+.ver-diff-row { display: flex; gap: 8px; font-size: 13px; padding: 2px 0; }
+.ver-op { width: 14px; font-weight: 700; text-align: center; flex: none; }
+.ver-diff-row.added .ver-op { color: #2e7d32; }
+.ver-diff-row.removed .ver-op { color: #c62828; }
+.ver-diff-row.changed .ver-op { color: #96660a; }
+.ver-field { font-size: 12px; opacity: .85; overflow-wrap: anywhere; }
+.ver-field code { font-size: 11.5px; }
