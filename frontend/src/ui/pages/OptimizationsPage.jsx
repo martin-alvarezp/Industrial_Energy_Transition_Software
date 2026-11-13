@@ -9,6 +9,15 @@ import RunModal from "../components/RunModal.jsx";
 import CompareRuns from "../../components/CompareRuns.jsx";
 import { musd } from "../../lib/format.js";
 
+/** Fecha y hora LOCAL de una marca ISO (saved_at viene en UTC; el nombre usa la local). */
+const localStamp = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(+d)) return String(iso).replace("T", " ").slice(0, 16);
+  const p2 = (x) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+};
+
 
 export default function OptimizationsPage() {
   const { t } = useI18n();
@@ -43,7 +52,7 @@ export default function OptimizationsPage() {
                   <td>{r.scenario ? t("scn." + r.scenario) : "—"}</td>
                   <td><span className={"ui-tag " + (r.feasible ? "ok" : "bad")}>{r.feasible ? t("opt.feasible") : t("opt.infeasible")}</span></td>
                   <td className="num">{r.npv != null ? musd(r.npv, 2) : "—"}</td>
-                  <td>{(r.saved_at ?? "").replace("T", " ").slice(0, 16)}</td>
+                  <td>{localStamp(r.saved_at)}</td>
                   <td style={{ color: "var(--ui-muted)", maxWidth: 320 }}>{r.notes}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <Menu items={[

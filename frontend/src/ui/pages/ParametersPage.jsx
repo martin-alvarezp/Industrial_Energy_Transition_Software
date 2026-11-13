@@ -77,6 +77,13 @@ export default function ParametersPage({ route }) {
     return { ...DEFAULT_CONFIG, ...n,
              ...Object.fromEntries(EXTRA_OVERRIDES.filter((k) => own[k] != null).map((k) => [k, own[k]])) };
   });
+  // metas de emisiones: ≥ 1e11 t es el centinela «sin meta» del motor — se muestra vacío
+  const UNCAPPED = 1e12;
+  const capNum = (k) => (
+    <input className="ui-input" type="number" placeholder={t("par.noCap")}
+           value={v(k) == null || +v(k) >= 1e11 ? "" : v(k)}
+           onChange={(e) => set({ [k]: e.target.value === "" ? UNCAPPED : +e.target.value })} />
+  );
   const num = (k, { pct = false, step = "any" } = {}) => (
     <input className="ui-input" type="number" step={step}
            value={pct ? pctIn(v(k)) : v(k) ?? ""}
@@ -219,12 +226,12 @@ export default function ParametersPage({ route }) {
           <h3 className="ui-card-title">{t("par.climate")}</h3>
           <div className="par-row">
             <Field t={t} label={t("par.capStart")} unit="tCO₂e">
-              <input className="ui-input" type="number" value={draft.emissions_cap_net_start} onChange={(e) => set({ emissions_cap_net_start: +e.target.value })} />
+              {capNum("emissions_cap_net_start")}
             </Field>
             <Field t={t} label={t("par.capEnd")} unit="tCO₂e">
-              <input className="ui-input" type="number" value={draft.emissions_cap_net_end} onChange={(e) => set({ emissions_cap_net_end: +e.target.value })} />
+              {capNum("emissions_cap_net_end")}
             </Field>
-            <Field t={t} label={t("par.capGross")} unit="tCO₂e" overridden={over("emissions_cap_gross")} siteValue={base?.emissions_cap_gross}>{num("emissions_cap_gross")}</Field>
+            <Field t={t} label={t("par.capGross")} unit="tCO₂e" overridden={over("emissions_cap_gross")} siteValue={base?.emissions_cap_gross >= 1e11 ? t("par.noCap") : base?.emissions_cap_gross}>{capNum("emissions_cap_gross")}</Field>
             <Field t={t} label={t("par.carbon")} unit={`${cur}/tCO₂e`} overridden={over("carbon_price")} siteValue={base?.carbon_price}>{num("carbon_price")}</Field>
           </div>
           {/* carbono (4.2): topes por alcance y ETS con asignación gratuita */}

@@ -1,4 +1,4 @@
-import { musd, tons, pct, usdPerTon, num, calYear } from "../lib/format.js";
+import { musd, tons, pct, usdPerTon, num, calYear, mw } from "../lib/format.js";
 import { TECH_LABELS } from "../lib/mockEngine.js";
 import { useL } from "../ui/i18n.jsx";
 
@@ -21,11 +21,11 @@ export default function Narrative({ result, reference, referenceLabel, bauFeasib
   const paragraphs = [];
 
   // 1 · el plan
-  const invs = result.investments.filter((i) => i.mw >= 0.05)
-    .map((i) => L(`${nameOf(i.tech)} (${num(i.mw, 1)} MW, año ${calYear(baseYear, i.year)})`,
-                  `${nameOf(i.tech)} (${num(i.mw, 1)} MW, year ${calYear(baseYear, i.year)})`))
+  const invs = result.investments.filter((i) => i.mw > 1e-3)
+    .map((i) => L(`${nameOf(i.tech)} (${mw(i.mw)}, año ${calYear(baseYear, i.year)})`,
+                  `${nameOf(i.tech)} (${mw(i.mw)}, year ${calYear(baseYear, i.year)})`))
     .join(", ");
-  const notBuilt = candidates.filter((t) => !result.investments.some((i) => i.tech === t && i.mw >= 0.05));
+  const notBuilt = candidates.filter((t) => !result.investments.some((i) => i.tech === t && i.mw > 1e-3));
   const start = config.emissions_cap_net_start ?? sc.emissions_cap_net_start;
   const end = config.emissions_cap_net_end ?? sc.emissions_cap_net_end;
   // topes por año, en palabras: «un tope de emisiones brutas de 467 t en 2030»

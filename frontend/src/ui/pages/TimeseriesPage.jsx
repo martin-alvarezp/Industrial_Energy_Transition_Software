@@ -11,7 +11,7 @@ export default function TimeseriesPage() {
   return (
     <div className="ui-page ui-legacy">
       <PageHead icon={NAV_ICONS.timeseries} title={t("nav.timeseries")} help={t("ts.help")} />
-      <SeriesEditor siteJson={twin.siteJson} patchSite={(fn) => patchSite(fn, "Series de tiempo editadas")} />
+      <SeriesEditor siteJson={twin.siteJson} center={twin.layout?.center} patchSite={(fn) => patchSite(fn, "Series de tiempo editadas")} />
     </div>
   );
 }

@@ -95,6 +95,7 @@ const _Flame = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" 
 const _Battery = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M4 7.5h14v9H4zM18 10.5h2v3h-2\"/><path d=\"M11.5 9l-2.5 3.5h3.5L10 15.5\"/></g>");
 const _HeatPump = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M3.5 5.5h17v13h-17z\"/><circle cx=\"10\" cy=\"12\" r=\"4\"/><path d=\"M10 8v8M6 12h8\"/></g><path stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-dasharray=\"1 2.2\" stroke-linecap=\"round\" d=\"M16.5 9h1.5M16.5 12h1.5M16.5 15h1.5\"/>");
 const _Tank = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M7 6.5h10v12.5H7z\"/><path d=\"M9 6.5V4h6v2.5M7 10.5h10\"/></g><path stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-dasharray=\"1 2.2\" stroke-linecap=\"round\" d=\"M9.5 14h5M9.5 16.5h5\"/>");
+const _Compressor = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><circle cx=\"12\" cy=\"12\" r=\"6.5\"/><path d=\"M7 8.2l9.6 2.3M7 15.8l9.6-2.3\"/></g><path stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-dasharray=\"1 2.2\" stroke-linecap=\"round\" d=\"M1.8 12h3M19.2 12h3\"/>");
 const _Co2 = mk("0 0 24 24", "<g stroke=\"currentColor\" stroke-width=\"1.2\" fill=\"none\" stroke-linecap=\"square\" stroke-linejoin=\"miter\"><path d=\"M6.5 17.5a3.5 3.5 0 0 1 0-7 5 5 0 0 1 9.7-1.2A4 4 0 0 1 17.5 17.5z\"/></g><text x=\"12\" y=\"15.6\" font-size=\"4.6\" font-family=\"sans-serif\" font-weight=\"700\" text-anchor=\"middle\" fill=\"currentColor\">CO₂</text>");
 
 // nodo: componentes apilados en un mismo punto
@@ -192,5 +193,6 @@ export const IcOutlineWbSunny = _Sun;
 export const IcSolarPower = _SolarPanel;
 export const IcLocalFireDepartment = _Flame;
 export const IcHeatPump = _HeatPump;
+export const IcCompress = _Compressor;
 export const IcEco = _Leaf;
 export const IcOutlineCable = _Cable;

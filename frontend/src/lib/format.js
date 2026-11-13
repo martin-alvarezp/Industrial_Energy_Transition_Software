@@ -39,3 +39,7 @@ export const usdPerTon = (x) => (x == null ? "—" : `${num(x, 0)} ${CUR}/t`);
 
 /** Año relativo (1..N) → calendario cuando hay base_year (M13). */
 export const calYear = (base, y) => (base > 0 ? base + y - 1 : y);
+
+/** Potencia en MW con precisión que no esconde lo chico: 2 decimales bajo 1 MW
+ *  (0,04 MW, no «0 MW»), 1 decimal sobre 1 MW. */
+export const mw = (x) => (x == null || Number.isNaN(x) ? "—" : `${num(x, Math.abs(x) < 1 ? 2 : 1)} MW`);

@@ -10,7 +10,7 @@ import {
   IcSpaceDashboard, IcOutlineMoving, IcBarChart, IcAttachMoney, IcOutlineInsertChart,
   IcOutlineBusinessCenter, IcOutlineWorkspaces, IcDashboard,
   IcSolarPower, IcHeatPump, IcBatteryChargingFull, IcLocalFireDepartment, IcAcUnit,
-  IcElectricBolt, IcWindPower, IcWaterDrop, IcPropaneTank, IcFactory, IcCo2,
+  IcElectricBolt, IcWindPower, IcWaterDrop, IcPropaneTank, IcFactory, IcCo2, IcCompress,
   IcOutlineSwapHoriz, IcWbSunny, IcEco, IcOutlineCable,
 } from "./iconset.jsx";
 
@@ -68,7 +68,7 @@ export function componentIcon(t) {
   }
   if (/transformador|transformer|empalme|acometida|red|pipe|cañer|network/.test(id)) return IcOutlineCable;
   if (/tren de|gas train|regula/.test(id)) return IcPropaneTank;
-  if (/compres/.test(id) && !/chill/.test(id)) return IcWindPower;
+  if (/compres/.test(id) && !/chill/.test(id)) return IcCompress;
   if (/chp|cogener|trigener|electroliz/.test(id)) return IcFactory;
   if (/heat_pump|bomba de calor|heat pump/.test(id)) return IcHeatPump;
   if (/chill|frio|frío|cool|hielo|absor|enfriamiento/.test(id) || /cool|frio|frío|chill/.test(out)) return IcAcUnit;

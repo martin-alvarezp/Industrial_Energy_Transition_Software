@@ -4,6 +4,7 @@
 // texto en blanco).
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { DICT } from "./dict.js";
+import { currency } from "../lib/format.js";
 
 const LangCtx = createContext({ lang: "es", setLang: () => {}, t: (k) => k });
 
@@ -28,6 +29,8 @@ export function LangProvider({ children }) {
       s = key;
     }
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, v);
+    // {cur}: la moneda vigente del sistema o de la corrida (no «USD» fijo)
+    if (s.includes("{cur}")) s = s.replaceAll("{cur}", currency());
     return s;
   }, [lang]);
   const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);

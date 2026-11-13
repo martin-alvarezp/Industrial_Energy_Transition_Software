@@ -78,6 +78,7 @@ const CUSTOM = {
   Battery: g('<path d="M4 7.5h14v9H4zM18 10.5h2v3h-2"/><path d="M11.5 9l-2.5 3.5h3.5L10 15.5"/>'),
   HeatPump: g('<path d="M3.5 5.5h17v13h-17z"/><circle cx="10" cy="12" r="4"/><path d="M10 8v8M6 12h8"/>') + `<path ${D} d="M16.5 9h1.5M16.5 12h1.5M16.5 15h1.5"/>`,
   Tank: g('<path d="M7 6.5h10v12.5H7z"/><path d="M9 6.5V4h6v2.5M7 10.5h10"/>') + `<path ${D} d="M9.5 14h5M9.5 16.5h5"/>`,
+  Compressor: g('<circle cx="12" cy="12" r="6.5"/><path d="M7 8.2l9.6 2.3M7 15.8l9.6-2.3"/>') + `<path ${D} d="M1.8 12h3M19.2 12h3"/>`,
   Co2: g('<path d="M6.5 17.5a3.5 3.5 0 0 1 0-7 5 5 0 0 1 9.7-1.2A4 4 0 0 1 17.5 17.5z"/>') + '<text x="12" y="15.6" font-size="4.6" font-family="sans-serif" font-weight="700" text-anchor="middle" fill="currentColor">CO₂</text>',
 };
 
@@ -105,7 +106,7 @@ const USE = {
   IcCo2: "Co2", IcElectricBolt: "Pylon", IcPropaneTank: "Tank", IcAcUnit: "Snow", IcWaterDrop: "Drop",
   IcBatteryChargingFull: "Battery", IcWindPower: "Wind", IcWbSunny: "Sun", IcOutlineWbSunny: "Sun",
   IcSolarPower: "SolarPanel", IcLocalFireDepartment: "Flame", IcHeatPump: "HeatPump", IcEco: "Leaf",
-  IcOutlineCable: "Cable",
+  IcOutlineCable: "Cable", IcCompress: "Compressor",
 };
 
 // redondeo a 0,1; si un negativo redondea a 0, su "-" era el separador: se deja un espacio

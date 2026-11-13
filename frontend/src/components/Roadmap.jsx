@@ -1,6 +1,6 @@
 import ChartCard from "./ChartCard.jsx";
 import { TECH_LABELS } from "../lib/mockEngine.js";
-import { num, calYear } from "../lib/format.js";
+import { num, calYear, mw } from "../lib/format.js";
 import { useL } from "../ui/i18n.jsx";
 
 const PALETTE = ["#008165", "#c86f95", "#5f3f9c", "#2b62c4", "#b97e14", "#86938f", "#0e6027", "#a2134f"];
@@ -50,7 +50,7 @@ export default function Roadmap({ investments, horizon, baseYear = 0, siteJson }
                       <span className="roadmap-dot" style={{ background: color }} />
                     </span>
                     <span className="roadmap-label" style={{ left: `${((inv.year - 0.4) / horizon) * 100}%` }}>
-                      {calYear(baseYear, inv.year)} · {num(inv.mw, 1)} MW
+                      {calYear(baseYear, inv.year)} · {mw(inv.mw)}
                     </span>
                   </>
                 ) : (

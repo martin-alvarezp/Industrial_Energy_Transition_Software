@@ -75,12 +75,12 @@ function Spark({ values, timesteps, unit }) {
  * agregación reportado) o valor plano para todo el año.
  */
 function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onRemove,
-                    onRaw, hasRaw }) {
+                    onRaw, hasRaw, defHemi = "south" }) {
   const L = useL();
   const SEASON = L(SEASON_ES, SEASON_EN);
   const [open, setOpen] = useState(false);
   const [flat, setFlat] = useState("");
-  const [hemisphere, setHemisphere] = useState("south");
+  const [hemisphere, setHemisphere] = useState(defHemi);
   const [csvInfo, setCsvInfo] = useState(null);
   const fileRef = useRef(null);
   const st = seriesStats(values, timesteps, { isDemand });
@@ -172,7 +172,7 @@ function SeriesRow({ id, label, unit, values, timesteps, isDemand, onChange, onR
   );
 }
 
-function AddSeries({ options, onAdd }) {
+function AddSeries({ options, onAdd, label = (c) => c }) {
   const L = useL();
   const [sel, setSel] = useState("");
   if (options.length === 0) return null;
@@ -180,7 +180,7 @@ function AddSeries({ options, onAdd }) {
     <div className="range-row" style={{ marginTop: 10 }}>
       <select value={sel} onChange={(e) => setSel(e.target.value)}>
         <option value="">{L("agregar serie para…", "add series for…")}</option>
-        {options.map((c) => <option key={c} value={c}>{c}</option>)}
+        {options.map((c) => <option key={c} value={c}>{label(c)}</option>)}
       </select>
       <button className="chart-toggle" disabled={!sel}
               onClick={() => { onAdd(sel); setSel(""); }}>
@@ -195,10 +195,10 @@ function AddSeries({ options, onAdd }) {
  * series crudas guardadas se re-agregan; las que no tienen crudo se proyectan
  * desde su plantilla actual.
  */
-function TemplateCard({ siteJson, patchSite, info }) {
+function TemplateCard({ siteJson, patchSite, info, defHemi = "south" }) {
   const L = useL();
   const [method, setMethod] = useState(info.kind);
-  const [hemisphere, setHemisphere] = useState(siteJson.hourly?.template?.hemisphere ?? "south");
+  const [hemisphere, setHemisphere] = useState(siteJson.hourly?.template?.hemisphere ?? defHemi);
   const [days, setDays] = useState(siteJson.hourly?.template?.days ?? DEFAULT_TYPICAL_DAYS);
   const quarter = info.raw.length > 0 &&
     info.raw.every((k) => siteJson.hourly.series[k]?.length === 35040);
@@ -250,7 +250,7 @@ function TemplateCard({ siteJson, patchSite, info }) {
                    onChange={(e) => setDays(Math.max(2, Math.min(365, Math.round(+e.target.value || DEFAULT_TYPICAL_DAYS))))} />
           </label>
         )}
-        <button className="chart-toggle" disabled={!dirty && hemisphere === (siteJson.hourly?.template?.hemisphere ?? "south")}
+        <button className="chart-toggle" disabled={!dirty && hemisphere === (siteJson.hourly?.template?.hemisphere ?? defHemi)}
                 onClick={() => patchSite((sj) => applyTemplate(sj, method, { hemisphere, days }))}>
           {L("Aplicar resolución", "Apply resolution")}
         </button>
@@ -267,7 +267,12 @@ function TemplateCard({ siteJson, patchSite, info }) {
 }
 
 /** Demandas, precios de mercado y factores de emisión del twin (fase 3). */
-export default function SeriesEditor({ siteJson, patchSite }) {
+export default function SeriesEditor({ siteJson, patchSite, center = null }) {
+  // hemisferio por defecto: el del sitio (latitud del mapa); sin ubicación, sur
+  const defHemi = center && center[0] > 0 ? "north" : "south";
+  // nombres de los vectores (no los ids internos) en las etiquetas
+  const cname = (c) => siteJson.carriers?.find((x) => x.carrier_id === c)?.name ?? c;
+  const scopeLbl = (sc) => ({ scope1: "alcance 1", scope2: "alcance 2", scope3: "alcance 3" }[sc] ?? sc);
   const L = useL();
   const ts = siteJson.timesteps;
   const nsteps = ts.length;
@@ -284,6 +289,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
     });
   const raw = siteJson.hourly?.series ?? {};
   const rawProps = (key) => ({
+    defHemi,
     hasRaw: key in raw,
     onRaw: (values, hemisphere) => patchSite((sj) => setRawSeries(sj, key, values, { hemisphere })),
   });
@@ -312,7 +318,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
 
   return (
     <>
-      <TemplateCard siteJson={siteJson} patchSite={patchSite} info={info} />
+      <TemplateCard siteJson={siteJson} patchSite={patchSite} info={info} defHemi={defHemi} />
       <p className="section-label">
         {L("Demandas y mercados — CSV horario (8760) o valor plano; el año tipo resultante se escala por año con las tasas del escenario", "Demands and markets — hourly CSV (8760) or flat value; the resulting template year is scaled per year with the scenario rates")}
       </p>
@@ -349,12 +355,12 @@ export default function SeriesEditor({ siteJson, patchSite }) {
         <div className="card">
           <h3 className="card-title">{L("Demandas (MW por paso)", "Demands (MW per step)")}</h3>
           {Object.entries(siteJson.demands).map(([c, v]) => (
-            <SeriesRow key={c} id={`demands:${c}`} label={c} unit="MW"
+            <SeriesRow key={c} id={`demands:${c}`} label={cname(c)} unit="MW"
                        values={v} timesteps={ts} isDemand {...rawProps(`demands.${c}`)}
                        onChange={(nv) => setSeries("demands", c, nv)}
                        onRemove={() => dropSeries("demands", c)} />
           ))}
-          <AddSeries options={demandable}
+          <AddSeries options={demandable} label={cname}
                      onAdd={(c) => setSeries("demands", c, flatSeries(nsteps, 0))} />
           {(siteJson.demand_parts ?? []).length > 0 && (
             <div data-testid="ts-demand-parts">
@@ -364,7 +370,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
                 "How each carrier's demand is split across the twin's nodes (added in each node's panel). The carrier's demand above still sets the total; these series set each node's share hour by hour.")}</p>
               {siteJson.demand_parts.map((pt) => (
                 <SeriesRow key={pt.part_id} id={`demand_part_series:${pt.part_id}`}
-                           label={`${pt.name} (${pt.carrier} · ${siteJson.nodes?.find((n) => n.node_id === (pt.home ?? pt.node))?.name ?? pt.home ?? pt.node})`}
+                           label={`${pt.name} (${cname(pt.carrier)} · ${siteJson.nodes?.find((n) => n.node_id === (pt.home ?? pt.node))?.name ?? pt.home ?? pt.node})`}
                            unit="MW" values={siteJson.demand_part_series?.[pt.part_id] ?? flatSeries(nsteps, 0)} timesteps={ts} isDemand
                            {...rawProps(`demand_part_series.${pt.part_id}`)}
                            onChange={(nv) => setSeries("demand_part_series", pt.part_id, nv)} />
@@ -377,12 +383,12 @@ export default function SeriesEditor({ siteJson, patchSite }) {
           <h3 className="card-title">{L(`Mercados — precios (${currency()}/MWh)`, `Markets — prices (${currency()}/MWh)`)}</h3>
           {Object.entries(siteJson.prices).map(([c, v]) => (
             <SeriesRow key={c} id={`prices:${c}`}
-                       label={c === "grid_export" ? L("grid_export (precio de venta)", "grid_export (sale price)") : c}
+                       label={c === "grid_export" ? L("Venta a red (precio de venta)", "Grid export (sale price)") : cname(c)}
                        unit={`${currency()}/MWh`} values={v} timesteps={ts} {...rawProps(`prices.${c}`)}
                        onChange={(nv) => setSeries("prices", c, nv)}
                        onRemove={() => dropSeries("prices", c)} />
           ))}
-          <AddSeries options={priceable}
+          <AddSeries options={priceable} label={cname}
                      onAdd={(c) => setSeries("prices", c, flatSeries(nsteps, 0))} />
 
           {(siteJson.markets ?? []).length > 0 && (
@@ -392,7 +398,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
               </h3>
               {siteJson.markets.map((mk) => (
                 <SeriesRow key={mk.market_id} id={`markets:${mk.market_id}`}
-                           label={`${mk.name} (${mk.direction === "buy" ? L("compra", "buy") : L("venta", "sell")} · ${mk.carrier_id})`}
+                           label={`${mk.name} (${mk.direction === "buy" ? L("compra", "buy") : L("venta", "sell")} · ${cname(mk.carrier_id)})`}
                            unit={`${currency()}/MWh`} values={mk.price} timesteps={ts}
                            {...rawProps(`markets.${mk.market_id}`)}
                            onChange={(nv) => patchSite((sj) => clearRaw({
@@ -411,7 +417,7 @@ export default function SeriesEditor({ siteJson, patchSite }) {
             <div className="range-row" key={`${f.carrier_id}-${f.scope}`}
                  style={{ marginBottom: 6 }}>
               <span style={{ flex: 1, fontSize: 12.5 }}>
-                {f.carrier_id} <span className="equip-sub">{f.scope}</span>
+                {cname(f.carrier_id)} <span className="equip-sub">{L(scopeLbl(f.scope), f.scope.replace("scope", "scope "))}</span>
               </span>
               <input type="number" step={0.01} min={0} value={f.factor}
                      style={{ width: 110 }}

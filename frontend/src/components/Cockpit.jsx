@@ -61,7 +61,7 @@ function FeasibleCockpit({ result, reference, referenceLabel, bauFeasible, bau, 
   const baseRow = refLast ?? first;
   const grossRed = baseRow?.gross > 0 ? 1 - last.gross / baseRow.gross : null;
   const netRed = baseRow?.gross > 0 ? 1 - last.net / baseRow.gross : null;
-  const built = new Set(result.investments.filter((i) => i.mw >= 0.05).map((i) => i.tech)).size;
+  const built = new Set(result.investments.filter((i) => i.mw > 1e-3).map((i) => i.tech)).size;
   const hasCap = [config?.emissions_cap_net_start, config?.emissions_cap_net_end].some((x) => x != null && +x < 1e11)
     || (config?.emission_caps ?? []).length > 0;
   const offsetShare = last.gross > 0 ? last.offsets / last.gross : 0;

@@ -107,7 +107,7 @@ export default function TradePage() {
                   <td className="num">{m.max_annual ?? "—"}</td>
                   <td className="num">{m.demand_charge ?? "—"}</td>
                   <td>{m.scheme ?? "—"}</td>
-                  <td>{m.connection ?? t("trade.direct")}</td>
+                  <td>{m.connection ? (sj.technologies.find((x) => x.tech_id === m.connection)?.name ?? m.connection) : t("trade.direct")}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <button className="ui-btn ghost sm" onClick={() => setDrawer({ draft: { ...m }, isNew: false })}>{t("common.edit")}</button>
                   </td>
