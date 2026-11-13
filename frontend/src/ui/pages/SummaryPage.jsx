@@ -6,7 +6,7 @@ import {
   IcFileDownload, IcDescription, IcBolt, IcClose,
 } from "../iconset.jsx";
 import { useI18n } from "../i18n.jsx";
-import { useStudio } from "../studio.jsx";
+import { useStudio, HEAVY_CFG } from "../studio.jsx";
 import { useStored, readJSON } from "../storage.js";
 import { Menu, LabeledSelect, Empty } from "../kit.jsx";
 import { NAV_ICONS, componentIcon } from "../icons.jsx";
@@ -22,6 +22,7 @@ import { buildFlows } from "../../lib/flows.js";
 import { num, pct, currency } from "../../lib/format.js";
 import { downloadXlsx } from "../../lib/api.js";
 import { openMemo } from "../../lib/memo.js";
+import { fullYearValidationConfig } from "../../lib/pins.js";
 
 
 const SCALES = { 1: "", 1000: "k", 1000000: "mn" };
@@ -151,7 +152,7 @@ function CompareColumn({ bundle, t, factor, scale, scaleLbl, hidden }) {
 export default function SummaryPage() {
   const { t } = useI18n();
   const { siteName, twin, data, runs, viewing, openRun, appliedSiteJson, applied, appliedPayload, appliedSite, apiUp,
-          loadRunBundle } = useStudio();
+          loadRunBundle, run, running } = useStudio();
   // comparación lado a lado: ids de otras corridas (hasta 2) y sus bundles
   const [cmp, setCmp] = useState([]);
   const [cmpData, setCmpData] = useState({});
@@ -286,6 +287,37 @@ export default function SummaryPage() {
                action={<button className="ui-btn primary" onClick={() => setNewRun(true)}><IcAdd /> {t("sum.optimization")}</button>}>
           {t("sum.noRunsText")}
         </Empty>
+      )}
+      {/* WP-2 · validar a año completo una corrida de resolución reducida (días
+          tipo, estacional): mismas compras, solo la operación a 8760 h */}
+      {data && feasible && !data.config?.pin_builds && !data.config?.dispatch_only &&
+       data.config?.run_template?.method && data.config.run_template.method !== "full" && (
+        <div className="ui-banner" data-testid="validate-full">
+          <span>{t("val.hint")}</span>
+          <button className="ui-btn" style={{ marginLeft: 12 }} disabled={running || !apiUp} data-testid="validate-full-go"
+                  title={apiUp ? t("val.help") : t("val.needsApi")}
+                  onClick={() => {
+                    // los perfiles por paso de la corrida están en SU plantilla (días
+                    // tipo): fuera, para que se rearmen desde el sistema a 8760 h
+                    const base = Object.fromEntries(Object.entries(data.config).filter(([k]) => !HEAVY_CFG.includes(k)));
+                    const cfg = fullYearValidationConfig(base, result);
+                    if (!cfg) return;
+                    // misma pila de escenarios (re-aplicarla es inocuo: solo agrega
+                    // puntos iguales y compras forzadas que caben en lo fijado)
+                    run({ name: t("val.name", { name: viewing?.name ?? "" }), stack: data.config?.scenario_stack ?? [],
+                          cfg: { ...cfg, validates: { id: viewing?.id ?? null, name: viewing?.name ?? "", npv: result.kpis?.npv ?? null,
+                                                      emissions: result.kpis?.final_net_emissions ?? null } } }).catch(() => {});
+                  }}>{running ? t("run.running") : t("val.go")}</button>
+          {!apiUp && <span className="ui-hint" style={{ margin: "0 0 0 10px" }}>{t("val.needsApi")}</span>}
+        </div>
+      )}
+      {data && data.config?.validates && (
+        <div className={"ui-banner " + (feasible ? "" : "bad")} data-testid="validate-result">
+          {feasible
+            ? t("val.result", { name: data.config.validates.name,
+                                d: data.config.validates.npv ? num(100 * (result.kpis.npv - data.config.validates.npv) / Math.abs(data.config.validates.npv), 2) : "—" })
+            : t("val.infeasible", { name: data.config.validates.name })}
+        </div>
       )}
       {data && !feasible && (
         <div className="ui-banner bad">{t("sum.infeasible")}

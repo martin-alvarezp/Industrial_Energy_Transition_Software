@@ -18,15 +18,17 @@ variables según SPEC §5, restricciones §7-8 y objetivo VAN según SPEC §6.
 """
 function build_model(site::Site, cfg::ScenarioConfig;
                      optimizer = HiGHS.Optimizer, silent::Bool = true,
-                     direct::Bool = get(ENV, "IETO_DIRECT_MODEL", "0") == "1")
+                     direct::Bool = get(ENV, "IETO_DIRECT_MODEL", "1") != "0")
     # modo despacho (1.3): infraestructura fija — el modelo y los resultados
     # usan el sitio transformado
     cfg.dispatch_only && ((site, cfg) = fix_infrastructure(site, cfg))
     sets = build_sets(site, cfg)
     params = build_parameters(site, cfg)
 
-    # WP-2: `direct` construye sobre el solver sin la copia intermedia de JuMP
-    # (CachingOptimizer): menos memoria en modelos grandes (8760 h × hitos)
+    # WP-2: `direct` (por defecto) construye sobre el solver sin la copia
+    # intermedia de JuMP (CachingOptimizer): mismo óptimo, −9 % de memoria y −5 %
+    # de tiempo en México 8760 h × 2 hitos (6,4 vs 7,0 GB). IETO_DIRECT_MODEL=0
+    # vuelve al modelo con caché.
     m = direct ? JuMP.direct_model(JuMP.MOI.Bridges.full_bridge_optimizer(optimizer(), Float64)) :
                  JuMP.Model(optimizer)
     silent && JuMP.set_silent(m)

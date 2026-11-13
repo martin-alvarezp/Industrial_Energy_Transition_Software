@@ -45,7 +45,9 @@
     "verify:deck": "node scripts/verify_deck.mjs",
     "verify:versions": "node scripts/verify_versions.mjs",
     "verify:meterclean": "node scripts/verify_meterclean.mjs",
-    "verify:newdemand": "node scripts/verify_newdemand.mjs"
+    "verify:newdemand": "node scripts/verify_newdemand.mjs",
+    "verify:pins": "node scripts/verify_pins.mjs",
+    "verify:validate": "node scripts/verify_validate.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

@@ -102,6 +102,7 @@ export function toConfig(cfg) {
     grid_ef_by_year: [],
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
+    pin_builds: cfg.pin_builds ?? {},   // WP-2: inversiones fijadas (validar a año completo)
     commitment: cfg.commitment ?? "auto",
     capex_learning: cfg.capex_learning ?? {},
     capex_by_year: cfg.capex_by_year ?? {},

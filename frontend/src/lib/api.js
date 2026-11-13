@@ -181,6 +181,7 @@ export function toOverrides(cfg) {
     // modo despacho (1.3): infraestructura fija
     dispatch_only: !!cfg.dispatch_only,
     fixed_capacity: cfg.fixed_capacity ?? {},
+    pin_builds: cfg.pin_builds ?? {},   // WP-2: inversiones fijadas (validar a año completo)
     commitment: cfg.commitment ?? "auto",   // 2.1: entero en despacho, lineal en planificación
     capex_learning: cfg.capex_learning ?? {},   // 3.1: CAPEX por año
     capex_by_year: cfg.capex_by_year ?? {},

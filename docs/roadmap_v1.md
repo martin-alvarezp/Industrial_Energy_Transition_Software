@@ -777,6 +777,28 @@ Avance:
   - Restaurar es reversible: antes se guarda «Antes de restaurar».
   - Las series largas se guardan una vez por contenido: unos 31 KB por
     versión en lugar de 5 MB (`lib/versions.js`, `verify:versions`).
+- ✅ WP-6a limpieza de datos de medidor al subir una serie
+  (`lib/meterclean.js`, `verify:meterclean`).
+- ✅ WP-6b el libro Excel de entradas se valida al importar; cada error dice
+  su hoja y su fila.
+- ✅ Demandas finales como componentes: Agregar → Demanda, en un nodo o en el
+  mapa, moverlas y eliminarlas (`verify:newdemand`).
+- 🟡 WP-2 escala, perfil de México a 8760 h × 2 hitos (1,14 M variables,
+  4,1 M restricciones):
+
+  | modelo | armar | resolver | memoria máx. |
+  |---|---|---|---|
+  | JuMP con caché | 72 s | 50 min | 7,0 GB |
+  | directo (ahora por defecto) | 74 s | 48 min | 6,4 GB |
+
+  - Ambos llegan al mismo óptimo. Casi todo el tiempo y la memoria se van en
+    HiGHS resolviendo el MILP, no en armar el modelo.
+  - Por eso la palanca es no optimizar a 8760 h: optimizar con días tipo y
+    **validar a año completo** con las compras fijadas (`pin_builds`, en los
+    dos motores; `test_pins.jl`, `verify:pins`, `verify:validate`).
+  - El despacho de un año a 8760 h resuelve en unos 40 s.
+  - Pendiente: agregación de equipos idénticos, formulaciones más ajustadas y
+    corridas pesadas en un proceso aparte.
 
 ## 8 · Riesgos técnicos a vigilar
 

@@ -27,5 +27,6 @@ function add_constraints!(m::JuMP.Model, sets::ModelSets, params::ModelParameter
     add_grid_constraints!(m, sets, params, cfg)          # + disponibilidad de mercados (R20)
     add_arc_constraints!(m, sets, params)
     add_emissions_constraints!(m, sets, params, site, cfg)
+    add_pins!(m, sets, cfg)                               # WP-2: inversiones fijadas
     return m
 end

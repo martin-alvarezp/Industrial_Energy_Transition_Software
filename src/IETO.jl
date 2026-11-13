@@ -48,6 +48,7 @@ include("constraints/measures.jl")
 include("constraints/demand_side.jl")
 include("constraints/resilience.jl")
 include("constraints/balancing.jl")
+include("constraints/pins.jl")
 include("constraints/constraints.jl")
 
 # results: extracción de resultados y resumen (SPEC §10)

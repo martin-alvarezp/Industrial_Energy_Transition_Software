@@ -1330,6 +1330,22 @@ export function buildLP(site0, cfg0, opts = {}) {
       years.forEach((y) => inc(tr, `b_${id}_${y}`, 1));
       row(`once_${id}`, tr, "<=", 1);
     }
+    // WP-2 · inversiones fijadas (validar a año completo lo que decidió una
+    // corrida de días tipo): MW nuevos por hito y su binaria; espejo de pins.jl
+    const pin = cfg.pin_builds?.[t.tech_id], pinE = cfg.pin_builds?.[`energy:${t.tech_id}`];
+    for (const y of years) {
+      if (pin && pin[y - 1] != null) {
+        const v = pin[y - 1], tol = 1e-5 * Math.max(1, v);
+        row(`pinb_${id}_${y}`, { [`b_${id}_${y}`]: 1 }, "=", v > 1e-6 ? 1 : 0);
+        row(`pinlo_${id}_${y}`, { [`nc_${id}_${y}`]: 1 }, ">=", Math.max(0, v - tol));
+        row(`pinhi_${id}_${y}`, { [`nc_${id}_${y}`]: 1 }, "<=", v + tol);
+      }
+      if (pinE && pinE[y - 1] != null && ownEnergy(cfg, t)) {
+        const v = pinE[y - 1], tol = 1e-5 * Math.max(1, v);
+        row(`pinelo_${id}_${y}`, { [`eng_${id}_${y}`]: 1 }, ">=", Math.max(0, v - tol));
+        row(`pinehi_${id}_${y}`, { [`eng_${id}_${y}`]: 1 }, "<=", v + tol);
+      }
+    }
     // R32: tope de lo comprado y vivo en cada año (espejo de capacity.jl)
     if (cfg.max_new_mode === "alive")
       for (const y of years) {
@@ -1382,6 +1398,8 @@ export function buildLP(site0, cfg0, opts = {}) {
       integers.push(`em_${id}_${y}`);
       row(`emub_${id}_${y}`, { [`em_${id}_${y}`]: 1 }, "<=", 1);
       once[`em_${id}_${y}`] = 1;
+      const pm = cfg.pin_builds?.[`measure:${em.id}`];   // WP-2: medida fijada
+      if (pm && pm[y - 1] != null) row(`pinem_${id}_${y}`, { [`em_${id}_${y}`]: 1 }, "=", pm[y - 1] > 0.5 ? 1 : 0);
     }
     row(`emonce_${id}`, once, "<=", 1);
   }
