@@ -130,10 +130,13 @@ export default function Narrative({ result, reference, referenceLabel, bauFeasib
   }
 
   // 4 · advertencias de configuración
-  if (N > 15) {
+  // solo si el optimizador NO probó el óptimo (p. ej. se detuvo por el límite de
+  // tiempo): antes salía siempre con horizontes > 15 años, también tras resolver
+  const st = String(result.meta?.status ?? "OPTIMAL").toUpperCase();
+  if (st && !/OPTIMAL/.test(st)) {
     paragraphs.push(L(
-      <>⚠ Horizontes sobre 15 años: conviene validar los tiempos de resolución del optimizador antes de comprometer resultados.</>,
-      <>⚠ Horizons above 15 years: validate the optimizer's solve times before committing to results.</>));
+      <>⚠ El optimizador se detuvo antes de probar el óptimo ({st.toLowerCase()}): el plan es factible, pero puede haber uno algo más barato. Sube el límite de tiempo o la brecha permitida en «Optimizador».</>,
+      <>⚠ The optimizer stopped before proving optimality ({st.toLowerCase()}): the plan is feasible, but a somewhat cheaper one may exist. Raise the time limit or the allowed gap under «Optimizer».</>));
   }
 
   return (
