@@ -739,6 +739,28 @@ cada subsistema se abastece solo por las líneas del gemelo (65fa662).
 cronología de un año completo (almacenamiento encadenado entre días a la
 misma hora) — arreglado; informe en curso.
 
+### Plan de mejora (13-nov-2026) — paquetes WP-1 a WP-10
+
+Aprobado por el usuario. Decisiones: **IETO sigue en el navegador** (sin
+backend propio de cuentas/BD), con **acceso limitado a personas autorizadas**
+que administra el dueño (ver WP-10); **solver solo de código abierto** (HiGHS).
+
+| WP | Paquete | Alcance |
+|---|---|---|
+| WP-1 | Red de seguridad de pruebas y release | batería E2E automatizada (humo por push, completa periódica), pruebas que nunca escriben en `data/sample_sites` y limpian sus corridas |
+| WP-2 | Escala con solver abierto | perfilar armado y memoria; arranque en caliente 8760 h desde días tipo; agregación de equipos idénticos; formulaciones más ajustadas; corridas pesadas en proceso aparte; meta: el caso de 1,3 M variables en < 30 min y < 4 GB |
+| WP-3 | Brechas de modelo vistas en las referencias | degradación anual de capacidad; razón mínima de generación / tiempos mínimos en cadenas; medidores y submedidores con tarifa; subsidios por tecnología y certificados (REC/GdO); reservas |
+| WP-4 | Deuda técnica: un solo modelo de configuración | `ScenarioConfig`/`Market`/`DemandPart` con campos por nombre y defaults; esquema y validación desde una tabla de campos compartida por los dos motores |
+| WP-5 | Proyectos que viven meses | historial de versiones dentro de la app (instantánea por guardado, diferencias y restaurar), también en modo navegador |
+| WP-6 | Incorporar una planta real | plantilla Excel de levantamiento con validación; limpieza de datos de medidores; importador de tarifas; importadores de formatos de referencia con nombres neutros; asistente de planta nueva |
+| WP-7 | Entregables para el cliente | presentación en un clic (PDF/PPTX) con mapa, hoja de ruta, Sankey, costos, emisiones y supuestos; comparación de 2-3 corridas; sensibilidades en modo navegador para casos chicos |
+| WP-8 | Diagnóstico y explicación | análisis del subsistema infactible del solver como respaldo; «¿por qué compró X?»; avisos antes de resolver |
+| WP-9 | Paquete de credibilidad | informe de validación anonimizado; manual con los ejemplos como tutoriales; glosario |
+| WP-10 | Acceso y privacidad | sitio detrás de un control de acceso por correo (lista administrada por el dueño), repositorio privado, geocodificación sin servicio público |
+
+Orden: WP-1 → WP-4 → WP-2 y WP-7 → WP-5 → WP-6/WP-9/WP-10 según clientes →
+WP-3/WP-8 caso a caso.
+
 ## 8 · Riesgos técnicos a vigilar
 
 1. **Tamaño del MILP**: 8760 pasos × rampas × portafolio explota; mitigación:
