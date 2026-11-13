@@ -5,7 +5,7 @@
 // se puede comprar (ventana y tramos de compra) y la compra directa al mercado.
 // Es una cota optimista (no mira si alcanza el combustible o la electricidad de
 // entrada): si aun así falta capacidad, esa es la causa.
-import { modelYears, relYear, demandProfileAt, yearFactor, buildLimitAt } from "./lp.js";
+import { modelYears, relYear, demandProfileAt, yearFactor, buildLimitAt, demandShares, arcLinks } from "./lp.js";
 
 const r1 = (x) => (Math.round(x * 10) / 10).toLocaleString("es-CL");
 
@@ -101,6 +101,55 @@ export function diagnoseWeb(site, cfg, scenario = "") {
       if (cpeak > supply + 1e-6) {
         hints.push(lack(cpeak, ` (contando ${caps.map(([d]) => cName(d)).join(", ")}, que solo se produce desde ${cName(c)})`));
         break;
+      }
+    }
+  }
+  // por nodo (gemelo con líneas): una demanda que se consume en un nodo propio
+  // solo recibe lo que llega por sus líneas y lo que producen los equipos de
+  // ese lugar — la cota del sitio entero no lo ve (una línea de 0,1 MW a una
+  // demanda de 1 MW pasaba como «sin falta evidente»)
+  if ((site.arcs ?? []).length && !hints.length) {
+    const shares = demandShares(site);
+    const links = arcLinks(site);
+    const nodeOfTech = (t) => t.node ?? "main";
+    const nodeName = (n) => site.demand_parts?.find((x) => x.part_id === n)?.name
+      ?? (n.startsWith("dem_") ? cName(n.slice(4)) : null)
+      ?? site.nodes?.find((x) => x.node_id === n)?.name ?? nameOf(n);
+    const linkCap = (l) => (l.capacity == null || l.capacity === "" ? Infinity : +l.capacity * (l.efficiency ?? 1));
+    outer: for (const c of Object.keys(site.demands ?? {})) {
+      for (const [n, sh] of Object.entries(shares[c] ?? {})) {
+        if (n === "main") continue;
+        for (const r of yo) {
+          const dem = demandAt(c, r);
+          const peak = Math.max(...dem.map((v, i) => v * (sh[i] ?? 0)));
+          if (!(peak > 1e-6)) continue;
+          let sup = 0;
+          const who = [];
+          for (const t of techs) {
+            const out = outputs(t).find((q) => q.carrier === c);
+            if (!out || t.type === "source" || nodeOfTech(t) !== n) continue;
+            const mw = capAt(t, r) * (out.ratio ?? 1);
+            if (mw > 1e-9) { sup += mw; who.push(`${nameOf(t.tech_id)} ${r1(mw)}`); }
+          }
+          for (const m of site.markets ?? []) {
+            if (m.direction !== "buy" || m.carrier_id !== c) continue;
+            const conn = site.technologies?.find((t) => t.tech_id === m.connection);
+            if ((conn ? nodeOfTech(conn) : "main") !== n) continue;
+            sup += m.max_power ?? Infinity; who.push(`compra ${m.name ?? m.market_id}`);
+          }
+          for (const l of links) {
+            if (l.to !== n || l.carrier !== c) continue;
+            const cap = linkCap(l);
+            sup += cap;
+            who.push(`línea desde ${nodeName(l.from)}${Number.isFinite(cap) ? ` ${r1(cap)}` : ""}`);
+          }
+          if (peak > sup + 1e-6) {
+            hints.push(`Falta capacidad de ${cName(c)} en «${nodeName(n)}» en ${cal(r)}: la punta que se consume ahí es ${r1(peak)} MW ` +
+              `y lo máximo que puede llegar o producirse en ese lugar es ${r1(sup)} MW${who.length ? ` (${who.join(", ")})` : " (nada: ninguna línea trae ese vector)"}. ` +
+              "Agranda la línea, conecta otra o pon equipos en ese lugar.");
+            break outer;
+          }
+        }
       }
     }
   }

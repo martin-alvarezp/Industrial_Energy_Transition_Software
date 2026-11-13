@@ -21,6 +21,11 @@ import { CARRIER_PRESETS, TECH_PRESETS, CARRIER_CATEGORY_META } from "../../lib/
 import { GRID_FACTORS } from "../../lib/gridFactors.js";
 import { num } from "../../lib/format.js";
 
+/** Número con la coma o el punto del idioma y hasta 3 decimales (0,202 · 0.202). */
+const fmtN = (x, lang) => (x == null || x === "" ? "—" : (+x).toLocaleString(lang === "en" ? "en-US" : "es-CL", { maximumFractionDigits: 3 }));
+/** Nombre de un vector del catálogo por su id (no «hot_water»). */
+const presetCarrierKey = (id) => CARRIER_PRESETS.find((p) => p.key === id || p.carrier?.carrier_id === id)?.key;
+
 
 // Biblioteca de escenarios: escenarios de partida y sensibilidades
 // predefinidas que se aplican a cualquier sistema guardado. Aplicar = crear el
@@ -162,8 +167,8 @@ export function LibCarriersPage() {
               <td><b style={{ fontWeight: 600 }}>{t("cpreset." + p.key)}</b>{p.askLevel ? <span className="ui-hint"> · {p.askLevel}</span> : ""}</td>
               <td>{lang === "en" ? CARRIER_CATEGORY_META[p.carrier.category]?.label_en : CARRIER_CATEGORY_META[p.carrier.category]?.label}</td>
               <td>{p.carrier.unit}</td>
-              <td className="num">{p.factors.map((f) => `${f.scope === "scope1" ? "S1" : "S2"} ${f.factor}`).join(" · ") || "—"}</td>
-              <td className="num">{p.price ?? "—"}</td>
+              <td className="num">{p.factors.map((f) => `${lang === "en" ? (f.scope === "scope1" ? "Scope 1" : "Scope 2") : (f.scope === "scope1" ? "Alcance 1" : "Alcance 2")}: ${fmtN(f.factor, lang)}`).join(" · ") || "—"}</td>
+              <td className="num">{fmtN(p.price, lang)}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -214,7 +219,7 @@ export function LibLocationsPage() {
 }
 
 export function LibTechnologiesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <div className="ui-page">
       <PageHead icon={NAV_ICONS.technologies} title={t("nav.technologies")} help={t("lib.techHelp")} />
@@ -226,6 +231,7 @@ export function LibTechnologiesPage() {
             <th className="num">{t("lib.fixedOpex")}</th><th className="num">{t("lib.varOpex")}</th><th className="num">{t("cc.life")}</th>
           </tr></thead>
           <tbody>{TECH_PRESETS.map((p) => {
+            const cl = (id) => (presetCarrierKey(id) ? t("cpreset." + presetCarrierKey(id)) : id);
             const tech = { tech_id: p.key, name: p.label, type: p.type, ...p.tech };
             const I = componentIcon(tech);
             const ins = p.tech.ports?.inputs?.map((x) => x.carrier) ?? (p.tech.input_carrier ? [p.tech.input_carrier] : []);
@@ -235,8 +241,8 @@ export function LibTechnologiesPage() {
                 <td><span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><I size={18} /><b style={{ fontWeight: 600 }}>{t("preset." + p.key)}</b></span></td>
                 <td>{t("cat." + p.group)}</td>
                 <td>{t(techKind(tech))}</td>
-                <td style={{ color: "var(--ui-muted)" }}>{ins.join(" + ") || "—"} → {outs.join(" + ") || "—"}</td>
-                <td className="num">{p.tech.efficiency ?? (p.tech.cf_constant != null ? `cf ${p.tech.cf_constant}` : "—")}</td>
+                <td style={{ color: "var(--ui-muted)" }}>{ins.map(cl).join(" + ") || "—"} → {outs.map(cl).join(" + ") || "—"}</td>
+                <td className="num">{p.tech.efficiency != null ? fmtN(p.tech.efficiency, lang) : (p.tech.cf_constant != null ? `${lang === "en" ? "CF" : "FP"} ${fmtN(p.tech.cf_constant, lang)}` : "—")}</td>
                 <td className="num">{num(p.tech.capex_per_kw, 0)}</td>
                 <td className="num">{num(p.tech.fixed_opex, 0)}</td>
                 <td className="num">{num(p.tech.variable_opex, 1)}</td>

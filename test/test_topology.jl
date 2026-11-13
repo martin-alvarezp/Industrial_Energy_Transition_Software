@@ -351,6 +351,9 @@ end
     # línea eléctrica más chica que la demanda de la planta: infactible
     small = 0.5 * 0.3 * maximum(tot)
     @test !run_scenario(mk(small), cfg3; verbose = false, shadow_prices = false).feasible
+    # y el diagnóstico nombra el lugar: la parte de la planta con su línea chica
+    f = IETO.diagnose_infeasibility(mk(small), cfg3)
+    @test any(x -> x.category == :capacity && occursin("«nodo_planta»", x.message) && occursin("línea desde", x.message), f)
     # sin partes (toda la electricidad en la casa), la misma línea chica no molesta
     @test run_scenario(mk(small; parts = false), cfg3; verbose = false, shadow_prices = false).feasible
     # validación: nodo inexistente o vector sin demanda

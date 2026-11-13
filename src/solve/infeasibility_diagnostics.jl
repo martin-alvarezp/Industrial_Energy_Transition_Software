@@ -192,6 +192,74 @@ function diagnose_infeasibility(site::Site, cfg::ScenarioConfig)
         end
     end
 
+    # ── 1b · capacidad por nodo (gemelo con líneas) ──
+    # una demanda que se consume en un nodo propio solo recibe lo que llega por
+    # sus líneas y lo que producen los equipos de ese lugar: la cota del sitio
+    # entero no lo ve (una línea de 0,1 MW a una demanda de 1 MW). Optimista:
+    # equipos del nodo + mercados conectados ahí + capacidad × η de las líneas
+    # que traen el vector. Un aviso: el primero que falta.
+    if !isempty(site.arcs) && !any(f -> f.category == :capacity, findings)
+        shares = demand_shares(site)
+        links = arc_links(site)
+        node_of_t(t) = get(site.node_of, t, DEFAULT_NODE)
+        part_name = Dict(p.id => p.name for p in site.demand_parts)
+        function nname(n)
+            haskey(part_name, n) && return part_name[n]
+            s = String(n)
+            startswith(s, "dem_") && haskey(site.carriers, Symbol(s[5:end])) && return cname(Symbol(s[5:end]))
+            haskey(site.nodes, n) && return site.nodes[n].name
+            return tname(n)
+        end
+        done = false
+        for c in sets.demand_carriers
+            done && break
+            for (n, sh) in get(shares, c, Dict{Symbol,Vector{Float64}}())
+                (done || n == DEFAULT_NODE) && continue
+                for k in 1:N
+                    r = ry[k]
+                    dem = demand_at(c, k)
+                    peak = maximum(dem[s] * sh[s] for s in eachindex(dem); init = 0.0)
+                    peak > 1e-6 || continue
+                    sup = 0.0
+                    who = String[]
+                    for id in sets.converters, p in site.converters[id].outputs
+                        (p.carrier == c && node_of_t(id) == n) || continue
+                        mw = cap_at(id, r) * p.ratio
+                        mw > 1e-9 && (sup += mw; push!(who, "$(tname(id)) $(_r1(mw))"))
+                    end
+                    for id in sets.generators
+                        (site.generators[id].output_carrier == c && node_of_t(id) == n) || continue
+                        mw = cap_at(id, r); mw > 1e-9 && (sup += mw; push!(who, "$(tname(id)) $(_r1(mw))"))
+                    end
+                    for id in sets.storages
+                        (site.storages[id].carrier == c && node_of_t(id) == n) || continue
+                        mw = cap_at(id, r); mw > 1e-9 && (sup += mw; push!(who, "$(tname(id)) $(_r1(mw))"))
+                    end
+                    for (_, mk) in EMK
+                        (mk.direction == :buy && mk.carrier == c) || continue
+                        (mk.connection == Symbol("") ? DEFAULT_NODE : node_of_t(mk.connection)) == n || continue
+                        sup += mk.max_power; push!(who, "compra $(mk.name)")
+                    end
+                    for (_, lc, lf, lt, cap, eff) in links
+                        (lt == n && lc == c) || continue
+                        sup += cap * eff
+                        push!(who, "línea desde $(nname(lf))" * (isfinite(cap) ? " $(_r1(cap * eff))" : ""))
+                    end
+                    if peak > sup + 1e-6
+                        push!(findings, InfeasibilityFinding(:capacity,
+                            "falta capacidad de $(cname(c)) en «$(nname(n))» en $(calendar_year(cfg, r)): la punta " *
+                            "que se consume ahí es $(_r1(peak)) MW y lo máximo que puede llegar o producirse en ese " *
+                            "lugar es $(_r1(sup)) MW" *
+                            (isempty(who) ? " (nada: ninguna línea trae ese vector)" : " ($(join(who, ", ")))") *
+                            " — agranda la línea, conecta otra o pon equipos en ese lugar"))
+                        done = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+
     # ── 2 · piso de emisiones vs trayectoria del cap ──
     # térmicos = calor + frío: un chiller eléctrico (elec → cooling, COP) entra
     # a la cota igual que una bomba de calor — sigue siendo un piso válido
