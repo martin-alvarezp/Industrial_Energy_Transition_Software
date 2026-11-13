@@ -55,7 +55,7 @@ export function demandsAt(siteJson, c, n) {
   return parts.filter((p) => p.node === n).map((p) => ({ name: p.name, series: siteJson.demand_part_series?.[p.part_id] ?? [] }));
 }
 
-export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
+export function buildFlows(siteJson, dispatchRows, year, mode = "component", { byBus = true } = {}) {
   const w = siteJson.timesteps.map((t) => t.weight_hours);
   const rows = dispatchRows.filter((r) => r.year === year);
   const annual = {};
@@ -110,7 +110,8 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
     };
     return Object.keys(g).some(walk);
   })();
-  const topo = arcs.length > 0 && arcRows && !reversed && !cyclic;
+  // byBus = false: la vista agregada aunque haya líneas (más legible para presentar)
+  const topo = byBus && arcs.length > 0 && arcRows && !reversed && !cyclic;
   const nodeOf = (id) => (topo ? (techById[id]?.node ?? "main") : "main");
   const busName = Object.fromEntries(
     (siteJson.nodes ?? []).map((n) => [n.node_id, n.name || n.node_id]));
@@ -247,6 +248,15 @@ export function buildFlows(siteJson, dispatchRows, year, mode = "component") {
       if (idx == null) continue;
       const v = (inflow[idx] ?? 0) - (outflow[idx] ?? 0);
       const names = topo ? demandsAt(siteJson, cid, dn).map((d) => d.name).filter(Boolean) : [];
+      // vista agregada con demandas por nodo: una salida por parte, en proporción
+      // a la energía de su serie (el motor reparte la demanda del vector igual)
+      const parts = !topo ? (siteJson.demand_parts ?? []).filter((q) => q.carrier === cid) : [];
+      if (parts.length > 1 && v > MIN_MWH) {
+        const en = parts.map((q) => (siteJson.demand_part_series?.[q.part_id] ?? []).reduce((acc, x, i) => acc + x * (w[i] ?? 0), 0));
+        const tot = en.reduce((x, y) => x + y, 0);
+        parts.forEach((q, j) => link(idx, nodeId(`d:${cid}:${q.part_id}`, q.name, "#9aa39f"), tot > 0 ? v * en[j] / tot : v / parts.length));
+        continue;
+      }
       if (v > MIN_MWH)
         link(idx, nodeId(names.length ? `d:${cid}:${dn}` : `d:${cid}`,
                          names.length ? names.join(" + ") : `Demanda ${carrierLabel(carriers[cid])}`, "#9aa39f"), v);

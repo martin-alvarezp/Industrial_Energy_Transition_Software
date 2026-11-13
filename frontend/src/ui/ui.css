@@ -798,3 +798,6 @@ body { background: var(--ui-bg); font-family: var(--ui-font); color: var(--ui-te
 .cr-table .cr-unit { margin-left: 8px; font-weight: 400; color: var(--ui-muted); font-size: 12px; }
 .cr-table tr.cr-hl td:not(:first-child) { background: rgba(120, 140, 220, 0.08); }
 @media (max-width: 900px) { .cr-top { grid-template-columns: 1fr; } }
+
+/* Flujo energético: casilla «Por lugar» (detalle por barra del gemelo) */
+.sum-flow-bus { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ui-text-2); cursor: pointer; }

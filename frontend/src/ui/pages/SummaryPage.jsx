@@ -177,6 +177,7 @@ export default function SummaryPage() {
   const [flowMode, setFlowMode] = useState("technology");
   const [flowYear, setFlowYear] = useState(1);
   const [flowLoc, setFlowLoc] = useState("");
+  const [flowBus, setFlowBus] = useState(false);   // detalle por lugar (barras del gemelo)
   const accounting = readJSON("ieto.accounting", { inflation: 0.02 });
   const result = data?.result;
   const siteJson = data?.site_snapshot ?? appliedSiteJson ?? twin?.siteJson;
@@ -221,9 +222,9 @@ export default function SummaryPage() {
       const keep = new Set(sj.technologies.filter((x) => locationOf(twin.layout, x.tech_id) === flowLoc).map((x) => x.tech_id));
       sj = { ...sj, technologies: sj.technologies.filter((x) => keep.has(x.tech_id) || x.type === "source") };
     }
-    try { return buildFlows(sj, result.dispatch, flowYear, flowMode === "technology" ? "technology" : "component"); }
+    try { return buildFlows(sj, result.dispatch, flowYear, flowMode === "technology" ? "technology" : "component", { byBus: flowBus }); }
     catch { return null; }
-  }, [result, siteJson, flowYear, flowMode, flowLoc, twin]);
+  }, [result, siteJson, flowYear, flowMode, flowLoc, twin, flowBus]);
 
   const runOptions = [
     ...(data && !runs.some((r) => r.id === viewing?.id) ? [{ id: "__current", name: `${viewing?.name ?? ""} ${t("sum.current")}` }] : []),
@@ -424,6 +425,12 @@ export default function SummaryPage() {
                             <option value="">{t("sum.global")}</option>
                             {(twin?.layout?.locations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                           </select>
+                          {(siteJson?.arcs ?? []).length > 0 && (
+                            <label className="sum-flow-bus" data-testid="flow-by-bus">
+                              <input type="checkbox" checked={flowBus} onChange={(e) => setFlowBus(e.target.checked)} />
+                              {t("sum.flowByBus")}
+                            </label>
+                          )}
                         </div>}>
             {flowData?.links?.length ? <SankeyFlow data={flowData} /> : <p className="ui-hint">{t("sum.noFlows")}</p>}
           </ChartPanel>

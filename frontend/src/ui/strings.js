@@ -677,6 +677,7 @@ extend({
   "sum.reductionLbl": ["Reducción", "Reduction"],
   "sum.increase": ["Aumento", "Increase"],
   "sum.energyFlow": ["Flujo energético", "Energy flow"],
+  "sum.flowByBus": ["Por lugar", "By location"],
   "sum.component": ["Componente", "Component"],
   "sum.technology": ["Tecnología", "Technology"],
   "sum.global": ["Global", "Global"],
