@@ -31,9 +31,11 @@ export function ViewToggle({ view, setView }) {
 
 export const countLabel = (t, n) => (n === 1 ? t("cc.count1") : t("cc.count", { n }));
 
-function flowsOf(tech) {
-  const ins = tech.ports?.inputs?.map((p) => p.carrier) ?? (tech.input_carrier ? [tech.input_carrier] : []);
-  const outs = tech.ports?.outputs?.map((p) => p.carrier) ?? (tech.output_carrier ? [tech.output_carrier] : []);
+function flowsOf(tech, carriers = []) {
+  // nombres de los vectores (no los ids internos)
+  const nm = (c) => carriers.find((x) => x.carrier_id === c)?.name ?? c;
+  const ins = (tech.ports?.inputs?.map((p) => p.carrier) ?? (tech.input_carrier ? [tech.input_carrier] : [])).map(nm);
+  const outs = (tech.ports?.outputs?.map((p) => p.carrier) ?? (tech.output_carrier ? [tech.output_carrier] : [])).map(nm);
   return `${ins.join(" + ") || "—"} → ${outs.join(" + ") || "—"}`;
 }
 
@@ -73,6 +75,8 @@ export default function ComponentCollection({
   techs, layout, view = "grid", builtYears = {}, onOpen, onLocate, onDelete, onMoveNode, columns,
 }) {
   const { t } = useI18n();
+  const { twin } = useStudio();
+  const twinCarriers = twin?.siteJson?.carriers ?? [];
   const [closed, setClosed] = useState({});
   if (!techs.length) return <p className="ui-hint" style={{ padding: "12px 0" }}>{t("cc.empty")}</p>;
   const groups = GROUP_ORDER.map((g) => [g, techs.filter((x) => x.type === g)]).filter(([, l]) => l.length);
@@ -98,7 +102,7 @@ export default function ComponentCollection({
                   <td>{t(techKind(x))}</td>
                   <td>{layout ? [layout.nodes?.find((n) => n.id === nodeOf(layout, x.tech_id))?.name,
                                  locName(locationOf(layout, x.tech_id))].filter(Boolean).join(" · ") : "—"}</td>
-                  <td style={{ color: "var(--ui-muted)" }}>{flowsOf(x)}</td>
+                  <td style={{ color: "var(--ui-muted)" }}>{flowsOf(x, twinCarriers)}</td>
                   <td className="num">{num(x.existing_capacity, 1)}</td>
                   <td className="num">{num(x.max_new_capacity, 1)}</td>
                   <td className="num">{num(x.efficiency, 2)}</td>

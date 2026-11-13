@@ -299,8 +299,12 @@ step("corrida con años hito resuelta por el motor real: solo esos años",
 step("el VAN es la suma descontada de los hitos",
      Math.abs(cbh.reduce((a, c) => a + c.npv, 0) - ph.result.kpis.npv) <= 1e-6 * Math.abs(ph.result.kpis.npv));
 await p.goto(`${URL}/?r=${Date.now()}#/sys/${SITE}/rcomponents`, { waitUntil: "networkidle2" });
-await p.waitForSelector(".pg-toolbar select", { timeout: 30000 }).catch(() => null);
-const opts = await p.evaluate(() => [...(document.querySelector(".pg-toolbar select")?.options ?? [])].map((o) => o.textContent));
+// desde el rediseño del menú (10-nov) los años se ofrecen al elegir un componente:
+// fichas de año sobre su tabla
+await p.waitForSelector(".ui-table tbody tr", { timeout: 30000 }).catch(() => null);
+await p.evaluate(() => document.querySelector(".ui-table tbody tr")?.click());
+await p.waitForSelector(".cr-ychip", { timeout: 30000 }).catch(() => null);
+const opts = await p.evaluate(() => [...document.querySelectorAll(".cr-ychip")].map((o) => o.textContent.trim()));
 const expOpts = ms.map((y) => String(y));
 step("Resultados → Componentes ofrece solo los hitos", JSON.stringify(opts) === JSON.stringify(expOpts),
      `${JSON.stringify(opts)} (esperado ${JSON.stringify(expOpts)})`);

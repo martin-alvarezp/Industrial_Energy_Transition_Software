@@ -100,6 +100,7 @@ export function MeasuresTimeline({ rows, years, t, factor = () => 1, scale = 1, 
                 const I = here.length ? componentIcon(here[0].t ?? {}) : null;
                 return (
                   <div key={n + ":" + y} className={"mt-c" + (on ? " on" : "")} data-testid={here.length ? "measure-dot" : undefined}
+                       title={here.length ? `${n} · ${y} · ${here.map(capOf).join(" + ")}` : undefined}
                        onMouseEnter={(e) => show(n, e.currentTarget)}>
                     {I && <span className={"mt-i" + (here[0].measure ? " eco" : "")}><I size={18} /></span>}
                   </div>
