@@ -51,6 +51,8 @@ export async function readProjectFile(file) {
     const { readInputsBook } = await import("./inputsbook.js");
     return readInputsBook(file);
   }
+  // un .xlsx que no es ZIP está dañado (no es «JSON inválido»)
+  if (/\.xlsx?$/i.test(file.name ?? "")) throw new Error("el archivo no es un libro Excel válido (¿está dañado o es de otro formato?)");
   return readProject(file);
 }
 
