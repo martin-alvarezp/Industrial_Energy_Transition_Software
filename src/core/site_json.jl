@@ -258,7 +258,10 @@ function site_json(site::Site)
     # demandas finales por nodo: la ficha de cada una y su serie por paso (un
     # grupo de series aparte, para que las plantillas la re-expresen igual)
     if !isempty(site.demand_parts)
-        parts = sort([(part_id = String(p.id), name = p.name, carrier = String(p.carrier), node = String(p.node))
+        # `home` solo si difiere del nodo (la huella de los sitios sin él no cambia)
+        parts = sort([p.home == p.node ?
+                      (part_id = String(p.id), name = p.name, carrier = String(p.carrier), node = String(p.node)) :
+                      (part_id = String(p.id), name = p.name, carrier = String(p.carrier), node = String(p.node), home = String(p.home))
                       for p in site.demand_parts]; by = x -> x.part_id)
         result = merge(result, (demand_parts = parts,
                                 demand_part_series = _sorted_series(Dict(p.id => p.values for p in site.demand_parts))))
@@ -279,9 +282,12 @@ function _demand_parts_from_json(meta, series, ctx = "demand_parts")
         id = Symbol(_twin_req(p, :part_id, ctx))
         vals = series === nothing ? nothing : _twin_get(series, id)
         vals === nothing && throw(SchemaError("$ctx[$id]: falta su serie en demand_part_series"))
+        node = Symbol(_twin_req(p, :node, "$ctx[$id]"))
+        home = _twin_get(p, :home)
         push!(parts, DemandPart(id, String(something(_twin_get(p, :name), String(id))),
-                                Symbol(_twin_req(p, :carrier, "$ctx[$id]")), Symbol(_twin_req(p, :node, "$ctx[$id]")),
-                                _series_vec(vals, "demand_part_series[$id]")))
+                                Symbol(_twin_req(p, :carrier, "$ctx[$id]")), node,
+                                _series_vec(vals, "demand_part_series[$id]"),
+                                home === nothing || home == "" ? node : Symbol(home)))
     end
     return parts
 end

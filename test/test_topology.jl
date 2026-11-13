@@ -331,6 +331,19 @@ end
     s_disk = load_site(dir)
     @test Set(p.id for p in s_disk.demand_parts) == Set([:elec_casa, :elec_planta])
     @test only(p for p in s_disk.demand_parts if p.id == :elec_planta).node == :nodo_planta
+    # el nodo elegido en el gemelo (`home`) sobrevive a JSON y disco aunque hoy se consuma en otro
+    sj_h = JSON3.read(JSON3.write(site_json(s)), Dict{String,Any})
+    for p in sj_h["demand_parts"]
+        p["part_id"] == "elec_planta" && (p["node"] = "main"; p["home"] = "nodo_planta")
+    end
+    s_h = site_from_json(JSON3.read(JSON3.write(sj_h)))
+    ph = only(p for p in s_h.demand_parts if p.id == :elec_planta)
+    @test ph.node == :main && ph.home == :nodo_planta
+    @test only(p for p in site_from_json(JSON3.read(JSON3.write(site_json(s_h)))).demand_parts if p.id == :elec_planta).home == :nodo_planta
+    dir_h = mktempdir(); save_site(dir_h, s_h)
+    @test only(p for p in load_site(dir_h).demand_parts if p.id == :elec_planta).home == :nodo_planta
+    # sin `home` distinto, la ficha no gana la clave (huella estable)
+    @test !any(haskey(p, :home) for p in site_json(s).demand_parts)
     # línea holgada: el mismo VAN que la placa de cobre
     r = run_scenario(s, cfg3; verbose = false, shadow_prices = false)
     @test r.feasible

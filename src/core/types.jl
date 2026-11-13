@@ -1260,7 +1260,13 @@ struct DemandPart
     carrier::Symbol
     node::Symbol
     values::Vector{Float64}       # MW por paso (misma plantilla que las demandas)
+    home::Symbol                  # nodo elegido en el gemelo (vuelve ahí si su nodo se reconecta);
+                                  # el motor usa `node`
 end
+
+# retro-compatibilidad: 5 campos → el nodo elegido es el nodo donde se consume
+DemandPart(id::Symbol, name::AbstractString, carrier::Symbol, node::Symbol, values::Vector{Float64}) =
+    DemandPart(id, String(name), carrier, node, values, node)
 
 """
 Puerto de un arco (roadmap M14): un vector que transita por el arco, con su
