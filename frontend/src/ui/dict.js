@@ -9,6 +9,7 @@ const E = {
   "nav.technologies": ["Tecnologías", "Technologies"],
   "nav.accounting": ["Contabilidad", "Accounting"],
   "nav.changelog": ["Registro de cambios", "Change Log"],
+  "nav.help": ["Ayuda", "Help"],
   "nav.digitalTwin": ["Gemelo digital", "Digital twin"],
   "nav.infrastructure": ["Infraestructura", "Infrastructure"],
   "nav.components": ["Componentes", "Components"],

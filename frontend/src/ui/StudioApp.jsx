@@ -44,6 +44,7 @@ const LIBRARY_PAGES = {
   technologies: library("LibTechnologiesPage"),
   accounting: library("AccountingPage"),
   changelog: ChangeLogPage,
+  help: lazy(() => import("./pages/HelpPage.jsx")),   // WP-9: guía, glosario y validación
 };
 
 // páginas a pantalla completa (el mapa ocupa todo el panel, sin padding)

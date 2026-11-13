@@ -182,10 +182,18 @@ export function TopBar({ route, onMenu }) {
                   { header: t("top.exportBack") },
                 ]} />
         )}
-        <button className="ui-icon-btn" title={t("top.help")} aria-label={t("top.help")}
-                onClick={() => setHelp(true)}>
-          <IcHelpOutline size={24} />
-        </button>
+        <Menu label={t("top.help")}
+              trigger={({ toggle }) => (
+                <button className="ui-icon-btn" title={t("top.help")} aria-label={t("top.help")} onClick={toggle} data-testid="top-help">
+                  <IcHelpOutline size={24} />
+                </button>)}
+              items={[
+                { label: t("help.guide"), onClick: () => navigate(hrefFor({ scope: "library", page: "help", query: { tab: "guide" } })) },
+                { label: t("help.glossary"), onClick: () => navigate(hrefFor({ scope: "library", page: "help", query: { tab: "glossary" } })) },
+                { label: t("help.quality"), onClick: () => navigate(hrefFor({ scope: "library", page: "help", query: { tab: "quality" } })) },
+                "-",
+                { label: t("help.model"), onClick: () => setHelp(true) },
+              ]} />
         <UserMenu />
       </div>
       {cmd && <CommandPalette onClose={() => setCmd(false)} />}

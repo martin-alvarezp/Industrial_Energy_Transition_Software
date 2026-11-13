@@ -11,6 +11,7 @@ export const LIBRARY_NAV = [
   { page: "technologies", key: "nav.technologies", scope: "library" },
   { page: "accounting", key: "nav.accounting", scope: "library" },
   { page: "changelog", key: "nav.changelog", scope: "library" },
+  { page: "help", key: "nav.help", scope: "library" },
 ];
 
 /** Vistas de un sistema, agrupadas en secciones plegables. */
