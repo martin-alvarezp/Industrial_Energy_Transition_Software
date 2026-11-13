@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   IcSearch, IcLink, IcHelpOutline, IcChevronLeft, IcChevronRight,
-  IcExpandLess, IcExpandMore, IcCheck, IcMenu,
+  IcExpandLess, IcExpandMore, IcCheck, IcMenu, IcFileDownload, IcTableChart,
 } from "./iconset.jsx";
 import { useI18n } from "./i18n.jsx";
 import { useStudio } from "./studio.jsx";
@@ -118,7 +118,7 @@ function CommandPalette({ onClose }) {
 
 export function TopBar({ route, onMenu }) {
   const { t, lang } = useI18n();
-  const { siteName, twin } = useStudio();
+  const { siteName, twin, sites, exportProject, exportInputs } = useStudio();
   const [cmd, setCmd] = useState(false);
   const [help, setHelp] = useState(false);
   const [flash, setFlash] = useFlash();
@@ -162,6 +162,26 @@ export function TopBar({ route, onMenu }) {
                 }}>
           <IcLink size={24} style={{ transform: "rotate(-45deg)" }} />
         </button>
+        {/* exportar el sistema abierto: proyecto completo (.ieto) o libro de entradas (Excel) — versiones */}
+        {route.scope === "system" && siteName && (sites ?? []).includes(siteName) && (
+          <Menu label={t("top.export")}
+                trigger={({ toggle }) => (
+                  <button className="ui-btn outline sm ui-top-export" onClick={toggle} data-testid="top-export"
+                          title={t("top.exportHint")}>
+                    <IcFileDownload size={18} /> <span className="ui-hide-sm">{t("top.export")}</span>
+                  </button>)}
+                items={[
+                  { label: t("systems.export"), icon: IcFileDownload, onClick: async () => {
+                      setFlash(t("systems.exporting"));
+                      try { const r = await exportProject(siteName); setFlash(t("systems.exported", { f: r.file, n: r.runs })); }
+                      catch (e) { setFlash(e.message); } } },
+                  { label: t("systems.exportInputs"), icon: IcTableChart, onClick: async () => {
+                      try { const r = await exportInputs(siteName); setFlash(t("systems.inputsExported", { f: r.file })); }
+                      catch (e) { setFlash(e.message); } } },
+                  "-",
+                  { header: t("top.exportBack") },
+                ]} />
+        )}
         <button className="ui-icon-btn" title={t("top.help")} aria-label={t("top.help")}
                 onClick={() => setHelp(true)}>
           <IcHelpOutline size={24} />

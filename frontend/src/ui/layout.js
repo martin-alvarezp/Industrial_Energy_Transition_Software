@@ -4,10 +4,10 @@
 // imagen de portada y una descripción. Todo es presentación: el optimizador
 // sigue viendo sólo site_json. El backend guarda el GeoJSON tal cual, así que
 // las extensiones viajan sin tocar la API.
-import { layoutToGeoJSON, geoJSONToLayout } from "../lib/twin.js";
+import { layoutToGeoJSON, geoJSONToLayout, demandEndpoints, demandNodeOf } from "../lib/twin.js";
 
 export const EMPTY_LAYOUT = {
-  address: null, center: null, boundary: null, equipment: {}, arcs: {},
+  address: null, center: null, boundary: null, equipment: {}, arcs: {}, demands: {},
   locations: [], equipmentLocation: {}, nodes: [], techNode: {}, cover: null, description: "", title: "", meta: {}, scenarios: [], params: [], techScenario: {}, siteConfig: {},
 };
 
@@ -24,6 +24,12 @@ export function toGeoJSON(l) {
     g.features.push({ type: "Feature",
                       properties: { role: "node", node_id: n.id, name: n.name, description: n.description ?? "" },
                       geometry: { type: "Point", coordinates: [n.pos[1], n.pos[0]] } });
+  }
+  // DEMANDAS finales en el mapa: punto por demanda (vector entero o parte)
+  for (const [id, pos] of Object.entries(l.demands ?? {})) {
+    if (!pos) continue;
+    g.features.push({ type: "Feature", properties: { role: "demand", demand_id: id },
+                      geometry: { type: "Point", coordinates: [pos[1], pos[0]] } });
   }
   for (const loc of l.locations ?? []) {
     const props = { role: "location", location_id: loc.id, name: loc.name,
@@ -51,7 +57,7 @@ export function toGeoJSON(l) {
 
 export function fromGeoJSON(g) {
   const base = g ? geoJSONToLayout(g) : { ...EMPTY_LAYOUT };
-  const out = { ...EMPTY_LAYOUT, ...base, locations: [], equipmentLocation: {}, nodes: [] };
+  const out = { ...EMPTY_LAYOUT, ...base, locations: [], equipmentLocation: {}, nodes: [], demands: {} };
   for (const f of g?.features ?? []) {
     const p = f.properties ?? {};
     if (p.role === "location") {
@@ -65,6 +71,9 @@ export function fromGeoJSON(g) {
     } else if (p.role === "node" && f.geometry?.type === "Point") {
       const [ln, la] = f.geometry.coordinates;
       out.nodes.push({ id: p.node_id, name: p.name ?? p.node_id, description: p.description ?? "", pos: [la, ln] });
+    } else if (p.role === "demand" && f.geometry?.type === "Point") {
+      const [ln, la] = f.geometry.coordinates;
+      out.demands[p.demand_id] = [la, ln];
     } else if (p.role === "equipment" && p.location_id) {
       out.equipmentLocation[p.tech_id] = p.location_id;
     }
@@ -142,6 +151,44 @@ export function endpointPositions(layout) {
     if (p) out[id] = p;
   }
   for (const n of layout.nodes ?? []) if (n.pos) out[n.id] = n.pos;
+  for (const [id, pos] of Object.entries(layout.demands ?? {})) if (pos) out[id] = pos;
+  return out;
+}
+
+/**
+ * Posición de cada demanda final en el mapa: la guardada; si no tiene, junto
+ * al nodo o equipo donde se consume; si se consume en la barra común, en una
+ * columna a la derecha del sistema (así siempre se ven). { id: [lat, lng] }.
+ */
+export function demandPositions(siteJson, layout) {
+  const dems = demandEndpoints(siteJson);
+  if (!dems.length) return {};
+  const ends = endpointPositions(layout);
+  const pts = [...(layout.boundary ?? []), ...Object.values(ends)];
+  for (const l of layout.locations ?? []) pts.push(...(l.polygon ?? []));
+  if (!pts.length && layout.center) pts.push(layout.center);
+  if (!pts.length) return {};
+  const las = pts.map((p) => p[0]), lns = pts.map((p) => p[1]);
+  const [la0, la1, ln0, ln1] = [Math.min(...las), Math.max(...las), Math.min(...lns), Math.max(...lns)];
+  const h = Math.max(la1 - la0, 0.0008), w = Math.max(ln1 - ln0, 0.0008);
+  const out = {};
+  const free = [];
+  const byHome = {};
+  for (const d of dems) {
+    if (layout.demands?.[d.id]) { out[d.id] = layout.demands[d.id]; continue; }
+    const home = demandNodeOf(siteJson, d);
+    if (home !== "main" && home !== d.id && ends[home]) (byHome[home] ??= []).push(d.id);
+    else free.push(d.id);
+  }
+  // junto a su nodo: una columna a la derecha, centrada en el nodo
+  const STEP = 0.00055;
+  for (const [home, ids] of Object.entries(byHome)) {
+    const [la, ln] = ends[home];
+    ids.forEach((id, i) => { out[id] = [la + STEP * ((ids.length - 1) / 2 - i), ln + 0.0011]; });
+  }
+  // en la barra común: una columna a la derecha del sistema
+  const step = Math.max(Math.min(h / (free.length + 1), STEP), 0.00035);
+  free.forEach((id, i) => { out[id] = [la1 - step * (i + 1), ln1 + w * 0.12]; });
   return out;
 }
 

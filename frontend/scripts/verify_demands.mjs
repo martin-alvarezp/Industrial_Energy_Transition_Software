@@ -25,6 +25,11 @@ const clickText = (sel, label) => p.evaluate((sel, label) => { const el = [...do
 const NODE = "Central de frío y aire comprimido";
 
 await p.goto(APP_URL + "/", { waitUntil: "networkidle2", timeout: 60000 });
+// solo sin API: con API, editar el ejemplo escribiría en data/sample_sites
+if (await p.evaluate(async (u) => { try { return (await fetch(`${u}/sites`)).headers.get("content-type")?.includes("json"); } catch { return false; } }, APP_URL)) {
+  console.error("verify:demands corre SIN API (vite preview): con API modificaría los ejemplos en disco.");
+  await b.close(); process.exit(2);
+}
 await p.evaluate(async () => {
   localStorage.clear(); localStorage.setItem("ieto.lang", "es");
   localStorage.setItem("ieto.infra.panel.collapsed", "false"); localStorage.setItem("ieto.infra.view", JSON.stringify("map"));

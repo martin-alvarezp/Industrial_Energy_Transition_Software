@@ -875,11 +875,52 @@ export const arcCarrierOptions = (siteJson) =>
   siteJson.carriers.filter((c) => ARC_CARRIER_CATS.includes(c.category));
 
 export const arcEndpointLabel = (siteJson, id, nodes = []) =>
-  techById(siteJson, id)?.name ?? nodes.find((n) => n.id === id)?.name ?? id;
+  techById(siteJson, id)?.name ?? nodes.find((n) => n.id === id)?.name ??
+  demandEndpoints(siteJson).find((d) => d.id === id)?.name ?? id;
+
+// ── demandas finales en el mapa ────────────────────────────────────────────
+// Cada demanda final es un EXTREMO del gemelo, como un equipo: la del vector
+// entero tiene id `dem_<vector>`; si el vector está repartido, cada parte usa
+// su propio id. Conectada por líneas, la demanda se consume en su propia barra
+// y solo recibe lo que llega por esas líneas; sin líneas, en la barra común.
+export const DEMAND_PREFIX = "dem_";
+export const demandEndpointId = (c) => DEMAND_PREFIX + c;
+
+/** Demandas finales del sitio como extremos del mapa: [{id, carrier, name, part}]. */
+export function demandEndpoints(siteJson) {
+  const out = [];
+  const cname = (c) => siteJson.carriers?.find((x) => x.carrier_id === c)?.name ?? c;
+  for (const c of Object.keys(siteJson.demands ?? {})) {
+    const parts = (siteJson.demand_parts ?? []).filter((p) => p.carrier === c);
+    if (parts.length) for (const p of parts) out.push({ id: p.part_id, carrier: c, name: p.name, part: true });
+    else if ((siteJson.demands[c] ?? []).some((v) => v > 0))
+      out.push({ id: demandEndpointId(c), carrier: c, name: cname(c), part: false });
+  }
+  return out;
+}
+
+/** Barra donde se consume una demanda del mapa: su propio id (conectada por
+ *  líneas), un nodo o equipo del gemelo, o "main" (la barra común). */
+export function demandNodeOf(siteJson, d) {
+  if (d.part) return (siteJson.demand_parts ?? []).find((p) => p.part_id === d.id)?.node ?? "main";
+  return siteJson.demand_nodes?.[d.carrier] ?? "main";
+}
+
+/** Serie (MW por paso) de una demanda del mapa. */
+export const demandSeriesOf = (siteJson, d) =>
+  d.part ? siteJson.demand_part_series?.[d.id] ?? [] : siteJson.demands?.[d.carrier] ?? [];
+
+/** Renombra un extremo en las líneas (from/to). */
+export const renameEndpoint = (siteJson, from, to) => ({
+  ...siteJson,
+  arcs: (siteJson.arcs ?? []).map((a) => (a.from === from || a.to === from
+    ? { ...a, from: a.from === from ? to : a.from, to: a.to === from ? to : a.to } : a)),
+});
 
 /** Arco nuevo entre dos equipos, listo para el drawer. */
 export function blankArc(from, to, siteJson) {
-  const c = arcCarrierOptions(siteJson)[0]?.carrier_id ?? "electricity";
+  const dem = demandEndpoints(siteJson).find((d) => d.id === to || d.id === from);
+  const c = dem?.carrier ?? arcCarrierOptions(siteJson)[0]?.carrier_id ?? "electricity";
   return {
     arc_id: "", name: "", from, to, directed: true,
     ports: [{ carrier: c, capacity: null, efficiency: 1 }],
@@ -912,13 +953,19 @@ export function applyTopology(siteJson, techNode = null) {
   // por alguna línea; si no, en la barra común — igual que los equipos
   if (siteJson.demand_parts?.length)
     out.demand_parts = siteJson.demand_parts.map((p) => {
-      const node = endpoints.has(p.home ?? p.node) ? (p.home ?? p.node) : "main";
+      // conectada por líneas a su propio marcador del mapa: su propia barra
+      const node = endpoints.has(p.part_id) ? p.part_id
+        : endpoints.has(p.home ?? p.node) ? (p.home ?? p.node) : "main";
       return p.node === node && p.home ? p : { ...p, home: p.home ?? p.node, node };
     });
   if (arcs.length === 0) { delete out.arcs; delete out.demand_nodes; }
   else {
     out.arcs = arcs;
     const dn = Object.fromEntries(Object.entries(siteJson.demand_nodes ?? {}).filter(([, n]) => endpoints.has(n)));
+    // la demanda del vector entero conectada por líneas a su marcador: su propia barra
+    for (const c of Object.keys(siteJson.demands ?? {}))
+      if (endpoints.has(demandEndpointId(c)) && !(siteJson.demand_parts ?? []).some((p) => p.carrier === c))
+        dn[c] = demandEndpointId(c);
     if (Object.keys(dn).length) out.demand_nodes = dn; else delete out.demand_nodes;
   }
   return out;
@@ -1016,6 +1063,65 @@ export function removeDemandPart(siteJson, id) {
   return applyTopology(out);
 }
 
+/**
+ * Divide una demanda del mapa: una parte nueva `name` con la fracción `frac`
+ * de la demanda del vector, con su propio marcador. Si el vector estaba
+ * entero, su marcador pasa a ser el «resto» (con sus líneas). Devuelve
+ * { siteJson, newId, renamed: [viejo, nuevo] | null } para mover el layout.
+ */
+export function splitDemandOnMap(siteJson, endpointId, name, frac) {
+  const d = demandEndpoints(siteJson).find((x) => x.id === endpointId);
+  if (!d) return { siteJson, newId: null, renamed: null };
+  // dónde se consume hoy: la parte nueva se consume ahí mismo hasta que le
+  // conectes líneas propias (así el sistema sigue siendo factible)
+  const bus = demandNodeOf(siteJson, d);
+  const own = bus === d.id;
+  const before = new Set((siteJson.demand_parts ?? []).map((p) => p.part_id));
+  let sj = { ...siteJson };
+  if (!d.part && own) {   // el vector entero tenía barra propia: la toma el resto
+    const dn = { ...(sj.demand_nodes ?? {}) };
+    delete dn[d.carrier];
+    sj.demand_nodes = Object.keys(dn).length ? dn : undefined;
+  }
+  sj = addDemandPart(sj, d.carrier, own ? "main" : bus, name, frac);
+  const added = (sj.demand_parts ?? []).filter((p) => !before.has(p.part_id));
+  const newPart = added[added.length - 1];
+  let renamed = null, newHome = own ? d.id : bus;
+  const setHome = (id, home) => { sj = { ...sj, demand_parts: sj.demand_parts.map((p) => (p.part_id === id ? { ...p, home } : p)) }; };
+  if (!d.part && added.length === 2) {
+    const rest = added[0];
+    renamed = [d.id, rest.part_id];   // el marcador del vector pasa a ser el del resto
+    if (own) { sj = renameEndpoint(sj, d.id, rest.part_id); setHome(rest.part_id, rest.part_id); newHome = rest.part_id; }
+  }
+  setHome(newPart.part_id, newHome);
+  return { siteJson: applyTopology(sj), newId: newPart.part_id, renamed };
+}
+
+/**
+ * Quita una parte del mapa: su serie pasa a otra parte del vector; si queda
+ * una sola, el vector vuelve a estar entero y ese marcador pasa a ser el del
+ * vector (con sus líneas). Devuelve { siteJson, renamed: [viejo, nuevo] | null }.
+ */
+export function removeDemandOnMap(siteJson, partId) {
+  const p = (siteJson.demand_parts ?? []).find((x) => x.part_id === partId);
+  if (!p) return { siteJson, renamed: null };
+  const rest = (siteJson.demand_parts ?? []).filter((x) => x.carrier === p.carrier && x.part_id !== partId);
+  // líneas que llegaban a la parte quitada: se van con ella
+  let sj = { ...siteJson, arcs: (siteJson.arcs ?? []).filter((a) => a.from !== partId && a.to !== partId) };
+  if (rest.length === 1) {
+    const last = rest[0];
+    const own = (sj.arcs ?? []).some((a) => a.from === last.part_id || a.to === last.part_id);
+    sj = removeDemandPart(sj, partId);
+    if (own) {
+      const id = demandEndpointId(p.carrier);
+      sj = setDemandNode(renameEndpoint(sj, last.part_id, id), p.carrier, id);
+      return { siteJson: applyTopology(sj), renamed: [last.part_id, id] };
+    }
+    return { siteJson: sj, renamed: [last.part_id, demandEndpointId(p.carrier)] };
+  }
+  return { siteJson: removeDemandPart(sj, partId), renamed: null };
+}
+
 /** Renombra una demanda por nodo. */
 export const renameDemandPart = (siteJson, id, name) => ({
   ...siteJson, demand_parts: (siteJson.demand_parts ?? []).map((p) => (p.part_id === id ? { ...p, name } : p)) });
@@ -1034,7 +1140,8 @@ export const hasTopology = (siteJson) => (siteJson.arcs ?? []).length > 0;
 /** Validación ligera de un arco (espejo de validate_site, M14). */
 export function arcProblems(draft, siteJson, isNew, nodes = []) {
   const p = [];
-  const exists = (id) => techById(siteJson, id) || nodes.some((n) => n.id === id);
+  const exists = (id) => techById(siteJson, id) || nodes.some((n) => n.id === id) ||
+    demandEndpoints(siteJson).some((d) => d.id === id);
   if (draft.from === draft.to)
     p.push("un arco no puede conectar un equipo consigo mismo");
   if (!exists(draft.from)) p.push("el extremo de origen no existe");

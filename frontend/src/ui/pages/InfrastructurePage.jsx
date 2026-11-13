@@ -13,17 +13,19 @@ import SystemMap, { systemPoints } from "../map/SystemMap.jsx";
 import FlowView from "../map/FlowView.jsx";
 import SystemPanel from "../components/SystemPanel.jsx";
 import CatalogModal from "../components/CatalogModal.jsx";
-import { newLocationId, locationOf, newNodeId, nodeOf, assignToNode, endpointPositions } from "../layout.js";
+import { newLocationId, locationOf, newNodeId, nodeOf, assignToNode, endpointPositions, demandPositions } from "../layout.js";
 import { componentIcon } from "../icons.jsx";
 import EquipmentDrawer from "../../components/twin/EquipmentDrawer.jsx";
 import CarrierDrawer from "../../components/twin/CarrierDrawer.jsx";
 import MarketDrawer from "../../components/twin/MarketDrawer.jsx";
 import ArcDrawer from "../../components/twin/ArcDrawer.jsx";
 import AddressSearch from "../../components/twin/AddressSearch.jsx";
+import DemandDrawer from "../../components/twin/DemandDrawer.jsx";
 import {
   upsertTech, removeTech, isMultiport, upsertCarrier, removeCarrier, upsertMarket,
   removeMarket, blankMarket, blankArc, upsertArc, removeArc, CARRIER_PRESETS, blankCarrier,
-  carrierColor, TECH_TYPE_META,
+  carrierColor, TECH_TYPE_META, arcEndpointLabel, splitDemandOnMap, removeDemandOnMap,
+  renameDemandPart,
 } from "../../lib/twin.js";
 import L from "leaflet";
 
@@ -65,6 +67,7 @@ export default function InfrastructurePage({ route }) {
   const [carrierDrawer, setCarrierDrawer] = useState(null);
   const [marketDrawer, setMarketDrawer] = useState(null);
   const [arcDrawer, setArcDrawer] = useState(null);
+  const [demandSel, setDemandSel] = useState(null);   // demanda final abierta en su panel
   const [catalog, setCatalog] = useState(null);
   const [carrierPick, setCarrierPick] = useState(false);
   const [newLoc, setNewLoc] = useState(null);
@@ -150,14 +153,30 @@ export default function InfrastructurePage({ route }) {
     goNode(id);
   };
   // un extremo de línea puede ser un componente o un nodo
+  const allPositions = () => ({ ...endpointPositions(layout), ...demandPositions(siteJson, layout) });
   const pickEndpoint = (id) => {
+    // «Conectar» desde una demanda: el destino ya está elegido, falta el origen
+    if (!draftArc?.from && draftArc?.to && id !== draftArc.to) {
+      const pos = allPositions();
+      const a = pos[id], b = pos[draftArc.to];
+      setArcDrawer({ draft: blankArc(id, draftArc.to, siteJson), isNew: true,
+                     geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
+      cancelMode();
+      return;
+    }
     if (!draftArc?.from) { setDraftArc({ from: id, waypoints: [] }); return; }
     if (id === draftArc.from) return;
-    const pos = endpointPositions(layout);
+    const pos = allPositions();
     const a = pos[draftArc.from], b = pos[id];
     setArcDrawer({ draft: blankArc(draftArc.from, id, siteJson), isNew: true,
                    geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
     cancelMode();
+  };
+  // una demanda sin posición guardada se dibuja en una automática: al usarla, se fija
+  const pinDemand = (id, pos) => { if (!layout.demands?.[id] && pos) patchLayout((l) => ({ demands: { ...(l.demands ?? {}), [id]: pos } })); };
+  const onSelectDemand = (id, pos) => {
+    if (mode === "connect") { pinDemand(id, pos); return pickEndpoint(id); }
+    if (!mode) setDemandSel(id);
   };
   const onSelectNode = (id) => {
     if (mode === "connect") return pickEndpoint(id);
@@ -167,14 +186,7 @@ export default function InfrastructurePage({ route }) {
     if (mode === "connect") {
       const node = nodeOf(layout, id);
       if (node && !layout.equipment?.[id]) return pickEndpoint(node);
-      if (!draftArc?.from) { setDraftArc({ from: id, waypoints: [] }); return; }
-      if (id === draftArc.from) return;
-      const pos = endpointPositions(layout);
-      const a = pos[draftArc.from], b = pos[id];
-      setArcDrawer({ draft: blankArc(draftArc.from, id, siteJson), isNew: true,
-                     geometry: a && b ? [a, ...draftArc.waypoints, b] : null });
-      cancelMode();
-      return;
+      return pickEndpoint(id);
     }
     const tech = siteJson.technologies.find((x) => x.tech_id === id);
     if (tech) setDrawer({ tech: { ...tech, ports_mode: isMultiport(tech) }, isNew: false });
@@ -265,7 +277,8 @@ export default function InfrastructurePage({ route }) {
     if (mode?.startsWith("place:")) return t("infra.modePlace",
       { name: siteJson.technologies.find((x) => x.tech_id === mode.slice(6))?.name ?? "" });
     if (mode === "connect") return draftArc?.from
-      ? t("infra.modeConnectTo", { name: siteJson.technologies.find((x) => x.tech_id === draftArc.from)?.name })
+      ? t("infra.modeConnectTo", { name: arcEndpointLabel(siteJson, draftArc.from, layout.nodes ?? []) })
+      : draftArc?.to ? t("dem.modeConnectTo", { name: arcEndpointLabel(siteJson, draftArc.to, layout.nodes ?? []) })
       : t("infra.modeConnectFrom");
     return null;
   };
@@ -284,7 +297,9 @@ export default function InfrastructurePage({ route }) {
                    onSelectLocation={(id) => navigate(hrefFor({ site: siteName, page: "infrastructure", query: { loc: id, tab: "components" } }))}
                    onSelectArc={openArc} onSelectNode={onSelectNode}
                    onMoveNode={(id, p) => patchLayout((l) => ({ nodes: l.nodes.map((n) => (n.id === id ? { ...n, pos: p } : n)) }))}
-                   onMoveComponent={(id, p) => patchLayout((l) => ({ equipment: { ...l.equipment, [id]: p } }))} />
+                   onMoveComponent={(id, p) => patchLayout((l) => ({ equipment: { ...l.equipment, [id]: p } }))}
+                   selectedDemand={demandSel} onSelectDemand={onSelectDemand}
+                   onMoveDemand={(id, p) => patchLayout((l) => ({ demands: { ...(l.demands ?? {}), [id]: p } }))} />
       ) : (
         <FlowView ref={flowRef} siteJson={siteJson} selectedComponent={drawer?.tech?.tech_id}
                   onSelectComponent={onSelectComponent} onSelectCarrier={openCarrier} />
@@ -314,7 +329,7 @@ export default function InfrastructurePage({ route }) {
       {filterOpen && (
         <div className="ip-filter-pop">
           <h4>{t("infra.fLayers")}</h4>
-          {[["boundary", "infra.fBoundary"], ["locations", "infra.fLocations"], ["nodes", "node.layer"]].map(([k, key]) => (
+          {[["boundary", "infra.fBoundary"], ["locations", "infra.fLocations"], ["nodes", "node.layer"], ["demands", "dem.layer"]].map(([k, key]) => (
             <label key={k}><input type="checkbox" checked={filters[k] !== false}
                                   onChange={(e) => setFilters({ ...filters, [k]: e.target.checked })} />{t(key)}</label>
           ))}
@@ -466,6 +481,42 @@ export default function InfrastructurePage({ route }) {
                       onSave={(d) => { patchSite((sj) => upsertMarket(sj, d), `Mercado '${d.name}' guardado`); setMarketDrawer(null); }}
                       onDelete={(id) => { patchSite((sj) => removeMarket(sj, id), `Mercado '${id}' eliminado`); setMarketDrawer(null); }}
                       onClose={() => setMarketDrawer(null)} />
+      )}
+      {demandSel && (
+        <DemandDrawer key={demandSel} id={demandSel} siteJson={siteJson} nodes={layout.nodes ?? []}
+                      onClose={() => setDemandSel(null)}
+                      onSeries={() => navigate(hrefFor({ site: siteName, page: "timeseries" }))}
+                      onConnect={() => {
+                        pinDemand(demandSel, demandPositions(siteJson, layout)[demandSel]);
+                        setView("map"); cancelMode(); setMode("connect");
+                        setDraftArc({ from: null, waypoints: [], to: demandSel }); setDemandSel(null);
+                      }}
+                      onRename={(name) => patchSite((sj) => renameDemandPart(sj, demandSel, name), `Demanda renombrada: ${name}`)}
+                      onSplit={(name, frac) => {
+                        const pos = demandPositions(siteJson, layout)[demandSel];
+                        const r = splitDemandOnMap(siteJson, demandSel, name, frac);
+                        if (!r.newId) return;
+                        patchSite(() => r.siteJson, `Demanda dividida: ${name} (${Math.round(frac * 100)} %)`);
+                        patchLayout((l) => {
+                          const dm = { ...(l.demands ?? {}) };
+                          if (r.renamed) { dm[r.renamed[1]] = dm[r.renamed[0]] ?? pos; delete dm[r.renamed[0]]; }
+                          else if (pos && !dm[demandSel]) dm[demandSel] = pos;
+                          if (pos) dm[r.newId] = [pos[0] - 0.00022, pos[1] + 0.0003];
+                          return { demands: dm };
+                        });
+                        setDemandSel(r.newId);
+                      }}
+                      onRemovePart={() => {
+                        const r = removeDemandOnMap(siteJson, demandSel);
+                        patchSite(() => r.siteJson, "Demanda por nodo quitada");
+                        patchLayout((l) => {
+                          const dm = { ...(l.demands ?? {}) };
+                          delete dm[demandSel];
+                          if (r.renamed && dm[r.renamed[0]]) { dm[r.renamed[1]] = dm[r.renamed[0]]; delete dm[r.renamed[0]]; }
+                          return { demands: dm };
+                        });
+                        setDemandSel(null);
+                      }} />
       )}
       {arcDrawer && (
         <ArcDrawer draft={arcDrawer.draft} isNew={arcDrawer.isNew} siteJson={siteJson} nodes={layout.nodes ?? []}

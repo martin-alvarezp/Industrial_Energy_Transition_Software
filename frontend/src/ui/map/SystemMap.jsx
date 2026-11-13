@@ -11,10 +11,11 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { carrierColor } from "../../lib/twin.js";
+import { carrierColor, demandEndpoints, demandNodeOf, arcEndpointLabel } from "../../lib/twin.js";
 import { componentIcon } from "../icons.jsx";
-import { IcNode } from "../iconset.jsx";
-import { endpointPositions, techsInNode } from "../layout.js";
+import { IcNode, IcOutlineFactory } from "../iconset.jsx";
+import { endpointPositions, techsInNode, demandPositions } from "../layout.js";
+import { useI18n } from "../i18n.jsx";
 
 export const BASE_LAYERS = {
   // calles de OpenStreetMap aclaradas a gris (clase sm-tiles-light): el mapa
@@ -62,6 +63,23 @@ function nodeMarkerIcon(name, n, { selected }) {
     }));
   }
   return nodeIconCache.get(key);
+}
+
+// marcador de DEMANDA final: fábrica con anillo del color del vector y su
+// nombre debajo; punteado si no tiene líneas (se abastece de la barra común)
+const demandIconCache = new Map();
+function demandMarkerIcon(name, color, { selected, wired }) {
+  const key = `${name}|${color}|${selected}|${wired}`;
+  if (!demandIconCache.has(key)) {
+    const svg = renderToStaticMarkup(<IcOutlineFactory size={18} />);
+    const esc = String(name).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    demandIconCache.set(key, L.divIcon({
+      className: "",
+      html: `<div class="sm-demand${selected ? " selected" : ""}${wired ? "" : " loose"}" style="--dc:${color}"><div class="sm-demand-ico">${svg}</div><div class="sm-demand-name">${esc}</div></div>`,
+      iconSize: [34, 34], iconAnchor: [17, 17],
+    }));
+  }
+  return demandIconCache.get(key);
 }
 
 const vertexIcon = L.divIcon({ className: "", html: '<div class="sm-vertex"></div>',
@@ -119,8 +137,9 @@ export default function SystemMap({
   filters = {}, selectedComponent, selectedLocation, selectedNode, focusLocation,
   editing = false, mode = null, draft = [], cursor = null, draftArc = null,
   onMapClick, onCursor, onSelectComponent, onSelectLocation, onSelectArc, onMoveComponent,
-  onSelectNode, onMoveNode,
+  onSelectNode, onMoveNode, selectedDemand, onSelectDemand, onMoveDemand,
 }) {
+  const { t } = useI18n();
   const techs = siteJson.technologies ?? [];
   const byId = useMemo(() => Object.fromEntries(techs.map((t) => [t.tech_id, t])), [techs]);
   const carrierById = useMemo(
@@ -129,7 +148,9 @@ export default function SystemMap({
   const drawing = mode === "draw-boundary" || mode === "draw-location";
   const connecting = mode === "connect";
   const pts = useMemo(() => systemPoints(layout), [layout]);
-  const positions = useMemo(() => endpointPositions(layout), [layout]);
+  const dPos = useMemo(() => demandPositions(siteJson, layout), [siteJson, layout]);
+  const positions = useMemo(() => ({ ...endpointPositions(layout), ...dPos }), [layout, dPos]);
+  const dems = useMemo(() => demandEndpoints(siteJson), [siteJson]);
   const hiddenType = (t) => filters.types && filters.types[t.type] === false;
   const hiddenCarrier = (c) => filters.carriers && filters.carriers[c] === false;
 
@@ -211,6 +232,33 @@ export default function SystemMap({
           </Marker>
         );
       })}
+
+      {/* demanda que se consume en un nodo o equipo: punteado hasta él */}
+      {filters.demands !== false && dems.map((d) => {
+        const home = demandNodeOf(siteJson, d);
+        if (home === "main" || home === d.id || !dPos[d.id] || !positions[home] || hiddenCarrier(d.carrier)) return null;
+        return <Polyline key={"dl:" + d.id} positions={[dPos[d.id], positions[home]]} interactive={false}
+                         pathOptions={{ color: carrierColor(carrierById[d.carrier]), weight: 2, opacity: 0.9, dashArray: "2 6" }} />;
+      })}
+      {filters.demands !== false && dems.map((d) => dPos[d.id] && !hiddenCarrier(d.carrier) && (
+        <Marker key={"d:" + d.id} position={dPos[d.id]} draggable={editing && !connecting && !drawing}
+                icon={demandMarkerIcon(d.name, carrierColor(carrierById[d.carrier]),
+                                       { selected: d.id === selectedDemand || draftArc?.from === d.id,
+                                         wired: demandNodeOf(siteJson, d) !== "main" })}
+                eventHandlers={{
+                  click: (e) => { L.DomEvent.stopPropagation(e); onSelectDemand?.(d.id, dPos[d.id]); },
+                  dragend: (e) => { const ll = e.target.getLatLng(); onMoveDemand?.(d.id, [ll.lat, ll.lng]); },
+                }}>
+          <Tooltip direction="top" offset={[0, -18]}>
+            <b>{d.name}</b>
+            <div>{(() => {
+              const home = demandNodeOf(siteJson, d);
+              return home === d.id ? t("dem.wired") : home === "main" ? t("dem.loose")
+                : t("dem.atNode", { name: arcEndpointLabel(siteJson, home, layout.nodes ?? []) });
+            })()}</div>
+          </Tooltip>
+        </Marker>
+      ))}
 
       {filters.nodes !== false && (layout.nodes ?? []).map((n) => n.pos && (
         <Marker key={"n:" + n.id} position={n.pos} draggable={editing && !connecting && !drawing}
